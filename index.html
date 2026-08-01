@@ -664,6 +664,7 @@ async function garantirDashData(portalId) {
     mensal: dados.serie.map((p) => p.valor),
     unidade: dados.portal.unidade,
     categorias: dados.categorias,
+    kpis: dados.kpis, // já calculado pelo backend, respeitando o tipoResumo do portal
   };
   return DASH_DATA[portalId];
 }
@@ -705,6 +706,9 @@ function kpiRowSVG(dd, cor){
   const penultimo = dd.mensal[dd.mensal.length-2];
   const topCat = [...dd.categorias].sort((a,b)=>b.valor-a.valor)[0];
   const total = dd.categorias.reduce((a,c)=>a+c.valor,0);
+  const resumo = dd.kpis?.resumoValor ?? dd.mensal.reduce((a,b)=>a+b,0);
+  const resumoLabel = dd.kpis?.resumoLabel ?? "Acumulado 12 meses";
+  const resumoSinal = resumo > 0 ? "+" : "";
   return `
     <div class="kpi-row">
       <div class="kpi-card">
@@ -714,9 +718,9 @@ function kpiRowSVG(dd, cor){
         ${sparklineSVG(dd.mensal, cor)}
       </div>
       <div class="kpi-card">
-        <div class="kpi-label">Acumulado 12 meses</div>
-        <div class="kpi-value">${dd.mensal.reduce((a,b)=>a+b,0)}</div>
-        <span class="kpi-delta flat">${dd.unidade}</span>
+        <div class="kpi-label">${resumoLabel}</div>
+        <div class="kpi-value">${resumoLabel === "Variação no período" ? resumoSinal : ""}${resumo}</div>
+        <span class="kpi-delta flat">${dd.unidade || ""}</span>
       </div>
       <div class="kpi-card">
         <div class="kpi-label">Categoria líder</div>
