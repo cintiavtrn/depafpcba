@@ -296,8 +296,17 @@ footer .nota{font-family:'IBM Plex Mono',monospace;font-size:11px;max-width:44ch
       <label>ARQUIVO (.csv ou .xlsx)</label>
       <input type="file" id="input-planilha" accept=".csv,.xlsx" style="font-family:'IBM Plex Mono',monospace;font-size:12.5px">
     </div>
+    <div class="dash-filtro">
+      <label>VINCULAR A UM PORTAL (OPCIONAL)</label>
+      <select id="select-portal-upload">
+        <option value="">Não vincular — só gerar e ver na hora</option>
+      </select>
+    </div>
     <button class="btn-exportar-xlsx" id="btn-gerar-dashboard">GERAR DASHBOARD</button>
   </div>
+  <p class="font-mono" style="font-size:11px;color:#9AA3B2;margin:-8px 0 16px">
+    Vinculando a um portal, a planilha fica salva e aparece depois na aba "PLANILHAS ENVIADAS" daquele portal.
+  </p>
   <p id="upload-status" class="font-mono" style="font-size:12px;color:#9AA3B2;margin-bottom:16px"></p>
   <div id="upload-resultado"></div>
 </section>
@@ -514,6 +523,21 @@ function donutChartSVG(categorias, selectedLabel) {
   return `<svg viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg">${cols}${rows}${cells}</svg>`;
 }
 
+// formata número grande pro eixo (1234567 -> "1,2M") — sem isso, planilha com
+// muita linha faz o eixo virar uma sequência de dígitos ilegível
+function formatarEixo(valor) {
+  const abs = Math.abs(valor);
+  if (abs >= 1000000) return (valor / 1000000).toLocaleString("pt-BR", { maximumFractionDigits: 1 }) + "M";
+  if (abs >= 1000) return (valor / 1000).toLocaleString("pt-BR", { maximumFractionDigits: 1 }) + "k";
+  return Math.round(valor).toLocaleString("pt-BR");
+}
+
+// quando tem muito ponto no eixo X (planilha com 100+ linhas, por exemplo),
+// mostrar rótulo em cada um empilha tudo ilegível — mostra só 1 a cada N
+function passoRotulo(n, maxRotulos = 12) {
+  return Math.max(1, Math.ceil(n / maxRotulos));
+}
+
 function simpleBarChartSVG(pontos, cor) {
   const w = 520, h = 200, padL = 34, padR = 14, padT = 10, baseY = h - 34;
   const n = pontos.length || 1;
@@ -521,11 +545,12 @@ function simpleBarChartSVG(pontos, cor) {
   const plotH = baseY - padT;
   const bw = (w - padL - padR) / n;
   const barW = Math.min(bw * 0.56, 40);
+  const passo = passoRotulo(n);
   let grade = "", eixoY = "", barras = "", labels = "";
   [0, 0.25, 0.5, 0.75, 1].forEach(f => {
     const y = baseY - plotH * f;
     grade += `<line x1="${padL}" y1="${y.toFixed(1)}" x2="${w - padR}" y2="${y.toFixed(1)}" stroke="var(--paper-line)" stroke-width="1" stroke-dasharray="${f === 0 ? "0" : "2 4"}" />`;
-    eixoY += `<text x="${(padL - 6).toFixed(1)}" y="${(y + 3).toFixed(1)}" text-anchor="end" font-family="monospace" font-size="8" fill="var(--carvao)" fill-opacity="0.5">${Math.round(max * f)}</text>`;
+    eixoY += `<text x="${(padL - 6).toFixed(1)}" y="${(y + 3).toFixed(1)}" text-anchor="end" font-family="monospace" font-size="8" fill="var(--carvao)" fill-opacity="0.5">${formatarEixo(max * f)}</text>`;
   });
   pontos.forEach((p, i) => {
     const cxB = padL + bw * i + bw / 2;
@@ -533,7 +558,9 @@ function simpleBarChartSVG(pontos, cor) {
     const y = baseY - alt;
     const ultimo = i === n - 1;
     barras += `<rect class="barra" x="${(cxB - barW / 2).toFixed(1)}" y="${y.toFixed(1)}" width="${barW.toFixed(1)}" height="${alt.toFixed(1)}" fill="${ultimo ? cor : corGlow(cor)}" stroke="${cor}" stroke-width="1.4"><title>${p.label}: ${p.valor}</title></rect>`;
-    labels += `<text x="${cxB.toFixed(1)}" y="${baseY + 16}" text-anchor="middle" font-family="monospace" font-size="9" fill="var(--carvao)" fill-opacity="${ultimo ? 1 : 0.6}" font-weight="${ultimo ? 700 : 400}">${p.label}</text>`;
+    if (i % passo === 0 || ultimo) {
+      labels += `<text x="${cxB.toFixed(1)}" y="${baseY + 16}" text-anchor="middle" font-family="monospace" font-size="9" fill="var(--carvao)" fill-opacity="${ultimo ? 1 : 0.6}" font-weight="${ultimo ? 700 : 400}">${p.label}</text>`;
+    }
   });
   return `<svg viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg">${grade}${eixoY}${barras}${labels}</svg>`;
 }
@@ -544,11 +571,12 @@ function simpleLineChartSVG(pontos, cor) {
   const max = Math.max(...pontos.map(p => p.valor), 1);
   const plotH = baseY - padT;
   const stepX = (w - padL - padR) / (n - 1 || 1);
+  const passo = passoRotulo(n);
   let grade = "", eixoY = "";
   [0, 0.25, 0.5, 0.75, 1].forEach(f => {
     const y = baseY - plotH * f;
     grade += `<line x1="${padL}" y1="${y.toFixed(1)}" x2="${w - padR}" y2="${y.toFixed(1)}" stroke="var(--paper-line)" stroke-width="1" stroke-dasharray="${f === 0 ? "0" : "2 4"}" />`;
-    eixoY += `<text x="${(padL - 6).toFixed(1)}" y="${(y + 3).toFixed(1)}" text-anchor="end" font-family="monospace" font-size="8" fill="var(--carvao)" fill-opacity="0.5">${Math.round(max * f)}</text>`;
+    eixoY += `<text x="${(padL - 6).toFixed(1)}" y="${(y + 3).toFixed(1)}" text-anchor="end" font-family="monospace" font-size="8" fill="var(--carvao)" fill-opacity="0.5">${formatarEixo(max * f)}</text>`;
   });
   const pts = pontos.map((p, i) => [padL + i * stepX, baseY - plotH * (p.valor / max)]);
   const linha = "M " + pts.map(([x, y]) => `${x.toFixed(1)} ${y.toFixed(1)}`).join(" L ");
@@ -557,8 +585,11 @@ function simpleLineChartSVG(pontos, cor) {
   pontos.forEach((p, i) => {
     const [x, y] = pts[i];
     const ultimo = i === n - 1;
-    nodos += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${ultimo ? 5 : 3.4}" fill="${ultimo ? cor : "var(--surface)"}" stroke="${cor}" stroke-width="1.6"><title>${p.label}: ${p.valor}</title></circle>`;
-    labels += `<text x="${x.toFixed(1)}" y="${baseY + 16}" text-anchor="middle" font-family="monospace" font-size="9" fill="var(--carvao)" fill-opacity="${ultimo ? 1 : 0.55}" font-weight="${ultimo ? 700 : 400}">${p.label}</text>`;
+    const raio = n > 30 ? 2 : (ultimo ? 5 : 3.4); // planilha com muita linha: ponto menor, senão vira uma mancha
+    nodos += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${raio}" fill="${ultimo ? cor : "var(--surface)"}" stroke="${cor}" stroke-width="1.6"><title>${p.label}: ${p.valor}</title></circle>`;
+    if (i % passo === 0 || ultimo) {
+      labels += `<text x="${x.toFixed(1)}" y="${baseY + 16}" text-anchor="middle" font-family="monospace" font-size="9" fill="var(--carvao)" fill-opacity="${ultimo ? 1 : 0.55}" font-weight="${ultimo ? 700 : 400}">${p.label}</text>`;
+    }
   });
   return `<svg viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg">${grade}${eixoY}<path d="${area}" fill="${corGlow(cor)}" stroke="none" /><path d="${linha}" fill="none" stroke="${cor}" stroke-width="2.2" stroke-linejoin="round" />${nodos}${labels}</svg>`;
 }
@@ -929,6 +960,319 @@ const CHART_INFO = {
 
 let dashState = { tipoEvolucao: "bar", tipoComp: "donut" };
 
+// helpers de string segura pra colocar valor do usuário dentro de atributo/HTML
+function escapeHTML(s) {
+  return String(s ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+}
+function escapeAttr(s) {
+  return escapeHTML(s).replace(/"/g,"&quot;");
+}
+
+function souAdmin() {
+  return obterSessao()?.usuario?.papel === "admin";
+}
+
+function renderIndicadoresLeitura(indicadores) {
+  if (!indicadores || !indicadores.length) return '<p class="tela-intro">Nenhum indicador cadastrado ainda.</p>';
+  let html = `<div class="dados-grid">`;
+  indicadores.forEach(d => {
+    html += `
+      <div class="dado">
+        <div class="valor">${escapeHTML(d.valor)}</div>
+        <div class="rotulo">${escapeHTML(d.rotulo)}</div>
+        ${d.exemplo ? `<span class="tag tag-exemplo">EXEMPLO ILUSTRATIVO</span>` : ""}
+        ${d.pendente ? `<span class="tag tag-pendente">A PREENCHER</span>` : ""}
+      </div>
+    `;
+  });
+  html += `</div>`;
+  return html;
+}
+
+function renderIndicadoresEdicao(indicadores) {
+  const linhas = (indicadores || []).map(d => `
+    <tr data-id="${d.id}">
+      <td><input type="text" class="input-rotulo" value="${escapeAttr(d.rotulo)}" style="width:100%;background:var(--paper);color:var(--carvao);border:1px solid var(--paper-line);padding:6px;font-family:'IBM Plex Mono',monospace;font-size:12px"></td>
+      <td><input type="text" class="input-valor" value="${escapeAttr(d.valor)}" style="width:100%;background:var(--paper);color:var(--carvao);border:1px solid var(--paper-line);padding:6px;font-family:'IBM Plex Mono',monospace;font-size:12px"></td>
+      <td><button class="btn-remover-linha" type="button" style="background:none;border:none;color:var(--terracota);cursor:pointer;font-size:14px">✕</button></td>
+    </tr>
+  `).join("");
+  return `
+    <table class="dash-tabela" id="tabela-edicao-indicadores">
+      <thead><tr><th>RÓTULO</th><th>VALOR</th><th></th></tr></thead>
+      <tbody>${linhas}</tbody>
+    </table>
+    <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn-exportar-xlsx" id="btn-add-indicador" type="button">+ ADICIONAR LINHA</button>
+      <button class="btn-exportar-xlsx" id="btn-salvar-indicadores" type="button" style="background:var(--oliva)">SALVAR</button>
+      <button class="voltar show" id="btn-cancelar-indicadores" type="button">CANCELAR</button>
+    </div>
+  `;
+}
+
+function renderProjetosLeitura(projetos) {
+  if (!projetos || !projetos.length) return "";
+  let html = "";
+  projetos.forEach(proj => {
+    html += `
+      <div class="projeto-card">
+        <div class="top">
+          <span class="icon">${ICONS[proj.icon] || ICONS.projeto_sac}</span>
+          <div>
+            <h3>${escapeHTML(proj.titulo)}</h3>
+            <p class="texto">${escapeHTML(proj.texto)}</p>
+          </div>
+        </div>
+        <div class="progress-row">
+          <div class="progress-track"><div class="progress-fill" style="width:${proj.progresso}%"></div></div>
+          <span class="progress-label font-mono">${escapeHTML(proj.status)} · ${proj.progresso}%</span>
+        </div>
+        ${proj.exemplo ? `<span class="tag tag-exemplo">STATUS E PROGRESSO SÃO EXEMPLO ILUSTRATIVO</span>` : ""}
+        <div class="equipe">
+          <span>PATROCINADOR: ${escapeHTML(proj.patrocinador)}</span>
+          <span>GESTOR DE NEGÓCIO: ${escapeHTML(proj.gestor)}</span>
+          <span>GERENTE DE PROJETO: ${escapeHTML(proj.gerente)}</span>
+        </div>
+      </div>
+    `;
+  });
+  return html;
+}
+
+function templateProjetoEdicao(proj) {
+  proj = proj || {};
+  return `
+    <div class="projeto-card projeto-edicao" data-id="${proj.id || ""}">
+      <input type="text" class="input-titulo" placeholder="Título do projeto" value="${escapeAttr(proj.titulo)}" style="${CAMPO_STYLE};margin-bottom:6px;font-family:'Space Grotesk',sans-serif;font-size:15px">
+      <textarea class="input-texto" placeholder="Descrição" rows="2" style="${CAMPO_STYLE};margin-bottom:6px">${escapeHTML(proj.texto)}</textarea>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px">
+        <input type="text" class="input-status" placeholder="Status (ex: Em execução)" value="${escapeAttr(proj.status)}" style="${CAMPO_STYLE}">
+        <input type="number" class="input-progresso" placeholder="Progresso %" min="0" max="100" value="${proj.progresso ?? 0}" style="${CAMPO_STYLE}">
+        <input type="text" class="input-patrocinador" placeholder="Patrocinador" value="${escapeAttr(proj.patrocinador)}" style="${CAMPO_STYLE}">
+        <input type="text" class="input-gestor" placeholder="Gestor de negócio" value="${escapeAttr(proj.gestor)}" style="${CAMPO_STYLE}">
+        <input type="text" class="input-gerente" placeholder="Gerente de projeto" value="${escapeAttr(proj.gerente)}" style="${CAMPO_STYLE}">
+      </div>
+      <button class="btn-remover-projeto" type="button" style="background:none;border:1px solid var(--terracota);color:var(--terracota);cursor:pointer;padding:4px 8px;font-family:'IBM Plex Mono',monospace;font-size:11px">✕ remover este projeto</button>
+    </div>
+  `;
+}
+
+const CAMPO_STYLE = "width:100%;background:var(--paper);color:var(--carvao);border:1px solid var(--paper-line);padding:6px;font-family:'IBM Plex Sans',sans-serif;font-size:12.5px;box-sizing:border-box";
+
+function renderProjetosEdicao(projetos) {
+  const cards = (projetos || []).map(templateProjetoEdicao).join("");
+  return `
+    <div id="lista-edicao-projetos">${cards}</div>
+    <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn-exportar-xlsx" id="btn-add-projeto" type="button">+ ADICIONAR PROJETO</button>
+      <button class="btn-exportar-xlsx" id="btn-salvar-projetos" type="button" style="background:var(--oliva)">SALVAR</button>
+      <button class="voltar show" id="btn-cancelar-projetos" type="button">CANCELAR</button>
+    </div>
+  `;
+}
+
+// liga o botão "editar" de indicadores: busca dado fresco, troca pra view
+// editável, e os botões de dentro dela (adicionar linha / cancelar / salvar)
+function ligarEdicaoIndicadores(portalId) {
+  const btnEditar = document.getElementById("btn-editar-indicadores");
+  if (!btnEditar) return; // não é admin — o botão nem foi renderizado
+
+  const view = document.getElementById("view-indicadores");
+
+  // delegação: um listener só, funciona pra linha adicionada depois também
+  view.addEventListener("click", (ev) => {
+    if (ev.target.matches(".btn-remover-linha")) ev.target.closest("tr").remove();
+  });
+
+  btnEditar.addEventListener("click", async () => {
+    let indicadores;
+    try {
+      indicadores = (await apiFetch(`/api/portais/${portalId}`)).indicadores;
+    } catch (erro) {
+      alert("Não consegui carregar os indicadores: " + erro.message);
+      return;
+    }
+
+    view.innerHTML = renderIndicadoresEdicao(indicadores);
+    btnEditar.style.display = "none";
+
+    document.getElementById("btn-add-indicador").addEventListener("click", () => {
+      const tbody = document.querySelector("#tabela-edicao-indicadores tbody");
+      const tr = document.createElement("tr");
+      tr.innerHTML = `<td><input type="text" class="input-rotulo" style="${CAMPO_STYLE}"></td><td><input type="text" class="input-valor" style="${CAMPO_STYLE}"></td><td><button class="btn-remover-linha" type="button" style="background:none;border:none;color:var(--terracota);cursor:pointer;font-size:14px">✕</button></td>`;
+      tbody.appendChild(tr);
+    });
+
+    document.getElementById("btn-cancelar-indicadores").addEventListener("click", () => {
+      view.innerHTML = renderIndicadoresLeitura(indicadores);
+      btnEditar.style.display = "inline-block";
+    });
+
+    document.getElementById("btn-salvar-indicadores").addEventListener("click", async () => {
+      const linhas = Array.from(document.querySelectorAll("#tabela-edicao-indicadores tbody tr"))
+        .map(tr => ({
+          id: tr.dataset.id || undefined,
+          rotulo: tr.querySelector(".input-rotulo").value.trim(),
+          valor: tr.querySelector(".input-valor").value.trim(),
+        }))
+        .filter(i => i.rotulo);
+
+      try {
+        await apiFetch(`/api/portais/${portalId}/indicadores`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ indicadores: linhas }),
+        });
+        await abrirTela(portalId); // recarrega tudo — simples, sempre consistente
+      } catch (erro) {
+        alert("Não consegui salvar: " + erro.message);
+      }
+    });
+  });
+}
+
+function ligarEdicaoProjetos(portalId) {
+  const btnEditar = document.getElementById("btn-editar-projetos");
+  if (!btnEditar) return;
+
+  const view = document.getElementById("view-projetos");
+
+  view.addEventListener("click", (ev) => {
+    if (ev.target.matches(".btn-remover-projeto")) ev.target.closest(".projeto-edicao").remove();
+  });
+
+  btnEditar.addEventListener("click", async () => {
+    let projetos;
+    try {
+      projetos = (await apiFetch(`/api/portais/${portalId}`)).projetos;
+    } catch (erro) {
+      alert("Não consegui carregar os projetos: " + erro.message);
+      return;
+    }
+
+    view.innerHTML = renderProjetosEdicao(projetos);
+    btnEditar.style.display = "none";
+
+    document.getElementById("btn-add-projeto").addEventListener("click", () => {
+      document.getElementById("lista-edicao-projetos").insertAdjacentHTML("beforeend", templateProjetoEdicao({}));
+    });
+
+    document.getElementById("btn-cancelar-projetos").addEventListener("click", () => {
+      view.innerHTML = renderProjetosLeitura(projetos);
+      btnEditar.style.display = "inline-block";
+    });
+
+    document.getElementById("btn-salvar-projetos").addEventListener("click", async () => {
+      const lista = Array.from(document.querySelectorAll("#lista-edicao-projetos .projeto-edicao"))
+        .map(card => ({
+          id: card.dataset.id || undefined,
+          titulo: card.querySelector(".input-titulo").value.trim(),
+          texto: card.querySelector(".input-texto").value.trim(),
+          status: card.querySelector(".input-status").value.trim(),
+          progresso: Number(card.querySelector(".input-progresso").value) || 0,
+          patrocinador: card.querySelector(".input-patrocinador").value.trim(),
+          gestor: card.querySelector(".input-gestor").value.trim(),
+          gerente: card.querySelector(".input-gerente").value.trim(),
+        }))
+        .filter(p => p.titulo);
+
+      try {
+        await apiFetch(`/api/portais/${portalId}/projetos`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ projetos: lista }),
+        });
+        await abrirTela(portalId);
+      } catch (erro) {
+        alert("Não consegui salvar: " + erro.message);
+      }
+    });
+  });
+}
+
+// tabela genérica a partir de um array de objetos — usada pra mostrar a
+// planilha original (dados brutos) de um upload já salvo
+function renderTabelaBruta(linhas, maxLinhas = 50) {
+  if (!linhas || !linhas.length) return "<p>Planilha vazia.</p>";
+  const colunas = Object.keys(linhas[0]);
+  const corpo = linhas.slice(0, maxLinhas)
+    .map(row => `<tr>${colunas.map(c => `<td>${escapeHTML(row[c])}</td>`).join("")}</tr>`)
+    .join("");
+  const aviso = linhas.length > maxLinhas
+    ? `<p class="font-mono" style="font-size:11px;color:#9AA3B2;margin-top:8px">Mostrando as primeiras ${maxLinhas} de ${linhas.length} linhas.</p>`
+    : "";
+  return `
+    <div style="overflow-x:auto">
+      <table class="dash-tabela">
+        <thead><tr>${colunas.map(c => `<th>${escapeHTML(c)}</th>`).join("")}</tr></thead>
+        <tbody>${corpo}</tbody>
+      </table>
+    </div>
+    ${aviso}
+  `;
+}
+
+async function visualizarUploadPortal(uploadId) {
+  const alvo = document.getElementById("upload-portal-resultado");
+  alvo.innerHTML = `<p class="tela-intro">Carregando...</p>`;
+  try {
+    const [{ dashboard }, detalhe] = await Promise.all([
+      apiFetch(`/api/uploads/${uploadId}/dashboard`),
+      apiFetch(`/api/uploads/${uploadId}`),
+    ]);
+    alvo.innerHTML = `
+      <div class="tabs">
+        <button class="tab-btn active" data-sub="graficos">GRÁFICOS</button>
+        <button class="tab-btn" data-sub="tabela">DADOS BRUTOS</button>
+      </div>
+      <div class="tab-panel" id="sub-graficos"></div>
+      <div class="tab-panel" id="sub-tabela" hidden>${renderTabelaBruta(detalhe.linhas)}</div>
+    `;
+    alvo.querySelectorAll(".tab-btn").forEach(btn => {
+      btn.addEventListener("click", () => {
+        alvo.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+        btn.classList.add("active");
+        alvo.querySelector("#sub-graficos").hidden = btn.dataset.sub !== "graficos";
+        alvo.querySelector("#sub-tabela").hidden = btn.dataset.sub !== "tabela";
+      });
+    });
+    renderDashboardGenerico(dashboard, "sub-graficos");
+  } catch (erro) {
+    alvo.innerHTML = `<p class="tela-intro">Não consegui carregar: ${erro.message}</p>`;
+  }
+}
+
+async function carregarUploadsPortal(portalId) {
+  const painel = document.getElementById("tab-planilhas");
+  try {
+    const uploads = await apiFetch(`/api/portais/${portalId}/uploads`);
+    if (!uploads.length) {
+      painel.innerHTML = `<p class="tela-intro">Nenhuma planilha enviada pra este portal ainda. Use o botão "SUBIR PLANILHA" no topo e escolha este portal na hora de enviar.</p>`;
+      return;
+    }
+    const linhasHtml = uploads.map(u => `
+      <tr data-upload-id="${u.id}" style="cursor:pointer">
+        <td>${escapeHTML(u.nomeArquivo)}</td>
+        <td>${u.tipo.toUpperCase()}</td>
+        <td>${new Date(u.criadoEm).toLocaleString("pt-BR")}</td>
+        <td>${escapeHTML(u.criadoPor || "—")}</td>
+      </tr>
+    `).join("");
+    painel.innerHTML = `
+      <table class="dash-tabela">
+        <thead><tr><th>ARQUIVO</th><th>TIPO</th><th>ENVIADO EM</th><th>POR</th></tr></thead>
+        <tbody>${linhasHtml}</tbody>
+      </table>
+      <div id="upload-portal-resultado" style="margin-top:20px"></div>
+    `;
+    painel.querySelectorAll("tbody tr").forEach(tr => {
+      tr.addEventListener("click", () => visualizarUploadPortal(tr.dataset.uploadId));
+    });
+  } catch (erro) {
+    painel.innerHTML = `<p class="tela-intro">Não consegui carregar o histórico: ${erro.message}</p>`;
+  }
+}
+
 async function abrirTela(id) {
   const pBase = PORTAIS.find(x => x.id === id);
   if (!pBase) return;
@@ -949,48 +1293,13 @@ async function abrirTela(id) {
 
   const p = { ...pBase, intro: detalhe.intro, dados: detalhe.indicadores, projetos: detalhe.projetos };
 
-  let corpoGeral = "";
+  const botaoEditarIndicadores = souAdmin() ? `<button class="btn-exportar-xlsx" id="btn-editar-indicadores" style="margin-bottom:14px">✎ EDITAR INDICADORES</button>` : "";
+  const botaoEditarProjetos = souAdmin() ? `<button class="btn-exportar-xlsx" id="btn-editar-projetos" style="margin:14px 0">✎ EDITAR PROJETOS</button>` : "";
 
-  if (p.dados) {
-    corpoGeral += `<div class="dados-grid">`;
-    p.dados.forEach(d => {
-      corpoGeral += `
-        <div class="dado">
-          <div class="valor">${d.valor}</div>
-          <div class="rotulo">${d.rotulo}</div>
-          ${d.exemplo ? `<span class="tag tag-exemplo">EXEMPLO ILUSTRATIVO</span>` : ""}
-          ${d.pendente ? `<span class="tag tag-pendente">A PREENCHER</span>` : ""}
-        </div>
-      `;
-    });
-    corpoGeral += `</div>`;
-  }
-
-  if (p.projetos) {
-    p.projetos.forEach(proj => {
-      corpoGeral += `
-        <div class="projeto-card">
-          <div class="top">
-            <span class="icon">${ICONS[proj.icon]}</span>
-            <div>
-              <h3>${proj.titulo}</h3>
-              <p class="texto">${proj.texto}</p>
-            </div>
-          </div>
-          <div class="progress-row">
-            <div class="progress-track"><div class="progress-fill" style="width:${proj.progresso}%"></div></div>
-            <span class="progress-label font-mono">${proj.status} · ${proj.progresso}%</span>
-          </div>
-          ${proj.exemplo ? `<span class="tag tag-exemplo">STATUS E PROGRESSO SÃO EXEMPLO ILUSTRATIVO</span>` : ""}
-          <div class="equipe">
-            <span>PATROCINADOR: ${proj.patrocinador}</span>
-            <span>GESTOR DE NEGÓCIO: ${proj.gestor}</span>
-            <span>GERENTE DE PROJETO: ${proj.gerente}</span>
-          </div>
-        </div>
-      `;
-    });
-  }
+  let corpoGeral = `
+    <div id="bloco-indicadores">${botaoEditarIndicadores}<div id="view-indicadores">${renderIndicadoresLeitura(p.dados)}</div></div>
+    <div id="bloco-projetos">${botaoEditarProjetos}<div id="view-projetos">${renderProjetosLeitura(p.projetos)}</div></div>
+  `;
 
   let dadosDash = null;
   try {
@@ -1074,20 +1383,26 @@ async function abrirTela(id) {
     <div class="tabs">
       <button class="tab-btn active" data-tab="geral">VISÃO GERAL</button>
       <button class="tab-btn" data-tab="dashboard">DASHBOARD</button>
+      <button class="tab-btn" data-tab="planilhas">PLANILHAS ENVIADAS</button>
     </div>
     <div class="tab-panel" id="tab-geral">${corpoGeral}</div>
     <div class="tab-panel" id="tab-dashboard" hidden>${corpoDash}</div>
+    <div class="tab-panel" id="tab-planilhas" hidden><p class="tela-intro">Carregando...</p></div>
   `;
 
+  const PAINEIS = ["geral", "dashboard", "planilhas"];
   telaConteudo.querySelectorAll(".tab-btn").forEach(btn => {
     btn.addEventListener("click", () => {
       telaConteudo.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
       btn.classList.add("active");
       const alvo = btn.dataset.tab;
-      telaConteudo.querySelector("#tab-geral").hidden = alvo !== "geral";
-      telaConteudo.querySelector("#tab-dashboard").hidden = alvo !== "dashboard";
+      PAINEIS.forEach(nome => { telaConteudo.querySelector(`#tab-${nome}`).hidden = alvo !== nome; });
+      if (alvo === "planilhas") carregarUploadsPortal(p.id);
     });
   });
+
+  ligarEdicaoIndicadores(p.id);
+  ligarEdicaoProjetos(p.id);
 
   if (dd) {
     dashState = { tipoEvolucao: "bar", tipoComp: "donut" };
@@ -1229,13 +1544,18 @@ function abrirTelaUpload() {
   document.getElementById("tela-upload").hidden = false;
   voltarBtn.classList.add("show");
   window.scrollTo({ top: 0, behavior: "smooth" });
+
+  const select = document.getElementById("select-portal-upload");
+  const opcoesPortais = PORTAIS.map(p => `<option value="${p.id}">${escapeHTML(p.label)}</option>`).join("");
+  select.innerHTML = `<option value="">Não vincular — só gerar e ver na hora</option>${opcoesPortais}`;
 }
 document.getElementById("btn-abrir-upload").addEventListener("click", abrirTelaUpload);
 
-async function enviarPlanilha(arquivo) {
+async function enviarPlanilha(arquivo, portalSlug) {
   const sessao = obterSessao();
   const formData = new FormData();
   formData.append("planilha", arquivo);
+  if (portalSlug) formData.append("portalSlug", portalSlug);
   const resposta = await fetch(`${API_CONFIG.BASE_URL}/api/uploads`, {
     method: "POST",
     headers: sessao ? { Authorization: `Bearer ${sessao.token}` } : {}, // sem Content-Type: o navegador define o boundary do multipart sozinho
@@ -1288,7 +1608,7 @@ function heatmapGenericoSVG(chart) {
   return `<svg viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg">${cols}${rows}${cells}</svg>`;
 }
 
-function renderDashboardGenerico(dashboard) {
+function renderDashboardGenerico(dashboard, elementoAlvoId = "upload-resultado") {
   const kpisHtml = dashboard.kpis.map(k => `
     <div class="kpi-card">
       <div class="kpi-label">${k.title}</div>
@@ -1308,7 +1628,7 @@ function renderDashboardGenerico(dashboard) {
     return "";
   }).join("");
 
-  document.getElementById("upload-resultado").innerHTML = `
+  document.getElementById(elementoAlvoId).innerHTML = `
     ${kpisHtml ? `<div class="kpi-row">${kpisHtml}</div>` : ""}
     <div class="dash-charts" style="grid-template-columns:1fr;margin-top:16px">${chartsHtml}</div>
   `;
@@ -1317,6 +1637,7 @@ function renderDashboardGenerico(dashboard) {
 document.getElementById("btn-gerar-dashboard").addEventListener("click", async () => {
   const input = document.getElementById("input-planilha");
   const status = document.getElementById("upload-status");
+  const portalSlug = document.getElementById("select-portal-upload").value;
   if (!input.files[0]) {
     status.textContent = "Escolha um arquivo primeiro.";
     return;
@@ -1324,8 +1645,9 @@ document.getElementById("btn-gerar-dashboard").addEventListener("click", async (
   status.textContent = "Enviando e analisando a planilha...";
   document.getElementById("upload-resultado").innerHTML = "";
   try {
-    const { dashboard } = await enviarPlanilha(input.files[0]);
-    status.textContent = `Pronto — ${dashboard.charts.length} gráfico(s) sugerido(s) a partir de ${dashboard.schema ? Object.keys(dashboard.schema).length : "?"} coluna(s).`;
+    const { dashboard } = await enviarPlanilha(input.files[0], portalSlug);
+    const vinculo = portalSlug ? ` — salva no portal "${document.getElementById("select-portal-upload").selectedOptions[0].textContent}"` : "";
+    status.textContent = `Pronto — ${dashboard.charts.length} gráfico(s) sugerido(s) a partir de ${dashboard.schema ? Object.keys(dashboard.schema).length : "?"} coluna(s)${vinculo}.`;
     renderDashboardGenerico(dashboard);
   } catch (erro) {
     status.textContent = "Erro: " + erro.message;
