@@ -7,6 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 <style>
 :root{
   /* base escura */
@@ -244,10 +245,27 @@ footer .nota{font-family:'IBM Plex Mono',monospace;font-size:11px;max-width:44ch
     <span id="brand-icon"></span>
     <span class="brand-text">POLÍCIA CIVIL DA BAHIA<b>DEPAF</b></span>
   </div>
-  <button class="voltar" id="voltar-btn">← VOLTAR AO PORTAL</button>
+  <div style="display:flex;align-items:center;gap:10px">
+    <span id="usuario-badge" class="font-mono" style="font-size:11px;color:#9AA3B2;display:none"></span>
+    <button class="voltar show" id="btn-abrir-upload" style="margin-right:8px;background:var(--tinta,#22D3EE);display:none">⬆ SUBIR PLANILHA</button>
+    <button class="voltar" id="btn-sair" style="display:none">SAIR</button>
+    <button class="voltar" id="voltar-btn">← VOLTAR AO PORTAL</button>
+  </div>
 </div>
 
-<div id="tela-inicio">
+<section id="tela-login">
+  <div class="intro" style="margin-top:80px">
+    <div class="eyebrow">DOSSIÊ INSTITUCIONAL · ACESSO RESTRITO</div>
+    <h1>DEPAF</h1>
+    <p>Entre com a conta Google autorizada pra acessar o painel.</p>
+  </div>
+  <div style="display:flex;justify-content:center;margin-top:32px">
+    <div id="google-signin-botao"></div>
+  </div>
+  <p id="login-status" class="font-mono" style="text-align:center;margin-top:16px;font-size:12px;color:#9AA3B2"></p>
+</section>
+
+<div id="tela-inicio" hidden>
   <div class="intro">
     <div class="eyebrow">DOSSIÊ INSTITUCIONAL · PORTAL INTERATIVO</div>
     <h1>DEPAF</h1>
@@ -262,6 +280,27 @@ footer .nota{font-family:'IBM Plex Mono',monospace;font-size:11px;max-width:44ch
 </div>
 
 <section class="tela" id="tela-conteudo" hidden></section>
+
+<section class="tela" id="tela-upload" hidden>
+  <div class="tela-head" style="--tela-color:var(--tinta)">
+    <div>
+      <h2>Subir planilha</h2>
+    </div>
+  </div>
+  <p class="tela-intro">
+    Escolha um arquivo .csv ou .xlsx. O sistema olha as colunas sozinho — identifica o
+    que é número, data ou categoria — e sugere os gráficos, sem precisar configurar nada.
+  </p>
+  <div class="dash-filtros" style="align-items:flex-end">
+    <div class="dash-filtro">
+      <label>ARQUIVO (.csv ou .xlsx)</label>
+      <input type="file" id="input-planilha" accept=".csv,.xlsx" style="font-family:'IBM Plex Mono',monospace;font-size:12.5px">
+    </div>
+    <button class="btn-exportar-xlsx" id="btn-gerar-dashboard">GERAR DASHBOARD</button>
+  </div>
+  <p id="upload-status" class="font-mono" style="font-size:12px;color:#9AA3B2;margin-bottom:16px"></p>
+  <div id="upload-resultado"></div>
+</section>
 
 <footer>
   <div style="display:flex;align-items:center;gap:16px">
@@ -566,176 +605,68 @@ function barRankingChartSVG(categorias, selectedLabel) {
 }
 
 // =====================================================================
-// 2. DADOS DO PORTAL
+// 2. DADOS DO PORTAL — agora vêm da API, não ficam mais escritos aqui.
+// Troque GOOGLE_CLIENT_ID pelo Client ID do Google Auth Platform (Clients
+// → seu Web application) — não precisa do Client Secret.
 // =====================================================================
-const PORTAIS = [
-  {
-    id: "pessoal",
-    label: "Pessoal",
-    icon: "competencia_folha_pagamento",
-    cor: "var(--mostarda)",
-    artigos: ["I"],
-    intro: "Elabora a folha de pagamento e controla a lotação e vacância dos cargos permanentes e temporários da Polícia Civil.",
-    dados: [
-      { rotulo: "Servidores lotados no DEPAF", valor: "312", exemplo: true },
-      { rotulo: "Cargos em vacância", valor: "28", exemplo: true },
-      { rotulo: "Admissões no último concurso", valor: "45", exemplo: true },
-      { rotulo: "Coordenador do setor", valor: "A preencher", exemplo: false, pendente: true }
-    ]
-  },
-  {
-    id: "normas",
-    label: "Normas e Modernização",
-    icon: "competencia_normas",
-    cor: "var(--terracota)",
-    artigos: ["II", "VI"],
-    intro: "Redige decretos, títulos, normas e procedimentos, e conduz a modernização administrativa em articulação com a SSP.",
-    dados: [
-      { rotulo: "Normas emitidas no ano", valor: "64", exemplo: true },
-      { rotulo: "Projetos de modernização em curso", valor: "3", exemplo: true },
-      { rotulo: "Coordenador do setor", valor: "A preencher", exemplo: false, pendente: true }
-    ]
-  },
-  {
-    id: "patrimonio",
-    label: "Patrimônio e Bens",
-    icon: "competencia_tombamento",
-    cor: "var(--oliva)",
-    artigos: ["III", "VII"],
-    intro: "Cadastra, tomba e controla bens e material de consumo — inclui material de escritório e de expediente das unidades — além de guardar bens apreendidos ou arrecadados vinculados a ocorrências. Armamento e munição não entram aqui: ficam com a Coordenação de Fiscalização de Produtos Controlados (CFPC), unidade à parte do DEPAF.",
-    dados: [
-      { rotulo: "Itens tombados no cadastro", valor: "1.842", exemplo: true },
-      { rotulo: "Requisições de material de expediente no mês", valor: "57", exemplo: true },
-      { rotulo: "Bens apreendidos sob guarda", valor: "96", exemplo: true },
-      { rotulo: "Itens abaixo do estoque mínimo", valor: "12", exemplo: true },
-      { rotulo: "Tempo médio de atendimento do pedido", valor: "9 dias", exemplo: true },
-      { rotulo: "Atendimento — unidades da capital", valor: "6 dias", exemplo: true },
-      { rotulo: "Atendimento — unidades do interior", valor: "17 dias", exemplo: true },
-      { rotulo: "Saldo consumido da Ata de Registro de Preços vigente", valor: "48%", exemplo: true },
-      { rotulo: "Classe A — reposição mensal", valor: "Munição, combustível, perícia", exemplo: true },
-      { rotulo: "Classe C — reposição trimestral/semestral", valor: "Material de escritório comum", exemplo: true },
-      { rotulo: "Coordenador do setor", valor: "A preencher", exemplo: false, pendente: true }
-    ]
-  },
-  {
-    id: "frota",
-    label: "Frota",
-    icon: "viatura",
-    cor: "var(--oliva)",
-    artigos: ["IV"],
-    intro: "Mantém, abastece e planeja a expansão da frota de viaturas, prevendo renovação e adequação ao serviço.",
-    dados: [
-      { rotulo: "Frota total", valor: "187 viaturas", exemplo: true },
-      { rotulo: "Compacto / passeio", valor: "94 unidades", exemplo: true },
-      { rotulo: "SUV / utilitário", valor: "68 unidades", exemplo: true },
-      { rotulo: "Especial / blindado", valor: "25 unidades", exemplo: true },
-      { rotulo: "Moto", valor: "A preencher", exemplo: false, pendente: true },
-      { rotulo: "Idade média da frota", valor: "6 anos", exemplo: true },
-      { rotulo: "Viaturas ativas", valor: "94%", exemplo: true },
-      { rotulo: "Em manutenção no momento", valor: "9 viaturas", exemplo: true },
-      { rotulo: "Tempo médio parado em manutenção", valor: "5 dias", exemplo: true },
-      { rotulo: "Taxa de renovação anual", valor: "8%", exemplo: true },
-      { rotulo: "Custo médio de manutenção por viatura/ano", valor: "R$ 6.200,00", exemplo: true },
-      { rotulo: "Aquisição — compra direta", valor: "62%", exemplo: true },
-      { rotulo: "Aquisição — convênio federal", valor: "31%", exemplo: true },
-      { rotulo: "Aquisição — doação", valor: "7%", exemplo: true },
-      { rotulo: "Coordenador do setor", valor: "A preencher", exemplo: false, pendente: true }
-    ]
-  },
-  {
-    id: "infraestrutura",
-    label: "Infraestrutura",
-    icon: "predio",
-    cor: "var(--oliva)",
-    artigos: ["V"],
-    intro: "Coordena portaria, recepção, segurança patrimonial, limpeza, abastecimento de energia e água, e a manutenção predial das instalações e dependências.",
-    dados: [
-      { rotulo: "Unidades sob manutenção ativa", valor: "14", exemplo: true },
-      { rotulo: "Chamados de manutenção no mês", valor: "38", exemplo: true },
-      { rotulo: "Coordenador do setor", valor: "A preencher", exemplo: false, pendente: true }
-    ]
-  },
-  {
-    id: "orcamento",
-    label: "Orçamento e Finanças",
-    icon: "moeda",
-    cor: "var(--tinta)",
-    artigos: ["VIII", "IX"],
-    intro: "Programa, orça, acompanha e executa a administração financeira e contábil, em articulação com o sistema estadual.",
-    dados: [
-      { rotulo: "Orçamento vigente (LOA)", valor: "R$ 4.200.000,00", exemplo: true },
-      { rotulo: "Cota liberada no período", valor: "R$ 3.150.000,00", exemplo: true },
-      { rotulo: "Valor empenhado", valor: "R$ 2.780.000,00", exemplo: true },
-      { rotulo: "Valor liquidado", valor: "R$ 2.410.000,00", exemplo: true },
-      { rotulo: "Valor pago", valor: "R$ 2.190.000,00", exemplo: true },
-      { rotulo: "Execução no período (pago/orçado)", valor: "52%", exemplo: true },
-      { rotulo: "Custeio", valor: "74%", exemplo: true },
-      { rotulo: "Investimento", valor: "26%", exemplo: true },
-      { rotulo: "Fonte — Tesouro estadual", valor: "83%", exemplo: true },
-      { rotulo: "Fonte — Convênio federal (Senasp/FNSP)", valor: "17%", exemplo: true },
-      { rotulo: "Maior categoria de gasto", valor: "Pessoal e encargos", exemplo: true },
-      { rotulo: "Coordenador do setor", valor: "A preencher", exemplo: false, pendente: true }
-    ]
-  },
-  {
-    id: "projetos",
-    label: "Projetos",
-    icon: "projeto_sac",
-    cor: "var(--terracota)",
-    artigos: [],
-    intro: "Projetos institucionais do DEPAF no Portfólio PCBA 2026–2027.",
-    projetos: [
-      {
-        titulo: "Aqui tem SAC",
-        icon: "projeto_sac",
-        texto: "Estruturação do modelo de atendimento no padrão SAC nas delegacias.",
-        patrocinador: "DPC Cristiano Marcos Pitangueira Mangueira",
-        gestor: "DPC Ilma Leonor Magarão Paiva",
-        gerente: "EPC Kristianne Lima Moscovits",
-        status: "Em execução",
-        progresso: 40,
-        exemplo: true
-      },
-      {
-        titulo: "Salas de Investigação Criminal",
-        icon: "projeto_investigacao",
-        texto: "Modernização e estruturação das salas de investigação criminal.",
-        patrocinador: "DPC Cristiano Marcos Pitangueira Mangueira",
-        gestor: "DPC Ilma Leonor Magarão Paiva",
-        gerente: "EPC Kristianne Lima Moscovits",
-        status: "Planejamento",
-        progresso: 15,
-        exemplo: true
-      },
-      {
-        titulo: "Requalificação da Rede Física",
-        icon: "projeto_rede",
-        texto: "Requalificação da rede física da Polícia Civil em todo o estado.",
-        patrocinador: "DPC Cristiano Marcos Pitangueira Mangueira",
-        gestor: "DPC Ilma Leonor Magarão Paiva",
-        gerente: "EPC Kristianne Lima Moscovits",
-        status: "Em execução",
-        progresso: 55,
-        exemplo: true
-      }
-    ]
-  },
-  {
-    id: "indicadores",
-    label: "Indicadores",
-    icon: "competencia_balanca",
-    cor: "var(--mostarda)",
-    artigos: [],
-    intro: "Visão consolidada — espaço pronto para os indicadores reais de acompanhamento.",
-    dados: [
-      { rotulo: "Execução orçamentária", valor: "52%", exemplo: true },
-      { rotulo: "Frota ativa", valor: "94%", exemplo: true },
-      { rotulo: "Progresso médio dos projetos", valor: "37%", exemplo: true },
-      { rotulo: "Itens de estoque abaixo do mínimo", valor: "12", exemplo: true },
-      { rotulo: "Chamados de manutenção em aberto", valor: "9", exemplo: true }
-    ]
+const API_CONFIG = {
+  BASE_URL: "http://localhost:3333",
+  GOOGLE_CLIENT_ID: "27568374447-jlc9f4iq888d0mdob43dlabgbfo2rl6h.apps.googleusercontent.com",
+};
+
+const CHAVE_SESSAO = "depaf_sessao";
+function obterSessao() {
+  try {
+    return JSON.parse(localStorage.getItem(CHAVE_SESSAO) || "null");
+  } catch {
+    return null;
   }
-];
+}
+function salvarSessao(sessao) {
+  localStorage.setItem(CHAVE_SESSAO, JSON.stringify(sessao));
+}
+function limparSessao() {
+  localStorage.removeItem(CHAVE_SESSAO);
+}
+
+async function apiFetch(caminho, opcoes = {}) {
+  const sessao = obterSessao();
+  const resposta = await fetch(`${API_CONFIG.BASE_URL}${caminho}`, {
+    ...opcoes,
+    headers: {
+      ...(sessao ? { Authorization: `Bearer ${sessao.token}` } : {}),
+      ...(opcoes.headers || {}),
+    },
+  });
+  if (resposta.status === 401) {
+    limparSessao();
+    mostrarTelaLogin("Sua sessão expirou — entre de novo.");
+    throw new Error("Sessão expirada");
+  }
+  if (!resposta.ok) {
+    const corpo = await resposta.json().catch(() => ({}));
+    throw new Error(corpo.erro || `Erro ${resposta.status} ao falar com a API`);
+  }
+  return resposta.json();
+}
+
+let PORTAIS = [];
+
+// cache do dashboard "cru" (mensal, todas as categorias) por portal — os
+// KPIs sempre mostram o acumulado geral independente do filtro selecionado
+// na tela (era assim no HTML original), e os exportadores de Excel/Power BI
+// também precisam dessa versão sem filtro.
+let DASH_DATA = {};
+async function garantirDashData(portalId) {
+  if (DASH_DATA[portalId]) return DASH_DATA[portalId];
+  const dados = await apiFetch(`/api/portais/${portalId}/dashboard?periodo=mensal&categoria=todas`);
+  DASH_DATA[portalId] = {
+    mensal: dados.serie.map((p) => p.valor),
+    unidade: dados.portal.unidade,
+    categorias: dados.categorias,
+  };
+  return DASH_DATA[portalId];
+}
 
 const DIRECAO = {
   nome: "Del. Cristiano Marcos Pitangueira Mangueira",
@@ -744,88 +675,6 @@ const DIRECAO = {
 };
 
 const MESES = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
-
-const DASH_DATA = {
-  pessoal: {
-    mensal: [286,291,298,301,305,309,312,308,310,312,314,312],
-    unidade: "servidores",
-    categorias: [
-      { label: "Efetivo (cargo permanente)", valor: 210 },
-      { label: "Temporário/REDA", valor: 62 },
-      { label: "Comissionado", valor: 40 }
-    ]
-  },
-  normas: {
-    mensal: [4,5,3,6,7,5,6,4,5,8,6,5],
-    unidade: "normas emitidas",
-    categorias: [
-      { label: "Portaria", valor: 38 },
-      { label: "Ordem de serviço", valor: 16 },
-      { label: "Instrução normativa", valor: 10 }
-    ]
-  },
-  patrimonio: {
-    mensal: [1620,1655,1680,1702,1735,1760,1780,1795,1810,1822,1835,1842],
-    unidade: "itens tombados",
-    categorias: [
-      { label: "Mobiliário", valor: 640 },
-      { label: "Equip. de informática", valor: 512 },
-      { label: "Material de expediente", valor: 398 },
-      { label: "Bens apreendidos", valor: 96 },
-      { label: "Outros", valor: 196 }
-    ]
-  },
-  frota: {
-    mensal: [178,180,181,183,184,185,186,186,187,187,187,187],
-    unidade: "viaturas",
-    categorias: [
-      { label: "Compacto/passeio", valor: 94 },
-      { label: "SUV/utilitário", valor: 68 },
-      { label: "Especial/blindado", valor: 25 }
-    ]
-  },
-  infraestrutura: {
-    mensal: [30,34,29,41,36,33,38,35,37,40,36,38],
-    unidade: "chamados",
-    categorias: [
-      { label: "Elétrica", valor: 11 },
-      { label: "Hidráulica", valor: 8 },
-      { label: "Climatização", valor: 9 },
-      { label: "Segurança/portaria", valor: 6 },
-      { label: "Outros", valor: 4 }
-    ]
-  },
-  orcamento: {
-    mensal: [165,172,180,188,195,201,208,214,219,224,228,231],
-    unidade: "R$ mil pagos",
-    categorias: [
-      { label: "Pessoal e encargos", valor: 1240 },
-      { label: "Custeio geral", valor: 560 },
-      { label: "Investimento", valor: 390 }
-    ]
-  },
-  projetos: {
-    mensal: [12,15,18,20,24,27,30,32,34,36,38,40],
-    unidade: "% progresso médio",
-    categorias: [
-      { label: "Aqui tem SAC", valor: 40 },
-      { label: "Salas de Investigação Criminal", valor: 15 },
-      { label: "Requalificação da Rede Física", valor: 55 }
-    ]
-  },
-  indicadores: {
-    mensal: [48,49,50,50,51,51,52,52,52,52,52,52],
-    unidade: "% execução orçamentária",
-    categorias: [
-      { label: "Pessoal", valor: 100 },
-      { label: "Normas e Modernização", valor: 100 },
-      { label: "Patrimônio e Bens", valor: 100 },
-      { label: "Frota", valor: 94 },
-      { label: "Infraestrutura", valor: 100 },
-      { label: "Orçamento e Finanças", valor: 52 }
-    ]
-  }
-};
 
 // =====================================================================
 // 3. HELPERS DE GRÁFICO (KPIs E AGREGAÇÃO)
@@ -877,31 +726,12 @@ function kpiRowSVG(dd, cor){
     </div>`;
 }
 
-function aggregarPeriodo(mensal, periodo) {
-  if (periodo === "mensal") return mensal.map((v, i) => ({ label: MESES[i], valor: v }));
-  if (periodo === "trimestral") {
-    const out = [];
-    for (let i = 0; i < 12; i += 3) {
-      const soma = mensal.slice(i, i + 3).reduce((a, b) => a + b, 0);
-      out.push({ label: `T${i / 3 + 1}`, valor: Math.round((soma / 3) * 100) / 100 });
-    }
-    return out;
-  }
-  const soma = mensal.reduce((a, b) => a + b, 0);
-  return [{ label: "Ano", valor: Math.round((soma / 12) * 100) / 100 }];
-}
+// aggregarPeriodo e serieCategoria (as versões que rodavam no navegador)
+// saíram daqui — quem agrega por período e filtra por categoria agora é o
+// backend (GET /api/portais/:slug/dashboard?periodo=...&categoria=...).
 
 const TONS = ["var(--tinta)", "var(--mostarda)", "var(--terracota)", "var(--oliva)", "var(--dourado)", "var(--vinho)"];
 function corCategoria(i) { return TONS[i % TONS.length]; }
-
-function serieCategoria(dd, catLabel) {
-  if (!catLabel || catLabel === "todas") return dd.mensal;
-  const total = dd.categorias.reduce((a, c) => a + c.valor, 0) || 1;
-  const cat = dd.categorias.find(c => c.label === catLabel);
-  if (!cat) return dd.mensal;
-  const frac = cat.valor / total;
-  return dd.mensal.map(v => Math.round(v * frac * 100) / 100);
-}
 
 // =====================================================================
 // 4. LÓGICA DA INTERFACE (DOM)
@@ -984,7 +814,96 @@ function buildHub() {
   });
 }
 
-buildHub();
+async function carregarPortais() {
+  try {
+    const lista = await apiFetch("/api/portais");
+    PORTAIS = lista.map((item) => ({
+      id: item.slug,
+      label: item.label,
+      icon: item.icon,
+      cor: "#" + item.corHex,
+      artigos: item.artigos || [],
+    }));
+    buildHub();
+  } catch (erro) {
+    document.querySelector("#tela-inicio .intro p").textContent =
+      "Não consegui carregar os portais: " + erro.message +
+      " — confira se o backend está rodando (npm start) e se você ainda está logado.";
+  }
+}
+
+// =====================================================================
+// 4c. LOGIN COM GOOGLE — gate de acesso antes de mostrar qualquer dado
+// =====================================================================
+function mostrarTelaLogin(mensagem) {
+  document.getElementById("tela-login").hidden = false;
+  document.getElementById("tela-inicio").hidden = true;
+  document.getElementById("tela-conteudo").hidden = true;
+  document.getElementById("tela-upload").hidden = true;
+  document.getElementById("usuario-badge").style.display = "none";
+  document.getElementById("btn-abrir-upload").style.display = "none";
+  document.getElementById("btn-sair").style.display = "none";
+  document.getElementById("voltar-btn").classList.remove("show");
+  if (mensagem) document.getElementById("login-status").textContent = mensagem;
+}
+
+function mostrarAppLogado(usuario) {
+  document.getElementById("tela-login").hidden = true;
+  document.getElementById("tela-inicio").hidden = false;
+  const badge = document.getElementById("usuario-badge");
+  badge.textContent = `${usuario.nome} · ${usuario.papel}`;
+  badge.style.display = "inline";
+  document.getElementById("btn-abrir-upload").style.display = "inline-block";
+  document.getElementById("btn-sair").style.display = "inline-block";
+}
+
+async function aoReceberCredencialGoogle(response) {
+  document.getElementById("login-status").textContent = "Entrando...";
+  try {
+    const resultado = await apiFetch("/api/auth/google", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ credential: response.credential }),
+    });
+    salvarSessao(resultado);
+    mostrarAppLogado(resultado.usuario);
+    await carregarPortais();
+  } catch (erro) {
+    document.getElementById("login-status").textContent = "Não consegui entrar: " + erro.message;
+  }
+}
+
+document.getElementById("btn-sair").addEventListener("click", () => {
+  limparSessao();
+  mostrarTelaLogin("");
+});
+
+function iniciarApp() {
+  if (!window.google || !window.google.accounts) {
+    // a lib do Google (carregada por <script async defer>) ainda não terminou de baixar
+    setTimeout(iniciarApp, 200);
+    return;
+  }
+  google.accounts.id.initialize({
+    client_id: API_CONFIG.GOOGLE_CLIENT_ID,
+    callback: aoReceberCredencialGoogle,
+  });
+  google.accounts.id.renderButton(document.getElementById("google-signin-botao"), {
+    theme: "outline",
+    size: "large",
+    text: "signin_with",
+  });
+
+  const sessao = obterSessao();
+  if (sessao) {
+    mostrarAppLogado(sessao.usuario);
+    carregarPortais();
+  } else {
+    mostrarTelaLogin("");
+  }
+}
+iniciarApp();
+
 window.addEventListener("resize", () => {
   clearTimeout(window._hubResizeT);
   window._hubResizeT = setTimeout(buildHub, 150);
@@ -1006,9 +925,25 @@ const CHART_INFO = {
 
 let dashState = { tipoEvolucao: "bar", tipoComp: "donut" };
 
-function abrirTela(id) {
-  const p = PORTAIS.find(x => x.id === id);
-  if (!p) return;
+async function abrirTela(id) {
+  const pBase = PORTAIS.find(x => x.id === id);
+  if (!pBase) return;
+
+  telaConteudo.innerHTML = `<p class="tela-intro">Carregando...</p>`;
+  telaConteudo.hidden = false;
+  telaInicio.style.display = "none";
+  voltarBtn.classList.add("show");
+  window.scrollTo({ top: 0, behavior: "smooth" });
+
+  let detalhe;
+  try {
+    detalhe = await apiFetch(`/api/portais/${id}`);
+  } catch (erro) {
+    telaConteudo.innerHTML = `<p class="tela-intro">Não consegui carregar esse portal: ${erro.message}</p>`;
+    return;
+  }
+
+  const p = { ...pBase, intro: detalhe.intro, dados: detalhe.indicadores, projetos: detalhe.projetos };
 
   let corpoGeral = "";
 
@@ -1053,8 +988,14 @@ function abrirTela(id) {
     });
   }
 
-  const dd = DASH_DATA[p.id];
-  let corpoDash = `<p class="tela-intro">Dashboard ainda não configurado para este portal.</p>`;
+  let dadosDash = null;
+  try {
+    dadosDash = await garantirDashData(p.id);
+  } catch (erro) {
+    dadosDash = null; // portal ainda sem série mensal cadastrada
+  }
+  const dd = dadosDash;
+  let corpoDash = `<p class="tela-intro">Este portal ainda não tem série mensal cadastrada — suba uma planilha (botão "SUBIR PLANILHA" no topo) ou rode o seed do backend.</p>`;
   if (dd) {
     const catOptions = dd.categorias.map(c => `<option value="${c.label}">${c.label}</option>`).join("");
     corpoDash = `
@@ -1183,15 +1124,26 @@ function abrirTela(id) {
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
-function atualizarDashboard(portalId, periodo, categoriaFiltro) {
+async function atualizarDashboard(portalId, periodo, categoriaFiltro) {
   const p = PORTAIS.find(x => x.id === portalId);
-  const dd = DASH_DATA[portalId];
+  const dd = await garantirDashData(portalId); // cache — sempre mensal/todas, só pros KPIs
   if (!dd) return;
-  
+
   const categoriaSelecionada = categoriaFiltro && categoriaFiltro !== "todas" ? categoriaFiltro : null;
-  const serie = serieCategoria(dd, categoriaSelecionada);
-  const pontos = aggregarPeriodo(serie, periodo);
-  const idxSel = categoriaSelecionada ? dd.categorias.findIndex(c => c.label === categoriaSelecionada) : -1;
+
+  let dadosFiltrados;
+  try {
+    dadosFiltrados = await apiFetch(
+      `/api/portais/${portalId}/dashboard?periodo=${periodo}&categoria=${encodeURIComponent(categoriaFiltro || "todas")}`
+    );
+  } catch (erro) {
+    console.error(erro);
+    return;
+  }
+  const pontos = dadosFiltrados.serie;
+  const categorias = dadosFiltrados.categorias;
+
+  const idxSel = categoriaSelecionada ? categorias.findIndex(c => c.label === categoriaSelecionada) : -1;
   const corEvolucao = idxSel >= 0 ? corCategoria(idxSel) : p.cor;
 
   document.getElementById("dash-kpis").innerHTML = kpiRowSVG(dd, corEvolucao);
@@ -1209,7 +1161,7 @@ function atualizarDashboard(portalId, periodo, categoriaFiltro) {
 
   const RENDER_COMP = { donut: pieChartSVG, ranking: barRankingChartSVG, matriz: donutChartSVG, rede: rankingChartSVG };
   const elComp = document.getElementById("dash-chart-donut");
-  elComp.innerHTML = (RENDER_COMP[dashState.tipoComp] || pieChartSVG)(dd.categorias, categoriaSelecionada);
+  elComp.innerHTML = (RENDER_COMP[dashState.tipoComp] || pieChartSVG)(categorias, categoriaSelecionada);
   const infoC = CHART_INFO[dashState.tipoComp];
   document.getElementById("hint-comp").innerHTML = `<b>${infoC.nome}:</b> indicado pra ${infoC.indicado} Mostra ${infoC.mostra} <i>Como ler:</i> ${infoC.eixo}`;
 
@@ -1224,12 +1176,10 @@ function atualizarDashboard(portalId, periodo, categoriaFiltro) {
     el.addEventListener("click", () => alternarFiltro(el.dataset.cat));
   });
 
-  const total = dd.categorias.reduce((a, c) => a + c.valor, 0) || 1;
-  const corpo = dd.categorias.map(c => {
-    const pct = ((c.valor / total) * 100).toFixed(1);
+  const corpo = categorias.map(c => {
     const dim = categoriaSelecionada && categoriaSelecionada !== c.label;
     const sel = categoriaSelecionada === c.label;
-    return `<tr class="${dim ? "dim" : ""}" data-cat="${c.label}" style="${sel ? "font-weight:600;" : ""}"><td>${c.label}</td><td class="num">${c.valor}</td><td class="num">${pct}%</td></tr>`;
+    return `<tr class="${dim ? "dim" : ""}" data-cat="${c.label}" style="${sel ? "font-weight:600;" : ""}"><td>${c.label}</td><td class="num">${c.valor}</td><td class="num">${c.percentualDoTotal}%</td></tr>`;
   }).join("");
   const tbody = document.getElementById("dash-tabela-body");
   tbody.innerHTML = corpo;
@@ -1256,6 +1206,8 @@ function atualizarDashboard(portalId, periodo, categoriaFiltro) {
 
 function fecharTela() {
   telaConteudo.hidden = true;
+  const telaUpload = document.getElementById("tela-upload");
+  if (telaUpload) telaUpload.hidden = true;
   telaInicio.style.display = "";
   voltarBtn.classList.remove("show");
   window.scrollTo({ top: 0, behavior: "smooth" });
@@ -1263,6 +1215,118 @@ function fecharTela() {
 
 voltarBtn.addEventListener("click", fecharTela);
 document.getElementById("brand-home-btn").addEventListener("click", fecharTela);
+
+// =====================================================================
+// 4b. UPLOAD DE PLANILHA — gera dashboard a partir de um CSV/XLSX qualquer
+// =====================================================================
+function abrirTelaUpload() {
+  telaConteudo.hidden = true;
+  telaInicio.style.display = "none";
+  document.getElementById("tela-upload").hidden = false;
+  voltarBtn.classList.add("show");
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+document.getElementById("btn-abrir-upload").addEventListener("click", abrirTelaUpload);
+
+async function enviarPlanilha(arquivo) {
+  const sessao = obterSessao();
+  const formData = new FormData();
+  formData.append("planilha", arquivo);
+  const resposta = await fetch(`${API_CONFIG.BASE_URL}/api/uploads`, {
+    method: "POST",
+    headers: sessao ? { Authorization: `Bearer ${sessao.token}` } : {}, // sem Content-Type: o navegador define o boundary do multipart sozinho
+    body: formData,
+  });
+  if (resposta.status === 401) {
+    limparSessao();
+    mostrarTelaLogin("Sua sessão expirou — entre de novo.");
+    throw new Error("Sessão expirada");
+  }
+  if (!resposta.ok) {
+    const corpo = await resposta.json().catch(() => ({}));
+    throw new Error(corpo.erro || `Erro ${resposta.status}`);
+  }
+  return resposta.json();
+}
+
+// grade de intensidade pra cruzamento de duas colunas categóricas — mesma
+// linguagem visual da matriz de correlação, mas genérica pra qualquer par
+// de colunas que a planilha enviada tiver.
+function heatmapGenericoSVG(chart) {
+  const [colA, colB] = chart.columns;
+  const valoresA = [...new Set(chart.data.map(d => d[colA]))];
+  const valoresB = [...new Set(chart.data.map(d => d[colB]))];
+  const max = Math.max(...chart.data.map(d => Number(d.count)), 1);
+  const cell = 34, gap = 1, padL = 110, padT = 64;
+  const w = padL + valoresB.length * (cell + gap) + 10;
+  const h = padT + valoresA.length * (cell + gap) + 10;
+  const mapa = new Map(chart.data.map(d => [`${d[colA]}|${d[colB]}`, Number(d.count)]));
+
+  let cols = "", rows = "", cells = "";
+  valoresB.forEach((vb, j) => {
+    const x = padL + j * (cell + gap) + cell / 2;
+    const curto = String(vb).length > 14 ? String(vb).slice(0, 13) + "…" : vb;
+    cols += `<text x="${x.toFixed(1)}" y="${(padT - 8).toFixed(1)}" text-anchor="start" transform="rotate(-40 ${x.toFixed(1)} ${(padT - 8).toFixed(1)})" font-family="monospace" font-size="8" fill="var(--carvao)" fill-opacity="0.6">${curto}</text>`;
+  });
+  valoresA.forEach((va, i) => {
+    const y = padT + i * (cell + gap) + cell / 2;
+    const curto = String(va).length > 14 ? String(va).slice(0, 13) + "…" : va;
+    rows += `<text x="${(padL - 8).toFixed(1)}" y="${(y + 3).toFixed(1)}" text-anchor="end" font-family="monospace" font-size="9" fill="var(--carvao)" fill-opacity="0.85">${curto}</text>`;
+    valoresB.forEach((vb, j) => {
+      const v = mapa.get(`${va}|${vb}`) || 0;
+      const t = v / max;
+      const x = padL + j * (cell + gap);
+      const yc = padT + i * (cell + gap);
+      cells += `<rect x="${x.toFixed(1)}" y="${yc.toFixed(1)}" width="${cell}" height="${cell}" fill="rgba(34,211,238,${(0.08 + t * 0.75).toFixed(2)})"><title>${va} × ${vb}: ${v}</title></rect>`;
+      if (v) cells += `<text x="${(x + cell / 2).toFixed(1)}" y="${(yc + cell / 2 + 3).toFixed(1)}" text-anchor="middle" font-family="monospace" font-size="8.5" fill="var(--carvao)" fill-opacity="${t > 0.6 ? 0.95 : 0.6}">${v}</text>`;
+    });
+  });
+  return `<svg viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg">${cols}${rows}${cells}</svg>`;
+}
+
+function renderDashboardGenerico(dashboard) {
+  const kpisHtml = dashboard.kpis.map(k => `
+    <div class="kpi-card">
+      <div class="kpi-label">${k.title}</div>
+      <div class="kpi-value">${Number(k.value).toLocaleString("pt-BR")}</div>
+    </div>
+  `).join("");
+
+  const chartsHtml = dashboard.charts.map(c => {
+    if (c.kind === "bar" || c.kind === "line") {
+      const pontos = c.data.map(d => ({ label: d.name, valor: d.value }));
+      const desenho = c.kind === "bar" ? simpleBarChartSVG(pontos, "var(--tinta)") : simpleLineChartSVG(pontos, "var(--tinta)");
+      return `<div class="dash-chart-box"><h4>${c.title}</h4>${desenho}</div>`;
+    }
+    if (c.kind === "heatmap") {
+      return `<div class="dash-chart-box"><h4>${c.title}</h4>${heatmapGenericoSVG(c)}</div>`;
+    }
+    return "";
+  }).join("");
+
+  document.getElementById("upload-resultado").innerHTML = `
+    ${kpisHtml ? `<div class="kpi-row">${kpisHtml}</div>` : ""}
+    <div class="dash-charts" style="grid-template-columns:1fr;margin-top:16px">${chartsHtml}</div>
+  `;
+}
+
+document.getElementById("btn-gerar-dashboard").addEventListener("click", async () => {
+  const input = document.getElementById("input-planilha");
+  const status = document.getElementById("upload-status");
+  if (!input.files[0]) {
+    status.textContent = "Escolha um arquivo primeiro.";
+    return;
+  }
+  status.textContent = "Enviando e analisando a planilha...";
+  document.getElementById("upload-resultado").innerHTML = "";
+  try {
+    const { dashboard } = await enviarPlanilha(input.files[0]);
+    status.textContent = `Pronto — ${dashboard.charts.length} gráfico(s) sugerido(s) a partir de ${dashboard.schema ? Object.keys(dashboard.schema).length : "?"} coluna(s).`;
+    renderDashboardGenerico(dashboard);
+  } catch (erro) {
+    status.textContent = "Erro: " + erro.message;
+  }
+});
 
 // =====================================================================
 // 5. EXPORTADOR EXCEL — DEPAF
@@ -1350,7 +1414,12 @@ function ref(col, row) { return colLetter(col) + row; }
 
 const XLSX_COR_MAP = { "var(--tinta)": "14507A", "var(--mostarda)": "E3A424", "var(--terracota)": "C0492B", "var(--oliva)": "3D7A50", "var(--dourado)": "C9A96E", "var(--vinho)": "7A2E3F" };
 const XLSX_PALETA_HEX = ["14507A", "E3A424", "C0492B", "3D7A50", "C9A96E", "7A2E3F"];
-function xlsxCorHex(cssVar) { return XLSX_COR_MAP[cssVar] || "1B3A5C"; }
+function xlsxCorHex(cor) {
+  if (XLSX_COR_MAP[cor]) return XLSX_COR_MAP[cor];
+  const m = /^#?([0-9a-f]{6})$/i.exec(String(cor));
+  if (m) return m[1].toUpperCase();
+  return "1B3A5C";
+}
 
 function xlsxFormatoValor(unidade) {
   if (/R\$/.test(unidade)) return { code: '"R$" #,##0.00', tipo: "moeda" };
@@ -1713,9 +1782,15 @@ function xlsxBuildWorkbookBytes(p, dd) {
   return zip.build();
 }
 
-function exportarDashboardExcel(portalId) {
+async function exportarDashboardExcel(portalId) {
   const p = PORTAIS.find(x => x.id === portalId);
-  const dd = DASH_DATA[portalId];
+  let dd;
+  try {
+    dd = await garantirDashData(portalId);
+  } catch (erro) {
+    alert("Não consegui gerar o Excel: " + erro.message);
+    return;
+  }
   if (!p || !dd) return;
   const bytes = xlsxBuildWorkbookBytes(p, dd);
   const blob = new Blob([bytes], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
@@ -1846,7 +1921,13 @@ function pbiLeiaMe() {
     "  não são medição real por categoria mês a mês."
   ].join("\r\n");
 }
-function exportarPowerBI() {
+async function exportarPowerBI() {
+  try {
+    await Promise.all(PORTAIS.map(p => garantirDashData(p.id).catch(() => null)));
+  } catch (erro) {
+    alert("Não consegui buscar os dados de todos os portais: " + erro.message);
+    return;
+  }
   const zip = new ZipBuilder();
   zip.addFile("fato_evolucao.csv", pbiFatoEvolucao());
   zip.addFile("fato_composicao.csv", pbiFatoComposicao());
