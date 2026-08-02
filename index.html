@@ -1212,7 +1212,28 @@ function renderTabelaBruta(linhas, maxLinhas = 50) {
   `;
 }
 
-async function visualizarUploadPortal(uploadId) {
+async function baixarUploadArquivo(uploadId, nomeArquivo) {
+  const sessao = obterSessao();
+  try {
+    const resposta = await fetch(`${API_CONFIG.BASE_URL}/api/uploads/${uploadId}/download`, {
+      headers: sessao ? { Authorization: `Bearer ${sessao.token}` } : {},
+    });
+    if (!resposta.ok) throw new Error(`Erro ${resposta.status}`);
+    const blob = await resposta.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = nomeArquivo || "planilha.csv";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  } catch (erro) {
+    alert("Não consegui baixar a planilha: " + erro.message);
+  }
+}
+
+async function visualizarUploadPortal(uploadId, portalSlug) {
   const alvo = document.getElementById("upload-portal-resultado");
   alvo.innerHTML = `<p class="tela-intro">Carregando...</p>`;
   try {
@@ -1225,9 +1246,19 @@ async function visualizarUploadPortal(uploadId) {
         <button class="tab-btn active" data-sub="graficos">GRÁFICOS</button>
         <button class="tab-btn" data-sub="tabela">DADOS BRUTOS</button>
       </div>
+      <div style="text-align:right;margin:10px 0">
+        <button class="btn-exportar-xlsx" id="btn-baixar-planilha">⬇ BAIXAR PLANILHA</button>
+      </div>
       <div class="tab-panel" id="sub-graficos"></div>
       <div class="tab-panel" id="sub-tabela" hidden>${renderTabelaBruta(detalhe.linhas)}</div>
+      ${souAdmin() ? `
+        <div style="margin-top:24px;border-top:2px solid var(--carvao);padding-top:20px">
+          <h4 style="margin-bottom:10px">Usar esta planilha como o dashboard oficial do portal</h4>
+          ${renderFormularioAplicarDashboard(dashboard.schema)}
+        </div>
+      ` : ""}
     `;
+    document.getElementById("btn-baixar-planilha").addEventListener("click", () => baixarUploadArquivo(uploadId, detalhe.nomeArquivo));
     alvo.querySelectorAll(".tab-btn").forEach(btn => {
       btn.addEventListener("click", () => {
         alvo.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
@@ -1237,6 +1268,7 @@ async function visualizarUploadPortal(uploadId) {
       });
     });
     renderDashboardGenerico(dashboard, "sub-graficos");
+    if (souAdmin()) ligarFormularioAplicarDashboard(alvo, uploadId, portalSlug);
   } catch (erro) {
     alvo.innerHTML = `<p class="tela-intro">Não consegui carregar: ${erro.message}</p>`;
   }
@@ -1266,7 +1298,7 @@ async function carregarUploadsPortal(portalId) {
       <div id="upload-portal-resultado" style="margin-top:20px"></div>
     `;
     painel.querySelectorAll("tbody tr").forEach(tr => {
-      tr.addEventListener("click", () => visualizarUploadPortal(tr.dataset.uploadId));
+      tr.addEventListener("click", () => visualizarUploadPortal(tr.dataset.uploadId, portalId));
     });
   } catch (erro) {
     painel.innerHTML = `<p class="tela-intro">Não consegui carregar o histórico: ${erro.message}</p>`;
@@ -1608,6 +1640,95 @@ function heatmapGenericoSVG(chart) {
   return `<svg viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg">${cols}${rows}${cells}</svg>`;
 }
 
+// formulário que deixa a pessoa escolher o que vira o quê no dashboard
+// oficial do portal — só aparece se a planilha tiver pelo menos uma coluna
+// de data e uma categórica (sem isso não dá pra gerar evolução/composição)
+function renderFormularioAplicarDashboard(schema) {
+  const colunas = Object.keys(schema || {});
+  const temporais = colunas.filter(c => schema[c].type === "temporal");
+  const categoricas = colunas.filter(c => schema[c].type === "categorical" || schema[c].type === "ano");
+  const numericas = colunas.filter(c => schema[c].type === "numeric");
+
+  if (!temporais.length || !categoricas.length) {
+    return `<p class="tela-intro">Essa planilha não tem coluna de data + coluna de categoria suficientes pra virar o dashboard oficial deste portal (precisa de pelo menos uma de cada).</p>`;
+  }
+
+  const opcoes = lista => lista.map(c => `<option value="${escapeAttr(c)}">${escapeHTML(c)}</option>`).join("");
+
+  return `
+    <div class="dash-filtros" style="flex-direction:column;align-items:stretch;gap:12px;max-width:420px">
+      <div class="dash-filtro">
+        <label>COLUNA DE DATA (vira a evolução mensal)</label>
+        <select id="map-coluna-data">${opcoes(temporais)}</select>
+      </div>
+      <div class="dash-filtro">
+        <label>O QUE CONTAR</label>
+        <select id="map-tipo-contagem">
+          <option value="linhas">Quantidade de linhas (ex.: nº de viaturas, nº de servidores)</option>
+          ${numericas.length ? `<option value="coluna">Somar uma coluna numérica</option>` : ""}
+        </select>
+      </div>
+      <div class="dash-filtro" id="map-coluna-valor-wrap" style="display:none">
+        <label>QUAL COLUNA SOMAR</label>
+        <select id="map-coluna-valor">${opcoes(numericas)}</select>
+      </div>
+      <div class="dash-filtro">
+        <label>COLUNA DE CATEGORIA (vira a composição e o filtro)</label>
+        <select id="map-coluna-categoria">${opcoes(categoricas)}</select>
+      </div>
+      <div class="dash-filtro">
+        <label>RÓTULO DA UNIDADE (ex.: viaturas, servidores)</label>
+        <input type="text" id="map-unidade" placeholder="Ex.: viaturas" style="${CAMPO_STYLE}">
+      </div>
+      <div class="dash-filtro">
+        <label>COMO RESUMIR NO CARD DE TOPO</label>
+        <select id="map-tipo-resumo">
+          <option value="ultimo">Estoque — mostra a variação no período (ex.: frota, pessoal)</option>
+          <option value="soma">Fluxo — soma o período inteiro (ex.: normas emitidas, R$ pago)</option>
+          <option value="media">Estoque variável — mostra a média do período</option>
+        </select>
+      </div>
+    </div>
+    <button class="btn-exportar-xlsx" id="btn-aplicar-dashboard" style="background:var(--oliva);margin-top:12px">USAR COMO DASHBOARD OFICIAL DESTE PORTAL</button>
+    <p id="aplicar-dashboard-status" class="font-mono" style="font-size:12px;color:#9AA3B2;margin-top:8px"></p>
+  `;
+}
+
+function ligarFormularioAplicarDashboard(container, uploadId, portalSlug) {
+  const selTipo = container.querySelector("#map-tipo-contagem");
+  const wrapValor = container.querySelector("#map-coluna-valor-wrap");
+  if (!selTipo) return; // schema insuficiente — o form nem foi desenhado
+
+  selTipo.addEventListener("change", () => {
+    wrapValor.style.display = selTipo.value === "coluna" ? "" : "none";
+  });
+
+  container.querySelector("#btn-aplicar-dashboard").addEventListener("click", async () => {
+    const status = container.querySelector("#aplicar-dashboard-status");
+    const corpo = {
+      uploadId,
+      colunaData: container.querySelector("#map-coluna-data").value,
+      tipoContagem: selTipo.value,
+      colunaValor: selTipo.value === "coluna" ? container.querySelector("#map-coluna-valor").value : undefined,
+      colunaCategoria: container.querySelector("#map-coluna-categoria").value,
+      unidade: container.querySelector("#map-unidade").value.trim() || undefined,
+      tipoResumo: container.querySelector("#map-tipo-resumo").value,
+    };
+    status.textContent = "Aplicando...";
+    try {
+      const resultado = await apiFetch(`/api/portais/${portalSlug}/dashboard-do-upload`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(corpo),
+      });
+      delete DASH_DATA[portalSlug]; // invalida o cache — próxima visita busca fresco
+      status.textContent = `Pronto — ${resultado.mesesGerados} mês(es) e ${resultado.categoriasGeradas} categoria(s) geradas a partir da planilha. Abra a aba "Dashboard" do portal pra ver.`;
+    } catch (erro) {
+      status.textContent = "Erro: " + erro.message;
+    }
+  });
+}
+
 function renderDashboardGenerico(dashboard, elementoAlvoId = "upload-resultado") {
   const kpisHtml = dashboard.kpis.map(k => `
     <div class="kpi-card">
@@ -1645,10 +1766,20 @@ document.getElementById("btn-gerar-dashboard").addEventListener("click", async (
   status.textContent = "Enviando e analisando a planilha...";
   document.getElementById("upload-resultado").innerHTML = "";
   try {
-    const { dashboard } = await enviarPlanilha(input.files[0], portalSlug);
+    const { upload, dashboard } = await enviarPlanilha(input.files[0], portalSlug);
     const vinculo = portalSlug ? ` — salva no portal "${document.getElementById("select-portal-upload").selectedOptions[0].textContent}"` : "";
     status.textContent = `Pronto — ${dashboard.charts.length} gráfico(s) sugerido(s) a partir de ${dashboard.schema ? Object.keys(dashboard.schema).length : "?"} coluna(s)${vinculo}.`;
     renderDashboardGenerico(dashboard);
+
+    if (portalSlug && souAdmin()) {
+      document.getElementById("upload-resultado").insertAdjacentHTML("beforeend", `
+        <div style="margin-top:24px;border-top:2px solid var(--carvao);padding-top:20px">
+          <h4 style="margin-bottom:10px">Usar esta planilha como o dashboard oficial do portal</h4>
+          ${renderFormularioAplicarDashboard(dashboard.schema)}
+        </div>
+      `);
+      ligarFormularioAplicarDashboard(document.getElementById("upload-resultado"), upload.id, portalSlug);
+    }
   } catch (erro) {
     status.textContent = "Erro: " + erro.message;
   }
