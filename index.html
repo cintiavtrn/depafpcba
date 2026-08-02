@@ -631,7 +631,11 @@ function pieChartSVG(categorias, selectedLabel) {
 }
 
 function barRankingChartSVG(categorias, selectedLabel) {
-  const w = 340, rowH = 26, padL = 140, padR = 44, padT = 10;
+  const MAX_ROTULO = 20;
+  const w = 380, padL = 170, padR = 46, padT = 10;
+  // linha alta o bastante pro maior nome quebrado — em vez de cortar o texto
+  const maxLinhas = Math.max(1, ...categorias.map(c => linhasDoTexto(c.label, MAX_ROTULO)));
+  const rowH = Math.max(26, maxLinhas * 12 + 10);
   const h = padT + categorias.length * rowH + 6;
   const max = Math.max(...categorias.map(c => c.valor), 1);
   let linhas = "";
@@ -640,11 +644,12 @@ function barRankingChartSVG(categorias, selectedLabel) {
     const y = padT + i * rowH;
     const larg = (w - padL - padR) * (c.valor / max);
     const dim = selectedLabel && selectedLabel !== c.label;
-    const nomeCurto = c.label.length > 20 ? c.label.slice(0, 19) + "…" : c.label;
+    const alturaBarra = Math.min(rowH - 8, 18);
+    const yBarra = y + (rowH - alturaBarra) / 2;
     linhas += `<g class="rank-bar" data-cat="${c.label}" style="cursor:pointer" opacity="${dim ? 0.35 : 1}">
-      <text x="${padL - 8}" y="${(y + rowH / 2 + 3).toFixed(1)}" text-anchor="end" font-family="monospace" font-size="9" font-weight="${selectedLabel === c.label ? 700 : 400}" fill="var(--carvao)">${nomeCurto}</text>
-      <rect class="barra" x="${padL}" y="${(y + 4).toFixed(1)}" width="${larg.toFixed(1)}" height="${rowH - 8}" fill="${cor}"><title>${c.label}: ${c.valor}</title></rect>
-      <text x="${(padL + larg + 6).toFixed(1)}" y="${(y + rowH / 2 + 3).toFixed(1)}" font-family="monospace" font-size="9" fill="var(--carvao)">${c.valor}</text>
+      ${textoSVG(c.label, padL - 8, y + rowH / 2, { maxChars: MAX_ROTULO, anchor: "end", fontSize: 9.5, peso: selectedLabel === c.label ? 700 : 400, alturaLinha: 11 })}
+      <rect class="barra" x="${padL}" y="${yBarra.toFixed(1)}" width="${larg.toFixed(1)}" height="${alturaBarra}" fill="${cor}"><title>${escapeHTML(c.label)}: ${c.valor}</title></rect>
+      <text x="${(padL + larg + 6).toFixed(1)}" y="${(y + rowH / 2 + 3).toFixed(1)}" font-family="monospace" font-size="9.5" font-weight="700" fill="var(--carvao)">${c.valor}</text>
     </g>`;
   });
   return `<svg viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg">${linhas}</svg>`;
@@ -1340,48 +1345,110 @@ function multiLinhaSVG(series, labels) {
 // matriz de cruzamento com totais de linha e coluna — inclui o total geral
 function cruzamentoSVG(dados) {
   const linhas = dados.linhas, colunas = dados.colunas;
-  const cell = 46, gap = 1, padL = 150, padT = 76;
-  const w = padL + (colunas.length + 1) * (cell + gap) + 12;
-  const h = padT + (linhas.length + 1) * (cell + gap) + 12;
+  const MAX_ROTULO = 18;
+  const cellW = 52, gap = 1, padL = 190;
+  // altura da linha acompanha o maior nome — nome de 3 linhas precisa de
+  // célula mais alta, senão o texto invade a linha de baixo
+  const maxLinhasRotulo = Math.max(1, ...linhas.map(l => linhasDoTexto(l.label, MAX_ROTULO)));
+  const cellH = Math.max(46, maxLinhasRotulo * 13 + 14);
+  const maxLinhasCabecalho = Math.max(1, ...colunas.map(c => linhasDoTexto(c.label, 14)));
+  const padT = 40 + maxLinhasCabecalho * 13;
+
+  const w = padL + (colunas.length + 1) * (cellW + gap) + 12;
+  const h = padT + (linhas.length + 1) * (cellH + gap) + 12;
   const max = Math.max(...linhas.flatMap(l => l.valores), 1);
 
   let cabecalho = "", corpo = "";
   colunas.forEach((c, j) => {
-    const x = padL + j * (cell + gap) + cell / 2;
-    const curto = c.label.length > 16 ? c.label.slice(0, 15) + "…" : c.label;
-    cabecalho += `<text x="${x.toFixed(1)}" y="${(padT - 10).toFixed(1)}" text-anchor="start" transform="rotate(-35 ${x.toFixed(1)} ${(padT - 10).toFixed(1)})" font-family="monospace" font-size="10" fill="var(--carvao)" fill-opacity="0.75">${escapeHTML(curto)}</text>`;
+    const x = padL + j * (cellW + gap) + cellW / 2;
+    const y = padT - 12;
+    cabecalho += textoSVG(c.label, x, y, { maxChars: 14, anchor: "start", fontSize: 10, opacidade: 0.8, alturaLinha: 11, transform: `rotate(-35 ${x.toFixed(1)} ${y.toFixed(1)})` });
   });
-  const xTotalCol = padL + colunas.length * (cell + gap) + cell / 2;
-  cabecalho += `<text x="${xTotalCol.toFixed(1)}" y="${(padT - 10).toFixed(1)}" text-anchor="start" transform="rotate(-35 ${xTotalCol.toFixed(1)} ${(padT - 10).toFixed(1)})" font-family="monospace" font-size="10" font-weight="700" fill="var(--carvao)">TOTAL</text>`;
+  const xTotalCol = padL + colunas.length * (cellW + gap) + cellW / 2;
+  cabecalho += textoSVG("TOTAL", xTotalCol, padT - 12, { maxChars: 10, anchor: "start", fontSize: 10, peso: 700, transform: `rotate(-35 ${xTotalCol.toFixed(1)} ${(padT - 12).toFixed(1)})` });
 
   linhas.forEach((l, i) => {
-    const y = padT + i * (cell + gap);
-    const curto = l.label.length > 20 ? l.label.slice(0, 19) + "…" : l.label;
-    corpo += `<text x="${(padL - 10).toFixed(1)}" y="${(y + cell / 2 + 4).toFixed(1)}" text-anchor="end" font-family="monospace" font-size="10.5" fill="var(--carvao)">${escapeHTML(curto)}</text>`;
+    const y = padT + i * (cellH + gap);
+    corpo += textoSVG(l.label, padL - 10, y + cellH / 2, { maxChars: MAX_ROTULO, anchor: "end", fontSize: 10.5, alturaLinha: 12 });
     l.valores.forEach((v, j) => {
-      const x = padL + j * (cell + gap);
+      const x = padL + j * (cellW + gap);
       const t = v / max;
-      corpo += `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${cell}" height="${cell}" fill="rgba(34,211,238,${(0.07 + t * 0.72).toFixed(2)})"><title>${l.label} × ${colunas[j].label}: ${v}</title></rect>`;
-      if (v) corpo += `<text x="${(x + cell / 2).toFixed(1)}" y="${(y + cell / 2 + 4).toFixed(1)}" text-anchor="middle" font-family="monospace" font-size="11" font-weight="${t > 0.6 ? 700 : 400}" fill="var(--carvao)" fill-opacity="${t > 0.5 ? 1 : 0.75}">${v}</text>`;
+      corpo += `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${cellW}" height="${cellH}" fill="rgba(34,211,238,${(0.07 + t * 0.72).toFixed(2)})"><title>${escapeHTML(l.label)} × ${escapeHTML(colunas[j].label)}: ${v}</title></rect>`;
+      if (v) corpo += `<text x="${(x + cellW / 2).toFixed(1)}" y="${(y + cellH / 2 + 4).toFixed(1)}" text-anchor="middle" font-family="monospace" font-size="11.5" font-weight="${t > 0.6 ? 700 : 400}" fill="var(--carvao)" fill-opacity="${t > 0.5 ? 1 : 0.75}">${v}</text>`;
     });
-    const xT = padL + colunas.length * (cell + gap);
-    corpo += `<rect x="${xT.toFixed(1)}" y="${y.toFixed(1)}" width="${cell}" height="${cell}" fill="var(--paper-line)" />`;
-    corpo += `<text x="${(xT + cell / 2).toFixed(1)}" y="${(y + cell / 2 + 4).toFixed(1)}" text-anchor="middle" font-family="monospace" font-size="11" font-weight="700" fill="var(--carvao)">${l.total}</text>`;
+    const xT = padL + colunas.length * (cellW + gap);
+    corpo += `<rect x="${xT.toFixed(1)}" y="${y.toFixed(1)}" width="${cellW}" height="${cellH}" fill="var(--paper-line)" />`;
+    corpo += `<text x="${(xT + cellW / 2).toFixed(1)}" y="${(y + cellH / 2 + 4).toFixed(1)}" text-anchor="middle" font-family="monospace" font-size="11.5" font-weight="700" fill="var(--carvao)">${l.total}</text>`;
   });
 
   // linha de totais por coluna, no rodapé
-  const yT = padT + linhas.length * (cell + gap);
-  corpo += `<text x="${(padL - 10).toFixed(1)}" y="${(yT + cell / 2 + 4).toFixed(1)}" text-anchor="end" font-family="monospace" font-size="10.5" font-weight="700" fill="var(--carvao)">TOTAL</text>`;
+  const yT = padT + linhas.length * (cellH + gap);
+  corpo += `<text x="${(padL - 10).toFixed(1)}" y="${(yT + cellH / 2 + 4).toFixed(1)}" text-anchor="end" font-family="monospace" font-size="10.5" font-weight="700" fill="var(--carvao)">TOTAL</text>`;
   colunas.forEach((c, j) => {
-    const x = padL + j * (cell + gap);
-    corpo += `<rect x="${x.toFixed(1)}" y="${yT.toFixed(1)}" width="${cell}" height="${cell}" fill="var(--paper-line)" />`;
-    corpo += `<text x="${(x + cell / 2).toFixed(1)}" y="${(yT + cell / 2 + 4).toFixed(1)}" text-anchor="middle" font-family="monospace" font-size="11" font-weight="700" fill="var(--carvao)">${c.total}</text>`;
+    const x = padL + j * (cellW + gap);
+    corpo += `<rect x="${x.toFixed(1)}" y="${yT.toFixed(1)}" width="${cellW}" height="${cellH}" fill="var(--paper-line)" />`;
+    corpo += `<text x="${(x + cellW / 2).toFixed(1)}" y="${(yT + cellH / 2 + 4).toFixed(1)}" text-anchor="middle" font-family="monospace" font-size="11.5" font-weight="700" fill="var(--carvao)">${c.total}</text>`;
   });
-  const xTT = padL + colunas.length * (cell + gap);
-  corpo += `<rect x="${xTT.toFixed(1)}" y="${yT.toFixed(1)}" width="${cell}" height="${cell}" fill="var(--carvao)" />`;
-  corpo += `<text x="${(xTT + cell / 2).toFixed(1)}" y="${(yT + cell / 2 + 4).toFixed(1)}" text-anchor="middle" font-family="monospace" font-size="11.5" font-weight="700" fill="var(--paper)">${dados.total}</text>`;
+  const xTT = padL + colunas.length * (cellW + gap);
+  corpo += `<rect x="${xTT.toFixed(1)}" y="${yT.toFixed(1)}" width="${cellW}" height="${cellH}" fill="var(--carvao)" />`;
+  corpo += `<text x="${(xTT + cellW / 2).toFixed(1)}" y="${(yT + cellH / 2 + 4).toFixed(1)}" text-anchor="middle" font-family="monospace" font-size="12" font-weight="700" fill="var(--paper)">${dados.total}</text>`;
 
   return `<svg viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg">${cabecalho}${corpo}</svg>`;
+}
+
+// barras do acumulado: a altura é o total acumulado, e em cima vai "+N"
+// (o que entrou naquele período). Sem os dois números, a última barra se lê
+// como "180 adquiridas em 2026" — que é falso.
+function barrasAcumuladoSVG(pontos, cor) {
+  const w = 620, h = 250, padL = 44, padR = 16, padT = 26, baseY = h - 42;
+  const n = pontos.length || 1;
+  const max = Math.max(...pontos.map(p => p.valor), 1);
+  const plotH = baseY - padT;
+  const bw = (w - padL - padR) / n;
+  const barW = Math.min(bw * 0.6, 44);
+  const passo = passoRotulo(n);
+
+  let grade = "", eixoY = "", barras = "", labels = "";
+  [0, 0.25, 0.5, 0.75, 1].forEach(f => {
+    const y = baseY - plotH * f;
+    grade += `<line x1="${padL}" y1="${y.toFixed(1)}" x2="${w - padR}" y2="${y.toFixed(1)}" stroke="var(--paper-line)" stroke-width="1" stroke-dasharray="${f === 0 ? "0" : "2 4"}" />`;
+    eixoY += `<text x="${(padL - 6).toFixed(1)}" y="${(y + 3).toFixed(1)}" text-anchor="end" font-family="monospace" font-size="9" fill="var(--carvao)" fill-opacity="0.55">${formatarEixo(max * f)}</text>`;
+  });
+
+  pontos.forEach((p, i) => {
+    const cx = padL + bw * i + bw / 2;
+    const alt = plotH * (p.valor / max);
+    const y = baseY - alt;
+    const ultimo = i === n - 1;
+    barras += `<rect class="barra" x="${(cx - barW / 2).toFixed(1)}" y="${y.toFixed(1)}" width="${barW.toFixed(1)}" height="${alt.toFixed(1)}" fill="${ultimo ? cor : corGlow(cor)}" stroke="${cor}" stroke-width="1.4"><title>${p.label}: total acumulado ${p.valor} · entraram ${p.incremento}</title></rect>`;
+    if (n <= 24) {
+      // acumulado em cima da barra, e logo abaixo o que entrou no período
+      barras += `<text x="${cx.toFixed(1)}" y="${(y - 14).toFixed(1)}" text-anchor="middle" font-family="monospace" font-size="9.5" font-weight="700" fill="var(--carvao)">${formatarEixo(p.valor)}</text>`;
+      if (p.incremento) barras += `<text x="${cx.toFixed(1)}" y="${(y - 4).toFixed(1)}" text-anchor="middle" font-family="monospace" font-size="8.5" fill="var(--oliva)">+${formatarEixo(p.incremento)}</text>`;
+    }
+    if (i % passo === 0 || ultimo) {
+      labels += `<text x="${cx.toFixed(1)}" y="${baseY + 16}" text-anchor="middle" font-family="monospace" font-size="9.5" fill="var(--carvao)" fill-opacity="${ultimo ? 1 : 0.65}" font-weight="${ultimo ? 700 : 400}">${p.label}</text>`;
+    }
+  });
+
+  const legenda = `<text x="${padL}" y="${h - 8}" font-family="monospace" font-size="9" fill="var(--carvao)" fill-opacity="0.6">número de cima = total acumulado · <tspan fill="var(--oliva)">+N = entraram no período</tspan></text>`;
+  return `<svg viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg">${grade}${eixoY}${barras}${labels}${legenda}</svg>`;
+}
+
+// cards de resumo que mudam conforme o painel, e a caixa de "como ler"
+function renderResumos(resumos) {
+  if (!resumos || !resumos.length) return "";
+  return `<div class="kpi-row">${resumos.map(r => `
+    <div class="kpi-card">
+      <div class="kpi-label">${escapeHTML(r.rotulo)}</div>
+      <div class="kpi-value">${r.sinal && r.valor > 0 ? "+" : ""}${Number(r.valor).toLocaleString("pt-BR")}${r.sufixo || ""}</div>
+      ${r.detalhe ? `<span class="kpi-delta flat">${escapeHTML(r.detalhe)}</span>` : ""}
+    </div>`).join("")}</div>`;
+}
+
+function renderComoLer(cl) {
+  if (!cl) return "";
+  return `<p class="dash-chart-hint"><b>${escapeHTML(cl.titulo)}:</b> ${escapeHTML(cl.texto)} <i>Como ler:</i> ${escapeHTML(cl.eixo)}</p>`;
 }
 
 function renderPainel(resultado) {
@@ -1397,16 +1464,17 @@ function renderPainel(resultado) {
   if (dados.tipo === "evolucao") {
     const corpo = dados.series.length
       ? multiLinhaSVG(dados.series, dados.pontos.map(p => p.label))
-      : simpleBarChartSVG(dados.pontos.map(p => ({ label: p.label, valor: p.valor })), "var(--tinta)");
-    return `${avisoFiltro}
-      <div class="kpi-row"><div class="kpi-card"><div class="kpi-label">${dados.acumulado ? "Total acumulado" : "Total no período"}</div><div class="kpi-value">${dados.total.toLocaleString("pt-BR")}</div></div></div>
+      : dados.acumulado
+        ? barrasAcumuladoSVG(dados.pontos, "var(--tinta)")
+        : simpleBarChartSVG(dados.pontos.map(p => ({ label: p.label, valor: p.valor })), "var(--tinta)");
+    return `${avisoFiltro}${renderResumos(dados.resumos)}${renderComoLer(dados.comoLer)}
       <div style="margin-top:12px">${corpo}</div>${rodape}`;
   }
 
   if (dados.tipo === "composicao") {
     const tabela = dados.categorias.map(c => `<tr><td>${escapeHTML(c.label)}</td><td class="num">${c.valor.toLocaleString("pt-BR")}</td><td class="num">${c.percentualDoTotal}%</td></tr>`).join("")
       + `<tr style="border-top:2px solid var(--carvao);font-weight:700"><td>TOTAL</td><td class="num">${dados.total.toLocaleString("pt-BR")}</td><td class="num">100%</td></tr>`;
-    return `${avisoFiltro}
+    return `${avisoFiltro}${renderResumos(dados.resumos)}${renderComoLer(dados.comoLer)}
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start">
         <div>${pieChartSVG(dados.categorias, null)}</div>
         <table class="dash-tabela"><thead><tr><th>CATEGORIA</th><th>VALOR</th><th>%</th></tr></thead><tbody>${tabela}</tbody></table>
@@ -1424,12 +1492,11 @@ function renderPainel(resultado) {
         </h5>
         <div style="overflow-x:auto">${cruzamentoSVG(seg)}</div>
       </div>`).join("");
-    return `${avisoFiltro}
-      <div class="kpi-row"><div class="kpi-card"><div class="kpi-label">Total geral (todos os ${escapeHTML(painel.config.colunaSegmento)})</div><div class="kpi-value">${dados.total.toLocaleString("pt-BR")}</div></div></div>
+    return `${avisoFiltro}${renderResumos(dados.resumos)}${renderComoLer(dados.comoLer)}
       <div style="margin-top:14px">${blocos}</div>${rodape}`;
   }
 
-  return `${avisoFiltro}<div style="overflow-x:auto">${cruzamentoSVG(dados)}</div>${rodape}`;
+  return `${avisoFiltro}${renderResumos(dados.resumos)}${renderComoLer(dados.comoLer)}<div style="overflow-x:auto">${cruzamentoSVG(dados)}</div>${rodape}`;
 }
 
 async function abrirPainel(painelId, alvoId) {
@@ -1441,6 +1508,35 @@ async function abrirPainel(painelId, alvoId) {
     adicionarControlesGrafico(alvo);
   } catch (erro) {
     alvo.innerHTML = `<p class="font-mono" style="font-size:11px;color:var(--terracota)">Não consegui calcular: ${escapeHTML(erro.message)}</p>`;
+  }
+}
+
+/**
+ * Painéis marcados como destaque, mostrados na aba "Visão Geral".
+ * É isto que faz a Visão Geral refletir dado real: em vez de números
+ * digitados à mão que envelhecem sozinhos, ela passa a exibir os painéis
+ * escolhidos, recalculados da planilha a cada abertura.
+ */
+async function carregarDestaques(portalSlug) {
+  const alvo = document.getElementById("bloco-destaques");
+  if (!alvo) return;
+  try {
+    const paineis = await apiFetch(`/api/portais/${portalSlug}/paineis`);
+    const destaques = paineis.filter(pn => pn.destaque);
+    if (!destaques.length) {
+      alvo.innerHTML = souAdmin()
+        ? `<p class="font-mono" style="font-size:11px;color:#6B7280;margin-bottom:16px">Nenhum painel em destaque. Na aba PAINÉIS, marque com ★ os que devem aparecer aqui na visão geral.</p>`
+        : "";
+      return;
+    }
+    alvo.innerHTML = destaques.map(pn => `
+      <div class="dash-chart-box" style="margin-bottom:2px">
+        <h4>${escapeHTML(pn.nome)}</h4>
+        <div id="destaque-corpo-${pn.id}"><p class="font-mono" style="font-size:11px;color:#9AA3B2">Calculando...</p></div>
+      </div>`).join("") + `<div style="height:20px"></div>`;
+    for (const pn of destaques) await abrirPainel(pn.id, `destaque-corpo-${pn.id}`);
+  } catch (erro) {
+    alvo.innerHTML = `<p class="font-mono" style="font-size:11px;color:var(--terracota)">Não consegui carregar os destaques: ${escapeHTML(erro.message)}</p>`;
   }
 }
 
@@ -1469,6 +1565,7 @@ async function carregarPaineisPortal(portalSlug) {
           <h4>${escapeHTML(pn.nome)}</h4>
           <div style="display:flex;gap:6px">
             <button class="dash-toggle-btn" data-abrir="${pn.id}">VER</button>
+            ${souAdmin() ? `<button class="dash-toggle-btn" data-destaque="${pn.id}" data-valor="${pn.destaque ? "0" : "1"}" title="Mostrar na Visão Geral" style="${pn.destaque ? "background:var(--mostarda);color:var(--paper)" : ""}">${pn.destaque ? "★ NA VISÃO GERAL" : "☆ DESTACAR"}</button>` : ""}
             ${souAdmin() ? `<button class="dash-toggle-btn" data-apagar="${pn.id}" style="color:var(--terracota)">REMOVER</button>` : ""}
           </div>
         </div>
@@ -1480,6 +1577,18 @@ async function carregarPaineisPortal(portalSlug) {
 
     painel.querySelectorAll("[data-abrir]").forEach(b => {
       b.addEventListener("click", () => abrirPainel(b.dataset.abrir, `painel-corpo-${b.dataset.abrir}`));
+    });
+    painel.querySelectorAll("[data-destaque]").forEach(b => {
+      b.addEventListener("click", async () => {
+        try {
+          await apiFetch(`/api/paineis/${b.dataset.destaque}/destaque`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ destaque: b.dataset.valor === "1" }),
+          });
+          carregarPaineisPortal(portalSlug);
+        } catch (erro) { alert("Não consegui alterar: " + erro.message); }
+      });
     });
     painel.querySelectorAll("[data-apagar]").forEach(b => {
       b.addEventListener("click", async () => {
@@ -1589,6 +1698,7 @@ async function abrirTela(id) {
   const botaoEditarProjetos = souAdmin() ? `<button class="btn-exportar-xlsx" id="btn-editar-projetos" style="margin:14px 0">✎ EDITAR PROJETOS</button>` : "";
 
   let corpoGeral = `
+    <div id="bloco-destaques"></div>
     <div id="bloco-indicadores">${botaoEditarIndicadores}<div id="view-indicadores">${renderIndicadoresLeitura(p.dados)}</div></div>
     <div id="bloco-projetos">${botaoEditarProjetos}<div id="view-projetos">${renderProjetosLeitura(p.projetos)}</div></div>
   `;
@@ -1683,16 +1793,14 @@ async function abrirTela(id) {
     <div class="tabs">
       <button class="tab-btn active" data-tab="geral">VISÃO GERAL</button>
       <button class="tab-btn" data-tab="paineis">PAINÉIS</button>
-      <button class="tab-btn" data-tab="dashboard">DASHBOARD</button>
       <button class="tab-btn" data-tab="planilhas">PLANILHAS ENVIADAS</button>
     </div>
     <div class="tab-panel" id="tab-geral">${corpoGeral}</div>
     <div class="tab-panel" id="tab-paineis" hidden><p class="tela-intro">Carregando...</p></div>
-    <div class="tab-panel" id="tab-dashboard" hidden>${corpoDash}</div>
     <div class="tab-panel" id="tab-planilhas" hidden><p class="tela-intro">Carregando...</p></div>
   `;
 
-  const PAINEIS = ["geral", "paineis", "dashboard", "planilhas"];
+  const PAINEIS = ["geral", "paineis", "planilhas"];
   telaConteudo.querySelectorAll(".tab-btn").forEach(btn => {
     btn.addEventListener("click", () => {
       telaConteudo.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
@@ -1706,45 +1814,10 @@ async function abrirTela(id) {
 
   ligarEdicaoIndicadores(p.id);
   ligarEdicaoProjetos(p.id);
+  carregarDestaques(p.id);
 
-  if (dd) {
-    dashState = { tipoEvolucao: "bar", tipoComp: "donut" };
-    const selPeriodo = document.getElementById("dash-filtro-periodo");
-    const selCategoria = document.getElementById("dash-filtro-categoria");
-    const selDimensao = document.getElementById("dash-filtro-dimensao");
-    const render = () => atualizarDashboard(p.id, selPeriodo.value, selCategoria.value, selDimensao ? selDimensao.value : undefined);
-    selPeriodo.addEventListener("change", render);
-    selCategoria.addEventListener("change", render);
-    if (selDimensao) {
-      selDimensao.addEventListener("change", () => {
-        selCategoria.value = "todas"; // categoria da dimensão antiga não existe na nova — volta pra "todas"
-        render();
-      });
-    }
-    const btnExportar = document.getElementById("btn-exportar-xlsx");
-    if (btnExportar) btnExportar.addEventListener("click", () => exportarDashboardExcel(p.id));
-    const btnPbi = document.getElementById("btn-exportar-pbi");
-    if (btnPbi) btnPbi.addEventListener("click", () => exportarPowerBI());
-
-    document.querySelectorAll("#toggle-tipo-evolucao .dash-toggle-btn").forEach(btn => {
-      btn.addEventListener("click", () => {
-        document.querySelectorAll("#toggle-tipo-evolucao .dash-toggle-btn").forEach(b => b.classList.remove("active"));
-        btn.classList.add("active");
-        dashState.tipoEvolucao = btn.dataset.val;
-        render();
-      });
-    });
-    document.querySelectorAll("#toggle-tipo-comp .dash-toggle-btn").forEach(btn => {
-      btn.addEventListener("click", () => {
-        document.querySelectorAll("#toggle-tipo-comp .dash-toggle-btn").forEach(b => b.classList.remove("active"));
-        btn.classList.add("active");
-        dashState.tipoComp = btn.dataset.val;
-        render();
-      });
-    });
-
-    render();
-  }
+  // (o antigo bloco de filtros do dashboard saiu junto com a aba DASHBOARD —
+  //  quem responde essas perguntas agora são os painéis, um por pergunta)
 
   telaConteudo.style.setProperty("--tela-color", p.cor);
   telaConteudo.hidden = false;
@@ -2053,6 +2126,46 @@ function ligarFormularioAplicarDashboard(container, uploadId, portalSlug) {
       status.textContent = "Erro: " + erro.message;
     }
   });
+}
+
+// ---------- texto em SVG que quebra em vez de cortar ----------
+// SVG não tem quebra automática de linha (diferente do HTML), por isso todo
+// rótulo longo vinha aparecendo cortado com "…". Aqui a quebra é feita na
+// mão, em <tspan>, preservando o nome inteiro — "12ª DT - Peripери" vira
+// duas linhas em vez de "12ª DT - Peripe…". Diminuir a fonte resolveria o
+// espaço, mas piora a leitura, que é o oposto do que se quer num painel
+// que vai pra apresentação.
+function quebrarTexto(texto, maxChars) {
+  const palavras = String(texto ?? "").trim().split(/\s+/);
+  const linhas = [];
+  let atual = "";
+  for (const palavra of palavras) {
+    if (!atual) { atual = palavra; continue; }
+    if ((atual + " " + palavra).length <= maxChars) atual += " " + palavra;
+    else { linhas.push(atual); atual = palavra; }
+  }
+  if (atual) linhas.push(atual);
+  // palavra única maior que o limite (ex.: um código sem espaço): parte à força
+  return linhas.flatMap(l => l.length > maxChars ? (l.match(new RegExp(`.{1,${maxChars}}`, "g")) || [l]) : [l]);
+}
+
+function textoSVG(texto, x, y, opcoes = {}) {
+  const {
+    maxChars = 18, anchor: ancora = "middle", fontSize = 10, peso = 400,
+    opacidade = 1, alturaLinha = fontSize + 2, transform = "", extra = "",
+  } = opcoes;
+  const linhas = quebrarTexto(texto, maxChars);
+  const yInicial = y - ((linhas.length - 1) * alturaLinha) / 2;
+  const tspans = linhas
+    .map((l, i) => `<tspan x="${x}" dy="${i === 0 ? 0 : alturaLinha}">${escapeHTML(l)}</tspan>`)
+    .join("");
+  return `<text x="${x}" y="${yInicial.toFixed(1)}" text-anchor="${ancora}" font-family="monospace" font-size="${fontSize}" font-weight="${peso}" fill="var(--carvao)" fill-opacity="${opacidade}" ${transform ? `transform="${transform}"` : ""} ${extra}><title>${escapeHTML(texto)}</title>${tspans}</text>`;
+}
+
+// quantas linhas um rótulo vai ocupar — usado pra dimensionar a altura das
+// células antes de desenhar, senão o texto quebrado invade a célula vizinha
+function linhasDoTexto(texto, maxChars) {
+  return quebrarTexto(texto, maxChars).length;
 }
 
 // ---------- ampliar e baixar gráfico como imagem ----------
