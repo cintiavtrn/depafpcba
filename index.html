@@ -87,7 +87,7 @@ body{background:var(--paper);color:var(--carvao);font-family:'IBM Plex Sans',san
 .direcao-card p{font-size:13px;color:#9AA3B2;margin-top:4px}
 
 /* ---------- telas dedicadas ---------- */
-.tela{padding:48px 24px 64px;max-width:900px;margin:0 auto}
+.tela{padding:48px 24px 64px;max-width:1200px;margin:0 auto}
 .tela[hidden]{display:none}
 .tela-head{display:flex;align-items:center;gap:16px;border-bottom:3px solid var(--carvao);padding-bottom:16px;margin-bottom:28px}
 .tela-head .icon-grande{width:46px;height:46px;color:var(--tela-color,var(--carvao))}
@@ -180,7 +180,7 @@ body{background:var(--paper);color:var(--carvao);font-family:'IBM Plex Sans',san
   font-family:'IBM Plex Mono',monospace;font-size:12.5px;padding:6px 8px;border:2px solid var(--carvao);background:var(--paper);color:var(--carvao);
 }
 
-.dash-charts{display:grid;grid-template-columns:1.3fr 1fr;gap:2px;background:var(--carvao);border:2px solid var(--carvao);margin-bottom:2px}
+.dash-charts{display:grid;grid-template-columns:1fr 1.05fr;gap:2px;background:var(--carvao);border:2px solid var(--carvao);margin-bottom:2px}
 @media (max-width:760px){.dash-charts{grid-template-columns:1fr}}
 .dash-chart-box{	background:var(--surface);padding:18px}
 .dash-chart-box h4{font-family:'Space Grotesk',sans-serif;font-size:16px;margin-bottom:12px}
@@ -218,10 +218,10 @@ body{background:var(--paper);color:var(--carvao);font-family:'IBM Plex Sans',san
 .donut-fatia{transition:transform .18s ease,opacity .2s ease;transform-origin:100px 100px}
 .donut-fatia:hover{transform:scale(1.04)}
 .donut-legenda{display:flex;flex-direction:column;gap:2px;margin-top:12px;border-top:1px solid var(--paper-line);padding-top:10px}
-.donut-leg{display:flex;align-items:center;gap:8px;background:none;border:none;padding:4px 2px;cursor:pointer;text-align:left;font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--carvao);transition:opacity .15s ease}
+.donut-leg{display:flex;align-items:flex-start;gap:8px;background:none;border:none;padding:5px 2px;cursor:pointer;text-align:left;font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--carvao);transition:opacity .15s ease}
 .donut-leg:hover{background:var(--paper-line)}
 .donut-leg .sw{width:11px;height:11px;flex:none;border:1px solid var(--carvao)}
-.donut-leg .lg-nome{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.donut-leg .lg-nome{flex:1;white-space:normal;line-height:1.3;text-align:left}
 .donut-leg .lg-pct{font-variant-numeric:tabular-nums;color:#9AA3B2}
 .kpi-card:nth-child(1){--kpi-cor:var(--tela-color,var(--tinta))}
 .kpi-card:nth-child(2){--kpi-cor:var(--dourado)}
@@ -474,7 +474,7 @@ function rankingChartSVG(categorias, selectedLabel) {
     const cor = corCategoria(i);
     const [x, y] = toXY(angFor(i));
     const sel = selectedLabel === c.label;
-    const nomeCurto = c.label.length > 16 ? c.label.slice(0, 15) + "…" : c.label;
+    const nomeCurto = c.label.length > 20 ? c.label.slice(0, 19) + "…" : c.label;
     const ang = angFor(i), rad = ang * Math.PI / 180;
     const lx = cx + (r + 28) * Math.cos(rad), ly = cy + (r + 28) * Math.sin(rad);
     nodos += `<circle class="rank-bar" data-cat="${c.label}" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${sel ? 8 : 6}" fill="${cor}" stroke="var(--surface)" stroke-width="2" style="cursor:pointer"><title>${c.label}: ${c.valor}</title></circle>`;
@@ -502,7 +502,7 @@ function donutChartSVG(categorias, selectedLabel) {
 
   let cols = "", rows = "", cells = "";
   categorias.forEach((c, i) => {
-    const nomeCurto = c.label.length > 14 ? c.label.slice(0, 13) + "…" : c.label;
+    const nomeCurto = c.label.length > 18 ? c.label.slice(0, 17) + "…" : c.label;
     const sel = selectedLabel === c.label;
     const xTop = padL + i * (cell + gap) + cell / 2;
     const yRow = padT + i * (cell + gap) + cell / 2;
@@ -558,6 +558,11 @@ function simpleBarChartSVG(pontos, cor) {
     const y = baseY - alt;
     const ultimo = i === n - 1;
     barras += `<rect class="barra" x="${(cxB - barW / 2).toFixed(1)}" y="${y.toFixed(1)}" width="${barW.toFixed(1)}" height="${alt.toFixed(1)}" fill="${ultimo ? cor : corGlow(cor)}" stroke="${cor}" stroke-width="1.4"><title>${p.label}: ${p.valor}</title></rect>`;
+    if (n <= 20) {
+      // valor em cima da barra — sem isso, o número só existia no tooltip,
+      // que some quando a imagem é baixada ou o gráfico é ampliado
+      barras += `<text x="${cxB.toFixed(1)}" y="${(y - 4).toFixed(1)}" text-anchor="middle" font-family="monospace" font-size="9" font-weight="700" fill="var(--carvao)">${formatarEixo(p.valor)}</text>`;
+    }
     if (i % passo === 0 || ultimo) {
       labels += `<text x="${cxB.toFixed(1)}" y="${baseY + 16}" text-anchor="middle" font-family="monospace" font-size="9" fill="var(--carvao)" fill-opacity="${ultimo ? 1 : 0.6}" font-weight="${ultimo ? 700 : 400}">${p.label}</text>`;
     }
@@ -597,7 +602,7 @@ function simpleLineChartSVG(pontos, cor) {
 function pieChartSVG(categorias, selectedLabel) {
   const cx = 100, cy = 100, rOut = 88, rIn = 48, total = categorias.reduce((a, c) => a + c.valor, 0) || 1;
   const toXY = (a, r) => { const rad = a * Math.PI / 180; return [cx + r * Math.cos(rad), cy + r * Math.sin(rad)]; };
-  let ang = -90, fatias = "";
+  let ang = -90, fatias = "", rotulosFatia = "";
   categorias.forEach((c, i) => {
     const cor = corCategoria(i);
     const a0 = ang, frac = c.valor / total, a1 = ang + frac * 360; ang = a1;
@@ -607,16 +612,26 @@ function pieChartSVG(categorias, selectedLabel) {
     const dim = selectedLabel && selectedLabel !== c.label;
     const d = `M ${x0o.toFixed(1)} ${y0o.toFixed(1)} A ${rOut} ${rOut} 0 ${large} 1 ${x1o.toFixed(1)} ${y1o.toFixed(1)} L ${x1i.toFixed(1)} ${y1i.toFixed(1)} A ${rIn} ${rIn} 0 ${large} 0 ${x0i.toFixed(1)} ${y0i.toFixed(1)} Z`;
     fatias += `<path class="donut-fatia" data-cat="${c.label}" d="${d}" fill="${cor}" opacity="${dim ? 0.28 : 1}" style="cursor:pointer"><title>${c.label}: ${c.valor} (${(frac * 100).toFixed(1)}%)</title></path>`;
+
+    // percentual escrito na própria fatia — só quando ela tem espaço real
+    // pra caber o texto (fatia fina com número em cima fica ilegível);
+    // fatia pequena continua com o número na legenda, que agora também mostra
+    if (frac >= 0.06 && !dim) {
+      const angMeio = (a0 + a1) / 2;
+      const [xr, yr] = toXY(angMeio, (rIn + rOut) / 2);
+      rotulosFatia += `<text x="${xr.toFixed(1)}" y="${yr.toFixed(1)}" text-anchor="middle" dominant-baseline="middle" font-family="monospace" font-size="11" font-weight="700" fill="var(--paper)" style="pointer-events:none">${(frac * 100).toFixed(0)}%</text>`;
+    }
   });
   const legenda = categorias.map((c, i) => {
     const pct = ((c.valor / total) * 100).toFixed(1);
-    return `<button class="donut-leg" data-cat="${c.label}" style="cursor:pointer"><span class="sw" style="background:${corCategoria(i)}"></span><span class="lg-nome">${c.label}</span><span class="lg-pct">${pct}%</span></button>`;
+    return `<button class="donut-leg" data-cat="${c.label}" style="cursor:pointer"><span class="sw" style="background:${corCategoria(i)}"></span><span class="lg-nome">${c.label}</span><span class="lg-valor" style="font-variant-numeric:tabular-nums;color:var(--carvao);opacity:.8">${c.valor.toLocaleString("pt-BR")}</span><span class="lg-pct">${pct}%</span></button>`;
   }).join("");
-  return `<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">${fatias}</svg><div class="donut-legenda">${legenda}</div>`;
+  const totalMeio = `<text x="${cx}" y="${(cy - 3).toFixed(1)}" text-anchor="middle" font-family="'Space Grotesk',sans-serif" font-size="22" font-weight="700" fill="var(--carvao)">${total.toLocaleString("pt-BR")}</text><text x="${cx}" y="${(cy + 13).toFixed(1)}" text-anchor="middle" font-family="monospace" font-size="7.5" letter-spacing="1.5" fill="var(--carvao)" fill-opacity="0.6">TOTAL</text>`;
+  return `<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">${fatias}${rotulosFatia}${totalMeio}</svg><div class="donut-legenda">${legenda}</div>`;
 }
 
 function barRankingChartSVG(categorias, selectedLabel) {
-  const w = 300, rowH = 26, padL = 108, padR = 44, padT = 10;
+  const w = 340, rowH = 26, padL = 140, padR = 44, padT = 10;
   const h = padT + categorias.length * rowH + 6;
   const max = Math.max(...categorias.map(c => c.valor), 1);
   let linhas = "";
@@ -625,7 +640,7 @@ function barRankingChartSVG(categorias, selectedLabel) {
     const y = padT + i * rowH;
     const larg = (w - padL - padR) * (c.valor / max);
     const dim = selectedLabel && selectedLabel !== c.label;
-    const nomeCurto = c.label.length > 15 ? c.label.slice(0, 14) + "…" : c.label;
+    const nomeCurto = c.label.length > 20 ? c.label.slice(0, 19) + "…" : c.label;
     linhas += `<g class="rank-bar" data-cat="${c.label}" style="cursor:pointer" opacity="${dim ? 0.35 : 1}">
       <text x="${padL - 8}" y="${(y + rowH / 2 + 3).toFixed(1)}" text-anchor="end" font-family="monospace" font-size="9" font-weight="${selectedLabel === c.label ? 700 : 400}" fill="var(--carvao)">${nomeCurto}</text>
       <rect class="barra" x="${padL}" y="${(y + 4).toFixed(1)}" width="${larg.toFixed(1)}" height="${rowH - 8}" fill="${cor}"><title>${c.label}: ${c.valor}</title></rect>
@@ -696,6 +711,8 @@ async function garantirDashData(portalId) {
     unidade: dados.portal.unidade,
     categorias: dados.categorias,
     kpis: dados.kpis, // já calculado pelo backend, respeitando o tipoResumo do portal
+    dimensaoAtiva: dados.dimensaoAtiva,
+    dimensoesDisponiveis: dados.dimensoesDisponiveis || [],
   };
   return DASH_DATA[portalId];
 }
@@ -1343,10 +1360,18 @@ async function abrirTela(id) {
   let corpoDash = `<p class="tela-intro">Este portal ainda não tem série mensal cadastrada — suba uma planilha (botão "SUBIR PLANILHA" no topo) ou rode o seed do backend.</p>`;
   if (dd) {
     const catOptions = dd.categorias.map(c => `<option value="${c.label}">${c.label}</option>`).join("");
+    const dimOptions = dd.dimensoesDisponiveis.map(d => `<option value="${escapeAttr(d)}" ${d === dd.dimensaoAtiva ? "selected" : ""}>${escapeHTML(d)}</option>`).join("");
+    const seletorDimensao = dd.dimensoesDisponiveis.length > 1 ? `
+        <div class="dash-filtro">
+          <label>VER POR</label>
+          <select id="dash-filtro-dimensao">${dimOptions}</select>
+        </div>
+    ` : "";
     corpoDash = `
       <div id="dash-kpis"></div>
       <div class="filter-chips" id="dash-chips"></div>
       <div class="dash-filtros">
+        ${seletorDimensao}
         <div class="dash-filtro">
           <label>PERÍODO</label>
           <select id="dash-filtro-periodo">
@@ -1440,9 +1465,16 @@ async function abrirTela(id) {
     dashState = { tipoEvolucao: "bar", tipoComp: "donut" };
     const selPeriodo = document.getElementById("dash-filtro-periodo");
     const selCategoria = document.getElementById("dash-filtro-categoria");
-    const render = () => atualizarDashboard(p.id, selPeriodo.value, selCategoria.value);
+    const selDimensao = document.getElementById("dash-filtro-dimensao");
+    const render = () => atualizarDashboard(p.id, selPeriodo.value, selCategoria.value, selDimensao ? selDimensao.value : undefined);
     selPeriodo.addEventListener("change", render);
     selCategoria.addEventListener("change", render);
+    if (selDimensao) {
+      selDimensao.addEventListener("change", () => {
+        selCategoria.value = "todas"; // categoria da dimensão antiga não existe na nova — volta pra "todas"
+        render();
+      });
+    }
     const btnExportar = document.getElementById("btn-exportar-xlsx");
     if (btnExportar) btnExportar.addEventListener("click", () => exportarDashboardExcel(p.id));
     const btnPbi = document.getElementById("btn-exportar-pbi");
@@ -1475,18 +1507,18 @@ async function abrirTela(id) {
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
-async function atualizarDashboard(portalId, periodo, categoriaFiltro) {
+async function atualizarDashboard(portalId, periodo, categoriaFiltro, dimensao) {
   const p = PORTAIS.find(x => x.id === portalId);
-  const dd = await garantirDashData(portalId); // cache — sempre mensal/todas, só pros KPIs
+  const dd = await garantirDashData(portalId); // cache — pros KPIs "todas" (dimension-independentes)
   if (!dd) return;
 
   const categoriaSelecionada = categoriaFiltro && categoriaFiltro !== "todas" ? categoriaFiltro : null;
 
   let dadosFiltrados;
   try {
-    dadosFiltrados = await apiFetch(
-      `/api/portais/${portalId}/dashboard?periodo=${periodo}&categoria=${encodeURIComponent(categoriaFiltro || "todas")}`
-    );
+    const query = new URLSearchParams({ periodo, categoria: categoriaFiltro || "todas" });
+    if (dimensao) query.set("dimensao", dimensao);
+    dadosFiltrados = await apiFetch(`/api/portais/${portalId}/dashboard?${query.toString()}`);
   } catch (erro) {
     console.error(erro);
     return;
@@ -1494,14 +1526,45 @@ async function atualizarDashboard(portalId, periodo, categoriaFiltro) {
   const pontos = dadosFiltrados.serie;
   const categorias = dadosFiltrados.categorias;
 
+  // (o cache "dd" NÃO é sincronizado com o filtro atual de propósito — ele
+  // precisa continuar representando a visão "todas" estável, porque os
+  // exportadores de Excel/Power BI dependem dele pra exportar o total certo,
+  // não o que estiver filtrado na tela no momento)
+
+  // a dimensão pode ter mudado — as opções de categoria são outras, então
+  // repopula o <select> se o conjunto de rótulos for diferente do que já tá lá
+  const selCategoria = document.getElementById("dash-filtro-categoria");
+  const rotulosAtuais = Array.from(selCategoria.options).slice(1).map(o => o.value).join("|");
+  const rotulosNovos = categorias.map(c => c.label).join("|");
+  if (rotulosAtuais !== rotulosNovos) {
+    selCategoria.innerHTML = `<option value="todas">Todas as categorias</option>${categorias.map(c => `<option value="${escapeAttr(c.label)}">${escapeHTML(c.label)}</option>`).join("")}`;
+    selCategoria.value = categoriaSelecionada && categorias.some(c => c.label === categoriaSelecionada) ? categoriaSelecionada : "todas";
+  }
+
   const idxSel = categoriaSelecionada ? categorias.findIndex(c => c.label === categoriaSelecionada) : -1;
   const corEvolucao = idxSel >= 0 ? corCategoria(idxSel) : p.cor;
 
-  document.getElementById("dash-kpis").innerHTML = kpiRowSVG(dd, corEvolucao);
+  // o KPI usa o dado FILTRADO (categoria + dimensão atuais), não o cache
+  // fixo em "todas" — assim "último mês" sempre bate com o que o resto da
+  // tela está mostrando, em vez de ficar preso na visão geral por baixo dos panos
+  const dadosParaKpi = {
+    mensal: dadosFiltrados.serieMensalBruta,
+    unidade: dadosFiltrados.portal.unidade,
+    categorias,
+    kpis: dadosFiltrados.kpis,
+  };
+  const escopo = categoriaSelecionada
+    ? `Mostrando: ${categoriaSelecionada}${dadosFiltrados.dimensaoAtiva ? ` (por ${dadosFiltrados.dimensaoAtiva})` : ""}`
+    : dadosFiltrados.dimensaoAtiva ? `Mostrando: todas — composição por ${dadosFiltrados.dimensaoAtiva}` : "Mostrando: todas as categorias";
+  document.getElementById("dash-kpis").innerHTML = `
+    <p class="font-mono" style="font-size:11px;color:#9AA3B2;margin-bottom:8px">${escapeHTML(escopo)}</p>
+    ${kpiRowSVG(dadosParaKpi, corEvolucao)}
+  `;
   const chips = document.getElementById("dash-chips");
   let chipsHTML = "";
-  if(periodo !== "mensal") chipsHTML += `<span class="filter-chip">${periodo} <button onclick="document.getElementById('dash-filtro-periodo').value='mensal';atualizarDashboard('${portalId}','mensal',document.getElementById('dash-filtro-categoria').value)">✕</button></span>`;
-  if(categoriaSelecionada) chipsHTML += `<span class="filter-chip">${categoriaSelecionada} <button onclick="document.getElementById('dash-filtro-categoria').value='todas';atualizarDashboard('${portalId}',document.getElementById('dash-filtro-periodo').value,'todas')">✕</button></span>`;
+  const dimensaoAtualStr = () => { const el = document.getElementById("dash-filtro-dimensao"); return el ? `,'${el.value}'` : ""; };
+  if(periodo !== "mensal") chipsHTML += `<span class="filter-chip">${periodo} <button onclick="document.getElementById('dash-filtro-periodo').value='mensal';atualizarDashboard('${portalId}','mensal',document.getElementById('dash-filtro-categoria').value${dimensaoAtualStr()})">✕</button></span>`;
+  if(categoriaSelecionada) chipsHTML += `<span class="filter-chip">${categoriaSelecionada} <button onclick="document.getElementById('dash-filtro-categoria').value='todas';atualizarDashboard('${portalId}',document.getElementById('dash-filtro-periodo').value,'todas'${dimensaoAtualStr()})">✕</button></span>`;
   chips.innerHTML = chipsHTML;
 
   const RENDER_EVOLUCAO = { bar: simpleBarChartSVG, line: simpleLineChartSVG, radar: barChartSVG, fluxo: lineChartSVG };
@@ -1522,18 +1585,20 @@ async function atualizarDashboard(portalId, periodo, categoriaFiltro) {
     const selCategoria = document.getElementById("dash-filtro-categoria");
     const novoValor = selCategoria.value === clicado ? "todas" : clicado;
     selCategoria.value = novoValor;
-    atualizarDashboard(portalId, document.getElementById("dash-filtro-periodo").value, novoValor);
+    const selDim = document.getElementById("dash-filtro-dimensao");
+    atualizarDashboard(portalId, document.getElementById("dash-filtro-periodo").value, novoValor, selDim ? selDim.value : undefined);
   }
 
   elComp.querySelectorAll("[data-cat]").forEach(el => {
     el.addEventListener("click", () => alternarFiltro(el.dataset.cat));
   });
 
+  const totalGeral = categorias.reduce((a, c) => a + c.valor, 0);
   const corpo = categorias.map(c => {
     const dim = categoriaSelecionada && categoriaSelecionada !== c.label;
     const sel = categoriaSelecionada === c.label;
     return `<tr class="${dim ? "dim" : ""}" data-cat="${c.label}" style="${sel ? "font-weight:600;" : ""}"><td>${c.label}</td><td class="num">${c.valor}</td><td class="num">${c.percentualDoTotal}%</td></tr>`;
-  }).join("");
+  }).join("") + `<tr style="border-top:2px solid var(--carvao);font-weight:700"><td>TOTAL</td><td class="num">${totalGeral.toLocaleString("pt-BR")}</td><td class="num">100%</td></tr>`;
   const tbody = document.getElementById("dash-tabela-body");
   tbody.innerHTML = corpo;
   tbody.querySelectorAll("tr[data-cat]").forEach(tr => {
@@ -1545,7 +1610,8 @@ async function atualizarDashboard(portalId, periodo, categoriaFiltro) {
       const asc = !th.classList.contains("sort-asc");
       document.querySelectorAll(".dash-tabela th").forEach(t=>t.classList.remove("sort-asc","sort-desc"));
       th.classList.add(asc?"sort-asc":"sort-desc");
-      const rows = [...tbody.querySelectorAll("tr")];
+      const linhaTotal = tbody.querySelector("tr:not([data-cat])");
+      const rows = [...tbody.querySelectorAll("tr[data-cat]")];
       rows.sort((a,b)=>{
         const av=a.children[col].textContent.replace("%",""), bv=b.children[col].textContent.replace("%","");
         const an=parseFloat(av), bn=parseFloat(bv);
@@ -1553,6 +1619,7 @@ async function atualizarDashboard(portalId, periodo, categoriaFiltro) {
         return asc?cmp:-cmp;
       });
       rows.forEach(r=>tbody.appendChild(r));
+      if (linhaTotal) tbody.appendChild(linhaTotal);
     };
   });
 }
@@ -1623,12 +1690,12 @@ function heatmapGenericoSVG(chart) {
   let cols = "", rows = "", cells = "";
   valoresB.forEach((vb, j) => {
     const x = padL + j * (cell + gap) + cell / 2;
-    const curto = String(vb).length > 14 ? String(vb).slice(0, 13) + "…" : vb;
+    const curto = String(vb).length > 18 ? String(vb).slice(0, 17) + "…" : vb;
     cols += `<text x="${x.toFixed(1)}" y="${(padT - 8).toFixed(1)}" text-anchor="start" transform="rotate(-40 ${x.toFixed(1)} ${(padT - 8).toFixed(1)})" font-family="monospace" font-size="8" fill="var(--carvao)" fill-opacity="0.6">${curto}</text>`;
   });
   valoresA.forEach((va, i) => {
     const y = padT + i * (cell + gap) + cell / 2;
-    const curto = String(va).length > 14 ? String(va).slice(0, 13) + "…" : va;
+    const curto = String(va).length > 18 ? String(va).slice(0, 17) + "…" : va;
     rows += `<text x="${(padL - 8).toFixed(1)}" y="${(y + 3).toFixed(1)}" text-anchor="end" font-family="monospace" font-size="9" fill="var(--carvao)" fill-opacity="0.85">${curto}</text>`;
     valoresB.forEach((vb, j) => {
       const v = mapa.get(`${va}|${vb}`) || 0;
@@ -1675,8 +1742,14 @@ function renderFormularioAplicarDashboard(schema) {
         <select id="map-coluna-valor">${opcoes(numericas)}</select>
       </div>
       <div class="dash-filtro">
-        <label>COLUNA DE CATEGORIA (vira a composição e o filtro)</label>
-        <select id="map-coluna-categoria">${opcoes(categoricas)}</select>
+        <label>COLUNAS DE CATEGORIA (pode marcar mais de uma — cada uma vira uma forma diferente de ver o dashboard, sem uma apagar a outra)</label>
+        <div id="map-colunas-categoria" style="display:flex;flex-direction:column;gap:6px;background:var(--paper);border:1px solid var(--paper-line);padding:8px">
+          ${categoricas.map(c => `
+            <label style="display:flex;align-items:center;gap:6px;font-family:'IBM Plex Mono',monospace;font-size:12px;cursor:pointer">
+              <input type="checkbox" class="check-categoria" value="${escapeAttr(c)}" checked> ${escapeHTML(c)}
+            </label>
+          `).join("")}
+        </div>
       </div>
       <div class="dash-filtro">
         <label>RÓTULO DA UNIDADE (ex.: viaturas, servidores)</label>
@@ -1707,12 +1780,17 @@ function ligarFormularioAplicarDashboard(container, uploadId, portalSlug) {
 
   container.querySelector("#btn-aplicar-dashboard").addEventListener("click", async () => {
     const status = container.querySelector("#aplicar-dashboard-status");
+    const colunasCategoria = Array.from(container.querySelectorAll(".check-categoria:checked")).map(c => c.value);
+    if (!colunasCategoria.length) {
+      status.textContent = "Marca pelo menos uma coluna de categoria.";
+      return;
+    }
     const corpo = {
       uploadId,
       colunaData: container.querySelector("#map-coluna-data").value,
       tipoContagem: selTipo.value,
       colunaValor: selTipo.value === "coluna" ? container.querySelector("#map-coluna-valor").value : undefined,
-      colunaCategoria: container.querySelector("#map-coluna-categoria").value,
+      colunasCategoria,
       unidade: container.querySelector("#map-unidade").value.trim() || undefined,
       tipoResumo: container.querySelector("#map-tipo-resumo").value,
     };
@@ -1724,7 +1802,7 @@ function ligarFormularioAplicarDashboard(container, uploadId, portalSlug) {
         body: JSON.stringify(corpo),
       });
       delete DASH_DATA[portalSlug]; // invalida o cache — próxima visita busca fresco
-      status.textContent = `Pronto — ${resultado.mesesGerados} mês(es) e ${resultado.categoriasGeradas} categoria(s) geradas a partir da planilha. Abra a aba "Dashboard" do portal pra ver.`;
+      status.textContent = `Pronto — ${resultado.mesesGerados} mês(es), ${resultado.dimensoesGeradas} dimensão(ões) e ${resultado.categoriasGeradas} categoria(s) geradas a partir da planilha. Abra a aba "Dashboard" do portal pra ver.`;
     } catch (erro) {
       status.textContent = "Erro: " + erro.message;
     }
