@@ -1291,6 +1291,227 @@ async function visualizarUploadPortal(uploadId, portalSlug) {
   }
 }
 
+// =====================================================================
+// PAINÉIS — cada painel responde UMA pergunta sobre uma planilha.
+// Vários por portal, de propósito: perguntas diferentes têm escalas
+// diferentes, e misturá-las num quadro só faz números incomparáveis
+// parecerem comparáveis (foi o que acontecia no dashboard único).
+// =====================================================================
+
+// linha com várias séries sobrepostas (ex.: operacional x manutenção por ano)
+function multiLinhaSVG(series, labels) {
+  const w = 620, h = 260, padL = 46, padR = 16, padT = 14, baseY = h - 46;
+  const plotH = baseY - padT;
+  const n = labels.length;
+  const stepX = (w - padL - padR) / (n - 1 || 1);
+  const max = Math.max(...series.flatMap(s => s.pontos.map(p => p.valor)), 1);
+  const passo = passoRotulo(n);
+
+  let grade = "", eixoY = "";
+  [0, 0.25, 0.5, 0.75, 1].forEach(f => {
+    const y = baseY - plotH * f;
+    grade += `<line x1="${padL}" y1="${y.toFixed(1)}" x2="${w - padR}" y2="${y.toFixed(1)}" stroke="var(--paper-line)" stroke-width="1" stroke-dasharray="${f === 0 ? "0" : "2 4"}" />`;
+    eixoY += `<text x="${(padL - 6).toFixed(1)}" y="${(y + 3).toFixed(1)}" text-anchor="end" font-family="monospace" font-size="9" fill="var(--carvao)" fill-opacity="0.55">${formatarEixo(max * f)}</text>`;
+  });
+
+  let linhas = "", pontosSvg = "", legenda = "";
+  series.forEach((s, si) => {
+    const cor = corCategoria(si);
+    const pts = s.pontos.map((p, i) => [padL + i * stepX, baseY - plotH * (p.valor / max)]);
+    linhas += `<path d="M ${pts.map(([x, y]) => `${x.toFixed(1)} ${y.toFixed(1)}`).join(" L ")}" fill="none" stroke="${cor}" stroke-width="2.4" stroke-linejoin="round" />`;
+    s.pontos.forEach((p, i) => {
+      const [x, y] = pts[i];
+      pontosSvg += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3.4" fill="${cor}" stroke="var(--surface)" stroke-width="1.4"><title>${s.nome} — ${p.label}: ${p.valor}</title></circle>`;
+      if (n <= 12) pontosSvg += `<text x="${x.toFixed(1)}" y="${(y - 8).toFixed(1)}" text-anchor="middle" font-family="monospace" font-size="8.5" font-weight="700" fill="${cor}">${formatarEixo(p.valor)}</text>`;
+    });
+    const lx = padL + si * 130, ly = h - 12;
+    legenda += `<rect x="${lx}" y="${ly - 8}" width="10" height="10" fill="${cor}" /><text x="${lx + 15}" y="${ly + 1}" font-family="monospace" font-size="9.5" fill="var(--carvao)">${escapeHTML(s.nome.length > 16 ? s.nome.slice(0, 15) + "…" : s.nome)}</text>`;
+  });
+
+  let rotulos = "";
+  labels.forEach((lb, i) => {
+    if (i % passo !== 0 && i !== n - 1) return;
+    rotulos += `<text x="${(padL + i * stepX).toFixed(1)}" y="${baseY + 16}" text-anchor="middle" font-family="monospace" font-size="9.5" fill="var(--carvao)" fill-opacity="0.75">${lb}</text>`;
+  });
+
+  return `<svg viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg">${grade}${eixoY}${linhas}${pontosSvg}${rotulos}${legenda}</svg>`;
+}
+
+// matriz de cruzamento com totais de linha e coluna — inclui o total geral
+function cruzamentoSVG(dados) {
+  const linhas = dados.linhas, colunas = dados.colunas;
+  const cell = 46, gap = 1, padL = 150, padT = 76;
+  const w = padL + (colunas.length + 1) * (cell + gap) + 12;
+  const h = padT + (linhas.length + 1) * (cell + gap) + 12;
+  const max = Math.max(...linhas.flatMap(l => l.valores), 1);
+
+  let cabecalho = "", corpo = "";
+  colunas.forEach((c, j) => {
+    const x = padL + j * (cell + gap) + cell / 2;
+    const curto = c.label.length > 16 ? c.label.slice(0, 15) + "…" : c.label;
+    cabecalho += `<text x="${x.toFixed(1)}" y="${(padT - 10).toFixed(1)}" text-anchor="start" transform="rotate(-35 ${x.toFixed(1)} ${(padT - 10).toFixed(1)})" font-family="monospace" font-size="10" fill="var(--carvao)" fill-opacity="0.75">${escapeHTML(curto)}</text>`;
+  });
+  const xTotalCol = padL + colunas.length * (cell + gap) + cell / 2;
+  cabecalho += `<text x="${xTotalCol.toFixed(1)}" y="${(padT - 10).toFixed(1)}" text-anchor="start" transform="rotate(-35 ${xTotalCol.toFixed(1)} ${(padT - 10).toFixed(1)})" font-family="monospace" font-size="10" font-weight="700" fill="var(--carvao)">TOTAL</text>`;
+
+  linhas.forEach((l, i) => {
+    const y = padT + i * (cell + gap);
+    const curto = l.label.length > 20 ? l.label.slice(0, 19) + "…" : l.label;
+    corpo += `<text x="${(padL - 10).toFixed(1)}" y="${(y + cell / 2 + 4).toFixed(1)}" text-anchor="end" font-family="monospace" font-size="10.5" fill="var(--carvao)">${escapeHTML(curto)}</text>`;
+    l.valores.forEach((v, j) => {
+      const x = padL + j * (cell + gap);
+      const t = v / max;
+      corpo += `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${cell}" height="${cell}" fill="rgba(34,211,238,${(0.07 + t * 0.72).toFixed(2)})"><title>${l.label} × ${colunas[j].label}: ${v}</title></rect>`;
+      if (v) corpo += `<text x="${(x + cell / 2).toFixed(1)}" y="${(y + cell / 2 + 4).toFixed(1)}" text-anchor="middle" font-family="monospace" font-size="11" font-weight="${t > 0.6 ? 700 : 400}" fill="var(--carvao)" fill-opacity="${t > 0.5 ? 1 : 0.75}">${v}</text>`;
+    });
+    const xT = padL + colunas.length * (cell + gap);
+    corpo += `<rect x="${xT.toFixed(1)}" y="${y.toFixed(1)}" width="${cell}" height="${cell}" fill="var(--paper-line)" />`;
+    corpo += `<text x="${(xT + cell / 2).toFixed(1)}" y="${(y + cell / 2 + 4).toFixed(1)}" text-anchor="middle" font-family="monospace" font-size="11" font-weight="700" fill="var(--carvao)">${l.total}</text>`;
+  });
+
+  // linha de totais por coluna, no rodapé
+  const yT = padT + linhas.length * (cell + gap);
+  corpo += `<text x="${(padL - 10).toFixed(1)}" y="${(yT + cell / 2 + 4).toFixed(1)}" text-anchor="end" font-family="monospace" font-size="10.5" font-weight="700" fill="var(--carvao)">TOTAL</text>`;
+  colunas.forEach((c, j) => {
+    const x = padL + j * (cell + gap);
+    corpo += `<rect x="${x.toFixed(1)}" y="${yT.toFixed(1)}" width="${cell}" height="${cell}" fill="var(--paper-line)" />`;
+    corpo += `<text x="${(x + cell / 2).toFixed(1)}" y="${(yT + cell / 2 + 4).toFixed(1)}" text-anchor="middle" font-family="monospace" font-size="11" font-weight="700" fill="var(--carvao)">${c.total}</text>`;
+  });
+  const xTT = padL + colunas.length * (cell + gap);
+  corpo += `<rect x="${xTT.toFixed(1)}" y="${yT.toFixed(1)}" width="${cell}" height="${cell}" fill="var(--carvao)" />`;
+  corpo += `<text x="${(xTT + cell / 2).toFixed(1)}" y="${(yT + cell / 2 + 4).toFixed(1)}" text-anchor="middle" font-family="monospace" font-size="11.5" font-weight="700" fill="var(--paper)">${dados.total}</text>`;
+
+  return `<svg viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg">${cabecalho}${corpo}</svg>`;
+}
+
+function renderPainel(resultado) {
+  const { painel, dados, upload } = resultado;
+  const rodape = `<p class="font-mono" style="font-size:10.5px;color:#6B7280;margin-top:8px">fonte: ${escapeHTML(upload.nomeArquivo)}${dados.linhasIgnoradas ? ` · ${dados.linhasIgnoradas} linha(s) sem data válida, ignoradas` : ""}</p>`;
+
+  if (dados.tipo === "evolucao") {
+    const corpo = dados.series.length
+      ? multiLinhaSVG(dados.series, dados.pontos.map(p => p.label))
+      : simpleBarChartSVG(dados.pontos.map(p => ({ label: p.label, valor: p.valor })), "var(--tinta)");
+    return `
+      <div class="kpi-row"><div class="kpi-card"><div class="kpi-label">${dados.acumulado ? "Total acumulado" : "Total no período"}</div><div class="kpi-value">${dados.total.toLocaleString("pt-BR")}</div></div></div>
+      <div style="margin-top:12px">${corpo}</div>${rodape}`;
+  }
+
+  if (dados.tipo === "composicao") {
+    const tabela = dados.categorias.map(c => `<tr><td>${escapeHTML(c.label)}</td><td class="num">${c.valor.toLocaleString("pt-BR")}</td><td class="num">${c.percentualDoTotal}%</td></tr>`).join("")
+      + `<tr style="border-top:2px solid var(--carvao);font-weight:700"><td>TOTAL</td><td class="num">${dados.total.toLocaleString("pt-BR")}</td><td class="num">100%</td></tr>`;
+    return `
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start">
+        <div>${pieChartSVG(dados.categorias, null)}</div>
+        <table class="dash-tabela"><thead><tr><th>CATEGORIA</th><th>VALOR</th><th>%</th></tr></thead><tbody>${tabela}</tbody></table>
+      </div>${rodape}`;
+  }
+
+  return `<div style="overflow-x:auto">${cruzamentoSVG(dados)}</div>${rodape}`;
+}
+
+async function abrirPainel(painelId, alvoId) {
+  const alvo = document.getElementById(alvoId);
+  alvo.innerHTML = `<p class="font-mono" style="font-size:11px;color:#9AA3B2">Calculando...</p>`;
+  try {
+    const resultado = await apiFetch(`/api/paineis/${painelId}/dados`);
+    alvo.innerHTML = renderPainel(resultado);
+    adicionarControlesGrafico(alvo);
+  } catch (erro) {
+    alvo.innerHTML = `<p class="font-mono" style="font-size:11px;color:var(--terracota)">Não consegui calcular: ${escapeHTML(erro.message)}</p>`;
+  }
+}
+
+async function carregarPaineisPortal(portalSlug) {
+  const painel = document.getElementById("tab-paineis");
+  try {
+    const [paineis, uploads] = await Promise.all([
+      apiFetch(`/api/portais/${portalSlug}/paineis`),
+      apiFetch(`/api/portais/${portalSlug}/uploads`),
+    ]);
+
+    const blocoCriar = souAdmin() && uploads.length ? `
+      <div class="dash-filtros" style="align-items:flex-end;margin-bottom:20px">
+        <div class="dash-filtro">
+          <label>CRIAR PAINEL A PARTIR DE QUAL PLANILHA</label>
+          <select id="sel-upload-painel">${uploads.map(u => `<option value="${u.id}">${escapeHTML(u.nomeArquivo)}</option>`).join("")}</select>
+        </div>
+        <button class="btn-exportar-xlsx" id="btn-ver-sugestoes">VER PAINÉIS DISPONÍVEIS</button>
+      </div>
+      <div id="sugestoes-paineis"></div>
+    ` : (souAdmin() ? `<p class="tela-intro">Suba uma planilha vinculada a este portal primeiro (botão "SUBIR PLANILHA" no topo) pra poder criar painéis.</p>` : "");
+
+    const lista = paineis.length ? paineis.map(pn => `
+      <div class="dash-chart-box" style="margin-bottom:2px">
+        <div class="dash-chart-head">
+          <h4>${escapeHTML(pn.nome)}</h4>
+          <div style="display:flex;gap:6px">
+            <button class="dash-toggle-btn" data-abrir="${pn.id}">VER</button>
+            ${souAdmin() ? `<button class="dash-toggle-btn" data-apagar="${pn.id}" style="color:var(--terracota)">REMOVER</button>` : ""}
+          </div>
+        </div>
+        <div id="painel-corpo-${pn.id}"></div>
+      </div>
+    `).join("") : `<p class="tela-intro">Nenhum painel criado ainda para este portal.</p>`;
+
+    painel.innerHTML = blocoCriar + lista;
+
+    painel.querySelectorAll("[data-abrir]").forEach(b => {
+      b.addEventListener("click", () => abrirPainel(b.dataset.abrir, `painel-corpo-${b.dataset.abrir}`));
+    });
+    painel.querySelectorAll("[data-apagar]").forEach(b => {
+      b.addEventListener("click", async () => {
+        if (!confirm("Remover este painel? A planilha continua salva.")) return;
+        try {
+          await apiFetch(`/api/paineis/${b.dataset.apagar}`, { method: "DELETE" });
+          carregarPaineisPortal(portalSlug);
+        } catch (erro) { alert("Não consegui remover: " + erro.message); }
+      });
+    });
+
+    const btnSug = document.getElementById("btn-ver-sugestoes");
+    if (btnSug) {
+      btnSug.addEventListener("click", async () => {
+        const uploadId = document.getElementById("sel-upload-painel").value;
+        const caixa = document.getElementById("sugestoes-paineis");
+        caixa.innerHTML = `<p class="font-mono" style="font-size:11px;color:#9AA3B2">Analisando a planilha...</p>`;
+        try {
+          const sugestoes = await apiFetch(`/api/portais/${portalSlug}/paineis/sugestoes?uploadId=${uploadId}`);
+          caixa.innerHTML = `
+            <p class="font-mono" style="font-size:11px;color:#9AA3B2;margin-bottom:8px">Cada painel abaixo responde UMA pergunta. Crie os que interessam:</p>
+            <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px">
+              ${sugestoes.map((s, i) => `
+                <button class="dash-toggle-btn" data-criar="${i}" ${s.jaExiste ? "disabled style='opacity:.4'" : ""}>
+                  ${s.jaExiste ? "✓ " : "+ "}${escapeHTML(s.nome)}
+                </button>`).join("")}
+            </div>`;
+          caixa.querySelectorAll("[data-criar]").forEach(b => {
+            b.addEventListener("click", async () => {
+              const s = sugestoes[Number(b.dataset.criar)];
+              b.disabled = true; b.textContent = "criando...";
+              try {
+                await apiFetch(`/api/portais/${portalSlug}/paineis`, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ uploadId, nome: s.nome, config: s.config }),
+                });
+                carregarPaineisPortal(portalSlug);
+              } catch (erro) {
+                b.disabled = false;
+                alert("Não consegui criar: " + erro.message);
+              }
+            });
+          });
+        } catch (erro) {
+          caixa.innerHTML = `<p class="font-mono" style="font-size:11px;color:var(--terracota)">${escapeHTML(erro.message)}</p>`;
+        }
+      });
+    }
+  } catch (erro) {
+    painel.innerHTML = `<p class="tela-intro">Não consegui carregar os painéis: ${escapeHTML(erro.message)}</p>`;
+  }
+}
+
 async function carregarUploadsPortal(portalId) {
   const painel = document.getElementById("tab-planilhas");
   try {
@@ -1439,15 +1660,17 @@ async function abrirTela(id) {
     <p class="tela-intro">${p.intro}</p>
     <div class="tabs">
       <button class="tab-btn active" data-tab="geral">VISÃO GERAL</button>
+      <button class="tab-btn" data-tab="paineis">PAINÉIS</button>
       <button class="tab-btn" data-tab="dashboard">DASHBOARD</button>
       <button class="tab-btn" data-tab="planilhas">PLANILHAS ENVIADAS</button>
     </div>
     <div class="tab-panel" id="tab-geral">${corpoGeral}</div>
+    <div class="tab-panel" id="tab-paineis" hidden><p class="tela-intro">Carregando...</p></div>
     <div class="tab-panel" id="tab-dashboard" hidden>${corpoDash}</div>
     <div class="tab-panel" id="tab-planilhas" hidden><p class="tela-intro">Carregando...</p></div>
   `;
 
-  const PAINEIS = ["geral", "dashboard", "planilhas"];
+  const PAINEIS = ["geral", "paineis", "dashboard", "planilhas"];
   telaConteudo.querySelectorAll(".tab-btn").forEach(btn => {
     btn.addEventListener("click", () => {
       telaConteudo.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
@@ -1455,6 +1678,7 @@ async function abrirTela(id) {
       const alvo = btn.dataset.tab;
       PAINEIS.forEach(nome => { telaConteudo.querySelector(`#tab-${nome}`).hidden = alvo !== nome; });
       if (alvo === "planilhas") carregarUploadsPortal(p.id);
+      if (alvo === "paineis") carregarPaineisPortal(p.id);
     });
   });
 
