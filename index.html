@@ -1507,12 +1507,14 @@ async function atualizarDashboard(portalId, periodo, categoriaFiltro) {
   const RENDER_EVOLUCAO = { bar: simpleBarChartSVG, line: simpleLineChartSVG, radar: barChartSVG, fluxo: lineChartSVG };
   const elLinha = document.getElementById("dash-chart-linha");
   elLinha.innerHTML = (RENDER_EVOLUCAO[dashState.tipoEvolucao] || simpleBarChartSVG)(pontos, corEvolucao);
+  adicionarControlesGrafico(elLinha);
   const infoE = CHART_INFO[dashState.tipoEvolucao];
   document.getElementById("hint-evolucao").innerHTML = `<b>${infoE.nome}:</b> indicado pra ${infoE.indicado} Mostra ${infoE.mostra} <i>Como ler:</i> ${infoE.eixo}`;
 
   const RENDER_COMP = { donut: pieChartSVG, ranking: barRankingChartSVG, matriz: donutChartSVG, rede: rankingChartSVG };
   const elComp = document.getElementById("dash-chart-donut");
   elComp.innerHTML = (RENDER_COMP[dashState.tipoComp] || pieChartSVG)(categorias, categoriaSelecionada);
+  adicionarControlesGrafico(elComp);
   const infoC = CHART_INFO[dashState.tipoComp];
   document.getElementById("hint-comp").innerHTML = `<b>${infoC.nome}:</b> indicado pra ${infoC.indicado} Mostra ${infoC.mostra} <i>Como ler:</i> ${infoC.eixo}`;
 
@@ -1729,6 +1731,116 @@ function ligarFormularioAplicarDashboard(container, uploadId, portalSlug) {
   });
 }
 
+// ---------- ampliar e baixar gráfico como imagem ----------
+
+function abrirGraficoAmpliado(svg) {
+  const overlay = document.createElement("div");
+  overlay.className = "overlay-grafico-ampliado";
+  overlay.style.cssText = "position:fixed;inset:0;background:rgba(11,14,20,0.94);z-index:1000;display:flex;align-items:center;justify-content:center;padding:5vw;cursor:zoom-out";
+  const svgClone = svg.cloneNode(true);
+  svgClone.removeAttribute("data-controles-adicionados");
+  svgClone.style.cssText = "width:100%;height:100%;max-width:1100px;max-height:90vh";
+  overlay.appendChild(svgClone);
+  const dica = document.createElement("p");
+  dica.textContent = "clique em qualquer lugar pra fechar";
+  dica.style.cssText = "position:absolute;bottom:20px;left:50%;transform:translateX(-50%);font-family:'IBM Plex Mono',monospace;font-size:11px;color:#9AA3B2";
+  overlay.appendChild(dica);
+  overlay.addEventListener("click", () => overlay.remove());
+  document.body.appendChild(overlay);
+}
+
+// clona o SVG e troca cada var(--x) pelo valor JÁ CALCULADO (getComputedStyle,
+// no elemento original, ainda preso ao documento) — precisa disso porque o
+// PNG é gerado a partir de uma imagem "solta" (via blob), que não enxerga
+// as variáveis de CSS da página; sem isso o gráfico exportado sairia sem cor.
+function inlinarCoresSVG(svgOriginal) {
+  const clone = svgOriginal.cloneNode(true);
+  const originais = [svgOriginal, ...svgOriginal.querySelectorAll("*")];
+  const clones = [clone, ...clone.querySelectorAll("*")];
+  originais.forEach((orig, i) => {
+    const cl = clones[i];
+    const estilo = getComputedStyle(orig);
+    if (orig.getAttribute("fill") !== null) cl.setAttribute("fill", estilo.fill);
+    if (orig.getAttribute("stroke") !== null) cl.setAttribute("stroke", estilo.stroke);
+    if (orig.getAttribute("fill-opacity") !== null) cl.setAttribute("fill-opacity", estilo.fillOpacity);
+    if (orig.getAttribute("stroke-width") !== null) cl.setAttribute("stroke-width", estilo.strokeWidth);
+  });
+  return clone;
+}
+
+async function baixarGraficoComoImagem(svg, nomeArquivo = "grafico.png") {
+  try {
+    const svgLimpo = inlinarCoresSVG(svg);
+    const viewBox = svg.viewBox && svg.viewBox.baseVal;
+    const largura = (viewBox && viewBox.width) || svg.clientWidth || 600;
+    const altura = (viewBox && viewBox.height) || svg.clientHeight || 300;
+    const escala = 3; // exporta em resolução 3x — pra imprimir/apresentar sem pixelar
+
+    const corFundo = (getComputedStyle(document.body).getPropertyValue("--surface") || "#10141D").trim() || "#10141D";
+
+    const svgString = new XMLSerializer().serializeToString(svgLimpo);
+    const svgBlob = new Blob([svgString], { type: "image/svg+xml;charset=utf-8" });
+    const url = URL.createObjectURL(svgBlob);
+
+    const img = new Image();
+    await new Promise((resolve, reject) => {
+      img.onload = resolve;
+      img.onerror = () => reject(new Error("não consegui carregar o SVG como imagem"));
+      img.src = url;
+    });
+
+    const canvas = document.createElement("canvas");
+    canvas.width = largura * escala;
+    canvas.height = altura * escala;
+    const ctx = canvas.getContext("2d");
+    ctx.fillStyle = corFundo;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    URL.revokeObjectURL(url);
+
+    canvas.toBlob((blob) => {
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = nomeArquivo;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    }, "image/png");
+  } catch (erro) {
+    alert("Não consegui gerar a imagem: " + erro.message);
+  }
+}
+
+// varre um container e adiciona um miniaturbo (ampliar/baixar) em cada <svg>
+// dentro dele — chame depois de qualquer innerHTML que desenhe gráfico novo
+function adicionarControlesGrafico(container) {
+  if (!container) return;
+  container.querySelectorAll("svg").forEach((svg, i) => {
+    if (svg.dataset.controlesAdicionados) return; // não duplica se já tiver
+    svg.dataset.controlesAdicionados = "1";
+
+    const jaEnvolvido = svg.parentElement && svg.parentElement.classList.contains("grafico-com-controles");
+    let wrapper = jaEnvolvido ? svg.parentElement : document.createElement("div");
+    if (!jaEnvolvido) {
+      wrapper.className = "grafico-com-controles";
+      wrapper.style.cssText = "position:relative";
+      svg.parentNode.insertBefore(wrapper, svg);
+      wrapper.appendChild(svg);
+    }
+
+    const toolbar = document.createElement("div");
+    toolbar.style.cssText = "position:absolute;top:0;right:0;display:flex;gap:3px;opacity:.75";
+    toolbar.innerHTML = `
+      <button type="button" title="Ampliar" style="background:var(--carvao);color:var(--paper);border:none;width:22px;height:22px;cursor:pointer;font-size:12px;line-height:1">⤢</button>
+      <button type="button" title="Baixar como imagem" style="background:var(--carvao);color:var(--paper);border:none;width:22px;height:22px;cursor:pointer;font-size:11px;line-height:1">⬇</button>
+    `;
+    wrapper.appendChild(toolbar);
+    const [btnAmpliar, btnBaixar] = toolbar.querySelectorAll("button");
+    btnAmpliar.addEventListener("click", () => abrirGraficoAmpliado(svg));
+    btnBaixar.addEventListener("click", () => baixarGraficoComoImagem(svg, `grafico-${i + 1}.png`));
+  });
+}
+
 function renderDashboardGenerico(dashboard, elementoAlvoId = "upload-resultado") {
   const kpisHtml = dashboard.kpis.map(k => `
     <div class="kpi-card">
@@ -1753,6 +1865,7 @@ function renderDashboardGenerico(dashboard, elementoAlvoId = "upload-resultado")
     ${kpisHtml ? `<div class="kpi-row">${kpisHtml}</div>` : ""}
     <div class="dash-charts" style="grid-template-columns:1fr;margin-top:16px">${chartsHtml}</div>
   `;
+  adicionarControlesGrafico(document.getElementById(elementoAlvoId));
 }
 
 document.getElementById("btn-gerar-dashboard").addEventListener("click", async () => {
