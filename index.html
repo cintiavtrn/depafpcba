@@ -1386,13 +1386,19 @@ function cruzamentoSVG(dados) {
 
 function renderPainel(resultado) {
   const { painel, dados, upload } = resultado;
+  const filtros = (painel.config?.filtros || [])
+    .map(f => `${escapeHTML(f.coluna)}: ${f.valores.map(escapeHTML).join(", ")}`)
+    .join(" · ");
+  const avisoFiltro = filtros
+    ? `<p class="font-mono" style="font-size:11px;color:var(--mostarda);margin-bottom:8px">filtrado por ${filtros} — ${dados.linhasConsideradas} de ${dados.linhasTotaisDaPlanilha} linhas</p>`
+    : "";
   const rodape = `<p class="font-mono" style="font-size:10.5px;color:#6B7280;margin-top:8px">fonte: ${escapeHTML(upload.nomeArquivo)}${dados.linhasIgnoradas ? ` · ${dados.linhasIgnoradas} linha(s) sem data válida, ignoradas` : ""}</p>`;
 
   if (dados.tipo === "evolucao") {
     const corpo = dados.series.length
       ? multiLinhaSVG(dados.series, dados.pontos.map(p => p.label))
       : simpleBarChartSVG(dados.pontos.map(p => ({ label: p.label, valor: p.valor })), "var(--tinta)");
-    return `
+    return `${avisoFiltro}
       <div class="kpi-row"><div class="kpi-card"><div class="kpi-label">${dados.acumulado ? "Total acumulado" : "Total no período"}</div><div class="kpi-value">${dados.total.toLocaleString("pt-BR")}</div></div></div>
       <div style="margin-top:12px">${corpo}</div>${rodape}`;
   }
@@ -1400,14 +1406,30 @@ function renderPainel(resultado) {
   if (dados.tipo === "composicao") {
     const tabela = dados.categorias.map(c => `<tr><td>${escapeHTML(c.label)}</td><td class="num">${c.valor.toLocaleString("pt-BR")}</td><td class="num">${c.percentualDoTotal}%</td></tr>`).join("")
       + `<tr style="border-top:2px solid var(--carvao);font-weight:700"><td>TOTAL</td><td class="num">${dados.total.toLocaleString("pt-BR")}</td><td class="num">100%</td></tr>`;
-    return `
+    return `${avisoFiltro}
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start">
         <div>${pieChartSVG(dados.categorias, null)}</div>
         <table class="dash-tabela"><thead><tr><th>CATEGORIA</th><th>VALOR</th><th>%</th></tr></thead><tbody>${tabela}</tbody></table>
       </div>${rodape}`;
   }
 
-  return `<div style="overflow-x:auto">${cruzamentoSVG(dados)}</div>${rodape}`;
+  // cruzamento com 3ª coluna: uma matriz por valor dela, cada uma com seus
+  // próprios totais — e um card no topo com o total geral, pra não precisar
+  // somar as matrizes na mão
+  if (dados.segmentado) {
+    const blocos = dados.segmentos.map(seg => `
+      <div style="margin-bottom:22px">
+        <h5 class="font-mono" style="font-size:12px;letter-spacing:.08em;color:var(--carvao);margin-bottom:6px;padding-left:8px;border-left:3px solid var(--tinta)">
+          ${escapeHTML(painel.config.colunaSegmento)}: ${escapeHTML(seg.nome)} — total ${seg.total.toLocaleString("pt-BR")}
+        </h5>
+        <div style="overflow-x:auto">${cruzamentoSVG(seg)}</div>
+      </div>`).join("");
+    return `${avisoFiltro}
+      <div class="kpi-row"><div class="kpi-card"><div class="kpi-label">Total geral (todos os ${escapeHTML(painel.config.colunaSegmento)})</div><div class="kpi-value">${dados.total.toLocaleString("pt-BR")}</div></div></div>
+      <div style="margin-top:14px">${blocos}</div>${rodape}`;
+  }
+
+  return `${avisoFiltro}<div style="overflow-x:auto">${cruzamentoSVG(dados)}</div>${rodape}`;
 }
 
 async function abrirPainel(painelId, alvoId) {
