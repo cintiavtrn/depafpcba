@@ -414,7 +414,7 @@ function passoRotulo(n, maxRotulos = 12) {
 function simpleBarChartSVG(pontos, cor) {
   const w = 520, h = 200, padL = 34, padR = 14, padT = 10, baseY = h - 34;
   const n = pontos.length || 1;
-  const max = Math.max(...pontos.map(p => p.valor), 1);
+  const max = maxSeguro(pontos.map(p => p.valor));
   const plotH = baseY - padT;
   const bw = (w - padL - padR) / n;
   const barW = Math.min(bw * 0.56, 40);
@@ -446,7 +446,7 @@ function simpleBarChartSVG(pontos, cor) {
 function simpleLineChartSVG(pontos, cor) {
   const w = 520, h = 200, padL = 34, padR = 14, padT = 10, baseY = h - 34;
   const n = pontos.length;
-  const max = Math.max(...pontos.map(p => p.valor), 1);
+  const max = maxSeguro(pontos.map(p => p.valor));
   const plotH = baseY - padT;
   const stepX = (w - padL - padR) / (n - 1 || 1);
   const passo = passoRotulo(n);
@@ -484,7 +484,7 @@ function pieChartSVG(categorias, selectedLabel) {
     const large = (a1 - a0) > 180 ? 1 : 0;
     const dim = selectedLabel && selectedLabel !== c.label;
     const d = `M ${x0o.toFixed(1)} ${y0o.toFixed(1)} A ${rOut} ${rOut} 0 ${large} 1 ${x1o.toFixed(1)} ${y1o.toFixed(1)} L ${x1i.toFixed(1)} ${y1i.toFixed(1)} A ${rIn} ${rIn} 0 ${large} 0 ${x0i.toFixed(1)} ${y0i.toFixed(1)} Z`;
-    fatias += `<path class="donut-fatia" data-cat="${c.label}" d="${d}" fill="${cor}" opacity="${dim ? 0.28 : 1}" style="cursor:pointer"><title>${c.label}: ${c.valor} (${(frac * 100).toFixed(1)}%)</title></path>`;
+    fatias += `<path class="donut-fatia" data-cat="${escapeAttr(c.label)}" d="${d}" fill="${cor}" opacity="${dim ? 0.28 : 1}" style="cursor:pointer"><title>${escapeHTML(c.label)}: ${c.valor} (${(frac * 100).toFixed(1)}%)</title></path>`;
 
     // percentual escrito na própria fatia — só quando ela tem espaço real
     // pra caber o texto (fatia fina com número em cima fica ilegível);
@@ -497,7 +497,7 @@ function pieChartSVG(categorias, selectedLabel) {
   });
   const legenda = categorias.map((c, i) => {
     const pct = ((c.valor / total) * 100).toFixed(1);
-    return `<button class="donut-leg" data-cat="${c.label}" style="cursor:pointer"><span class="sw" style="background:${corCategoria(i)}"></span><span class="lg-nome">${c.label}</span><span class="lg-valor" style="font-variant-numeric:tabular-nums;color:var(--carvao);opacity:.8">${c.valor.toLocaleString("pt-BR")}</span><span class="lg-pct">${pct}%</span></button>`;
+    return `<button class="donut-leg" data-cat="${escapeAttr(c.label)}" style="cursor:pointer"><span class="sw" style="background:${corCategoria(i)}"></span><span class="lg-nome">${escapeHTML(c.label)}</span><span class="lg-valor" style="font-variant-numeric:tabular-nums;color:var(--carvao);opacity:.8">${c.valor.toLocaleString("pt-BR")}</span><span class="lg-pct">${pct}%</span></button>`;
   }).join("");
   const totalMeio = `<text x="${cx}" y="${(cy - 3).toFixed(1)}" text-anchor="middle" font-family="'Space Grotesk',sans-serif" font-size="22" font-weight="700" fill="var(--carvao)">${total.toLocaleString("pt-BR")}</text><text x="${cx}" y="${(cy + 13).toFixed(1)}" text-anchor="middle" font-family="monospace" font-size="7.5" letter-spacing="1.5" fill="var(--carvao)" fill-opacity="0.6">TOTAL</text>`;
   return `<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">${fatias}${rotulosFatia}${totalMeio}</svg><div class="donut-legenda">${legenda}</div>`;
@@ -510,7 +510,7 @@ function barRankingChartSVG(categorias, selectedLabel) {
   const maxLinhas = Math.max(1, ...categorias.map(c => linhasDoTexto(c.label, MAX_ROTULO)));
   const rowH = Math.max(26, maxLinhas * 12 + 10);
   const h = padT + categorias.length * rowH + 6;
-  const max = Math.max(...categorias.map(c => c.valor), 1);
+  const max = maxSeguro(categorias.map(c => c.valor));
   let linhas = "";
   categorias.forEach((c, i) => {
     const cor = corCategoria(i);
@@ -519,7 +519,7 @@ function barRankingChartSVG(categorias, selectedLabel) {
     const dim = selectedLabel && selectedLabel !== c.label;
     const alturaBarra = Math.min(rowH - 8, 18);
     const yBarra = y + (rowH - alturaBarra) / 2;
-    linhas += `<g class="rank-bar" data-cat="${c.label}" style="cursor:pointer" opacity="${dim ? 0.35 : 1}">
+    linhas += `<g class="rank-bar" data-cat="${escapeAttr(c.label)}" style="cursor:pointer" opacity="${dim ? 0.35 : 1}">
       ${textoSVG(c.label, padL - 8, y + rowH / 2, { maxChars: MAX_ROTULO, anchor: "end", fontSize: 9.5, peso: selectedLabel === c.label ? 700 : 400, alturaLinha: 11 })}
       <rect class="barra" x="${padL}" y="${yBarra.toFixed(1)}" width="${larg.toFixed(1)}" height="${alturaBarra}" fill="${cor}"><title>${escapeHTML(c.label)}: ${c.valor}</title></rect>
       <text x="${(padL + larg + 6).toFixed(1)}" y="${(y + rowH / 2 + 3).toFixed(1)}" font-family="monospace" font-size="9.5" font-weight="700" fill="var(--carvao)">${c.valor}</text>
@@ -1103,7 +1103,7 @@ function multiLinhaSVG(series, labels) {
   const plotH = baseY - padT;
   const n = labels.length;
   const stepX = (w - padL - padR) / (n - 1 || 1);
-  const max = Math.max(...series.flatMap(s => s.pontos.map(p => p.valor)), 1);
+  const max = maxSeguro(series.flatMap(s => s.pontos.map(p => p.valor)));
   const passo = passoRotulo(n);
 
   let grade = "", eixoY = "";
@@ -1150,7 +1150,7 @@ function cruzamentoSVG(dados) {
 
   const w = padL + (colunas.length + 1) * (cellW + gap) + 12;
   const h = padT + (linhas.length + 1) * (cellH + gap) + 12;
-  const max = Math.max(...linhas.flatMap(l => l.valores), 1);
+  const max = maxSeguro(linhas.flatMap(l => l.valores));
 
   let cabecalho = "", corpo = "";
   colunas.forEach((c, j) => {
@@ -1196,7 +1196,7 @@ function cruzamentoSVG(dados) {
 function barrasAcumuladoSVG(pontos, cor) {
   const w = 620, h = 250, padL = 44, padR = 16, padT = 26, baseY = h - 42;
   const n = pontos.length || 1;
-  const max = Math.max(...pontos.map(p => p.valor), 1);
+  const max = maxSeguro(pontos.map(p => p.valor));
   const plotH = baseY - padT;
   const bw = (w - padL - padR) / n;
   const barW = Math.min(bw * 0.6, 44);
@@ -1247,13 +1247,25 @@ function renderComoLer(cl) {
 
 function renderPainel(resultado) {
   const { painel, dados, upload } = resultado;
+
+  // filtro que não sobrou nada: mostra "sem dados" em vez de derrubar o
+  // painel com TypeError ao tentar ler categorias[0] de um array vazio
+  const vazio =
+    (dados.tipo === "composicao" && !dados.categorias?.length) ||
+    (dados.tipo === "evolucao" && !dados.pontos?.length) ||
+    (dados.tipo === "cruzamento" && !dados.segmentado && !dados.linhas?.length) ||
+    (dados.segmentado && !dados.segmentos?.length);
+  if (vazio) {
+    return `<p class="dash-chart-hint">Nenhum dado atende a esta combinação de filtros — ${dados.linhasConsideradas ?? 0} de ${dados.linhasTotaisDaPlanilha ?? 0} linhas passaram. Afrouxe o filtro pra ver resultado.</p>`;
+  }
   const filtros = (painel.config?.filtros || [])
     .map(f => `${escapeHTML(f.coluna)}: ${f.valores.map(escapeHTML).join(", ")}`)
     .join(" · ");
   const avisoFiltro = filtros
     ? `<p class="font-mono" style="font-size:11px;color:var(--mostarda);margin-bottom:8px">filtrado por ${filtros} — ${dados.linhasConsideradas} de ${dados.linhasTotaisDaPlanilha} linhas</p>`
     : "";
-  const rodape = `<p class="font-mono" style="font-size:10.5px;color:#6B7280;margin-top:8px">fonte: ${escapeHTML(upload.nomeArquivo)}${dados.linhasIgnoradas ? ` · ${dados.linhasIgnoradas} linha(s) sem data válida, ignoradas` : ""}</p>`;
+  const avisosBase = (dados.avisos || []).map(a => `<p class="dash-chart-hint" style="border-left-color:var(--mostarda);font-size:10.5px"><b>Atenção:</b> ${escapeHTML(a)}</p>`).join("");
+  const rodape = avisosBase + `<p class="font-mono" style="font-size:10.5px;color:#6B7280;margin-top:8px">fonte: ${escapeHTML(upload.nomeArquivo)}${dados.linhasIgnoradas ? ` · ${dados.linhasIgnoradas} linha(s) sem data válida, ignoradas` : ""}</p>`;
 
   if (dados.tipo === "evolucao") {
     const corpo = dados.series.length
@@ -1311,6 +1323,62 @@ async function abrirPainel(painelId, alvoId) {
  * digitados à mão que envelhecem sozinhos, ela passa a exibir os painéis
  * escolhidos, recalculados da planilha a cada abertura.
  */
+// ---------- as três perguntas que definem o que uma linha significa ----------
+// Sem isso o motor não sabe se pode somar. É o formulário que evita que
+// "180 acumuladas" e "23 no mês" apareçam lado a lado como comparáveis.
+function renderFormularioDefinicao(schema, definicaoAtual) {
+  const colunas = Object.keys(schema || {});
+  const datas = colunas.filter(c => ["temporal", "ano", "data_estado_atual"].includes(schema[c].type));
+  const d = definicaoAtual || {};
+  const opt = (lista, sel) => lista.map(c => `<option value="${escapeAttr(c)}" ${c === sel ? "selected" : ""}>${escapeHTML(c)}</option>`).join("");
+
+  const bloqueadas = colunas.filter(c => schema[c].bloqueadaComoEixo);
+  const avisoBloqueio = bloqueadas.length
+    ? `<p class="dash-chart-hint" style="border-left-color:var(--mostarda)"><b>Coluna bloqueada como eixo de tempo:</b> ${bloqueadas.map(escapeHTML).join(", ")}. ${escapeHTML(schema[bloqueadas[0]].motivoBloqueio || "")}</p>`
+    : "";
+
+  return `
+    ${avisoBloqueio}
+    <div class="dash-filtros" style="flex-direction:column;align-items:stretch;gap:12px;max-width:560px">
+      <div class="dash-filtro">
+        <label>1. O QUE É UMA LINHA DESTA PLANILHA?</label>
+        <select id="def-grao">
+          <option value="cadastro" ${d.grao === "cadastro" ? "selected" : ""}>Uma coisa que existe — uma viatura, um servidor, um imóvel</option>
+          <option value="evento" ${d.grao === "evento" ? "selected" : ""}>Algo que aconteceu numa data — uma aquisição, uma norma emitida, um pagamento</option>
+          <option value="medicao_periodica" ${d.grao === "medicao_periodica" ? "selected" : ""}>Uma medição já feita de um período — "julho/2026, Compacto, 62 operacionais"</option>
+        </select>
+      </div>
+      <div class="dash-filtro">
+        <label>2. O QUE O NÚMERO MEDE?</label>
+        <select id="def-medida">
+          <option value="estoque" ${d.medidaTipo === "estoque" ? "selected" : ""}>Estoque — o que existe agora (frota, efetivo). Não se soma no tempo.</option>
+          <option value="fluxo" ${d.medidaTipo === "fluxo" ? "selected" : ""}>Fluxo — o que acontece no período (aquisições, R$ pago). Soma no tempo.</option>
+          <option value="razao" ${d.medidaTipo === "razao" ? "selected" : ""}>Razão — percentual, taxa ou média (disponibilidade, custo médio). Não se soma.</option>
+        </select>
+      </div>
+      <div class="dash-filtro">
+        <label>3. EXISTE COLUNA DE SAÍDA / BAIXA / DESLIGAMENTO?</label>
+        <select id="def-saida">
+          <option value="">Não existe — a planilha só tem o que está ativo hoje</option>
+          ${opt(datas, d.colunaDataSaida)}
+        </select>
+      </div>
+      <div class="dash-filtro">
+        <label>COMO CHAMAR O QUE ESTÁ SENDO CONTADO (ex.: viaturas, servidores)</label>
+        <input type="text" id="def-unidade" value="${escapeAttr(d.unidade || "")}" placeholder="registros" style="${CAMPO_STYLE}">
+      </div>
+      <button class="btn-exportar-xlsx" id="btn-salvar-definicao" style="background:var(--oliva)">SALVAR E VER PAINÉIS DISPONÍVEIS</button>
+      <p id="definicao-status" class="font-mono" style="font-size:11.5px;color:#9AA3B2"></p>
+    </div>`;
+}
+
+function renderAvisosDefinicao(permissoes) {
+  if (!permissoes || !permissoes.avisos?.length) return "";
+  return permissoes.avisos.map(a =>
+    `<p class="dash-chart-hint" style="border-left-color:var(--mostarda)"><b>Atenção:</b> ${escapeHTML(a)}</p>`
+  ).join("");
+}
+
 async function carregarDestaques(portalSlug) {
   const alvo = document.getElementById("bloco-destaques");
   if (!alvo) return;
@@ -1402,15 +1470,65 @@ async function carregarPaineisPortal(portalSlug) {
         const caixa = document.getElementById("sugestoes-paineis");
         caixa.innerHTML = `<p class="font-mono" style="font-size:11px;color:#9AA3B2">Analisando a planilha...</p>`;
         try {
-          const sugestoes = await apiFetch(`/api/portais/${portalSlug}/paineis/sugestoes?uploadId=${uploadId}`);
+          const resposta = await apiFetch(`/api/portais/${portalSlug}/paineis/sugestoes?uploadId=${uploadId}`);
+          const sugestoes = resposta.sugestoes;
+
+          // sem as três perguntas respondidas, o motor não sabe se pode somar —
+          // então o formulário vem primeiro, não os painéis
+          if (!resposta.definicao) {
+            const detalhe = await apiFetch(`/api/uploads/${uploadId}`);
+            caixa.innerHTML = `
+              <p class="dash-chart-hint"><b>Antes de criar painéis:</b> o sistema precisa saber o que uma linha desta planilha significa. Sem isso ele não tem como saber quais somas são válidas — e uma soma inválida vira um número que alguém defende numa reunião.</p>
+              ${renderFormularioDefinicao(detalhe.schema, null)}`;
+            caixa.querySelector("#btn-salvar-definicao").addEventListener("click", async () => {
+              const st = caixa.querySelector("#definicao-status");
+              st.textContent = "Salvando...";
+              try {
+                await apiFetch(`/api/uploads/${uploadId}/definicao`, {
+                  method: "PUT",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    grao: caixa.querySelector("#def-grao").value,
+                    medidaTipo: caixa.querySelector("#def-medida").value,
+                    colunaDataSaida: caixa.querySelector("#def-saida").value || null,
+                    unidade: caixa.querySelector("#def-unidade").value.trim() || null,
+                  }),
+                });
+                btnSug.click(); // recarrega, agora com a definição salva
+              } catch (erro) {
+                st.textContent = "Erro: " + erro.message;
+              }
+            });
+            return;
+          }
+
           caixa.innerHTML = `
+            ${renderAvisosDefinicao(resposta.permissoes)}
             <p class="font-mono" style="font-size:11px;color:#9AA3B2;margin-bottom:8px">Cada painel abaixo responde UMA pergunta. Crie os que interessam:</p>
             <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px">
               ${sugestoes.map((s, i) => `
                 <button class="dash-toggle-btn" data-criar="${i}" ${s.jaExiste ? "disabled style='opacity:.4'" : ""}>
                   ${s.jaExiste ? "✓ " : "+ "}${escapeHTML(s.nome)}
                 </button>`).join("")}
-            </div>`;
+            </div>
+            <button class="dash-toggle-btn" id="btn-reabrir-definicao" style="opacity:.7">✎ rever o que uma linha significa</button>`;
+          const btnRever = caixa.querySelector("#btn-reabrir-definicao");
+          if (btnRever) btnRever.addEventListener("click", async () => {
+            const detalhe = await apiFetch(`/api/uploads/${uploadId}`);
+            caixa.innerHTML = renderFormularioDefinicao(detalhe.schema, resposta.definicao);
+            caixa.querySelector("#btn-salvar-definicao").addEventListener("click", async () => {
+              await apiFetch(`/api/uploads/${uploadId}/definicao`, {
+                method: "PUT", headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  grao: caixa.querySelector("#def-grao").value,
+                  medidaTipo: caixa.querySelector("#def-medida").value,
+                  colunaDataSaida: caixa.querySelector("#def-saida").value || null,
+                  unidade: caixa.querySelector("#def-unidade").value.trim() || null,
+                }),
+              });
+              btnSug.click();
+            });
+          });
           caixa.querySelectorAll("[data-criar]").forEach(b => {
             b.addEventListener("click", async () => {
               const s = sugestoes[Number(b.dataset.criar)];
@@ -1639,6 +1757,18 @@ function heatmapGenericoSVG(chart) {
 // oficial do portal — só aparece se a planilha tiver pelo menos uma coluna
 // de data e uma categórica (sem isso não dá pra gerar evolução/composição)
 
+
+// máximo seguro: Math.max(...array) estoura a pilha por volta de 100 mil
+// elementos (planilha de empenho tem isso fácil) e devolve -Infinity em
+// array vazio, o que produzia "NaN" no meio do SVG e apagava o gráfico
+function maxSeguro(valores, minimo = 1) {
+  let m = minimo;
+  for (const v of valores) {
+    const n = Number(v);
+    if (Number.isFinite(n) && n > m) m = n;
+  }
+  return m;
+}
 
 // ---------- texto em SVG que quebra em vez de cortar ----------
 // SVG não tem quebra automática de linha (diferente do HTML), por isso todo
