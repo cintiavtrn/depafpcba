@@ -761,7 +761,18 @@ async function aoReceberCredencialGoogle(response) {
   }
 }
 
-document.getElementById("btn-sair").addEventListener("click", () => {
+document.getElementById("btn-sair").addEventListener("click", async () => {
+  // avisa o servidor pra revogar a sessão: sem isso, apagar o token no
+  // navegador não impedia que uma cópia dele continuasse valendo
+  try {
+    const sessao = obterSessao();
+    if (sessao) {
+      await fetch(`${API_CONFIG.BASE_URL}/api/auth/logout`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${sessao.token}` },
+      });
+    }
+  } catch { /* sair não pode falhar por causa da rede */ }
   limparSessao();
   mostrarTelaLogin("");
 });
@@ -1123,7 +1134,7 @@ async function visualizarUploadPortal(uploadId, portalSlug) {
     });
     renderDashboardGenerico(dashboard, "sub-graficos");
   } catch (erro) {
-    alvo.innerHTML = `<p class="tela-intro">Não consegui carregar: ${erro.message}</p>`;
+    alvo.innerHTML = `<p class="tela-intro">Não consegui carregar: ${escapeHTML(erro.message)}</p>`;
   }
 }
 
@@ -1634,7 +1645,7 @@ async function carregarUploadsPortal(portalId) {
       tr.addEventListener("click", () => visualizarUploadPortal(tr.dataset.uploadId, portalId));
     });
   } catch (erro) {
-    painel.innerHTML = `<p class="tela-intro">Não consegui carregar o histórico: ${erro.message}</p>`;
+    painel.innerHTML = `<p class="tela-intro">Não consegui carregar o histórico: ${escapeHTML(erro.message)}</p>`;
   }
 }
 
@@ -1652,7 +1663,7 @@ async function abrirTela(id) {
   try {
     detalhe = await apiFetch(`/api/portais/${id}`);
   } catch (erro) {
-    telaConteudo.innerHTML = `<p class="tela-intro">Não consegui carregar esse portal: ${erro.message}</p>`;
+    telaConteudo.innerHTML = `<p class="tela-intro">Não consegui carregar esse portal: ${escapeHTML(erro.message)}</p>`;
     return;
   }
 
@@ -1786,18 +1797,18 @@ function heatmapGenericoSVG(chart) {
   valoresB.forEach((vb, j) => {
     const x = padL + j * (cell + gap) + cell / 2;
     const curto = String(vb).length > 18 ? String(vb).slice(0, 17) + "…" : vb;
-    cols += `<text x="${x.toFixed(1)}" y="${(padT - 8).toFixed(1)}" text-anchor="start" transform="rotate(-40 ${x.toFixed(1)} ${(padT - 8).toFixed(1)})" font-family="monospace" font-size="8" fill="var(--carvao)" fill-opacity="0.6">${curto}</text>`;
+    cols += `<text x="${x.toFixed(1)}" y="${(padT - 8).toFixed(1)}" text-anchor="start" transform="rotate(-40 ${x.toFixed(1)} ${(padT - 8).toFixed(1)})" font-family="monospace" font-size="8" fill="var(--carvao)" fill-opacity="0.6">${escapeHTML(curto)}</text>`;
   });
   valoresA.forEach((va, i) => {
     const y = padT + i * (cell + gap) + cell / 2;
     const curto = String(va).length > 18 ? String(va).slice(0, 17) + "…" : va;
-    rows += `<text x="${(padL - 8).toFixed(1)}" y="${(y + 3).toFixed(1)}" text-anchor="end" font-family="monospace" font-size="9" fill="var(--carvao)" fill-opacity="0.85">${curto}</text>`;
+    rows += `<text x="${(padL - 8).toFixed(1)}" y="${(y + 3).toFixed(1)}" text-anchor="end" font-family="monospace" font-size="9" fill="var(--carvao)" fill-opacity="0.85">${escapeHTML(curto)}</text>`;
     valoresB.forEach((vb, j) => {
       const v = mapa.get(`${va}|${vb}`) || 0;
       const t = v / max;
       const x = padL + j * (cell + gap);
       const yc = padT + i * (cell + gap);
-      cells += `<rect x="${x.toFixed(1)}" y="${yc.toFixed(1)}" width="${cell}" height="${cell}" fill="rgba(34,211,238,${(0.08 + t * 0.75).toFixed(2)})"><title>${va} × ${vb}: ${v}</title></rect>`;
+      cells += `<rect x="${x.toFixed(1)}" y="${yc.toFixed(1)}" width="${cell}" height="${cell}" fill="rgba(34,211,238,${(0.08 + t * 0.75).toFixed(2)})"><title>${escapeHTML(va)} × ${escapeHTML(vb)}: ${v}</title></rect>`;
       if (v) cells += `<text x="${(x + cell / 2).toFixed(1)}" y="${(yc + cell / 2 + 3).toFixed(1)}" text-anchor="middle" font-family="monospace" font-size="8.5" fill="var(--carvao)" fill-opacity="${t > 0.6 ? 0.95 : 0.6}">${v}</text>`;
     });
   });
@@ -1974,7 +1985,7 @@ function adicionarControlesGrafico(container) {
 function renderDashboardGenerico(dashboard, elementoAlvoId = "upload-resultado") {
   const kpisHtml = dashboard.kpis.map(k => `
     <div class="kpi-card">
-      <div class="kpi-label">${k.title}</div>
+      <div class="kpi-label">${escapeHTML(k.title)}</div>
       <div class="kpi-value">${Number(k.value).toLocaleString("pt-BR")}</div>
     </div>
   `).join("");
@@ -1983,10 +1994,10 @@ function renderDashboardGenerico(dashboard, elementoAlvoId = "upload-resultado")
     if (c.kind === "bar" || c.kind === "line") {
       const pontos = c.data.map(d => ({ label: d.name, valor: d.value }));
       const desenho = c.kind === "bar" ? simpleBarChartSVG(pontos, "var(--tinta)") : simpleLineChartSVG(pontos, "var(--tinta)");
-      return `<div class="dash-chart-box"><h4>${c.title}</h4>${desenho}</div>`;
+      return `<div class="dash-chart-box"><h4>${escapeHTML(c.title)}</h4>${desenho}</div>`;
     }
     if (c.kind === "heatmap") {
-      return `<div class="dash-chart-box"><h4>${c.title}</h4>${heatmapGenericoSVG(c)}</div>`;
+      return `<div class="dash-chart-box"><h4>${escapeHTML(c.title)}</h4>${heatmapGenericoSVG(c)}</div>`;
     }
     return "";
   }).join("");
