@@ -412,32 +412,51 @@ function passoRotulo(n, maxRotulos = 12) {
 }
 
 function simpleBarChartSVG(pontos, cor) {
-  const w = 520, h = 200, padL = 34, padR = 14, padT = 10, baseY = h - 34;
+  const w = 520, h = 200, padL = 44, padR = 14, padT = 14, baseInf = h - 34;
   const n = pontos.length || 1;
-  const max = maxSeguro(pontos.map(p => p.valor));
-  const plotH = baseY - padT;
+  const valores = pontos.map(p => Number(p.valor) || 0);
+  // domínio real: com estorno/glosa/saldo existe valor negativo, e um eixo
+  // preso em zero desenharia altura negativa (SVG inválido) e cortaria a barra
+  const maxV = valores.reduce((a, v) => (v > a ? v : a), 0);
+  const minV = valores.reduce((a, v) => (v < a ? v : a), 0);
+  const amplitude = (maxV - minV) || 1;
+  const plotH = baseInf - padT;
+  const yDe = (v) => baseInf - ((v - minV) / amplitude) * plotH; // posição de um valor
+  const yZero = yDe(0);
+  const temNegativo = minV < 0;
+
   const bw = (w - padL - padR) / n;
   const barW = Math.min(bw * 0.56, 40);
   const passo = passoRotulo(n);
+
   let grade = "", eixoY = "", barras = "", labels = "";
   [0, 0.25, 0.5, 0.75, 1].forEach(f => {
-    const y = baseY - plotH * f;
-    grade += `<line x1="${padL}" y1="${y.toFixed(1)}" x2="${w - padR}" y2="${y.toFixed(1)}" stroke="var(--paper-line)" stroke-width="1" stroke-dasharray="${f === 0 ? "0" : "2 4"}" />`;
-    eixoY += `<text x="${(padL - 6).toFixed(1)}" y="${(y + 3).toFixed(1)}" text-anchor="end" font-family="monospace" font-size="8" fill="var(--carvao)" fill-opacity="0.5">${formatarEixo(max * f)}</text>`;
+    const valorLinha = minV + amplitude * f;
+    const y = yDe(valorLinha);
+    grade += `<line x1="${padL}" y1="${y.toFixed(1)}" x2="${w - padR}" y2="${y.toFixed(1)}" stroke="var(--paper-line)" stroke-width="1" stroke-dasharray="2 4" />`;
+    eixoY += `<text x="${(padL - 6).toFixed(1)}" y="${(y + 3).toFixed(1)}" text-anchor="end" font-family="monospace" font-size="9" fill="var(--carvao)" fill-opacity="0.55">${formatarEixo(valorLinha)}</text>`;
   });
+  // linha do zero só aparece quando o domínio cruza o zero
+  if (temNegativo) {
+    grade += `<line x1="${padL}" y1="${yZero.toFixed(1)}" x2="${w - padR}" y2="${yZero.toFixed(1)}" stroke="var(--carvao)" stroke-width="1.5" />`;
+  }
+
   pontos.forEach((p, i) => {
+    const v = Number(p.valor) || 0;
     const cxB = padL + bw * i + bw / 2;
-    const alt = plotH * (p.valor / max);
-    const y = baseY - alt;
+    const yTopo = Math.min(yDe(v), yZero);
+    const altura = Math.abs(yDe(v) - yZero);
     const ultimo = i === n - 1;
-    barras += `<rect class="barra" x="${(cxB - barW / 2).toFixed(1)}" y="${y.toFixed(1)}" width="${barW.toFixed(1)}" height="${alt.toFixed(1)}" fill="${ultimo ? cor : corGlow(cor)}" stroke="${cor}" stroke-width="1.4"><title>${p.label}: ${p.valor}</title></rect>`;
+    const negativo = v < 0;
+    // negativo em cor própria: não é o mesmo número com sinal, é outra coisa
+    const corBarra = negativo ? "var(--terracota)" : (ultimo ? cor : corGlow(cor));
+    barras += `<rect class="barra" x="${(cxB - barW / 2).toFixed(1)}" y="${yTopo.toFixed(1)}" width="${barW.toFixed(1)}" height="${Math.max(altura, 0.5).toFixed(1)}" fill="${corBarra}" stroke="${negativo ? "var(--terracota)" : cor}" stroke-width="1.4"><title>${escapeHTML(p.label)}: ${p.valor}</title></rect>`;
     if (n <= 20) {
-      // valor em cima da barra — sem isso, o número só existia no tooltip,
-      // que some quando a imagem é baixada ou o gráfico é ampliado
-      barras += `<text x="${cxB.toFixed(1)}" y="${(y - 4).toFixed(1)}" text-anchor="middle" font-family="monospace" font-size="9" font-weight="700" fill="var(--carvao)">${formatarEixo(p.valor)}</text>`;
+      const yTexto = negativo ? yTopo + altura + 11 : yTopo - 4;
+      barras += `<text x="${cxB.toFixed(1)}" y="${yTexto.toFixed(1)}" text-anchor="middle" font-family="monospace" font-size="9" font-weight="700" fill="${negativo ? "var(--terracota)" : "var(--carvao)"}">${formatarEixo(v)}</text>`;
     }
     if (i % passo === 0 || ultimo) {
-      labels += `<text x="${cxB.toFixed(1)}" y="${baseY + 16}" text-anchor="middle" font-family="monospace" font-size="9" fill="var(--carvao)" fill-opacity="${ultimo ? 1 : 0.6}" font-weight="${ultimo ? 700 : 400}">${p.label}</text>`;
+      labels += `<text x="${cxB.toFixed(1)}" y="${h - 8}" text-anchor="middle" font-family="monospace" font-size="9" fill="var(--carvao)" fill-opacity="${ultimo ? 1 : 0.6}" font-weight="${ultimo ? 700 : 400}">${escapeHTML(p.label)}</text>`;
     }
   });
   return `<svg viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg">${grade}${eixoY}${barras}${labels}</svg>`;
@@ -1056,6 +1075,23 @@ async function baixarUploadArquivo(uploadId, nomeArquivo) {
   }
 }
 
+// "o sistema calculou a partir DISTO" — sem esse bloco, o número na tela
+// não tem procedência: ninguém sabe se veio de 180 linhas ou de 176 porque
+// 4 foram descartadas por data inválida
+function renderQualidadeCarga(q, totalLinhas) {
+  if (!q) return "";
+  const partes = [];
+  if (totalLinhas != null) partes.push(`${totalLinhas} linha(s) lidas`);
+  if (q.formatoDetectado) partes.push(`formato: ${escapeHTML(q.formatoDetectado)}`);
+  if (q.encoding && q.encoding !== "n/a") partes.push(`codificação: ${escapeHTML(q.encoding)}`);
+  if (q.separador && q.separador !== "n/a") partes.push(`separador: "${escapeHTML(q.separador)}"`);
+  if (q.linhasIgnoradasAntesDoCabecalho) partes.push(`${q.linhasIgnoradasAntesDoCabecalho} linha(s) de título ignoradas (cabeçalho na linha ${q.linhaCabecalho})`);
+  const aviso = q.avisoFormato
+    ? `<p class="dash-chart-hint" style="border-left-color:var(--mostarda);margin-top:6px"><b>Sobre o arquivo:</b> ${escapeHTML(q.avisoFormato)}</p>`
+    : "";
+  return `<p class="font-mono" style="font-size:10.5px;color:#6B7280;margin:8px 0">${partes.join(" · ")}</p>${aviso}`;
+}
+
 async function visualizarUploadPortal(uploadId, portalSlug) {
   const alvo = document.getElementById("upload-portal-resultado");
   alvo.innerHTML = `<p class="tela-intro">Carregando...</p>`;
@@ -1069,6 +1105,7 @@ async function visualizarUploadPortal(uploadId, portalSlug) {
         <button class="tab-btn active" data-sub="graficos">GRÁFICOS</button>
         <button class="tab-btn" data-sub="tabela">DADOS BRUTOS</button>
       </div>
+      ${renderQualidadeCarga(detalhe.qualidade, detalhe.linhas?.length)}
       <div style="text-align:right;margin:10px 0">
         <button class="btn-exportar-xlsx" id="btn-baixar-planilha">⬇ BAIXAR PLANILHA</button>
       </div>
@@ -1278,11 +1315,25 @@ function renderPainel(resultado) {
   }
 
   if (dados.tipo === "composicao") {
-    const tabela = dados.categorias.map(c => `<tr><td>${escapeHTML(c.label)}</td><td class="num">${c.valor.toLocaleString("pt-BR")}</td><td class="num">${c.percentualDoTotal}%</td></tr>`).join("")
-      + `<tr style="border-top:2px solid var(--carvao);font-weight:700"><td>TOTAL</td><td class="num">${dados.total.toLocaleString("pt-BR")}</td><td class="num">100%</td></tr>`;
-    return `${avisoFiltro}${renderResumos(dados.resumos)}${renderComoLer(dados.comoLer)}
+    // rosca e "% do total" pressupõem partes de um todo: com valor negativo
+    // (estorno, glosa, saldo) não existe fatia, e o percentual passa de 100.
+    // Nesse caso o ranking é a leitura honesta.
+    const temNegativo = dados.categorias.some(c => c.valor < 0);
+    const somaPct = dados.categorias.reduce((a, c) => a + c.percentualDoTotal, 0);
+    const tabela = dados.categorias.map(c => `<tr><td>${escapeHTML(c.label)}</td><td class="num"${c.valor < 0 ? ' style="color:var(--terracota)"' : ''}>${c.valor.toLocaleString("pt-BR")}</td><td class="num">${temNegativo ? "—" : c.percentualDoTotal + "%"}</td></tr>`).join("")
+      // percentual arredondado raramente fecha 100 sozinho: mostra a soma real
+      + `<tr style="border-top:2px solid var(--carvao);font-weight:700"><td>TOTAL</td><td class="num">${dados.total.toLocaleString("pt-BR")}</td><td class="num">${temNegativo ? "—" : Math.round(somaPct * 10) / 10 + "%"}</td></tr>`;
+
+    const avisoNegativo = temNegativo
+      ? `<p class="dash-chart-hint" style="border-left-color:var(--terracota)"><b>Há valores negativos nesta série</b> (estorno, glosa ou saldo). Rosca e percentual do total ficam desativados: não existe fatia de valor negativo, e a soma dos percentuais não fecha 100. O ranking abaixo é a leitura correta.</p>`
+      : "";
+    const grafico = temNegativo
+      ? barRankingChartSVG(dados.categorias, null)
+      : pieChartSVG(dados.categorias, null);
+
+    return `${avisoFiltro}${renderResumos(dados.resumos)}${renderComoLer(dados.comoLer)}${avisoNegativo}
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start">
-        <div>${pieChartSVG(dados.categorias, null)}</div>
+        <div>${grafico}</div>
         <table class="dash-tabela"><thead><tr><th>CATEGORIA</th><th>VALOR</th><th>%</th></tr></thead><tbody>${tabela}</tbody></table>
       </div>${rodape}`;
   }
