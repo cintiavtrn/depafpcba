@@ -1309,10 +1309,18 @@ function renderPainel(resultado) {
   const filtros = (painel.config?.filtros || [])
     .map(f => `${escapeHTML(f.coluna)}: ${f.valores.map(escapeHTML).join(", ")}`)
     .join(" · ");
-  const avisoFiltro = filtros
+  const avisoFiltroBase = filtros
     ? `<p class="font-mono" style="font-size:11px;color:var(--mostarda);margin-bottom:8px">filtrado por ${filtros} — ${dados.linhasConsideradas} de ${dados.linhasTotaisDaPlanilha} linhas</p>`
     : "";
+  const avisoFiltro = avisoFiltroBase + (dados.contextoDrill
+    ? `<p class="dash-chart-hint" style="border-left-color:var(--tinta)"><b>Dentro de ${escapeHTML(dados.contextoDrill.coluna)}: ${escapeHTML(dados.contextoDrill.valor)}</b> — ${dados.linhasConsideradas} de ${dados.contextoDrill.totalDoNivelAcima} registros do total geral.</p>`
+    : "");
   const avisosBase = (dados.avisos || []).map(a => `<p class="dash-chart-hint" style="border-left-color:var(--mostarda);font-size:10.5px"><b>Atenção:</b> ${escapeHTML(a)}</p>`).join("");
+  // ao descer um nível, o total de cima acompanha — sem isso a pessoa olha a
+  // unidade com melhor taxa e esquece que ela tem 4 registros
+  const contextoDrill = dados.contextoDrill
+    ? `<p class="dash-chart-hint" style="border-left-color:var(--tinta)"><b>Vendo dentro de ${escapeHTML(dados.contextoDrill.coluna)}: ${escapeHTML(dados.contextoDrill.valor)}</b> — ${dados.linhasConsideradas} de ${dados.contextoDrill.totalDoNivelAcima} registros do total geral.</p>`
+    : "";
   const rodape = avisosBase + `<p class="font-mono" style="font-size:10.5px;color:#6B7280;margin-top:8px">fonte: ${escapeHTML(upload.nomeArquivo)}${dados.linhasIgnoradas ? ` · ${dados.linhasIgnoradas} linha(s) sem data válida, ignoradas` : ""}</p>`;
 
   if (dados.tipo === "evolucao") {
@@ -1323,6 +1331,32 @@ function renderPainel(resultado) {
         : simpleBarChartSVG(dados.pontos.map(p => ({ label: p.label, valor: p.valor })), "var(--tinta)");
     return `${avisoFiltro}${renderResumos(dados.resumos)}${renderComoLer(dados.comoLer)}
       <div style="margin-top:12px">${corpo}</div>${rodape}`;
+  }
+
+  // TAXA: toda linha mostra a fração de onde a taxa saiu. "69%" sozinho e
+  // "69% — 9 de 13" levam a decisões diferentes, e a segunda é a honesta.
+  if (dados.tipo === "razao") {
+    const suf = dados.comoPercentual ? "%" : "";
+    const pontos = dados.categorias.filter(c => c.valor !== null).map(c => ({ label: c.label, valor: c.valor }));
+    const avisoN = dados.algumDenominadorPequeno
+      ? `<p class="dash-chart-hint" style="border-left-color:var(--mostarda)"><b>Denominadores pequenos:</b> nos grupos marcados, um único registro muda a taxa em vários pontos. A distância entre 90% e 95% pode ser uma unidade de diferença, não desempenho — por isso ordenar por taxa aqui ordena ruído tanto quanto resultado.</p>`
+      : "";
+    const linhasTab = dados.categorias.map(c => `
+      <tr>
+        <td>${escapeHTML(c.label)}</td>
+        <td class="num">${c.valor === null ? "—" : c.valor + suf}</td>
+        <td class="num">${c.numerador.toLocaleString("pt-BR")} de ${c.denominador.toLocaleString("pt-BR")}${c.denominadorPequeno ? ' <span style="color:var(--mostarda)">⚠</span>' : ""}</td>
+      </tr>`).join("")
+      + `<tr style="border-top:2px solid var(--carvao);font-weight:700">
+           <td>TAXA GERAL</td>
+           <td class="num">${dados.total === null ? "—" : dados.total + suf}</td>
+           <td class="num">${dados.numeradorTotal.toLocaleString("pt-BR")} de ${dados.denominadorTotal.toLocaleString("pt-BR")}</td>
+         </tr>`;
+    return `${avisoFiltro}${renderResumos(dados.resumos)}${renderComoLer(dados.comoLer)}${avisoN}
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start">
+        <div>${barRankingChartSVG(pontos.map(p => ({ label: p.label, valor: p.valor })), null)}</div>
+        <table class="dash-tabela"><thead><tr><th>GRUPO</th><th>TAXA</th><th>DE QUANTOS</th></tr></thead><tbody>${linhasTab}</tbody></table>
+      </div>${rodape}`;
   }
 
   if (dados.tipo === "composicao") {
