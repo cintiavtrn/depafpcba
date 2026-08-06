@@ -1299,6 +1299,87 @@ function renderComoLer(cl) {
   return `<p class="dash-chart-hint"><b>${escapeHTML(cl.titulo)}:</b> ${escapeHTML(cl.texto)} <i>Como ler:</i> ${escapeHTML(cl.eixo)}</p>`;
 }
 
+// ---------- baixar a tabela do painel em CSV ----------
+// A imagem do gráfico sozinha perde as categorias e os números exatos. Quem
+// vai usar num relatório precisa da tabela junto — senão reconstrói na mão e
+// erra. Guardamos a tabela de cada painel aqui pra poder exportar.
+const TABELAS_PARA_BAIXAR = new Map();
+
+function baixarCSV(nomeArquivo, linhas) {
+  if (!linhas || !linhas.length) return;
+  const escapar = (v) => {
+    const t = String(v ?? "");
+    // neutraliza fórmula: célula começando com = + - @ é executada pelo Excel
+    const seguro = /^[=+\-@\t\r]/.test(t) ? `'${t}` : t;
+    return /[;"\n\r]/.test(seguro) ? `"${seguro.replace(/"/g, '""')}"` : seguro;
+  };
+  const colunas = Object.keys(linhas[0]);
+  const csv = [colunas.map(escapar).join(";")]
+    .concat(linhas.map((l) => colunas.map((c) => escapar(l[c])).join(";")))
+    .join("\r\n");
+  // BOM na frente: sem ele o Excel no Windows abre acentuação quebrada
+  const blob = new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = nomeArquivo;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+// monta a tabela exportável a partir do resultado, por tipo de painel
+function tabelaDoPainel(dados, painel) {
+  if (dados.tipo === "composicao") {
+    return dados.categorias.map((c) => ({
+      Categoria: c.label,
+      Valor: c.valor === null ? "(menos de 5 - omitido)" : c.valor,
+      "% do total": c.percentualDoTotal === null ? "" : c.percentualDoTotal,
+    }));
+  }
+  if (dados.tipo === "razao") {
+    const suf = dados.comoPercentual ? "%" : "";
+    return dados.categorias.map((c) => ({
+      Grupo: c.label,
+      [`Taxa${suf ? " (" + suf + ")" : ""}`]: c.valor === null ? "" : c.valor,
+      Numerador: c.numerador,
+      Denominador: c.denominador,
+      "Denominador pequeno": c.denominadorPequeno ? "sim" : "não",
+    }));
+  }
+  if (dados.tipo === "evolucao") {
+    return dados.pontos.map((p) => ({
+      Período: p.label,
+      Valor: p.valor,
+      ...(dados.acumulado ? { "Entraram no período": p.incremento } : {}),
+    }));
+  }
+  if (dados.tipo === "cruzamento" && !dados.segmentado) {
+    return dados.linhas.map((l) => {
+      const linha = { [painel.config.colunaA || "Linha"]: l.label };
+      dados.colunas.forEach((c, i) => {
+        linha[c.label] = l.valores[i] === null ? "(<5)" : l.valores[i];
+      });
+      linha.TOTAL = l.total;
+      return linha;
+    });
+  }
+  if (dados.segmentado) {
+    return dados.segmentos.flatMap((seg) =>
+      seg.linhas.map((l) => {
+        const linha = { [painel.config.colunaSegmento || "Segmento"]: seg.nome, [painel.config.colunaA || "Linha"]: l.label };
+        seg.colunas.forEach((c, i) => {
+          linha[c.label] = l.valores[i] === null ? "(<5)" : l.valores[i];
+        });
+        linha.TOTAL = l.total;
+        return linha;
+      })
+    );
+  }
+  return [];
+}
+
 function renderPainel(resultado) {
   const { painel, dados, upload } = resultado;
 
@@ -1336,7 +1417,19 @@ function renderPainel(resultado) {
   const avisoSoma = dados.somaDosGruposDifereDoTotal
     ? `<p class="dash-chart-hint" style="border-left-color:var(--mostarda);font-size:10.5px"><b>A soma das categorias é maior que o total.</b> Isso acontece quando a mesma pessoa/coisa aparece em mais de uma categoria (ex.: mudou de cargo). Cada categoria está certa; somar todas não dá o total.</p>`
     : "";
-  const rodape = avisosBase + avisoEntidade + avisoSupressao + avisoSoma + `<p class="font-mono" style="font-size:10.5px;color:#6B7280;margin-top:8px">fonte: ${escapeHTML(upload.nomeArquivo)}${dados.linhasIgnoradas ? ` · ${dados.linhasIgnoradas} linha(s) sem data válida, ignoradas` : ""}</p>`;
+  // guarda a tabela deste painel pra exportação (o clique é ligado depois,
+  // em abrirPainel, quando o HTML já está no documento)
+  const tabela = tabelaDoPainel(dados, painel);
+  if (tabela.length) TABELAS_PARA_BAIXAR.set(painel.id, { tabela, nome: painel.nome });
+  const botaoTabela = tabela.length
+    ? `<div style="text-align:right;margin:6px 0"><button class="dash-toggle-btn" data-baixar-tabela="${escapeAttr(painel.id)}">⬇ BAIXAR TABELA (CSV)</button></div>`
+    : "";
+
+  const avisoSupressaoExcessiva = dados.supressaoExcessiva
+    ? `<p class="dash-chart-hint" style="border-left-color:var(--terracota)"><b>A maior parte das células foi omitida.</b> Este cruzamento é fino demais para o tamanho da base — quase toda combinação tem menos de 5 registros. Cruze por uma categoria mais ampla (por região em vez de por unidade, por exemplo) para ter uma leitura útil.</p>`
+    : "";
+
+  const rodape = avisosBase + avisoEntidade + avisoSupressao + avisoSupressaoExcessiva + avisoSoma + botaoTabela + `<p class="font-mono" style="font-size:10.5px;color:#6B7280;margin-top:8px">fonte: ${escapeHTML(upload.nomeArquivo)}${dados.linhasIgnoradas ? ` · ${dados.linhasIgnoradas} linha(s) sem data válida, ignoradas` : ""}</p>`;
 
   if (dados.tipo === "evolucao") {
     const corpo = dados.series.length
@@ -1423,6 +1516,14 @@ async function abrirPainel(painelId, alvoId) {
     const resultado = await apiFetch(`/api/paineis/${painelId}/dados`);
     alvo.innerHTML = renderPainel(resultado);
     adicionarControlesGrafico(alvo);
+    alvo.querySelectorAll("[data-baixar-tabela]").forEach((b) => {
+      b.addEventListener("click", () => {
+        const guardado = TABELAS_PARA_BAIXAR.get(b.dataset.baixarTabela);
+        if (!guardado) return;
+        const nomeArquivo = guardado.nome.replace(/[^\w\s-]/g, "").trim().replace(/\s+/g, "-").toLowerCase() || "painel";
+        baixarCSV(`${nomeArquivo}.csv`, guardado.tabela);
+      });
+    });
   } catch (erro) {
     alvo.innerHTML = `<p class="font-mono" style="font-size:11px;color:var(--terracota)">Não consegui calcular: ${escapeHTML(erro.message)}</p>`;
   }
