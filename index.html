@@ -1214,6 +1214,12 @@ function cruzamentoSVG(dados) {
     corpo += textoSVG(l.label, padL - 10, y + cellH / 2, { maxChars: MAX_ROTULO, anchor: "end", fontSize: 10.5, alturaLinha: 12 });
     l.valores.forEach((v, j) => {
       const x = padL + j * (cellW + gap);
+      // null = célula suprimida por ter poucos registros (dado pessoal)
+      if (v === null) {
+        corpo += `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${cellW}" height="${cellH}" fill="var(--paper-line)" opacity="0.4"><title>menos de 5 registros — omitido para não identificar pessoas</title></rect>`;
+        corpo += `<text x="${(x + cellW / 2).toFixed(1)}" y="${(y + cellH / 2 + 4).toFixed(1)}" text-anchor="middle" font-family="monospace" font-size="10" fill="var(--carvao)" fill-opacity="0.45">&lt;5</text>`;
+        return;
+      }
       const t = v / max;
       corpo += `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${cellW}" height="${cellH}" fill="rgba(34,211,238,${(0.07 + t * 0.72).toFixed(2)})"><title>${escapeHTML(l.label)} × ${escapeHTML(colunas[j].label)}: ${v}</title></rect>`;
       if (v) corpo += `<text x="${(x + cellW / 2).toFixed(1)}" y="${(y + cellH / 2 + 4).toFixed(1)}" text-anchor="middle" font-family="monospace" font-size="11.5" font-weight="${t > 0.6 ? 700 : 400}" fill="var(--carvao)" fill-opacity="${t > 0.5 ? 1 : 0.75}">${v}</text>`;
@@ -1321,7 +1327,16 @@ function renderPainel(resultado) {
   const contextoDrill = dados.contextoDrill
     ? `<p class="dash-chart-hint" style="border-left-color:var(--tinta)"><b>Vendo dentro de ${escapeHTML(dados.contextoDrill.coluna)}: ${escapeHTML(dados.contextoDrill.valor)}</b> — ${dados.linhasConsideradas} de ${dados.contextoDrill.totalDoNivelAcima} registros do total geral.</p>`
     : "";
-  const rodape = avisosBase + `<p class="font-mono" style="font-size:10.5px;color:#6B7280;margin-top:8px">fonte: ${escapeHTML(upload.nomeArquivo)}${dados.linhasIgnoradas ? ` · ${dados.linhasIgnoradas} linha(s) sem data válida, ignoradas` : ""}</p>`;
+  const avisoEntidade = dados.contadoPorEntidade
+    ? `<p class="font-mono" style="font-size:10.5px;color:var(--oliva);margin-top:6px">contando registros distintos (não linhas) — a mesma pessoa/coisa não é contada duas vezes</p>`
+    : "";
+  const avisoSupressao = dados.houveSupressao || dados.suprimiuCelulas
+    ? `<p class="dash-chart-hint" style="border-left-color:var(--terracota);font-size:10.5px"><b>Células com menos de ${dados.nMinimoCelula || 5} registros aparecem vazias.</b> Com dado pessoal, um número pequeno num cruzamento identifica a pessoa — por isso é omitido, não é erro de cálculo.</p>`
+    : "";
+  const avisoSoma = dados.somaDosGruposDifereDoTotal
+    ? `<p class="dash-chart-hint" style="border-left-color:var(--mostarda);font-size:10.5px"><b>A soma das categorias é maior que o total.</b> Isso acontece quando a mesma pessoa/coisa aparece em mais de uma categoria (ex.: mudou de cargo). Cada categoria está certa; somar todas não dá o total.</p>`
+    : "";
+  const rodape = avisosBase + avisoEntidade + avisoSupressao + avisoSoma + `<p class="font-mono" style="font-size:10.5px;color:#6B7280;margin-top:8px">fonte: ${escapeHTML(upload.nomeArquivo)}${dados.linhasIgnoradas ? ` · ${dados.linhasIgnoradas} linha(s) sem data válida, ignoradas` : ""}</p>`;
 
   if (dados.tipo === "evolucao") {
     const corpo = dados.series.length
@@ -1365,7 +1380,7 @@ function renderPainel(resultado) {
     // Nesse caso o ranking é a leitura honesta.
     const temNegativo = dados.categorias.some(c => c.valor < 0);
     const somaPct = dados.categorias.reduce((a, c) => a + c.percentualDoTotal, 0);
-    const tabela = dados.categorias.map(c => `<tr><td>${escapeHTML(c.label)}</td><td class="num"${c.valor < 0 ? ' style="color:var(--terracota)"' : ''}>${c.valor.toLocaleString("pt-BR")}</td><td class="num">${temNegativo ? "—" : c.percentualDoTotal + "%"}</td></tr>`).join("")
+    const tabela = dados.categorias.map(c => `<tr><td>${escapeHTML(c.label)}</td><td class="num"${c.valor !== null && c.valor < 0 ? ' style="color:var(--terracota)"' : ''}>${c.valor === null ? `<span title="menos de 5 registros — omitido">&lt;5</span>` : c.valor.toLocaleString("pt-BR")}</td><td class="num">${c.valor === null || temNegativo ? "—" : c.percentualDoTotal + "%"}</td></tr>`).join("")
       // percentual arredondado raramente fecha 100 sozinho: mostra a soma real
       + `<tr style="border-top:2px solid var(--carvao);font-weight:700"><td>TOTAL</td><td class="num">${dados.total.toLocaleString("pt-BR")}</td><td class="num">${temNegativo ? "—" : Math.round(somaPct * 10) / 10 + "%"}</td></tr>`;
 
@@ -1433,8 +1448,17 @@ function renderFormularioDefinicao(schema, definicaoAtual) {
     ? `<p class="dash-chart-hint" style="border-left-color:var(--mostarda)"><b>Coluna bloqueada como eixo de tempo:</b> ${bloqueadas.map(escapeHTML).join(", ")}. ${escapeHTML(schema[bloqueadas[0]].motivoBloqueio || "")}</p>`
     : "";
 
+  const sensiveis = colunas.filter(c => schema[c].identificavel);
+  const avisoSensivel = sensiveis.length
+    ? `<p class="dash-chart-hint" style="border-left-color:var(--terracota)"><b>Dado pessoal detectado:</b> ${sensiveis.map(escapeHTML).join(", ")}. Estas colunas não podem virar categoria de gráfico, e os painéis desta planilha vão esconder células com menos de 5 registros — três filtros combinados chegam a uma pessoa só.</p>`
+    : "";
+  const cs = definicaoAtual?._chaveSugerida;
+  const avisoChave = cs?.aviso
+    ? `<p class="dash-chart-hint" style="border-left-color:var(--mostarda)"><b>Atenção:</b> ${escapeHTML(cs.aviso)}</p>`
+    : "";
+
   return `
-    ${avisoBloqueio}
+    ${avisoBloqueio}${avisoSensivel}${avisoChave}
     <div class="dash-filtros" style="flex-direction:column;align-items:stretch;gap:12px;max-width:560px">
       <div class="dash-filtro">
         <label>1. O QUE É UMA LINHA DESTA PLANILHA?</label>
@@ -1457,6 +1481,13 @@ function renderFormularioDefinicao(schema, definicaoAtual) {
         <select id="def-saida">
           <option value="">Não existe — a planilha só tem o que está ativo hoje</option>
           ${opt(datas, d.colunaDataSaida)}
+        </select>
+      </div>
+      <div class="dash-filtro">
+        <label>QUAL COLUNA IDENTIFICA CADA UM? (evita contar a mesma pessoa/coisa duas vezes)</label>
+        <select id="def-chave">
+          <option value="">Cada linha é uma coisa diferente — pode contar linhas</option>
+          ${colunas.map(c => `<option value="${escapeAttr(c)}" ${c === d.chaveEntidade ? "selected" : ""}>${escapeHTML(c)}</option>`).join("")}
         </select>
       </div>
       <div class="dash-filtro">
@@ -1587,6 +1618,7 @@ async function carregarPaineisPortal(portalSlug) {
                     grao: caixa.querySelector("#def-grao").value,
                     medidaTipo: caixa.querySelector("#def-medida").value,
                     colunaDataSaida: caixa.querySelector("#def-saida").value || null,
+                    chaveEntidade: caixa.querySelector("#def-chave").value || null,
                     unidade: caixa.querySelector("#def-unidade").value.trim() || null,
                   }),
                 });
@@ -1619,6 +1651,7 @@ async function carregarPaineisPortal(portalSlug) {
                   grao: caixa.querySelector("#def-grao").value,
                   medidaTipo: caixa.querySelector("#def-medida").value,
                   colunaDataSaida: caixa.querySelector("#def-saida").value || null,
+                  chaveEntidade: caixa.querySelector("#def-chave").value || null,
                   unidade: caixa.querySelector("#def-unidade").value.trim() || null,
                 }),
               });
