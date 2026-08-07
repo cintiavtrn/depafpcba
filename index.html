@@ -10,6 +10,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <style>
 :root{
+  /* base escura */
   --carvao:#E9EDF4;
   --paper:#0B0E14;
   --paper-line:#1C2230;
@@ -122,16 +123,10 @@ body{background:var(--paper);color:var(--carvao);font-family:'IBM Plex Sans',san
 .chart-axis-label{font-family:'IBM Plex Mono',monospace;font-size:9px;fill:#6B7280}
 
 /* ---------- assinatura visual: fita, glow, movimento ---------- */
-.tela-head{position:relative;overflow:hidden}
-.tela-head::before{
-  content:"";position:absolute;top:-20px;right:-70px;width:220px;height:44px;
-  background:var(--tela-color,var(--carvao));opacity:.92;
-  transform:rotate(-8deg);clip-path:polygon(3% 0,100% 0,97% 100%,0 100%);
-}
-.tela-head::after{
-  content:"DEPAF · PCBA";position:absolute;top:-6px;right:-28px;transform:rotate(-8deg);
-  font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.28em;color:var(--paper);
-}
+/* a fita diagonal com "DEPAF · PCBA" saiu: cortada pelo overflow do
+   cabeçalho, ela aparecia como um retângulo verde torto no canto e lia como
+   falha de renderização, não como assinatura visual */
+.tela-head{position:relative}
 .dash-chart-box svg rect,.dash-chart-box svg path,.dash-chart-box svg circle{transition:opacity .25s ease,stroke-width .2s ease}
 .dash-chart-box svg .barra:hover,.dash-chart-box svg .donut-fatia:hover{opacity:.82}
 .kpi-card{border-top:3px solid var(--kpi-cor,var(--carvao))}
@@ -172,7 +167,11 @@ body{background:var(--paper);color:var(--carvao);font-family:'IBM Plex Sans',san
 .tab-panel{padding-top:26px}
 .tab-panel[hidden]{display:none}
 
-.dash-filtros{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:24px;	background:var(--surface);border:2px solid var(--carvao);padding:14px 16px}
+.dash-filtros{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:24px;background:var(--surface);border:2px solid var(--carvao);padding:14px 16px;box-sizing:border-box;max-width:100%}
+.dash-filtros *{box-sizing:border-box}
+.dash-filtros select,.dash-filtros input[type="text"],.dash-filtros input[type="number"]{max-width:100%}
+.dash-filtro{min-width:0;max-width:100%}
+.dash-filtro label{white-space:normal;line-height:1.35}
 .dash-filtro{display:flex;flex-direction:column;gap:4px}
 .dash-filtro label{font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:0.08em;color:#9AA3B2}
 .dash-filtro select{
@@ -1559,7 +1558,7 @@ function renderFormularioDefinicao(schema, definicaoAtual) {
 
   return `
     ${avisoBloqueio}${avisoSensivel}${avisoChave}
-    <div class="dash-filtros" style="flex-direction:column;align-items:stretch;gap:12px;max-width:560px">
+    <div class="dash-filtros" style="flex-direction:column;align-items:stretch;gap:14px;width:100%;max-width:720px">
       <div class="dash-filtro">
         <label>1. O QUE É UMA LINHA DESTA PLANILHA?</label>
         <select id="def-grao">
@@ -1793,23 +1792,44 @@ async function carregarUploadsPortal(portalId) {
       painel.innerHTML = `<p class="tela-intro">Nenhuma planilha enviada pra este portal ainda. Use o botão "SUBIR PLANILHA" no topo e escolha este portal na hora de enviar.</p>`;
       return;
     }
+    const podeApagar = souAdmin();
     const linhasHtml = uploads.map(u => `
-      <tr data-upload-id="${u.id}" style="cursor:pointer">
-        <td>${escapeHTML(u.nomeArquivo)}</td>
-        <td>${u.tipo.toUpperCase()}</td>
-        <td>${new Date(u.criadoEm).toLocaleString("pt-BR")}</td>
-        <td>${escapeHTML(u.criadoPor || "—")}</td>
+      <tr data-upload-id="${escapeAttr(u.id)}">
+        <td style="cursor:pointer" data-ver="1">${escapeHTML(u.nomeArquivo)}</td>
+        <td style="cursor:pointer" data-ver="1">${u.tipo.toUpperCase()}</td>
+        <td style="cursor:pointer" data-ver="1">${new Date(u.criadoEm).toLocaleString("pt-BR")}</td>
+        <td style="cursor:pointer" data-ver="1">${escapeHTML(u.criadoPor || "—")}</td>
+        ${podeApagar ? `<td style="text-align:center"><button class="dash-toggle-btn" data-apagar-upload="${escapeAttr(u.id)}" data-nome="${escapeAttr(u.nomeArquivo)}" style="color:var(--terracota)">REMOVER</button></td>` : ""}
       </tr>
     `).join("");
     painel.innerHTML = `
       <table class="dash-tabela">
-        <thead><tr><th>ARQUIVO</th><th>TIPO</th><th>ENVIADO EM</th><th>POR</th></tr></thead>
+        <thead><tr><th>ARQUIVO</th><th>TIPO</th><th>ENVIADO EM</th><th>POR</th>${podeApagar ? "<th></th>" : ""}</tr></thead>
         <tbody>${linhasHtml}</tbody>
       </table>
       <div id="upload-portal-resultado" style="margin-top:20px"></div>
     `;
-    painel.querySelectorAll("tbody tr").forEach(tr => {
-      tr.addEventListener("click", () => visualizarUploadPortal(tr.dataset.uploadId, portalId));
+    // clique nas células abre; o botão de remover não pode abrir junto
+    painel.querySelectorAll("[data-ver]").forEach(td => {
+      td.addEventListener("click", () => visualizarUploadPortal(td.closest("tr").dataset.uploadId, portalId));
+    });
+    painel.querySelectorAll("[data-apagar-upload]").forEach(b => {
+      b.addEventListener("click", async (ev) => {
+        ev.stopPropagation();
+        // apagar a planilha apaga os painéis feitos com ela — a confirmação
+        // precisa dizer isso, senão a pessoa perde trabalho sem saber
+        if (!confirm(`Remover "${b.dataset.nome}"?\n\nOs painéis criados a partir dela também serão apagados. Esta ação não pode ser desfeita.`)) return;
+        b.disabled = true; b.textContent = "removendo...";
+        try {
+          const r = await apiFetch(`/api/uploads/${b.dataset.apagarUpload}`, { method: "DELETE" });
+          alert(`Removido: ${r.nomeArquivo}\n${r.linhasApagadas} linha(s) e ${r.paineisApagados} painel(éis) apagados.`);
+          carregarUploadsPortal(portalId);
+          carregarDestaques(portalId);
+        } catch (erro) {
+          b.disabled = false; b.textContent = "REMOVER";
+          alert("Não consegui remover: " + erro.message);
+        }
+      });
     });
   } catch (erro) {
     painel.innerHTML = `<p class="tela-intro">Não consegui carregar o histórico: ${escapeHTML(erro.message)}</p>`;
