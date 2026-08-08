@@ -1628,6 +1628,119 @@ async function carregarDestaques(portalSlug) {
   }
 }
 
+// =====================================================================
+// VÍNCULOS FATO-DIMENSÃO — modelo estrela: uma planilha "fato" (a que se
+// conta) ligada a uma planilha "dimensão" (a que descreve). Depois de
+// ligada, as colunas da dimensão passam a existir pros painéis da fato,
+// como se fossem colunas dela ("dUnidades.Regiao", por exemplo).
+//
+// O risco mora na chave: se ela se repetir na dimensão, o vínculo multiplica
+// linhas da fato e infla toda soma. Por isso o back RECUSA nesse caso — não
+// existe "ligar mesmo assim" aqui, e a tela abaixo só mostra o botão de
+// confirmar quando a checagem vier limpa.
+// =====================================================================
+
+async function renderVinculos(portalSlug, uploads) {
+  if (!souAdmin() || uploads.length < 2) return "";
+  let vinculos = [];
+  try { vinculos = await apiFetch(`/api/portais/${portalSlug}/vinculos`); } catch { /* segue sem a lista */ }
+
+  const listaVinculos = vinculos.length ? `
+    <table class="dash-tabela" style="margin-bottom:14px">
+      <thead><tr><th>FATO</th><th>LIGADA A</th><th>PELA COLUNA</th><th>CASAMENTO</th><th></th></tr></thead>
+      <tbody>${vinculos.map(v => `
+        <tr>
+          <td>${escapeHTML(v.uploadFato.nomeArquivo)}</td>
+          <td>${escapeHTML(v.uploadDimensao.nomeArquivo)} <span style="opacity:.6">(${escapeHTML(v.apelido)})</span></td>
+          <td>${escapeHTML(v.colunaFato)} = ${escapeHTML(v.colunaDimensao)}</td>
+          <td>${v.taxaCasamento}%${v.taxaCasamento < 100 ? " ⚠" : ""}</td>
+          <td><button class="dash-toggle-btn" data-apagar-vinculo="${escapeAttr(v.id)}" style="color:var(--terracota)">REMOVER</button></td>
+        </tr>`).join("")}</tbody>
+    </table>` : "";
+
+  return `
+    <div class="dash-chart-box" style="margin-bottom:16px">
+      <h4>Ligar planilhas (modelo fato-dimensão)</h4>
+      <p class="dash-chart-hint">Uma planilha de apoio (ex.: unidades com região, delegado) pode ser ligada à planilha principal. Depois de ligada, os painéis passam a poder agrupar por qualquer coluna dela — mesmo que a palavra não exista na planilha original.</p>
+      ${listaVinculos}
+      <div class="dash-filtros" style="align-items:flex-end">
+        <div class="dash-filtro">
+          <label>PLANILHA PRINCIPAL (fato — a que tem muitas linhas, uma por registro)</label>
+          <select id="sel-fato">${uploads.map(u => `<option value="${escapeAttr(u.id)}">${escapeHTML(u.nomeArquivo)}</option>`).join("")}</select>
+        </div>
+        <div class="dash-filtro">
+          <label>PLANILHA DE APOIO (dimensão — a que descreve, uma linha por categoria)</label>
+          <select id="sel-dimensao">${uploads.map((u, i) => `<option value="${escapeAttr(u.id)}" ${i === 1 ? "selected" : ""}>${escapeHTML(u.nomeArquivo)}</option>`).join("")}</select>
+        </div>
+        <button class="dash-toggle-btn" id="btn-propor-vinculo">VERIFICAR VÍNCULO</button>
+      </div>
+      <div id="proposta-vinculo"></div>
+    </div>`;
+}
+
+function ligarVinculos(portalSlug) {
+  const bloco = document.getElementById("bloco-vinculos");
+  if (!bloco) return;
+
+  bloco.querySelectorAll("[data-apagar-vinculo]").forEach(b => {
+    b.addEventListener("click", async () => {
+      if (!confirm("Remover este vínculo? Os painéis que usam colunas da dimensão vão parar de encontrá-las.")) return;
+      try {
+        await apiFetch(`/api/vinculos/${b.dataset.apagarVinculo}`, { method: "DELETE" });
+        carregarPaineisPortal(portalSlug);
+      } catch (erro) { alert("Não consegui remover: " + erro.message); }
+    });
+  });
+
+  const btnPropor = document.getElementById("btn-propor-vinculo");
+  if (!btnPropor) return;
+  btnPropor.addEventListener("click", async () => {
+    const fatoId = document.getElementById("sel-fato").value;
+    const dimId = document.getElementById("sel-dimensao").value;
+    const caixa = document.getElementById("proposta-vinculo");
+    if (fatoId === dimId) { caixa.innerHTML = `<p class="dash-chart-hint" style="border-left-color:var(--terracota)">As duas planilhas precisam ser diferentes.</p>`; return; }
+    caixa.innerHTML = `<p class="font-mono" style="font-size:11px;color:#9AA3B2">Verificando...</p>`;
+    try {
+      const r = await apiFetch(`/api/portais/${portalSlug}/vinculos/proposta?fato=${fatoId}&dimensao=${dimId}`);
+      const chaveOk = r.validacaoChave.ok;
+      const avisoChave = chaveOk
+        ? `<p class="font-mono" style="font-size:11px;color:var(--oliva)">chave "${escapeHTML(r.proposta.colunaDimensao)}" é única na dimensão — pode ligar</p>`
+        : `<p class="dash-chart-hint" style="border-left-color:var(--terracota)"><b>Não dá pra ligar por essa coluna.</b> "${escapeHTML(r.proposta.colunaDimensao)}" se repete na planilha de apoio (ex.: "${escapeHTML(r.validacaoChave.duplicados[0] || "")}"). Cada valor precisa aparecer uma vez só, senão as linhas da planilha principal seriam contadas mais de uma vez.</p>`;
+      caixa.innerHTML = `
+        <p class="font-mono" style="font-size:11px;color:#9AA3B2;margin-top:10px">Proposta: <b>${escapeHTML(r.proposta.colunaFato)}</b> (planilha principal) = <b>${escapeHTML(r.proposta.colunaDimensao)}</b> (apoio)</p>
+        <p class="font-mono" style="font-size:11px;color:#9AA3B2">Casamento: ${r.casamento.casadas} de ${r.casamento.total} linhas (${r.casamento.taxa}%)${r.casamento.exemplosSemCorrespondencia.length ? " — sem correspondência: " + r.casamento.exemplosSemCorrespondencia.map(escapeHTML).join(", ") : ""}</p>
+        <p class="font-mono" style="font-size:11px;color:#9AA3B2">Colunas que a dimensão traria: ${r.colunasQueSeriamTrazidas.map(escapeHTML).join(", ")}</p>
+        ${avisoChave}
+        ${chaveOk ? `
+          <div style="margin-top:8px;display:flex;gap:8px;align-items:center">
+            <input type="text" id="apelido-vinculo" value="${escapeAttr(r.apelidoSugerido)}" placeholder="apelido" style="${CAMPO_STYLE}max-width:180px">
+            <button class="dash-toggle-btn" id="btn-confirmar-vinculo" style="background:var(--oliva)">CONFIRMAR VÍNCULO</button>
+          </div>` : ""}
+      `;
+      const btnConfirmar = document.getElementById("btn-confirmar-vinculo");
+      if (btnConfirmar) btnConfirmar.addEventListener("click", async () => {
+        btnConfirmar.disabled = true; btnConfirmar.textContent = "ligando...";
+        try {
+          await apiFetch(`/api/portais/${portalSlug}/vinculos`, {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              uploadFatoId: fatoId, uploadDimensaoId: dimId,
+              colunaFato: r.proposta.colunaFato, colunaDimensao: r.proposta.colunaDimensao,
+              apelido: document.getElementById("apelido-vinculo").value.trim(),
+            }),
+          });
+          carregarPaineisPortal(portalSlug);
+        } catch (erro) {
+          btnConfirmar.disabled = false; btnConfirmar.textContent = "CONFIRMAR VÍNCULO";
+          alert("Não consegui ligar: " + erro.message);
+        }
+      });
+    } catch (erro) {
+      caixa.innerHTML = `<p class="dash-chart-hint" style="border-left-color:var(--terracota)">${escapeHTML(erro.message)}</p>`;
+    }
+  });
+}
+
 async function carregarPaineisPortal(portalSlug) {
   const painel = document.getElementById("tab-paineis");
   try {
@@ -1635,6 +1748,8 @@ async function carregarPaineisPortal(portalSlug) {
       apiFetch(`/api/portais/${portalSlug}/paineis`),
       apiFetch(`/api/portais/${portalSlug}/uploads`),
     ]);
+
+    const blocoVinculos = await renderVinculos(portalSlug, uploads);
 
     const blocoCriar = souAdmin() && uploads.length ? `
       <div class="dash-filtros" style="align-items:flex-end;margin-bottom:20px">
@@ -1661,7 +1776,8 @@ async function carregarPaineisPortal(portalSlug) {
       </div>
     `).join("") : `<p class="tela-intro">Nenhum painel criado ainda para este portal.</p>`;
 
-    painel.innerHTML = blocoCriar + lista;
+    painel.innerHTML = `<div id="bloco-vinculos">${blocoVinculos}</div>` + blocoCriar + lista;
+    ligarVinculos(portalSlug);
 
     painel.querySelectorAll("[data-abrir]").forEach(b => {
       b.addEventListener("click", () => abrirPainel(b.dataset.abrir, `painel-corpo-${b.dataset.abrir}`));
