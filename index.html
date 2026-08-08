@@ -1729,7 +1729,7 @@ function ligarVinculos(portalSlug) {
               apelido: document.getElementById("apelido-vinculo").value.trim(),
             }),
           });
-          carregarPaineisPortal(portalSlug);
+          carregarPaineisPortal(portalSlug, { autoAbrirSugestoesPara: fatoId });
         } catch (erro) {
           btnConfirmar.disabled = false; btnConfirmar.textContent = "CONFIRMAR VÍNCULO";
           alert("Não consegui ligar: " + erro.message);
@@ -1741,7 +1741,7 @@ function ligarVinculos(portalSlug) {
   });
 }
 
-async function carregarPaineisPortal(portalSlug) {
+async function carregarPaineisPortal(portalSlug, opcoes = {}) {
   const painel = document.getElementById("tab-paineis");
   try {
     const [paineis, uploads] = await Promise.all([
@@ -1778,6 +1778,18 @@ async function carregarPaineisPortal(portalSlug) {
 
     painel.innerHTML = `<div id="bloco-vinculos">${blocoVinculos}</div>` + blocoCriar + lista;
     ligarVinculos(portalSlug);
+
+    // depois de ligar uma dimensão, mostra os painéis que ela destravou
+    // NA HORA — sem isso, a pessoa tinha que rolar até uma seção separada,
+    // escolher de novo a mesma planilha e clicar de novo
+    if (opcoes.autoAbrirSugestoesPara) {
+      const selUp = document.getElementById("sel-upload-painel");
+      if (selUp) {
+        selUp.value = opcoes.autoAbrirSugestoesPara;
+        document.getElementById("btn-ver-sugestoes")?.click();
+        setTimeout(() => document.getElementById("sugestoes-paineis")?.scrollIntoView({ behavior: "smooth", block: "start" }), 200);
+      }
+    }
 
     painel.querySelectorAll("[data-abrir]").forEach(b => {
       b.addEventListener("click", () => abrirPainel(b.dataset.abrir, `painel-corpo-${b.dataset.abrir}`));
