@@ -1640,10 +1640,19 @@ async function carregarDestaques(portalSlug) {
 // confirmar quando a checagem vier limpa.
 // =====================================================================
 
-async function renderVinculos(portalSlug, uploads) {
-  if (!souAdmin() || uploads.length < 2) return "";
+// Um bloco só: ligar planilhas (quando há 2+) e, logo abaixo, criar painel —
+// sem pular pra uma seção separada lá embaixo. Antes eram dois blocos
+// desconhecidos entre si; "ver painéis disponíveis" ficava fora de vista.
+async function renderAdminPlanilhas(portalSlug, uploads) {
+  if (!souAdmin()) return "";
+  if (!uploads.length) {
+    return `<p class="tela-intro">Suba uma planilha vinculada a este portal primeiro (botão "SUBIR PLANILHA" no topo) pra poder criar painéis.</p>`;
+  }
+
   let vinculos = [];
-  try { vinculos = await apiFetch(`/api/portais/${portalSlug}/vinculos`); } catch { /* segue sem a lista */ }
+  if (uploads.length >= 2) {
+    try { vinculos = await apiFetch(`/api/portais/${portalSlug}/vinculos`); } catch { /* segue sem a lista */ }
+  }
 
   const listaVinculos = vinculos.length ? `
     <table class="dash-tabela" style="margin-bottom:14px">
@@ -1658,24 +1667,42 @@ async function renderVinculos(portalSlug, uploads) {
         </tr>`).join("")}</tbody>
     </table>` : "";
 
-  return `
-    <div class="dash-chart-box" style="margin-bottom:16px">
-      <h4>Ligar planilhas (modelo fato-dimensão)</h4>
-      <p class="dash-chart-hint">Uma planilha de apoio (ex.: unidades com região, delegado) pode ser ligada à planilha principal. Depois de ligada, os painéis passam a poder agrupar por qualquer coluna dela — mesmo que a palavra não exista na planilha original.</p>
-      ${listaVinculos}
-      <div class="dash-filtros" style="align-items:flex-end">
-        <div class="dash-filtro">
-          <label>PLANILHA PRINCIPAL (fato — a que tem muitas linhas, uma por registro)</label>
-          <select id="sel-fato">${uploads.map(u => `<option value="${escapeAttr(u.id)}">${escapeHTML(u.nomeArquivo)}</option>`).join("")}</select>
-        </div>
-        <div class="dash-filtro">
-          <label>PLANILHA DE APOIO (dimensão — a que descreve, uma linha por categoria)</label>
-          <select id="sel-dimensao">${uploads.map((u, i) => `<option value="${escapeAttr(u.id)}" ${i === 1 ? "selected" : ""}>${escapeHTML(u.nomeArquivo)}</option>`).join("")}</select>
-        </div>
-        <button class="dash-toggle-btn" id="btn-propor-vinculo">VERIFICAR VÍNCULO</button>
+  // uma planilha (fato) pode ter QUANTAS dimensões você quiser — o form
+  // continua aberto depois de cada vínculo, exatamente pra repetir com outra
+  const blocoLigar = uploads.length >= 2 ? `
+    <h4>Ligar planilhas (modelo fato-dimensão)</h4>
+    <p class="dash-chart-hint">Uma planilha de apoio (ex.: unidades com região, delegado) pode ser ligada à planilha principal. Depois de ligada, os painéis passam a poder agrupar por qualquer coluna dela — mesmo que a palavra não exista na planilha original. <b>Pode ligar mais de uma planilha de apoio na mesma principal</b> — repita a operação escolhendo outra planilha em "PLANILHA DE APOIO" e clicando em VERIFICAR VÍNCULO de novo.</p>
+    ${listaVinculos}
+    <div class="dash-filtros" style="align-items:flex-end">
+      <div class="dash-filtro">
+        <label>PLANILHA PRINCIPAL (fato — a que tem muitas linhas, uma por registro)</label>
+        <select id="sel-fato">${uploads.map(u => `<option value="${escapeAttr(u.id)}">${escapeHTML(u.nomeArquivo)}</option>`).join("")}</select>
       </div>
-      <div id="proposta-vinculo"></div>
-    </div>`;
+      <div class="dash-filtro">
+        <label>PLANILHA DE APOIO (dimensão — a que descreve, uma linha por categoria)</label>
+        <select id="sel-dimensao">${uploads.map((u, i) => `<option value="${escapeAttr(u.id)}" ${i === 1 ? "selected" : ""}>${escapeHTML(u.nomeArquivo)}</option>`).join("")}</select>
+      </div>
+      <button class="dash-toggle-btn" id="btn-propor-vinculo">VERIFICAR VÍNCULO</button>
+    </div>
+    <div id="proposta-vinculo"></div>
+    <div style="height:22px"></div>
+  ` : "";
+
+  // "ver painéis disponíveis" mora NO MESMO bloco, não numa seção à parte —
+  // é a pergunta natural depois de ligar (ou mesmo sem ligar nada)
+  const blocoCriar = `
+    <h4>Criar painel</h4>
+    <div class="dash-filtros" style="align-items:flex-end">
+      <div class="dash-filtro">
+        <label>A PARTIR DE QUAL PLANILHA</label>
+        <select id="sel-upload-painel">${uploads.map(u => `<option value="${escapeAttr(u.id)}">${escapeHTML(u.nomeArquivo)}</option>`).join("")}</select>
+      </div>
+      <button class="btn-exportar-xlsx" id="btn-ver-sugestoes">VER PAINÉIS DISPONÍVEIS</button>
+    </div>
+    <div id="sugestoes-paineis"></div>
+  `;
+
+  return `<div class="dash-chart-box" style="margin-bottom:16px">${blocoLigar}${blocoCriar}</div>`;
 }
 
 function ligarVinculos(portalSlug) {
@@ -1749,18 +1776,7 @@ async function carregarPaineisPortal(portalSlug, opcoes = {}) {
       apiFetch(`/api/portais/${portalSlug}/uploads`),
     ]);
 
-    const blocoVinculos = await renderVinculos(portalSlug, uploads);
-
-    const blocoCriar = souAdmin() && uploads.length ? `
-      <div class="dash-filtros" style="align-items:flex-end;margin-bottom:20px">
-        <div class="dash-filtro">
-          <label>CRIAR PAINEL A PARTIR DE QUAL PLANILHA</label>
-          <select id="sel-upload-painel">${uploads.map(u => `<option value="${u.id}">${escapeHTML(u.nomeArquivo)}</option>`).join("")}</select>
-        </div>
-        <button class="btn-exportar-xlsx" id="btn-ver-sugestoes">VER PAINÉIS DISPONÍVEIS</button>
-      </div>
-      <div id="sugestoes-paineis"></div>
-    ` : (souAdmin() ? `<p class="tela-intro">Suba uma planilha vinculada a este portal primeiro (botão "SUBIR PLANILHA" no topo) pra poder criar painéis.</p>` : "");
+    const blocoAdmin = await renderAdminPlanilhas(portalSlug, uploads);
 
     const lista = paineis.length ? paineis.map(pn => `
       <div class="dash-chart-box" style="margin-bottom:2px">
@@ -1776,7 +1792,7 @@ async function carregarPaineisPortal(portalSlug, opcoes = {}) {
       </div>
     `).join("") : `<p class="tela-intro">Nenhum painel criado ainda para este portal.</p>`;
 
-    painel.innerHTML = `<div id="bloco-vinculos">${blocoVinculos}</div>` + blocoCriar + lista;
+    painel.innerHTML = `<div id="bloco-vinculos">${blocoAdmin}</div>` + lista;
     ligarVinculos(portalSlug);
 
     // depois de ligar uma dimensão, mostra os painéis que ela destravou
