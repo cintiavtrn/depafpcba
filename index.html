@@ -1667,6 +1667,26 @@ async function renderAdminPlanilhas(portalSlug, uploads) {
         </tr>`).join("")}</tbody>
     </table>` : "";
 
+  // planilhas que JÁ SÃO fato de algum vínculo — uma entrada por planilha,
+  // mesmo que ela tenha mais de uma dimensão ligada
+  const idsComVinculo = new Set(vinculos.map(v => v.uploadFato.id));
+  const fatosComVinculo = [...new Map(vinculos.map(v => [v.uploadFato.id, v.uploadFato])).values()];
+
+  // "painéis desta relação" fica com área PRÓPRIA, logo abaixo de VERIFICAR
+  // VÍNCULO — separado do seletor genérico de baixo, que serve pra QUALQUER
+  // planilha (inclusive uma de apoio sozinha, sem nenhuma relação nova).
+  // Antes as duas coisas ficavam no mesmo lugar e misturava sugestão de
+  // planilha avulsa com sugestão que usa a dimensão — confuso.
+  const blocoSugestoesVinculo = fatosComVinculo.length ? `
+    <div style="border-top:1px solid var(--paper-line);margin-top:16px;padding-top:16px">
+      <h4 style="font-size:12px;opacity:.8">Painéis desta relação (usando as planilhas ligadas)</h4>
+      ${fatosComVinculo.map(f => `
+        <p class="font-mono" style="font-size:10.5px;color:#6B7280;margin-bottom:4px">${escapeHTML(f.nomeArquivo)}</p>
+        <div data-sugestoes-vinculo="${escapeAttr(f.id)}" style="margin-bottom:14px"><p class="font-mono" style="font-size:11px;color:#9AA3B2">Carregando...</p></div>
+      `).join("")}
+    </div>
+  ` : "";
+
   // uma planilha (fato) pode ter QUANTAS dimensões você quiser — o form
   // continua aberto depois de cada vínculo, exatamente pra repetir com outra
   const blocoLigar = uploads.length >= 2 ? `
@@ -1685,17 +1705,20 @@ async function renderAdminPlanilhas(portalSlug, uploads) {
       <button class="dash-toggle-btn" id="btn-propor-vinculo">VERIFICAR VÍNCULO</button>
     </div>
     <div id="proposta-vinculo"></div>
+    ${blocoSugestoesVinculo}
     <div style="height:22px"></div>
   ` : "";
 
-  // "ver painéis disponíveis" mora NO MESMO bloco, não numa seção à parte —
-  // é a pergunta natural depois de ligar (ou mesmo sem ligar nada)
+  // o seletor GENÉRICO continua listando tudo (inclusive quem já tem
+  // vínculo, caso a pessoa queira um painel simples sem dimensão nenhuma) —
+  // só não é mais o lugar onde os painéis do vínculo aparecem sozinhos
+  const uploadsOrdenados = [...uploads].sort((a, b) => (idsComVinculo.has(b.id) ? 1 : 0) - (idsComVinculo.has(a.id) ? 1 : 0));
   const blocoCriar = `
     <h4>Criar painel</h4>
     <div class="dash-filtros" style="align-items:flex-end">
       <div class="dash-filtro">
         <label>A PARTIR DE QUAL PLANILHA</label>
-        <select id="sel-upload-painel">${uploads.map(u => `<option value="${escapeAttr(u.id)}">${escapeHTML(u.nomeArquivo)}</option>`).join("")}</select>
+        <select id="sel-upload-painel">${uploadsOrdenados.map(u => `<option value="${escapeAttr(u.id)}">${idsComVinculo.has(u.id) ? "🔗 " : ""}${escapeHTML(u.nomeArquivo)}</option>`).join("")}</select>
       </div>
       <button class="btn-exportar-xlsx" id="btn-ver-sugestoes">VER PAINÉIS DISPONÍVEIS</button>
     </div>
@@ -1768,6 +1791,97 @@ function ligarVinculos(portalSlug) {
   });
 }
 
+// Busca e desenha as sugestões de painel pra UMA planilha, dentro do
+// container passado. Extraída pra função própria porque agora tem DOIS
+// lugares que precisam disso: o seletor genérico (qualquer planilha) e a
+// área de "painéis desta relação" logo abaixo de cada vínculo confirmado —
+// sem essa separação, as duas coisas ficavam misturadas no mesmo lugar.
+async function mostrarSugestoesPara(portalSlug, uploadId, caixa) {
+  caixa.innerHTML = `<p class="font-mono" style="font-size:11px;color:#9AA3B2">Analisando a planilha...</p>`;
+  try {
+    const resposta = await apiFetch(`/api/portais/${portalSlug}/paineis/sugestoes?uploadId=${uploadId}`);
+    const sugestoes = resposta.sugestoes;
+
+    // sem as três perguntas respondidas, o motor não sabe se pode somar —
+    // então o formulário vem primeiro, não os painéis
+    if (!resposta.definicao) {
+      const detalhe = await apiFetch(`/api/uploads/${uploadId}`);
+      caixa.innerHTML = `
+        <p class="dash-chart-hint"><b>Antes de criar painéis:</b> o sistema precisa saber o que uma linha desta planilha significa. Sem isso ele não tem como saber quais somas são válidas — e uma soma inválida vira um número que alguém defende numa reunião.</p>
+        ${renderFormularioDefinicao(detalhe.schema, null)}`;
+      caixa.querySelector("#btn-salvar-definicao").addEventListener("click", async () => {
+        const st = caixa.querySelector("#definicao-status");
+        st.textContent = "Salvando...";
+        try {
+          await apiFetch(`/api/uploads/${uploadId}/definicao`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              grao: caixa.querySelector("#def-grao").value,
+              medidaTipo: caixa.querySelector("#def-medida").value,
+              colunaDataSaida: caixa.querySelector("#def-saida").value || null,
+              chaveEntidade: caixa.querySelector("#def-chave").value || null,
+              unidade: caixa.querySelector("#def-unidade").value.trim() || null,
+            }),
+          });
+          mostrarSugestoesPara(portalSlug, uploadId, caixa); // recarrega, agora com a definição salva
+        } catch (erro) {
+          st.textContent = "Erro: " + erro.message;
+        }
+      });
+      return;
+    }
+
+    caixa.innerHTML = `
+      ${renderAvisosDefinicao(resposta.permissoes)}
+      <p class="font-mono" style="font-size:11px;color:#9AA3B2;margin-bottom:8px">Cada painel abaixo responde UMA pergunta. Crie os que interessam:</p>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px">
+        ${sugestoes.map((s, i) => `
+          <button class="dash-toggle-btn" data-criar="${i}" ${s.jaExiste ? "disabled style='opacity:.4'" : ""}>
+            ${s.jaExiste ? "✓ " : "+ "}${escapeHTML(s.nome)}
+          </button>`).join("")}
+      </div>
+      <button class="dash-toggle-btn" id="btn-reabrir-definicao" style="opacity:.7">✎ rever o que uma linha significa</button>`;
+    const btnRever = caixa.querySelector("#btn-reabrir-definicao");
+    if (btnRever) btnRever.addEventListener("click", async () => {
+      const detalhe = await apiFetch(`/api/uploads/${uploadId}`);
+      caixa.innerHTML = renderFormularioDefinicao(detalhe.schema, resposta.definicao);
+      caixa.querySelector("#btn-salvar-definicao").addEventListener("click", async () => {
+        await apiFetch(`/api/uploads/${uploadId}/definicao`, {
+          method: "PUT", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            grao: caixa.querySelector("#def-grao").value,
+            medidaTipo: caixa.querySelector("#def-medida").value,
+            colunaDataSaida: caixa.querySelector("#def-saida").value || null,
+            chaveEntidade: caixa.querySelector("#def-chave").value || null,
+            unidade: caixa.querySelector("#def-unidade").value.trim() || null,
+          }),
+        });
+        mostrarSugestoesPara(portalSlug, uploadId, caixa);
+      });
+    });
+    caixa.querySelectorAll("[data-criar]").forEach(b => {
+      b.addEventListener("click", async () => {
+        const s = sugestoes[Number(b.dataset.criar)];
+        b.disabled = true; b.textContent = "criando...";
+        try {
+          await apiFetch(`/api/portais/${portalSlug}/paineis`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ uploadId, nome: s.nome, config: s.config }),
+          });
+          carregarPaineisPortal(portalSlug);
+        } catch (erro) {
+          b.disabled = false;
+          alert("Não consegui criar: " + erro.message);
+        }
+      });
+    });
+  } catch (erro) {
+    caixa.innerHTML = `<p class="font-mono" style="font-size:11px;color:var(--terracota)">${escapeHTML(erro.message)}</p>`;
+  }
+}
+
 async function carregarPaineisPortal(portalSlug, opcoes = {}) {
   const painel = document.getElementById("tab-paineis");
   try {
@@ -1794,18 +1908,6 @@ async function carregarPaineisPortal(portalSlug, opcoes = {}) {
 
     painel.innerHTML = `<div id="bloco-vinculos">${blocoAdmin}</div>` + lista;
     ligarVinculos(portalSlug);
-
-    // depois de ligar uma dimensão, mostra os painéis que ela destravou
-    // NA HORA — sem isso, a pessoa tinha que rolar até uma seção separada,
-    // escolher de novo a mesma planilha e clicar de novo
-    if (opcoes.autoAbrirSugestoesPara) {
-      const selUp = document.getElementById("sel-upload-painel");
-      if (selUp) {
-        selUp.value = opcoes.autoAbrirSugestoesPara;
-        document.getElementById("btn-ver-sugestoes")?.click();
-        setTimeout(() => document.getElementById("sugestoes-paineis")?.scrollIntoView({ behavior: "smooth", block: "start" }), 200);
-      }
-    }
 
     painel.querySelectorAll("[data-abrir]").forEach(b => {
       b.addEventListener("click", () => abrirPainel(b.dataset.abrir, `painel-corpo-${b.dataset.abrir}`));
@@ -1835,93 +1937,25 @@ async function carregarPaineisPortal(portalSlug, opcoes = {}) {
 
     const btnSug = document.getElementById("btn-ver-sugestoes");
     if (btnSug) {
-      btnSug.addEventListener("click", async () => {
-        const uploadId = document.getElementById("sel-upload-painel").value;
-        const caixa = document.getElementById("sugestoes-paineis");
-        caixa.innerHTML = `<p class="font-mono" style="font-size:11px;color:#9AA3B2">Analisando a planilha...</p>`;
-        try {
-          const resposta = await apiFetch(`/api/portais/${portalSlug}/paineis/sugestoes?uploadId=${uploadId}`);
-          const sugestoes = resposta.sugestoes;
-
-          // sem as três perguntas respondidas, o motor não sabe se pode somar —
-          // então o formulário vem primeiro, não os painéis
-          if (!resposta.definicao) {
-            const detalhe = await apiFetch(`/api/uploads/${uploadId}`);
-            caixa.innerHTML = `
-              <p class="dash-chart-hint"><b>Antes de criar painéis:</b> o sistema precisa saber o que uma linha desta planilha significa. Sem isso ele não tem como saber quais somas são válidas — e uma soma inválida vira um número que alguém defende numa reunião.</p>
-              ${renderFormularioDefinicao(detalhe.schema, null)}`;
-            caixa.querySelector("#btn-salvar-definicao").addEventListener("click", async () => {
-              const st = caixa.querySelector("#definicao-status");
-              st.textContent = "Salvando...";
-              try {
-                await apiFetch(`/api/uploads/${uploadId}/definicao`, {
-                  method: "PUT",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({
-                    grao: caixa.querySelector("#def-grao").value,
-                    medidaTipo: caixa.querySelector("#def-medida").value,
-                    colunaDataSaida: caixa.querySelector("#def-saida").value || null,
-                    chaveEntidade: caixa.querySelector("#def-chave").value || null,
-                    unidade: caixa.querySelector("#def-unidade").value.trim() || null,
-                  }),
-                });
-                btnSug.click(); // recarrega, agora com a definição salva
-              } catch (erro) {
-                st.textContent = "Erro: " + erro.message;
-              }
-            });
-            return;
-          }
-
-          caixa.innerHTML = `
-            ${renderAvisosDefinicao(resposta.permissoes)}
-            <p class="font-mono" style="font-size:11px;color:#9AA3B2;margin-bottom:8px">Cada painel abaixo responde UMA pergunta. Crie os que interessam:</p>
-            <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px">
-              ${sugestoes.map((s, i) => `
-                <button class="dash-toggle-btn" data-criar="${i}" ${s.jaExiste ? "disabled style='opacity:.4'" : ""}>
-                  ${s.jaExiste ? "✓ " : "+ "}${escapeHTML(s.nome)}
-                </button>`).join("")}
-            </div>
-            <button class="dash-toggle-btn" id="btn-reabrir-definicao" style="opacity:.7">✎ rever o que uma linha significa</button>`;
-          const btnRever = caixa.querySelector("#btn-reabrir-definicao");
-          if (btnRever) btnRever.addEventListener("click", async () => {
-            const detalhe = await apiFetch(`/api/uploads/${uploadId}`);
-            caixa.innerHTML = renderFormularioDefinicao(detalhe.schema, resposta.definicao);
-            caixa.querySelector("#btn-salvar-definicao").addEventListener("click", async () => {
-              await apiFetch(`/api/uploads/${uploadId}/definicao`, {
-                method: "PUT", headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  grao: caixa.querySelector("#def-grao").value,
-                  medidaTipo: caixa.querySelector("#def-medida").value,
-                  colunaDataSaida: caixa.querySelector("#def-saida").value || null,
-                  chaveEntidade: caixa.querySelector("#def-chave").value || null,
-                  unidade: caixa.querySelector("#def-unidade").value.trim() || null,
-                }),
-              });
-              btnSug.click();
-            });
-          });
-          caixa.querySelectorAll("[data-criar]").forEach(b => {
-            b.addEventListener("click", async () => {
-              const s = sugestoes[Number(b.dataset.criar)];
-              b.disabled = true; b.textContent = "criando...";
-              try {
-                await apiFetch(`/api/portais/${portalSlug}/paineis`, {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ uploadId, nome: s.nome, config: s.config }),
-                });
-                carregarPaineisPortal(portalSlug);
-              } catch (erro) {
-                b.disabled = false;
-                alert("Não consegui criar: " + erro.message);
-              }
-            });
-          });
-        } catch (erro) {
-          caixa.innerHTML = `<p class="font-mono" style="font-size:11px;color:var(--terracota)">${escapeHTML(erro.message)}</p>`;
-        }
+      btnSug.addEventListener("click", () => {
+        mostrarSugestoesPara(portalSlug, document.getElementById("sel-upload-painel").value, document.getElementById("sugestoes-paineis"));
       });
+    }
+
+    // painéis das planilhas LIGADAS (modelo estrela) — área própria, separada
+    // do seletor genérico de cima. Aqui só entra quem tem dimensão vinculada,
+    // sem misturar com sugestão de planilha avulsa.
+    painel.querySelectorAll("[data-sugestoes-vinculo]").forEach(div => {
+      mostrarSugestoesPara(portalSlug, div.dataset.sugestoesVinculo, div);
+    });
+
+    // logo depois de confirmar um vínculo NOVO, rola até os painéis dele —
+    // eles já aparecem sozinhos, só falta trazer pra tela sem precisar procurar
+    if (opcoes.autoAbrirSugestoesPara) {
+      setTimeout(() => {
+        painel.querySelector(`[data-sugestoes-vinculo="${opcoes.autoAbrirSugestoesPara}"]`)
+          ?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 200);
     }
   } catch (erro) {
     painel.innerHTML = `<p class="tela-intro">Não consegui carregar os painéis: ${escapeHTML(erro.message)}</p>`;
