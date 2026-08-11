@@ -1549,7 +1549,7 @@ function renderFormularioDefinicao(schema, definicaoAtual) {
 
   const sensiveis = colunas.filter(c => schema[c].identificavel);
   const avisoSensivel = sensiveis.length
-    ? `<p class="dash-chart-hint" style="border-left-color:var(--terracota)"><b>Dado pessoal detectado:</b> ${sensiveis.map(escapeHTML).join(", ")}. Estas colunas não podem virar categoria de gráfico, e os painéis desta planilha vão esconder células com menos de 5 registros — três filtros combinados chegam a uma pessoa só.</p>`
+    ? `<p class="dash-chart-hint" style="border-left-color:var(--terracota)"><b>Dado pessoal detectado:</b> ${sensiveis.map(escapeHTML).join(", ")}. Estas colunas não podem virar categoria de gráfico. Os valores exatos (mesmo em grupos pequenos) aparecem normalmente nos painéis — é o esperado pra uso interno; se algo daqui for sair do DEPAF/PCBA algum dia, revise antes.</p>`
     : "";
   const cs = definicaoAtual?._chaveSugerida;
   const avisoChave = cs?.aviso
@@ -1682,7 +1682,7 @@ async function renderAdminPlanilhas(portalSlug, uploads) {
       <h4 style="font-size:12px;opacity:.8">Painéis desta relação (usando as planilhas ligadas)</h4>
       ${fatosComVinculo.map(f => `
         <p class="font-mono" style="font-size:10.5px;color:#6B7280;margin-bottom:4px">${escapeHTML(f.nomeArquivo)}</p>
-        <div data-sugestoes-vinculo="${escapeAttr(f.id)}" style="margin-bottom:14px"><p class="font-mono" style="font-size:11px;color:#9AA3B2">Carregando...</p></div>
+        <div data-sugestoes-vinculo="${escapeAttr(f.id)}" data-apelidos="${escapeAttr(vinculos.filter(v => v.uploadFato.id === f.id).map(v => v.apelido).join(","))}" style="margin-bottom:14px"><p class="font-mono" style="font-size:11px;color:#9AA3B2">Carregando...</p></div>
       `).join("")}
     </div>
   ` : "";
@@ -1796,11 +1796,16 @@ function ligarVinculos(portalSlug) {
 // lugares que precisam disso: o seletor genérico (qualquer planilha) e a
 // área de "painéis desta relação" logo abaixo de cada vínculo confirmado —
 // sem essa separação, as duas coisas ficavam misturadas no mesmo lugar.
-async function mostrarSugestoesPara(portalSlug, uploadId, caixa) {
+async function mostrarSugestoesPara(portalSlug, uploadId, caixa, apenasComApelidos = null) {
   caixa.innerHTML = `<p class="font-mono" style="font-size:11px;color:#9AA3B2">Analisando a planilha...</p>`;
   try {
     const resposta = await apiFetch(`/api/portais/${portalSlug}/paineis/sugestoes?uploadId=${uploadId}`);
-    const sugestoes = resposta.sugestoes;
+    // "painéis desta relação" mostra SÓ o que usa alguma coluna da dimensão
+    // ligada — o resto (sugestão comum, da planilha sozinha) some daqui,
+    // não fica misturado; quem quiser essas está no seletor genérico embaixo
+    const sugestoes = (apenasComApelidos && apenasComApelidos.length)
+      ? resposta.sugestoes.filter(s => apenasComApelidos.some(ap => JSON.stringify(s.config).includes(`"${ap}.`)))
+      : resposta.sugestoes;
 
     // sem as três perguntas respondidas, o motor não sabe se pode somar —
     // então o formulário vem primeiro, não os painéis
@@ -1824,7 +1829,7 @@ async function mostrarSugestoesPara(portalSlug, uploadId, caixa) {
               unidade: caixa.querySelector("#def-unidade").value.trim() || null,
             }),
           });
-          mostrarSugestoesPara(portalSlug, uploadId, caixa); // recarrega, agora com a definição salva
+          mostrarSugestoesPara(portalSlug, uploadId, caixa, apenasComApelidos); // recarrega, agora com a definição salva
         } catch (erro) {
           st.textContent = "Erro: " + erro.message;
         }
@@ -1857,7 +1862,7 @@ async function mostrarSugestoesPara(portalSlug, uploadId, caixa) {
             unidade: caixa.querySelector("#def-unidade").value.trim() || null,
           }),
         });
-        mostrarSugestoesPara(portalSlug, uploadId, caixa);
+        mostrarSugestoesPara(portalSlug, uploadId, caixa, apenasComApelidos);
       });
     });
     caixa.querySelectorAll("[data-criar]").forEach(b => {
@@ -1946,7 +1951,8 @@ async function carregarPaineisPortal(portalSlug, opcoes = {}) {
     // do seletor genérico de cima. Aqui só entra quem tem dimensão vinculada,
     // sem misturar com sugestão de planilha avulsa.
     painel.querySelectorAll("[data-sugestoes-vinculo]").forEach(div => {
-      mostrarSugestoesPara(portalSlug, div.dataset.sugestoesVinculo, div);
+      const apelidos = (div.dataset.apelidos || "").split(",").filter(Boolean);
+      mostrarSugestoesPara(portalSlug, div.dataset.sugestoesVinculo, div, apelidos);
     });
 
     // logo depois de confirmar um vínculo NOVO, rola até os painéis dele —
