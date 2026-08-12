@@ -61,7 +61,7 @@ body{background:var(--paper);color:var(--carvao);font-family:'IBM Plex Sans',san
 /* ---------- hero fundo institucional ---------- */
 .hero-fundo{
   position:relative;overflow:hidden;isolation:isolate;
-  margin:0 -24px 40px;padding:76px 24px 60px;
+  margin:0 0 32px;padding:64px 24px 48px;
   background:#0B0E14;text-align:center;
 }
 .hero-fundo::before{
@@ -81,7 +81,7 @@ body{background:var(--paper);color:var(--carvao);font-family:'IBM Plex Sans',san
 .hero-fundo .intro{position:relative;z-index:1;margin:0 auto}
 
 /* ---------- home ---------- */
-#tela-inicio{padding:0 24px 40px;max-width:1100px;margin:0 auto}}
+#tela-inicio{padding:0 24px 40px;max-width:1100px;margin:0 auto}
 .intro{max-width:680px;margin:0 auto 8px;text-align:center}
 .intro .eyebrow{font-family:'IBM Plex Mono',monospace;font-size:12px;letter-spacing:0.16em;color:var(--terracota);margin-bottom:12px}
 .intro h1{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:clamp(34px,6vw,56px);line-height:0.95}
@@ -400,10 +400,13 @@ select:focus-visible,input:focus-visible{
 </div>
 
 <section id="tela-login">
-  <div class="intro" style="margin-top:80px">
-    <div class="eyebrow">DOSSIÊ INSTITUCIONAL · ACESSO RESTRITO</div>
-    <h1>DEPAF</h1>
-    <p>Entre com a conta Google autorizada pra acessar o painel.</p>
+  <div class="hero-fundo">
+    <div class="hero-emblem" id="hero-emblem"></div>
+    <div class="intro">
+      <div class="eyebrow">DOSSIÊ INSTITUCIONAL · ACESSO RESTRITO</div>
+      <h1>DEPAF</h1>
+      <p>Entre com a conta Google autorizada pra acessar o painel.</p>
+    </div>
   </div>
   <div style="display:flex;justify-content:center;margin-top:32px">
     <div id="google-signin-botao"></div>
@@ -412,13 +415,10 @@ select:focus-visible,input:focus-visible{
 </section>
 
 <div id="tela-inicio" hidden>
-  <div class="hero-fundo">
-    <div class="hero-emblem" id="hero-emblem"></div>
-    <div class="intro">
-      <div class="eyebrow">DOSSIÊ INSTITUCIONAL · PORTAL INTERATIVO</div>
-      <h1>DEPAF</h1>
-      <p>Departamento de Planejamento, Administração e Finanças da Polícia Civil da Bahia. Escolha um caminho a partir do brasão para explorar cada frente do departamento.</p>
-    </div>
+  <div class="intro">
+    <div class="eyebrow">DOSSIÊ INSTITUCIONAL · PORTAL INTERATIVO</div>
+    <h1>DEPAF</h1>
+    <p>Departamento de Planejamento, Administração e Finanças da Polícia Civil da Bahia. Escolha um caminho a partir do brasão para explorar cada frente do departamento.</p>
   </div>
 
   <div class="hub-container">
