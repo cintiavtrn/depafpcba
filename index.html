@@ -58,8 +58,30 @@ body{background:var(--paper);color:var(--carvao);font-family:'IBM Plex Sans',san
 }
 .topbar .voltar.show{display:inline-block}
 
+/* ---------- hero fundo institucional ---------- */
+.hero-fundo{
+  position:relative;overflow:hidden;isolation:isolate;
+  margin:0 -24px 40px;padding:76px 24px 60px;
+  background:#0B0E14;text-align:center;
+}
+.hero-fundo::before{
+  content:"";position:absolute;inset:0;z-index:0;pointer-events:none;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='260' height='150'%3E%3Ctext x='-8' y='96' font-family='Space Grotesk, sans-serif' font-weight='700' font-size='58' letter-spacing='2' fill='rgba(233,237,244,0.05)'%3EDEPAF%3C/text%3E%3C/svg%3E");
+  background-repeat:repeat;background-size:260px 150px;
+  -webkit-mask-image:radial-gradient(ellipse 72% 88% at 50% 38%, black 50%, transparent 100%);
+  mask-image:radial-gradient(ellipse 72% 88% at 50% 38%, black 50%, transparent 100%);
+}
+.hero-fundo::after{
+  content:"";position:absolute;inset:0;z-index:0;pointer-events:none;
+  background:radial-gradient(ellipse 640px 420px at 50% 30%, rgba(234,179,8,.10), transparent 68%);
+}
+.hero-emblem{position:relative;z-index:1;width:112px;margin:0 auto 22px;color:var(--mostarda);
+  filter:drop-shadow(0 10px 26px rgba(0,0,0,.6)) drop-shadow(0 0 22px rgba(234,179,8,.20));}
+.hero-emblem svg{width:100%;height:auto;display:block}
+.hero-fundo .intro{position:relative;z-index:1;margin:0 auto}
+
 /* ---------- home ---------- */
-#tela-inicio{padding:56px 24px 40px;max-width:1100px;margin:0 auto}
+#tela-inicio{padding:0 24px 40px;max-width:1100px;margin:0 auto}}
 .intro{max-width:680px;margin:0 auto 8px;text-align:center}
 .intro .eyebrow{font-family:'IBM Plex Mono',monospace;font-size:12px;letter-spacing:0.16em;color:var(--terracota);margin-bottom:12px}
 .intro h1{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:clamp(34px,6vw,56px);line-height:0.95}
@@ -254,6 +276,12 @@ body::before{
 }
 .topbar,#tela-login,#tela-inicio,.tela,footer{position:relative;z-index:1}
 
+.mira-cantos{position:fixed;inset:0;z-index:60;pointer-events:none}
+.mira{position:fixed;width:22px;height:22px;color:rgba(233,237,244,.28)}
+.mira-tl{top:10px;left:10px}
+.mira-tr{top:10px;right:10px}
+.mira-bl{bottom:10px;left:10px}
+.mira-br{bottom:10px;right:10px}
 .topbar{box-shadow:0 12px 30px -18px rgba(0,0,0,.75)}
 .topbar::after{
   content:"";position:absolute;left:0;right:0;bottom:-4px;height:2px;
@@ -270,8 +298,9 @@ footer .selo svg{stroke-width:3}
 button,select,input{font-family:inherit}
 
 .voltar,.btn-exportar-xlsx,.btn-exportar-pbi,.dash-toggle-btn,.tab-btn{
-  border-radius:var(--radius-sm);
-  transition:transform .16s var(--ease-spring),box-shadow .16s ease,background .16s ease,color .16s ease,border-color .16s ease;
+  border-radius:0;
+  clip-path:polygon(9px 0,100% 0,100% calc(100% - 9px),calc(100% - 9px) 100%,0 100%,0 9px);
+  transition:transform .16s var(--ease-spring),box-shadow .16s ease,background .16s ease,color .16s ease,border-color .16s ease,clip-path .16s ease;
 }
 .voltar,.btn-exportar-xlsx,.btn-exportar-pbi{
   box-shadow:var(--shadow-sm);position:relative;font-weight:600;
@@ -350,6 +379,13 @@ select:focus-visible,input:focus-visible{
 </head>
 <body>
 
+<div class="mira-cantos" aria-hidden="true">
+  <svg class="mira mira-tl" viewBox="0 0 40 40"><path d="M2 14 L2 2 L14 2" stroke="currentColor" stroke-width="1.2" fill="none"/></svg>
+  <svg class="mira mira-tr" viewBox="0 0 40 40"><path d="M26 2 L38 2 L38 14" stroke="currentColor" stroke-width="1.2" fill="none"/></svg>
+  <svg class="mira mira-bl" viewBox="0 0 40 40"><path d="M2 26 L2 38 L14 38" stroke="currentColor" stroke-width="1.2" fill="none"/></svg>
+  <svg class="mira mira-br" viewBox="0 0 40 40"><path d="M38 26 L38 38 L26 38" stroke="currentColor" stroke-width="1.2" fill="none"/></svg>
+</div>
+
 <div class="topbar">
   <div class="brand" id="brand-home-btn">
     <span id="brand-icon"></span>
@@ -376,10 +412,13 @@ select:focus-visible,input:focus-visible{
 </section>
 
 <div id="tela-inicio" hidden>
-  <div class="intro">
-    <div class="eyebrow">DOSSIÊ INSTITUCIONAL · PORTAL INTERATIVO</div>
-    <h1>DEPAF</h1>
-    <p>Departamento de Planejamento, Administração e Finanças da Polícia Civil da Bahia. Escolha um caminho a partir do brasão para explorar cada frente do departamento.</p>
+  <div class="hero-fundo">
+    <div class="hero-emblem" id="hero-emblem"></div>
+    <div class="intro">
+      <div class="eyebrow">DOSSIÊ INSTITUCIONAL · PORTAL INTERATIVO</div>
+      <h1>DEPAF</h1>
+      <p>Departamento de Planejamento, Administração e Finanças da Polícia Civil da Bahia. Escolha um caminho a partir do brasão para explorar cada frente do departamento.</p>
+    </div>
   </div>
 
   <div class="hub-container">
@@ -736,7 +775,7 @@ function corCategoria(i) { return TONS[i % TONS.length]; }
 // =====================================================================
 document.getElementById("brand-icon").innerHTML = ICONS.brasao_pcba;
 document.getElementById("footer-selo").innerHTML = seloSVG("DEPAF", "DOSSIÊ");
-
+document.getElementById("hero-emblem").innerHTML = ICONS.distintivo_pcba;
 document.getElementById("direcao-card").innerHTML = `
   <div class="card-label">DIREÇÃO ATUAL</div>
   <h3>${DIRECAO.nome}</h3>
