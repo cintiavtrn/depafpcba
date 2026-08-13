@@ -2169,6 +2169,33 @@ async function montarBarraFiltros(paineis) {
     </div>
   `;
 }
+  // Ao trocar um chip, só os painéis cujo upload TEM aquela coluna são
+// recarregados — os outros painéis do mesmo portal ficam como estavam.
+function ligarBarraFiltros(container, paineis) {
+  container.querySelectorAll("[data-filtro-upload]").forEach(grupo => {
+    const uploadId = grupo.dataset.filtroUpload;
+    const coluna = grupo.dataset.filtroColuna;
+    grupo.querySelectorAll("[data-filtro-valor]").forEach(btn => {
+      btn.addEventListener("click", () => {
+        grupo.querySelectorAll("[data-filtro-valor]").forEach(b => b.classList.remove("active"));
+        btn.classList.add("active");
+
+        const semEssaColuna = (FILTRO_GLOBAL_POR_UPLOAD.get(uploadId) || []).filter(f => f.coluna !== coluna);
+        if (btn.dataset.filtroValor) semEssaColuna.push({ coluna, valores: [btn.dataset.filtroValor] });
+        FILTRO_GLOBAL_POR_UPLOAD.set(uploadId, semEssaColuna);
+
+        const filtrosDoUpload = FILTRO_GLOBAL_POR_UPLOAD.get(uploadId) || [];
+        paineis
+          .filter(pn => pn.upload?.id === uploadId)
+          .forEach(pn => {
+            if (document.getElementById(`painel-corpo-${pn.id}`)?.innerHTML.trim()) {
+              abrirPainel(pn.id, `painel-corpo-${pn.id}`, filtrosDoUpload);
+            }
+          });
+      });
+    });
+  });
+}
 
 async function carregarPaineisPortal(portalSlug, opcoes = {}) {
   const painel = document.getElementById("tab-paineis");
