@@ -2131,6 +2131,44 @@ function colunasFiltraveis(schema) {
 // rápido". Uma coluna sem valor nenhum (raro, mas possível) é ignorada sem
 // derrubar a barra inteira.
 async function montarBarraFiltros(paineis) {
+  const uploadsUsados = new Map();
+  for (const pn of paineis) {
+    if (pn.upload?.id && pn.upload?.schemaInferido && !uploadsUsados.has(pn.upload.id)) {
+      uploadsUsados.set(pn.upload.id, { nomeArquivo: pn.upload.nomeArquivo, schema: pn.upload.schemaInferido, definicao: pn.upload.definicao || null });
+    }
+  }
+
+  const grupos = [];
+  for (const [uploadId, { nomeArquivo, schema, definicao }] of uploadsUsados) {
+    for (const coluna of colunasFiltraveis(schema).slice(0, 3)) {
+      try {
+        const resp = await apiFetch(`/api/uploads/${uploadId}/colunas/${encodeURIComponent(coluna)}/valores`);
+        if (resp.valores?.length) grupos.push({ uploadId, nomeArquivo, coluna, valores: resp.valores, definicao });
+      } catch { /* coluna não deu pra filtrar (ex.: ficou vazia na amostra) — não quebra a barra inteira por isso */ }
+    }
+  }
+  if (!grupos.length) return "";
+
+  const multiplosUploads = uploadsUsados.size > 1;
+  return `
+    <div class="dash-filtros" style="margin-bottom:16px">
+      ${grupos.map(g => {
+        const ehColunaSituacao = g.definicao?.colunaSituacao === g.coluna && g.definicao?.valoresAtivos?.length;
+        const ativosNormalizados = ehColunaSituacao ? new Set(g.definicao.valoresAtivos.map(v => v.trim().toLowerCase())) : null;
+        const todosValores = ehColunaSituacao ? JSON.stringify(g.valores.map(v => v.valor)) : null;
+        return `
+        <div class="dash-filtro">
+          <label>${escapeHTML(g.coluna)}${multiplosUploads ? ` <span style="opacity:.5">(${escapeHTML(g.nomeArquivo)})</span>` : ""}${ehColunaSituacao ? ` <span style="opacity:.5">(mostrando só ativos por padrão)</span>` : ""}</label>
+          <div class="dash-toggle" data-filtro-upload="${escapeAttr(g.uploadId)}" data-filtro-coluna="${escapeAttr(g.coluna)}">
+            <button class="dash-toggle-btn${ehColunaSituacao ? "" : " active"}" data-filtro-valor="" ${ehColunaSituacao ? `data-filtro-todos-valores="${escapeAttr(todosValores)}"` : ""}>Todos</button>
+            ${g.valores.map(v => `<button class="dash-toggle-btn${ativosNormalizados?.has(v.valor.trim().toLowerCase()) ? " active" : ""}" data-filtro-valor="${escapeAttr(v.valor)}">${escapeHTML(v.valor)} (${v.contagem})</button>`).join("")}
+          </div>
+        </div>
+      `;
+      }).join("")}
+    </div>
+  `;
+}
 
 async function carregarPaineisPortal(portalSlug, opcoes = {}) {
   const painel = document.getElementById("tab-paineis");
