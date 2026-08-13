@@ -2209,7 +2209,6 @@ async function carregarPaineisPortal(portalSlug, opcoes = {}) {
         abrirPainel(b.dataset.abrir, `painel-corpo-${b.dataset.abrir}`, filtrosAtuais);
       });
     });
-    });
     painel.querySelectorAll("[data-destaque]").forEach(b => {
       b.addEventListener("click", async () => {
         try {
