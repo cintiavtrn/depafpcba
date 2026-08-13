@@ -1595,6 +1595,9 @@ function renderPainel(resultado) {
   const avisoRegistroAtual = dados.usouRegistroMaisRecente
     ? `<p class="font-mono" style="font-size:10.5px;color:var(--oliva);margin-top:2px">usando só o registro mais recente de cada pessoa/coisa (a foto de agora, não todo o histórico)${dados.linhasIgnoradasSemDataMovimento ? ` · ${dados.linhasIgnoradasSemDataMovimento} linha(s) sem data válida, ignoradas nessa parte` : ""}</p>`
     : "";
+  const avisoFiltroSituacao = dados.filtroSituacao
+    ? `<p class="font-mono" style="font-size:10.5px;color:var(--oliva);margin-top:2px">mostrando só ${escapeHTML(dados.filtroSituacao.coluna)}: ${dados.filtroSituacao.ativos.map(escapeHTML).join(", ")} (${dados.filtroSituacao.linhasDepois} de ${dados.filtroSituacao.linhasAntes}) — use o filtro de ${escapeHTML(dados.filtroSituacao.coluna)} pra ver todos</p>`
+    : "";
   const avisoSupressao = dados.houveSupressao || dados.suprimiuCelulas
     ? `<p class="dash-chart-hint" style="border-left-color:var(--terracota);font-size:10.5px"><b>Células com menos de ${dados.nMinimoCelula || 5} registros aparecem vazias.</b> Com dado pessoal, um número pequeno num cruzamento identifica a pessoa — por isso é omitido, não é erro de cálculo.</p>`
     : "";
@@ -1613,8 +1616,7 @@ function renderPainel(resultado) {
     ? `<p class="dash-chart-hint" style="border-left-color:var(--terracota)"><b>A maior parte das células foi omitida.</b> Este cruzamento é fino demais para o tamanho da base — quase toda combinação tem menos de 5 registros. Cruze por uma categoria mais ampla (por região em vez de por unidade, por exemplo) para ter uma leitura útil.</p>`
     : "";
 
-  const rodape = avisosBase + avisoEntidade + avisoRegistroAtual + avisoSupressao + avisoSupressaoExcessiva + avisoSoma + botaoTabela + `<p class="font-mono" style="font-size:10.5px;color:#6B7280;margin-top:8px">fonte: ${escapeHTML(upload.nomeArquivo)}${dados.linhasIgnoradas ? ` · ${dados.linhasIgnoradas} linha(s) sem data válida, ignoradas` : ""}</p>`;
-  if (dados.tipo === "evolucao") {
+  const rodape = avisosBase + avisoEntidade + avisoRegistroAtual + avisoFiltroSituacao + avisoSupressao + avisoSupressaoExcessiva + avisoSoma + botaoTabela + `<p class="font-mono" style="font-size:10.5px;color:#6B7280;margin-top:8px">fonte: ${escapeHTML(upload.nomeArquivo)}${dados.linhasIgnoradas ? ` · ${dados.linhasIgnoradas} linha(s) sem data válida, ignoradas` : ""}</p>`;  if (dados.tipo === "evolucao") {
     const corpo = dados.series.length
       ? multiLinhaSVG(dados.series, dados.pontos.map(p => p.label))
       : dados.acumulado
@@ -1785,6 +1787,20 @@ function renderFormularioDefinicao(schema, definicaoAtual) {
         </select>
         <p class="font-mono" style="font-size:10.5px;color:#9AA3B2;margin-top:4px">
           Com isso marcado, composição/cruzamento/taxa passam a olhar só a linha mais recente de cada um (ex.: a lotação atual, não todo lugar por onde já passou). Evolução continua usando o histórico inteiro.
+        </p>
+      </div>
+            <div class="dash-filtro">
+        <label>QUAL COLUNA DIZ A SITUAÇÃO ATUAL? (ex.: Ativo/Desligado, Em vigor/Revogado)</label>
+        <select id="def-situacao">
+          <option value="">Não existe / não se aplica — contar todo mundo</option>
+          ${opt(colunasFiltraveis(schema), d.colunaSituacao)}
+        </select>
+      </div>
+      <div class="dash-filtro">
+        <label>QUAIS VALORES DESSA COLUNA CONTAM COMO "ATIVO"? (separe por vírgula)</label>
+        <input type="text" id="def-situacao-ativos" value="${escapeAttr((d.valoresAtivos || []).join(", "))}" placeholder="ex.: Ativo" style="${CAMPO_STYLE}">
+        <p class="font-mono" style="font-size:10.5px;color:#9AA3B2;margin-top:4px">
+          Com os dois preenchidos, o total e os painéis de composição/cruzamento/taxa passam a contar só quem está ativo por padrão — quem já saiu não entra mais na conta sem avisar. Pra ver todos, use o filtro de situação na tela do portal.
         </p>
       </div>
       <div class="dash-filtro">
@@ -2025,10 +2041,12 @@ async function mostrarSugestoesPara(portalSlug, uploadId, caixa, apenasComApelid
               colunaDataSaida: caixa.querySelector("#def-saida").value || null,
               chaveEntidade: caixa.querySelector("#def-chave").value || null,
               colunaDataMovimento: caixa.querySelector("#def-data-movimento").value || null,
+              colunaSituacao: caixa.querySelector("#def-situacao").value || null,
+              valoresAtivos: caixa.querySelector("#def-situacao-ativos").value.split(",").map(v => v.trim()).filter(Boolean),
               unidade: caixa.querySelector("#def-unidade").value.trim() || null,
             }),
           });
-          mostrarSugestoesPara(portalSlug, uploadId, caixa, apenasComApelidos); // recarrega, agora com a definição salva
+          mostrarSugestoesPara(portalSlug, uploadId, caixa, apenasComApelidos);
         } catch (erro) {
           st.textContent = "Erro: " + erro.message;
         }
@@ -2058,7 +2076,10 @@ async function mostrarSugestoesPara(portalSlug, uploadId, caixa, apenasComApelid
             medidaTipo: caixa.querySelector("#def-medida").value,
             colunaDataSaida: caixa.querySelector("#def-saida").value || null,
             chaveEntidade: caixa.querySelector("#def-chave").value || null,
+            // cada lotação por onde ela já passou.
             colunaDataMovimento: caixa.querySelector("#def-data-movimento").value || null,
+            colunaSituacao: caixa.querySelector("#def-situacao").value || null,
+            valoresAtivos: caixa.querySelector("#def-situacao-ativos").value.split(",").map(v => v.trim()).filter(Boolean),
             unidade: caixa.querySelector("#def-unidade").value.trim() || null,
           }),
         });
@@ -2110,67 +2131,6 @@ function colunasFiltraveis(schema) {
 // rápido". Uma coluna sem valor nenhum (raro, mas possível) é ignorada sem
 // derrubar a barra inteira.
 async function montarBarraFiltros(paineis) {
-  const uploadsUsados = new Map();
-  for (const pn of paineis) {
-    if (pn.upload?.id && pn.upload?.schemaInferido && !uploadsUsados.has(pn.upload.id)) {
-      uploadsUsados.set(pn.upload.id, { nomeArquivo: pn.upload.nomeArquivo, schema: pn.upload.schemaInferido });
-    }
-  }
-
-  const grupos = [];
-  for (const [uploadId, { nomeArquivo, schema }] of uploadsUsados) {
-    for (const coluna of colunasFiltraveis(schema).slice(0, 3)) {
-      try {
-        const resp = await apiFetch(`/api/uploads/${uploadId}/colunas/${encodeURIComponent(coluna)}/valores`);
-        if (resp.valores?.length) grupos.push({ uploadId, nomeArquivo, coluna, valores: resp.valores });
-      } catch { /* coluna não deu pra filtrar (ex.: ficou vazia na amostra) — não quebra a barra inteira por isso */ }
-    }
-  }
-  if (!grupos.length) return "";
-
-  const multiplosUploads = uploadsUsados.size > 1;
-  return `
-    <div class="dash-filtros" style="margin-bottom:16px">
-      ${grupos.map(g => `
-        <div class="dash-filtro">
-          <label>${escapeHTML(g.coluna)}${multiplosUploads ? ` <span style="opacity:.5">(${escapeHTML(g.nomeArquivo)})</span>` : ""}</label>
-          <div class="dash-toggle" data-filtro-upload="${escapeAttr(g.uploadId)}" data-filtro-coluna="${escapeAttr(g.coluna)}">
-            <button class="dash-toggle-btn active" data-filtro-valor="">Todos</button>
-            ${g.valores.map(v => `<button class="dash-toggle-btn" data-filtro-valor="${escapeAttr(v.valor)}">${escapeHTML(v.valor)} (${v.contagem})</button>`).join("")}
-          </div>
-        </div>
-      `).join("")}
-    </div>
-  `;
-}
-
-// Ao trocar um chip, só os painéis cujo upload TEM aquela coluna são
-// recarregados — os outros painéis do mesmo portal ficam como estavam.
-function ligarBarraFiltros(container, paineis) {
-  container.querySelectorAll("[data-filtro-upload]").forEach(grupo => {
-    const uploadId = grupo.dataset.filtroUpload;
-    const coluna = grupo.dataset.filtroColuna;
-    grupo.querySelectorAll("[data-filtro-valor]").forEach(btn => {
-      btn.addEventListener("click", () => {
-        grupo.querySelectorAll("[data-filtro-valor]").forEach(b => b.classList.remove("active"));
-        btn.classList.add("active");
-
-        const semEssaColuna = (FILTRO_GLOBAL_POR_UPLOAD.get(uploadId) || []).filter(f => f.coluna !== coluna);
-        if (btn.dataset.filtroValor) semEssaColuna.push({ coluna, valores: [btn.dataset.filtroValor] });
-        FILTRO_GLOBAL_POR_UPLOAD.set(uploadId, semEssaColuna);
-
-        const filtrosDoUpload = FILTRO_GLOBAL_POR_UPLOAD.get(uploadId) || [];
-        paineis
-          .filter(pn => pn.upload?.id === uploadId)
-          .forEach(pn => {
-            if (document.getElementById(`painel-corpo-${pn.id}`)?.innerHTML.trim()) {
-              abrirPainel(pn.id, `painel-corpo-${pn.id}`, filtrosDoUpload);
-            }
-          });
-      });
-    });
-  });
-}
 
 async function carregarPaineisPortal(portalSlug, opcoes = {}) {
   const painel = document.getElementById("tab-paineis");
