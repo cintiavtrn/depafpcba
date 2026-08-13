@@ -1692,11 +1692,14 @@ function renderPainel(resultado) {
   return `${avisoFiltro}${renderResumos(dados.resumos)}${renderComoLer(dados.comoLer)}<div style="overflow-x:auto">${cruzamentoSVG(dados)}</div>${rodape}`;
 }
 
-async function abrirPainel(painelId, alvoId) {
+async function abrirPainel(painelId, alvoId, filtrosExtras = []) {
   const alvo = document.getElementById(alvoId);
   alvo.innerHTML = `<p class="font-mono" style="font-size:11px;color:#9AA3B2">Calculando...</p>`;
   try {
-    const resultado = await apiFetch(`/api/paineis/${painelId}/dados`);
+    // filtrosExtras é o filtro global do portal (o "slicer") — nunca é
+    // salvo no painel, só afeta esta consulta. Some da URL quando vazio.
+    const qs = filtrosExtras.length ? `?filtros=${encodeURIComponent(JSON.stringify(filtrosExtras))}` : "";
+    const resultado = await apiFetch(`/api/paineis/${painelId}/dados${qs}`);
     alvo.innerHTML = renderPainel(resultado);
     adicionarControlesGrafico(alvo);
     alvo.querySelectorAll("[data-baixar-tabela]").forEach((b) => {
@@ -2084,8 +2087,94 @@ async function mostrarSugestoesPara(portalSlug, uploadId, caixa, apenasComApelid
   }
 }
 
+// Filtro global do portal (o "slicer") — nunca é salvo no banco, só vive em
+// memória enquanto a aba PAINÉIS está aberta; reabrir a aba (ou trocar de
+// portal) reseta pra "Todos" de novo, de propósito, igual filtro de sessão
+// de qualquer ferramenta de BI. A chave é o UPLOAD, não o nome da coluna
+// sozinho: dois uploads diferentes do mesmo portal podem ter uma coluna
+// "Situação" com valores completamente diferentes, e misturar os dois
+// filtraria uma planilha usando os valores da outra por engano.
+let FILTRO_GLOBAL_POR_UPLOAD = new Map();
+
+function colunasFiltraveis(schema) {
+  return Object.keys(schema || {}).filter(c => {
+    const info = schema[c];
+    return info && ["categorical", "boolean"].includes(info.type) && !info.identificavel
+      && (info.uniqueCount ?? 0) >= 2 && (info.uniqueCount ?? 99) <= 8;
+  });
+}
+
+// Busca os valores de até 3 colunas filtráveis por upload usado nos painéis
+// visíveis, e monta a barra de chips. Limitado a 3 por planilha de propósito
+// — mais que isso a barra vira parede de botão e deixa de ser "filtro
+// rápido". Uma coluna sem valor nenhum (raro, mas possível) é ignorada sem
+// derrubar a barra inteira.
+async function montarBarraFiltros(paineis) {
+  const uploadsUsados = new Map();
+  for (const pn of paineis) {
+    if (pn.upload?.id && pn.upload?.schemaInferido && !uploadsUsados.has(pn.upload.id)) {
+      uploadsUsados.set(pn.upload.id, { nomeArquivo: pn.upload.nomeArquivo, schema: pn.upload.schemaInferido });
+    }
+  }
+
+  const grupos = [];
+  for (const [uploadId, { nomeArquivo, schema }] of uploadsUsados) {
+    for (const coluna of colunasFiltraveis(schema).slice(0, 3)) {
+      try {
+        const resp = await apiFetch(`/api/uploads/${uploadId}/colunas/${encodeURIComponent(coluna)}/valores`);
+        if (resp.valores?.length) grupos.push({ uploadId, nomeArquivo, coluna, valores: resp.valores });
+      } catch { /* coluna não deu pra filtrar (ex.: ficou vazia na amostra) — não quebra a barra inteira por isso */ }
+    }
+  }
+  if (!grupos.length) return "";
+
+  const multiplosUploads = uploadsUsados.size > 1;
+  return `
+    <div class="dash-filtros" style="margin-bottom:16px">
+      ${grupos.map(g => `
+        <div class="dash-filtro">
+          <label>${escapeHTML(g.coluna)}${multiplosUploads ? ` <span style="opacity:.5">(${escapeHTML(g.nomeArquivo)})</span>` : ""}</label>
+          <div class="dash-toggle" data-filtro-upload="${escapeAttr(g.uploadId)}" data-filtro-coluna="${escapeAttr(g.coluna)}">
+            <button class="dash-toggle-btn active" data-filtro-valor="">Todos</button>
+            ${g.valores.map(v => `<button class="dash-toggle-btn" data-filtro-valor="${escapeAttr(v.valor)}">${escapeHTML(v.valor)} (${v.contagem})</button>`).join("")}
+          </div>
+        </div>
+      `).join("")}
+    </div>
+  `;
+}
+
+// Ao trocar um chip, só os painéis cujo upload TEM aquela coluna são
+// recarregados — os outros painéis do mesmo portal ficam como estavam.
+function ligarBarraFiltros(container, paineis) {
+  container.querySelectorAll("[data-filtro-upload]").forEach(grupo => {
+    const uploadId = grupo.dataset.filtroUpload;
+    const coluna = grupo.dataset.filtroColuna;
+    grupo.querySelectorAll("[data-filtro-valor]").forEach(btn => {
+      btn.addEventListener("click", () => {
+        grupo.querySelectorAll("[data-filtro-valor]").forEach(b => b.classList.remove("active"));
+        btn.classList.add("active");
+
+        const semEssaColuna = (FILTRO_GLOBAL_POR_UPLOAD.get(uploadId) || []).filter(f => f.coluna !== coluna);
+        if (btn.dataset.filtroValor) semEssaColuna.push({ coluna, valores: [btn.dataset.filtroValor] });
+        FILTRO_GLOBAL_POR_UPLOAD.set(uploadId, semEssaColuna);
+
+        const filtrosDoUpload = FILTRO_GLOBAL_POR_UPLOAD.get(uploadId) || [];
+        paineis
+          .filter(pn => pn.upload?.id === uploadId)
+          .forEach(pn => {
+            if (document.getElementById(`painel-corpo-${pn.id}`)?.innerHTML.trim()) {
+              abrirPainel(pn.id, `painel-corpo-${pn.id}`, filtrosDoUpload);
+            }
+          });
+      });
+    });
+  });
+}
+
 async function carregarPaineisPortal(portalSlug, opcoes = {}) {
   const painel = document.getElementById("tab-paineis");
+  FILTRO_GLOBAL_POR_UPLOAD = new Map();
   try {
     const [paineis, uploads] = await Promise.all([
       apiFetch(`/api/portais/${portalSlug}/paineis`),
@@ -2093,6 +2182,7 @@ async function carregarPaineisPortal(portalSlug, opcoes = {}) {
     ]);
 
     const blocoAdmin = await renderAdminPlanilhas(portalSlug, uploads);
+    const blocoFiltros = await montarBarraFiltros(paineis);
 
     const lista = paineis.length ? paineis.map(pn => `
       <div class="dash-chart-box" style="margin-bottom:2px">
@@ -2108,11 +2198,17 @@ async function carregarPaineisPortal(portalSlug, opcoes = {}) {
       </div>
     `).join("") : `<p class="tela-intro">Nenhum painel criado ainda para este portal.</p>`;
 
-    painel.innerHTML = `<div id="bloco-vinculos">${blocoAdmin}</div>` + lista;
+    painel.innerHTML = `<div id="bloco-vinculos">${blocoAdmin}</div>${blocoFiltros}` + lista;
     ligarVinculos(portalSlug);
+    ligarBarraFiltros(painel, paineis);
 
     painel.querySelectorAll("[data-abrir]").forEach(b => {
-      b.addEventListener("click", () => abrirPainel(b.dataset.abrir, `painel-corpo-${b.dataset.abrir}`));
+      b.addEventListener("click", () => {
+        const pn = paineis.find(p => p.id === b.dataset.abrir);
+        const filtrosAtuais = pn?.upload?.id ? (FILTRO_GLOBAL_POR_UPLOAD.get(pn.upload.id) || []) : [];
+        abrirPainel(b.dataset.abrir, `painel-corpo-${b.dataset.abrir}`, filtrosAtuais);
+      });
+    });
     });
     painel.querySelectorAll("[data-destaque]").forEach(b => {
       b.addEventListener("click", async () => {
