@@ -1063,8 +1063,7 @@ function renderIndicadoresEdicao(indicadores, paineisDisponiveis = []) {
     ? `<p class="dash-chart-hint" style="border-left-color:var(--mostarda)">Nenhum painel de composição ou razão disponível ainda pra ligar — crie um na aba PAINÉIS primeiro, ou continue preenchendo o valor à mão.</p>`
     : "";
   return `
-    <p class="dash-chart-hint">Escolha um painel na coluna do meio pra este virar um cartão automático — o valor passa a vir do cálculo ao vivo daquele painel (só funciona com painel de composição ou razão, que dão um número só). Deixe em "— manual —" pra digitar um valor fixo, como antes.</p>
-    ${avisoSemPaineis}
+    <p class="dash-chart-hint">Escolha um painel na coluna do meio pra este virar um cartão automático — o valor passa a vir do cálculo ao vivo daquele painel. Os <b>cartões</b> (criados na aba PAINÉIS, em "+ CRIAR CARTÃO") vêm primeiro na lista e são os feitos pra isso: respondem exatamente uma pergunta. Painéis de composição e taxa também aparecem, mas o que entra no indicador é o <b>total</b> deles — confira se esse total é mesmo o que o rótulo aqui promete. Deixe em "— manual —" pra digitar um valor fixo, como antes.</p>    ${avisoSemPaineis}
     <table class="dash-tabela" id="tabela-edicao-indicadores">
       <thead><tr><th>RÓTULO</th><th>PAINEL / VALOR MANUAL</th><th></th></tr></thead>
       <tbody>${linhas}</tbody>
@@ -2471,11 +2470,15 @@ function ligarCriadorDeCartao(portalSlug) {
     const col = selFCol.value;
     $("cc-filtro-val-caixa").style.display = col ? "" : "none";
     if (!col) return;
-    try {
+        try {
       const resp = await apiFetch(`/api/uploads/${selUpload.value}/colunas/${encodeURIComponent(col)}/valores`);
-      preencher(selFVal, resp.valores || []);
+      // Esta rota devolve {valor, contagem} por item, não texto solto — a
+      // contagem vai no rótulo pra dar noção de tamanho antes de escolher.
+      selFVal.innerHTML = (resp.valores || [])
+        .map(v => `<option value="${escapeAttr(v.valor)}">${escapeHTML(v.valor)}${v.contagem != null ? ` (${v.contagem})` : ""}</option>`)
+        .join("");
     } catch (erro) {
-      preencher(selFVal, []);
+      selFVal.innerHTML = "";
       status.textContent = "não consegui listar os valores: " + erro.message;
     }
   }
@@ -2685,7 +2688,12 @@ async function abrirTela(id) {
   const p = { ...pBase, intro: detalhe.intro, dados: detalhe.indicadores, projetos: detalhe.projetos };
 
   const botaoEditarIndicadores = souAdmin() ? `<button class="btn-exportar-xlsx" id="btn-editar-indicadores" style="margin-bottom:14px">✎ EDITAR INDICADORES</button>` : "";
-  const botaoEditarProjetos = souAdmin() ? `<button class="btn-exportar-xlsx" id="btn-editar-projetos" style="margin:14px 0">✎ EDITAR PROJETOS</button>` : "";
+  // Projeto é assunto de um portal só. O botão aparecia em todos, convidando
+  // a cadastrar projeto no portal de frota ou de normas, onde ele não tem
+  // significado nenhum. A condição extra (já ter projeto cadastrado) existe
+  // pra não esconder conteúdo que alguém tenha criado antes desta regra.
+  const portalDeProjetos = id === "projetos" || (p.projetos && p.projetos.length > 0);
+  const botaoEditarProjetos = souAdmin() && portalDeProjetos ? `<button class="btn-exportar-xlsx" id="btn-editar-projetos" style="margin:14px 0">✎ EDITAR PROJETOS</button>` : "";
 
   let corpoGeral = `
     <div id="bloco-destaques"></div>
