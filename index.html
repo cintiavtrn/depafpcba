@@ -224,6 +224,20 @@ body{background:var(--paper);color:var(--carvao);font-family:'IBM Plex Sans',san
 .dash-tabela tr[data-cat]:hover{background:var(--paper-line)}
 .dash-tabela tr.selecionada{background:var(--paper-line);font-weight:700}
 .dash-tabela tr.selecionada td{border-color:var(--carvao)}
+.grade-destaques{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;align-items:start}
+.grade-destaques>.dash-chart-box{margin-bottom:0;min-width:0;grid-column:span 2}
+.grade-destaques>.card-medida{grid-column:span 1}
+.grade-destaques>.card-cruzamento,.grade-destaques>.card-evolucao{grid-column:span 4}
+@media(max-width:900px){
+  .grade-destaques{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .grade-destaques>.dash-chart-box,.grade-destaques>.card-cruzamento,.grade-destaques>.card-evolucao{grid-column:span 2}
+  .grade-destaques>.card-medida{grid-column:span 1}
+}
+.painel-detalhes{margin-top:8px}
+.painel-detalhes>summary{cursor:pointer;font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:#6B7280;letter-spacing:.04em;list-style:none}
+.painel-detalhes>summary::-webkit-details-marker{display:none}
+.painel-detalhes>summary::before{content:"\24D8  ";font-size:11px}
+.painel-detalhes>summary:hover{color:var(--carvao)}
 .dash-tabela th.sortable{cursor:pointer;user-select:none}
 .dash-tabela th.sortable:hover{color:var(--carvao)}
 .dash-tabela th.sortable::after{content:"⇅";margin-left:4px;opacity:.4;font-size:9px}
@@ -1617,8 +1631,20 @@ function tabelaDoPainel(dados, painel) {
   return [];
 }
 
-function renderPainel(resultado, selectedLabel = null) {
-  const { painel, dados, upload } = resultado;
+function renderPainel(resultado, selectedLabel = null, compacto = false) {
+  const { painel, upload } = resultado;
+  let { dados } = resultado;
+  // Guardado antes do enxugamento abaixo, que zera o "como ler" — o cartão
+  // usa esse título como legenda do número.
+  const tituloDaMedida = dados.comoLer?.titulo || "";
+  // Modo compacto = Visão Geral. Lá a pessoa está LENDO o resultado; na aba
+  // PAINÉIS ela está decidindo se confia no painel. Mesmo conteúdo, propósito
+  // oposto — por isso aqui fica só o número-título e o gráfico, e o resto
+  // (resumos secundários, "como ler", avisos, CSV, fonte) vai pro "detalhes".
+  // Nada é apagado: a aba PAINÉIS continua mostrando tudo, como sempre.
+  if (compacto) {
+    dados = { ...dados, resumos: (dados.resumos || []).slice(0, 1), comoLer: null };
+  }
 
   // filtro que não sobrou nada: mostra "sem dados" em vez de derrubar o
   // painel com TypeError ao tentar ler categorias[0] de um array vazio
@@ -1672,8 +1698,20 @@ function renderPainel(resultado, selectedLabel = null) {
     ? `<p class="dash-chart-hint" style="border-left-color:var(--terracota)"><b>A maior parte das células foi omitida.</b> Este cruzamento é fino demais para o tamanho da base — quase toda combinação tem menos de 5 registros. Cruze por uma categoria mais ampla (por região em vez de por unidade, por exemplo) para ter uma leitura útil.</p>`
     : "";
 
-  const rodape = avisosBase + avisoEntidade + avisoRegistroAtual + avisoFiltroSituacao + avisoSupressao + avisoSupressaoExcessiva + avisoSoma + botaoTabela + `<p class="font-mono" style="font-size:10.5px;color:#6B7280;margin-top:8px">fonte: ${escapeHTML(upload.nomeArquivo)}${dados.linhasIgnoradas ? ` · ${dados.linhasIgnoradas} linha(s) sem data válida, ignoradas` : ""}</p>`;  
-    if (dados.tipo === "medida") {
+    const fonteHtml = `<p class="font-mono" style="font-size:10.5px;color:#6B7280;margin-top:8px">fonte: ${escapeHTML(upload.nomeArquivo)}${dados.linhasIgnoradas ? ` · ${dados.linhasIgnoradas} linha(s) sem data válida, ignoradas` : ""}</p>`;
+  // Estes três mudam o SIGNIFICADO do número — de quem é a contagem, sobre
+  // que recorte, de que período. Ficam visíveis mesmo no compacto: esconder
+  // "mostrando só Ativos (1.033 de 1.107)" troca poluição por número
+  // enganoso, que é pior. O resto explica ou complementa, e cabe atrás do
+  // "detalhes".
+  const mudaSignificado = avisoEntidade + avisoRegistroAtual + avisoFiltroSituacao;
+  const complementar = avisosBase + avisoSupressao + avisoSupressaoExcessiva + avisoSoma + botaoTabela + fonteHtml;
+  const rodape = compacto
+    ? mudaSignificado + (complementar.trim()
+        ? `<details class="painel-detalhes"><summary>detalhes</summary>${complementar}</details>`
+        : "")
+    : avisosBase + mudaSignificado + avisoSupressao + avisoSupressaoExcessiva + avisoSoma + botaoTabela + fonteHtml;
+  if (dados.tipo === "medida") {
     const periodo = dados.periodoAplicado
       ? `<p class="font-mono" style="font-size:10.5px;color:var(--oliva);margin-top:2px">${escapeHTML(dados.periodoAplicado.descricao)}: <b>${escapeHTML(dados.periodoAplicado.rotulo)}</b> — ${dados.periodoAplicado.linhasDepois} de ${dados.periodoAplicado.linhasAntes} registros${dados.periodoAplicado.linhasSemData ? ` · ${dados.periodoAplicado.linhasSemData} sem data, fora da conta` : ""}</p>`
       : "";
@@ -1687,7 +1725,7 @@ function renderPainel(resultado, selectedLabel = null) {
     const corpo = `
       <div style="text-align:center;padding:20px 8px 12px">
         <div style="font-family:'IBM Plex Mono',monospace;font-weight:700;font-size:${tamanho}px;line-height:1.1;color:var(--tinta);word-break:break-word">${escapeHTML(texto)}</div>
-        <div class="font-mono" style="font-size:11px;color:#6B7280;margin-top:8px">${escapeHTML(dados.comoLer?.titulo || "")}</div>
+        <div class="font-mono" style="font-size:11px;color:#6B7280;margin-top:8px">${escapeHTML(tituloDaMedida)}</div>
         <div class="font-mono" style="font-size:10.5px;color:#9AA3B2;margin-top:2px">${escapeHTML(detalhe)}</div>
       </div>`;
     return `${avisoFiltro}${periodo}${corpo}${renderComoLer(dados.comoLer)}${rodape}`;
@@ -1815,7 +1853,9 @@ function propagarSelecaoNoGrupo(grupo, alvoIdOrigem, resultadoOrigem, categoria,
     const filtros = (categoria !== null && colunaOrigem && mesmaPlanilha)
       ? [{ coluna: colunaOrigem, valores: [categoria] }]
       : [];
-    abrirPainel(painelId, alvoId, filtros, grupo);
+    // Propagação só acontece na Visão Geral (grupo só existe lá), então o
+    // redesenho do vizinho é sempre compacto.
+    abrirPainel(painelId, alvoId, filtros, grupo, true);
   }
 }
 
@@ -1825,20 +1865,20 @@ function propagarSelecaoNoGrupo(grupo, alvoIdOrigem, resultadoOrigem, categoria,
 // de um grupo, o clique também FILTRA de verdade os outros painéis do
 // grupo (ver `propagarSelecaoNoGrupo`). Cobre composição/razão — evolução e
 // cruzamento ainda não têm esse destaque.
-function destacarNoPainel(alvo, resultado, selecionado, grupo = null, alvoId = null) {
+function destacarNoPainel(alvo, resultado, selecionado, grupo = null, alvoId = null, compacto = false) {
   alvo.querySelectorAll("[data-cat]").forEach((el) => {
     el.addEventListener("click", () => {
       const cat = el.dataset.cat ?? null;
       if (cat === null) return;
       const novo = selecionado === cat ? null : cat;
-      desenharPainel(alvo, resultado, novo, grupo, alvoId);
+      desenharPainel(alvo, resultado, novo, grupo, alvoId, compacto);
       if (grupo && alvoId) propagarSelecaoNoGrupo(grupo, alvoId, resultado, novo, el.dataset.col || null);
     });
   });
 }
 
-function desenharPainel(alvo, resultado, selecionado = null, grupo = null, alvoId = null) {
-  alvo.innerHTML = renderPainel(resultado, selecionado);
+function desenharPainel(alvo, resultado, selecionado = null, grupo = null, alvoId = null, compacto = false) {
+  alvo.innerHTML = renderPainel(resultado, selecionado, compacto);
   adicionarControlesGrafico(alvo);
   alvo.querySelectorAll("[data-baixar-tabela]").forEach((b) => {
     b.addEventListener("click", () => {
@@ -1848,14 +1888,14 @@ function desenharPainel(alvo, resultado, selecionado = null, grupo = null, alvoI
       baixarCSV(`${nomeArquivo}.csv`, guardado.tabela);
     });
   });
-  destacarNoPainel(alvo, resultado, selecionado, grupo, alvoId);
+  destacarNoPainel(alvo, resultado, selecionado, grupo, alvoId, compacto);
   if (grupo && alvoId) {
     if (!REGISTRO_PAINEIS_POR_GRUPO.has(grupo)) REGISTRO_PAINEIS_POR_GRUPO.set(grupo, new Map());
     REGISTRO_PAINEIS_POR_GRUPO.get(grupo).set(alvoId, resultado);
   }
 }
 
-async function abrirPainel(painelId, alvoId, filtrosExtras = [], grupo = null) {
+async function abrirPainel(painelId, alvoId, filtrosExtras = [], grupo = null, compacto = false) {
   const alvo = document.getElementById(alvoId);
   if (grupo && alvoId) ALVO_PARA_PAINEL.set(alvoId, painelId);
   alvo.innerHTML = `<p class="font-mono" style="font-size:11px;color:#9AA3B2">Calculando...</p>`;
@@ -1865,7 +1905,7 @@ async function abrirPainel(painelId, alvoId, filtrosExtras = [], grupo = null) {
     // salvo no painel, só afeta esta consulta. Some da URL quando vazio.
     const qs = filtrosExtras.length ? `?filtros=${encodeURIComponent(JSON.stringify(filtrosExtras))}` : "";
     const resultado = await apiFetch(`/api/paineis/${painelId}/dados${qs}`);
-    desenharPainel(alvo, resultado, null, grupo, alvoId);
+    desenharPainel(alvo, resultado, null, grupo, alvoId, compacto);
   } catch (erro) {
     alvo.innerHTML = `<p class="font-mono" style="font-size:11px;color:var(--terracota)">Não consegui calcular: ${escapeHTML(erro.message)}</p>`;
   }
@@ -1995,13 +2035,17 @@ async function carregarDestaques(portalSlug) {
       porGrupo.get(chave).push(pn);
     });
 
-    alvo.innerHTML = ordem.map(chave => {
+      alvo.innerHTML = ordem.map(chave => {
       const grupo = porGrupo.get(chave);
-      const corpo = grupo.map(pn => `
-        <div class="dash-chart-box" style="margin-bottom:2px">
+      // Cartões primeiro: são os números-título do grupo, e é essa faixa em
+      // cima que faz a leitura ser direta. Os gráficos vêm embaixo, na ordem
+      // em que foram criados.
+      const ordenado = [...grupo.filter(pn => pn.tipo === "medida"), ...grupo.filter(pn => pn.tipo !== "medida")];
+      const corpo = `<div class="grade-destaques">` + ordenado.map(pn => `
+        <div class="dash-chart-box card-${escapeAttr(pn.tipo)}">
           <h4>${escapeHTML(pn.nome)}</h4>
           <div id="destaque-corpo-${pn.id}"><p class="font-mono" style="font-size:11px;color:#9AA3B2">Calculando...</p></div>
-        </div>`).join("");
+        </div>`).join("") + `</div>`;
       if (!chave) return corpo;
       return `
         <div class="grupo-dashboard" style="border-left:3px solid var(--tinta);padding-left:14px;margin:18px 0 24px">
@@ -2010,7 +2054,7 @@ async function carregarDestaques(portalSlug) {
         </div>`;
     }).join("") + `<div style="height:20px"></div>`;
 
-    for (const pn of destaques) await abrirPainel(pn.id, `destaque-corpo-${pn.id}`, [], pn.grupoDashboard || null);
+    for (const pn of destaques) await abrirPainel(pn.id, `destaque-corpo-${pn.id}`, [], pn.grupoDashboard || null, true);
   } catch (erro) {
     alvo.innerHTML = `<p class="font-mono" style="font-size:11px;color:var(--terracota)">Não consegui carregar os destaques: ${escapeHTML(erro.message)}</p>`;
   }
