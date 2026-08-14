@@ -1014,12 +1014,18 @@ function renderIndicadoresLeitura(indicadores) {
   if (!indicadores || !indicadores.length) return '<p class="tela-intro">Nenhum indicador cadastrado ainda.</p>';
   let html = `<div class="dados-grid">`;
   indicadores.forEach(d => {
+    const aoVivo = !!d.painelId && !d.painelIncompativel && !d.painelIndisponivel;
+    const valorExibido = aoVivo
+      ? (d.valorAoVivo === null ? "—" : Number(d.valorAoVivo).toLocaleString("pt-BR") + (d.sufixoAoVivo || ""))
+      : d.valor;
     html += `
       <div class="dado">
-        <div class="valor">${escapeHTML(d.valor)}</div>
+        <div class="valor">${escapeHTML(valorExibido)}</div>
         <div class="rotulo">${escapeHTML(d.rotulo)}</div>
-        ${d.exemplo ? `<span class="tag tag-exemplo">EXEMPLO ILUSTRATIVO</span>` : ""}
-        ${d.pendente ? `<span class="tag tag-pendente">A PREENCHER</span>` : ""}
+        ${aoVivo ? `<span class="tag" style="background:var(--oliva);color:var(--paper)">● AO VIVO</span>` : ""}
+        ${d.painelId && (d.painelIncompativel || d.painelIndisponivel) ? `<span class="tag tag-pendente" title="O painel ligado a este cartão não existe mais, ou não dá mais um número só (virou evolução/cruzamento)">⚠ PAINEL INDISPONÍVEL</span>` : ""}
+        ${!d.painelId && d.exemplo ? `<span class="tag tag-exemplo">EXEMPLO ILUSTRATIVO</span>` : ""}
+        ${!d.painelId && d.pendente ? `<span class="tag tag-pendente">A PREENCHER</span>` : ""}
       </div>
     `;
   });
@@ -1027,17 +1033,39 @@ function renderIndicadoresLeitura(indicadores) {
   return html;
 }
 
-function renderIndicadoresEdicao(indicadores) {
-  const linhas = (indicadores || []).map(d => `
-    <tr data-id="${d.id}">
-      <td><input type="text" class="input-rotulo" value="${escapeAttr(d.rotulo)}" style="width:100%;background:var(--paper);color:var(--carvao);border:1px solid var(--paper-line);padding:6px;font-family:'IBM Plex Mono',monospace;font-size:12px"></td>
-      <td><input type="text" class="input-valor" value="${escapeAttr(d.valor)}" style="width:100%;background:var(--paper);color:var(--carvao);border:1px solid var(--paper-line);padding:6px;font-family:'IBM Plex Mono',monospace;font-size:12px"></td>
-      <td><button class="btn-remover-linha" type="button" style="background:none;border:none;color:var(--terracota);cursor:pointer;font-size:14px">✕</button></td>
-    </tr>
-  `).join("");
+const CAMPO_STYLE_MINI = "width:100%;background:var(--paper);color:var(--carvao);border:1px solid var(--paper-line);padding:6px;font-family:'IBM Plex Mono',monospace;font-size:12px;box-sizing:border-box";
+
+function opcoesPaineisIndicador(paineisDisponiveis, selecionadoId) {
+  const opcoes = (paineisDisponiveis || [])
+    .map(pn => `<option value="${escapeAttr(pn.id)}" ${pn.id === selecionadoId ? "selected" : ""}>${escapeHTML(pn.nome)}</option>`)
+    .join("");
+  return `<option value="">— manual —</option>${opcoes}`;
+}
+
+function linhaIndicadorEdicao(d, paineisDisponiveis) {
+  d = d || {};
+  const temPainel = !!d.painelId;
   return `
+    <tr data-id="${d.id || ""}">
+      <td><input type="text" class="input-rotulo" value="${escapeAttr(d.rotulo || "")}" style="${CAMPO_STYLE_MINI}"></td>
+      <td>
+        <select class="input-painel-ligado" style="${CAMPO_STYLE_MINI};margin-bottom:4px">${opcoesPaineisIndicador(paineisDisponiveis, d.painelId)}</select>
+        <input type="text" class="input-valor" value="${escapeAttr(d.valor || "")}" placeholder="valor manual (se “— manual —”)" style="${CAMPO_STYLE_MINI}" ${temPainel ? "disabled" : ""}>
+      </td>
+      <td><button class="btn-remover-linha" type="button" style="background:none;border:none;color:var(--terracota);cursor:pointer;font-size:14px">✕</button></td>
+    </tr>`;
+}
+
+function renderIndicadoresEdicao(indicadores, paineisDisponiveis = []) {
+  const linhas = (indicadores || []).map(d => linhaIndicadorEdicao(d, paineisDisponiveis)).join("");
+  const avisoSemPaineis = !paineisDisponiveis.length
+    ? `<p class="dash-chart-hint" style="border-left-color:var(--mostarda)">Nenhum painel de composição ou razão disponível ainda pra ligar — crie um na aba PAINÉIS primeiro, ou continue preenchendo o valor à mão.</p>`
+    : "";
+  return `
+    <p class="dash-chart-hint">Escolha um painel na coluna do meio pra este virar um cartão automático — o valor passa a vir do cálculo ao vivo daquele painel (só funciona com painel de composição ou razão, que dão um número só). Deixe em "— manual —" pra digitar um valor fixo, como antes.</p>
+    ${avisoSemPaineis}
     <table class="dash-tabela" id="tabela-edicao-indicadores">
-      <thead><tr><th>RÓTULO</th><th>VALOR</th><th></th></tr></thead>
+      <thead><tr><th>RÓTULO</th><th>PAINEL / VALOR MANUAL</th><th></th></tr></thead>
       <tbody>${linhas}</tbody>
     </table>
     <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
@@ -1113,31 +1141,41 @@ function renderProjetosEdicao(projetos) {
 // editável, e os botões de dentro dela (adicionar linha / cancelar / salvar)
 function ligarEdicaoIndicadores(portalId) {
   const btnEditar = document.getElementById("btn-editar-indicadores");
-  if (!btnEditar) return; // não é admin — o botão nem foi renderizado
+  if (!btnEditar) return;
 
   const view = document.getElementById("view-indicadores");
 
-  // delegação: um listener só, funciona pra linha adicionada depois também
   view.addEventListener("click", (ev) => {
     if (ev.target.matches(".btn-remover-linha")) ev.target.closest("tr").remove();
   });
 
+  view.addEventListener("change", (ev) => {
+    if (!ev.target.matches(".input-painel-ligado")) return;
+    const inputValor = ev.target.closest("tr").querySelector(".input-valor");
+    inputValor.disabled = !!ev.target.value;
+    if (ev.target.value) inputValor.value = "";
+  });
+
   btnEditar.addEventListener("click", async () => {
-    let indicadores;
+    let indicadores, paineis;
     try {
-      indicadores = (await apiFetch(`/api/portais/${portalId}`)).indicadores;
+      [indicadores, paineis] = await Promise.all([
+        apiFetch(`/api/portais/${portalId}`).then(p => p.indicadores),
+        apiFetch(`/api/portais/${portalId}/paineis`),
+      ]);
     } catch (erro) {
       alert("Não consegui carregar os indicadores: " + erro.message);
       return;
     }
+    const paineisLigaveis = paineis.filter(pn => pn.tipo === "composicao" || pn.tipo === "razao");
 
-    view.innerHTML = renderIndicadoresEdicao(indicadores);
+    view.innerHTML = renderIndicadoresEdicao(indicadores, paineisLigaveis);
     btnEditar.style.display = "none";
 
     document.getElementById("btn-add-indicador").addEventListener("click", () => {
       const tbody = document.querySelector("#tabela-edicao-indicadores tbody");
       const tr = document.createElement("tr");
-      tr.innerHTML = `<td><input type="text" class="input-rotulo" style="${CAMPO_STYLE}"></td><td><input type="text" class="input-valor" style="${CAMPO_STYLE}"></td><td><button class="btn-remover-linha" type="button" style="background:none;border:none;color:var(--terracota);cursor:pointer;font-size:14px">✕</button></td>`;
+      tr.innerHTML = linhaIndicadorEdicao(null, paineisLigaveis).replace(/<\/?tr[^>]*>/g, "");
       tbody.appendChild(tr);
     });
 
@@ -1152,6 +1190,7 @@ function ligarEdicaoIndicadores(portalId) {
           id: tr.dataset.id || undefined,
           rotulo: tr.querySelector(".input-rotulo").value.trim(),
           valor: tr.querySelector(".input-valor").value.trim(),
+          painelId: tr.querySelector(".input-painel-ligado").value || null,
         }))
         .filter(i => i.rotulo);
 
@@ -1161,7 +1200,7 @@ function ligarEdicaoIndicadores(portalId) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ indicadores: linhas }),
         });
-        await abrirTela(portalId); // recarrega tudo — simples, sempre consistente
+        await abrirTela(portalId);
       } catch (erro) {
         alert("Não consegui salvar: " + erro.message);
       }
@@ -1872,6 +1911,7 @@ function renderAvisosDefinicao(permissoes) {
 async function carregarDestaques(portalSlug) {
   const alvo = document.getElementById("bloco-destaques");
   if (!alvo) return;
+  REGISTRO_PAINEIS_POR_GRUPO.clear();
   try {
     const paineis = await apiFetch(`/api/portais/${portalSlug}/paineis`);
     const destaques = paineis.filter(pn => pn.destaque);
@@ -1881,12 +1921,31 @@ async function carregarDestaques(portalSlug) {
         : "";
       return;
     }
-    alvo.innerHTML = destaques.map(pn => `
-      <div class="dash-chart-box" style="margin-bottom:2px">
-        <h4>${escapeHTML(pn.nome)}</h4>
-        <div id="destaque-corpo-${pn.id}"><p class="font-mono" style="font-size:11px;color:#9AA3B2">Calculando...</p></div>
-      </div>`).join("") + `<div style="height:20px"></div>`;
-    for (const pn of destaques) await abrirPainel(pn.id, `destaque-corpo-${pn.id}`);
+
+    const ordem = [];
+    const porGrupo = new Map();
+    destaques.forEach(pn => {
+      const chave = pn.grupoDashboard || null;
+      if (!porGrupo.has(chave)) { porGrupo.set(chave, []); ordem.push(chave); }
+      porGrupo.get(chave).push(pn);
+    });
+
+    alvo.innerHTML = ordem.map(chave => {
+      const grupo = porGrupo.get(chave);
+      const corpo = grupo.map(pn => `
+        <div class="dash-chart-box" style="margin-bottom:2px">
+          <h4>${escapeHTML(pn.nome)}</h4>
+          <div id="destaque-corpo-${pn.id}"><p class="font-mono" style="font-size:11px;color:#9AA3B2">Calculando...</p></div>
+        </div>`).join("");
+      if (!chave) return corpo;
+      return `
+        <div class="grupo-dashboard" style="border-left:3px solid var(--tinta);padding-left:14px;margin:18px 0 24px">
+          <h3 class="font-mono" style="font-size:13px;letter-spacing:.06em;color:var(--tinta);margin-bottom:10px;text-transform:uppercase">${escapeHTML(chave)}</h3>
+          ${corpo}
+        </div>`;
+    }).join("") + `<div style="height:20px"></div>`;
+
+    for (const pn of destaques) await abrirPainel(pn.id, `destaque-corpo-${pn.id}`, [], pn.grupoDashboard || null);
   } catch (erro) {
     alvo.innerHTML = `<p class="font-mono" style="font-size:11px;color:var(--terracota)">Não consegui carregar os destaques: ${escapeHTML(erro.message)}</p>`;
   }
@@ -2259,11 +2318,12 @@ async function carregarPaineisPortal(portalSlug, opcoes = {}) {
     const blocoAdmin = await renderAdminPlanilhas(portalSlug, uploads);
     const blocoFiltros = await montarBarraFiltros(paineis);
 
-    const lista = paineis.length ? paineis.map(pn => `
+        const lista = paineis.length ? paineis.map(pn => `
       <div class="dash-chart-box" style="margin-bottom:2px">
         <div class="dash-chart-head">
           <h4>${escapeHTML(pn.nome)}</h4>
-          <div style="display:flex;gap:6px">
+          <div style="display:flex;gap:6px;align-items:center">
+            ${souAdmin() && pn.destaque ? `<input type="text" class="input-grupo-dashboard" data-grupo-painel="${pn.id}" value="${escapeAttr(pn.grupoDashboard || "")}" placeholder="reunir sob..." title="Painéis com o mesmo nome aqui aparecem juntos na Visão Geral, sob esse título" style="width:130px;background:var(--paper);color:var(--carvao);border:1px solid var(--paper-line);padding:4px 6px;font-family:'IBM Plex Mono',monospace;font-size:10.5px">` : ""}
             <button class="dash-toggle-btn" data-abrir="${pn.id}">VER</button>
             ${souAdmin() ? `<button class="dash-toggle-btn" data-destaque="${pn.id}" data-valor="${pn.destaque ? "0" : "1"}" title="Mostrar na Visão Geral" style="${pn.destaque ? "background:var(--mostarda);color:var(--paper)" : ""}">${pn.destaque ? "★ NA VISÃO GERAL" : "☆ DESTACAR"}</button>` : ""}
             ${souAdmin() ? `<button class="dash-toggle-btn" data-apagar="${pn.id}" style="color:var(--terracota)">REMOVER</button>` : ""}
@@ -2284,7 +2344,7 @@ async function carregarPaineisPortal(portalSlug, opcoes = {}) {
         abrirPainel(b.dataset.abrir, `painel-corpo-${b.dataset.abrir}`, filtrosAtuais);
       });
     });
-    painel.querySelectorAll("[data-destaque]").forEach(b => {
+       painel.querySelectorAll("[data-destaque]").forEach(b => {
       b.addEventListener("click", async () => {
         try {
           await apiFetch(`/api/paineis/${b.dataset.destaque}/destaque`, {
@@ -2293,8 +2353,20 @@ async function carregarPaineisPortal(portalSlug, opcoes = {}) {
             body: JSON.stringify({ destaque: b.dataset.valor === "1" }),
           });
           carregarPaineisPortal(portalSlug);
-          carregarDestaques(portalSlug); // reflete na Visão Geral imediatamente
+          carregarDestaques(portalSlug);
         } catch (erro) { alert("Não consegui alterar: " + erro.message); }
+      });
+    });
+    painel.querySelectorAll("[data-grupo-painel]").forEach(input => {
+      input.addEventListener("change", async () => {
+        try {
+          await apiFetch(`/api/paineis/${input.dataset.grupoPainel}/grupo`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ grupoDashboard: input.value.trim() || null }),
+          });
+          carregarDestaques(portalSlug);
+        } catch (erro) { alert("Não consegui alterar o grupo: " + erro.message); }
       });
     });
     painel.querySelectorAll("[data-apagar]").forEach(b => {
