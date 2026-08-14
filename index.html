@@ -1023,6 +1023,7 @@ function renderIndicadoresLeitura(indicadores) {
         <div class="valor">${escapeHTML(valorExibido)}</div>
         <div class="rotulo">${escapeHTML(d.rotulo)}</div>
         ${aoVivo ? `<span class="tag" style="background:var(--oliva);color:var(--paper)">● AO VIVO</span>` : ""}
+        ${aoVivo && d.periodoAoVivo ? `<span class="tag" title="${escapeAttr(d.periodoAoVivo.descricao)} — recalculado a cada leitura, então vira sozinho quando mudar o mês">🗓 ${escapeHTML(d.periodoAoVivo.rotulo)}</span>` : ""}
         ${d.painelId && (d.painelIncompativel || d.painelIndisponivel) ? `<span class="tag tag-pendente" title="O painel ligado a este cartão não existe mais, ou não dá mais um número só (virou evolução/cruzamento)">⚠ PAINEL INDISPONÍVEL</span>` : ""}
         ${!d.painelId && d.exemplo ? `<span class="tag tag-exemplo">EXEMPLO ILUSTRATIVO</span>` : ""}
         ${!d.painelId && d.pendente ? `<span class="tag tag-pendente">A PREENCHER</span>` : ""}
@@ -1167,7 +1168,12 @@ function ligarEdicaoIndicadores(portalId) {
       alert("Não consegui carregar os indicadores: " + erro.message);
       return;
     }
-    const paineisLigaveis = paineis.filter(pn => pn.tipo === "composicao" || pn.tipo === "razao");
+    // "medida" primeiro na lista: é o tipo feito pra virar cartão, e o total
+    // de um gráfico raramente é o número que o rótulo do cartão promete.
+    const paineisLigaveis = [
+      ...paineis.filter(pn => pn.tipo === "medida"),
+      ...paineis.filter(pn => pn.tipo === "composicao" || pn.tipo === "razao"),
+    ];
 
     view.innerHTML = renderIndicadoresEdicao(indicadores, paineisLigaveis);
     btnEditar.style.display = "none";
@@ -1659,7 +1665,28 @@ function renderPainel(resultado, selectedLabel = null) {
     ? `<p class="dash-chart-hint" style="border-left-color:var(--terracota)"><b>A maior parte das células foi omitida.</b> Este cruzamento é fino demais para o tamanho da base — quase toda combinação tem menos de 5 registros. Cruze por uma categoria mais ampla (por região em vez de por unidade, por exemplo) para ter uma leitura útil.</p>`
     : "";
 
-  const rodape = avisosBase + avisoEntidade + avisoRegistroAtual + avisoFiltroSituacao + avisoSupressao + avisoSupressaoExcessiva + avisoSoma + botaoTabela + `<p class="font-mono" style="font-size:10.5px;color:#6B7280;margin-top:8px">fonte: ${escapeHTML(upload.nomeArquivo)}${dados.linhasIgnoradas ? ` · ${dados.linhasIgnoradas} linha(s) sem data válida, ignoradas` : ""}</p>`;  if (dados.tipo === "evolucao") {
+  const rodape = avisosBase + avisoEntidade + avisoRegistroAtual + avisoFiltroSituacao + avisoSupressao + avisoSupressaoExcessiva + avisoSoma + botaoTabela + `<p class="font-mono" style="font-size:10.5px;color:#6B7280;margin-top:8px">fonte: ${escapeHTML(upload.nomeArquivo)}${dados.linhasIgnoradas ? ` · ${dados.linhasIgnoradas} linha(s) sem data válida, ignoradas` : ""}</p>`;  
+    if (dados.tipo === "medida") {
+    const periodo = dados.periodoAplicado
+      ? `<p class="font-mono" style="font-size:10.5px;color:var(--oliva);margin-top:2px">${escapeHTML(dados.periodoAplicado.descricao)}: <b>${escapeHTML(dados.periodoAplicado.rotulo)}</b> — ${dados.periodoAplicado.linhasDepois} de ${dados.periodoAplicado.linhasAntes} registros${dados.periodoAplicado.linhasSemData ? ` · ${dados.periodoAplicado.linhasSemData} sem data, fora da conta` : ""}</p>`
+      : "";
+    const texto = dados.valor === null ? "—" : Number(dados.valor).toLocaleString("pt-BR");
+    // Mesmo problema do número no meio da rosca: valor na casa dos milhões
+    // estoura a caixa. O tamanho cai conforme o número cresce.
+    const tamanho = texto.length <= 6 ? 46 : texto.length <= 9 ? 36 : texto.length <= 13 ? 28 : 22;
+    const detalhe = dados.valor === null
+      ? `nenhum registro com valor em "${dados.coluna}" depois dos filtros`
+      : `${dados.linhasNaConta.toLocaleString("pt-BR")} ${dados.contadoPorEntidade ? "registros distintos" : "registros"} na conta${dados.linhasSemValor ? ` · ${dados.linhasSemValor.toLocaleString("pt-BR")} sem valor, fora dela` : ""}`;
+    const corpo = `
+      <div style="text-align:center;padding:20px 8px 12px">
+        <div style="font-family:'IBM Plex Mono',monospace;font-weight:700;font-size:${tamanho}px;line-height:1.1;color:var(--tinta);word-break:break-word">${escapeHTML(texto)}</div>
+        <div class="font-mono" style="font-size:11px;color:#6B7280;margin-top:8px">${escapeHTML(dados.comoLer?.titulo || "")}</div>
+        <div class="font-mono" style="font-size:10.5px;color:#9AA3B2;margin-top:2px">${escapeHTML(detalhe)}</div>
+      </div>`;
+    return `${avisoFiltro}${periodo}${corpo}${renderComoLer(dados.comoLer)}${rodape}`;
+  }
+
+  if (dados.tipo === "evolucao") {
     const corpo = dados.series.length
       ? multiLinhaSVG(dados.series, dados.pontos.map(p => p.label))
       : dados.acumulado
@@ -2336,6 +2363,153 @@ function ligarBarraFiltros(container, paineis) {
   });
 }
 
+// Cartão (painel do tipo "medida") é o único painel que NÃO nasce de uma
+// sugestão: a pergunta que ele responde é específica demais pra ser
+// adivinhada ("quantas unidades estão EM MANUTENÇÃO", não "quantas por
+// status"). Por isso ele tem formulário próprio, e é o único lugar da tela
+// onde alguém monta um painel do zero.
+const AGREGACOES_CARTAO = {
+  contagem: "Quantos registros",
+  distintos: "Quantos valores diferentes",
+  soma: "Soma de uma coluna",
+  media: "Média de uma coluna",
+  minimo: "Menor valor de uma coluna",
+  maximo: "Maior valor de uma coluna",
+};
+const JANELAS_CARTAO = {
+  mes_atual: "Mês atual",
+  mes_anterior: "Mês anterior (fechado)",
+  ano_atual: "Ano atual",
+  ultimos_12_meses: "Últimos 12 meses",
+  ultimos_30_dias: "Últimos 30 dias",
+  ultimos_90_dias: "Últimos 90 dias",
+};
+const CAMPO_CARTAO = "background:var(--paper);color:var(--carvao);border:1px solid var(--paper-line);padding:6px;font-family:'IBM Plex Mono',monospace;font-size:11px;width:100%;box-sizing:border-box";
+const ROTULO_CARTAO = "font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:#6B7280;display:block;margin-bottom:3px;text-transform:uppercase;letter-spacing:.04em";
+
+function renderCriadorDeCartao(uploads) {
+  if (!souAdmin() || !uploads.length) return "";
+  const opt = (obj) => Object.entries(obj).map(([v, t]) => `<option value="${escapeAttr(v)}">${escapeHTML(t)}</option>`).join("");
+  return `
+    <details class="dash-chart-box" id="criador-cartao" style="margin-bottom:10px">
+      <summary style="cursor:pointer;font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:700;letter-spacing:.04em">+ CRIAR CARTÃO (um número só)</summary>
+      <p class="dash-chart-hint" style="margin-top:10px">Um cartão responde uma pergunta com um número — "quantas estão em manutenção", "média de dias sem revisão". Ele recalcula sozinho quando a planilha for atualizada, pode virar cartão de resumo na tela de indicadores, e reage ao clique nos gráficos do mesmo grupo.</p>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px;margin-top:10px">
+        <div><label style="${ROTULO_CARTAO}">Planilha</label>
+          <select id="cc-upload" style="${CAMPO_CARTAO}">${uploads.map(u => `<option value="${escapeAttr(u.id)}">${escapeHTML(u.nomeArquivo)}</option>`).join("")}</select></div>
+        <div><label style="${ROTULO_CARTAO}">O que calcular</label>
+          <select id="cc-agregacao" style="${CAMPO_CARTAO}">${opt(AGREGACOES_CARTAO)}</select></div>
+        <div id="cc-coluna-caixa" style="display:none"><label style="${ROTULO_CARTAO}">De qual coluna</label>
+          <select id="cc-coluna" style="${CAMPO_CARTAO}"></select></div>
+        <div><label style="${ROTULO_CARTAO}">Só onde (opcional)</label>
+          <select id="cc-filtro-col" style="${CAMPO_CARTAO}"><option value="">— sem filtro —</option></select></div>
+        <div id="cc-filtro-val-caixa" style="display:none"><label style="${ROTULO_CARTAO}">Valores (segure Ctrl p/ vários)</label>
+          <select id="cc-filtro-val" multiple size="4" style="${CAMPO_CARTAO}"></select></div>
+        <div id="cc-periodo-caixa" style="display:none"><label style="${ROTULO_CARTAO}">Recortar por período (opcional)</label>
+          <select id="cc-periodo-col" style="${CAMPO_CARTAO};margin-bottom:4px"><option value="">— período inteiro —</option></select>
+          <select id="cc-periodo-janela" style="${CAMPO_CARTAO}">${opt(JANELAS_CARTAO)}</select></div>
+        <div><label style="${ROTULO_CARTAO}">Nome do cartão</label>
+          <input type="text" id="cc-nome" placeholder="ex.: Unidades sob manutenção" style="${CAMPO_CARTAO}"></div>
+      </div>
+      <div style="margin-top:10px;display:flex;gap:8px;align-items:center">
+        <button class="dash-toggle-btn" id="cc-criar" style="background:var(--oliva);color:var(--paper)">CRIAR CARTÃO</button>
+        <span id="cc-status" class="font-mono" style="font-size:10.5px;color:#6B7280"></span>
+      </div>
+    </details>`;
+}
+
+function ligarCriadorDeCartao(portalSlug) {
+  const caixa = document.getElementById("criador-cartao");
+  if (!caixa) return;
+  const $ = (id) => document.getElementById(id);
+  const selUpload = $("cc-upload"), selAgr = $("cc-agregacao"), selCol = $("cc-coluna");
+  const selFCol = $("cc-filtro-col"), selFVal = $("cc-filtro-val"), selPCol = $("cc-periodo-col"), selPJan = $("cc-periodo-janela");
+  const status = $("cc-status");
+  let schema = {};
+
+  const preencher = (sel, cols, vazio = null) => {
+    sel.innerHTML = (vazio ? `<option value="">${vazio}</option>` : "") +
+      cols.map(c => `<option value="${escapeAttr(c)}">${escapeHTML(c)}</option>`).join("");
+  };
+
+  async function carregarSchema() {
+    status.textContent = "lendo a planilha...";
+    try {
+      schema = (await apiFetch(`/api/uploads/${selUpload.value}`)).schema || {};
+      status.textContent = "";
+    } catch (erro) {
+      schema = {};
+      status.textContent = "não consegui ler as colunas: " + erro.message;
+    }
+    // Datas de "última ocorrência" entram como período de propósito: são as
+    // únicas colunas de data que a maioria destas planilhas tem, e recortar
+    // "no mês" por elas é válido (o servidor avisa o que o número significa).
+    const datas = Object.keys(schema).filter(c => ["temporal", "data_estado_atual"].includes(schema[c]?.type));
+    preencher(selPCol, datas, "— período inteiro —");
+    $("cc-periodo-caixa").style.display = datas.length ? "" : "none";
+    preencher(selFCol, colunasFiltraveis(schema), "— sem filtro —");
+    ajustarColuna();
+  }
+
+  function ajustarColuna() {
+    const agr = selAgr.value;
+    const precisa = agr !== "contagem";
+    $("cc-coluna-caixa").style.display = precisa ? "" : "none";
+    if (!precisa) return;
+    const cols = agr === "distintos"
+      ? Object.keys(schema).filter(c => schema[c]?.type !== "empty")
+      : Object.keys(schema).filter(c => ["numeric", "ano"].includes(schema[c]?.type));
+    preencher(selCol, cols);
+    if (!cols.length) {
+      status.textContent = agr === "distintos"
+        ? "esta planilha não tem colunas utilizáveis"
+        : "esta planilha não tem nenhuma coluna numérica pra essa conta";
+    }
+  }
+
+  async function carregarValoresDoFiltro() {
+    const col = selFCol.value;
+    $("cc-filtro-val-caixa").style.display = col ? "" : "none";
+    if (!col) return;
+    try {
+      const resp = await apiFetch(`/api/uploads/${selUpload.value}/colunas/${encodeURIComponent(col)}/valores`);
+      preencher(selFVal, resp.valores || []);
+    } catch (erro) {
+      preencher(selFVal, []);
+      status.textContent = "não consegui listar os valores: " + erro.message;
+    }
+  }
+
+  selUpload.addEventListener("change", carregarSchema);
+  selAgr.addEventListener("change", ajustarColuna);
+  selFCol.addEventListener("change", carregarValoresDoFiltro);
+  caixa.addEventListener("toggle", () => { if (caixa.open && !Object.keys(schema).length) carregarSchema(); });
+
+  $("cc-criar").addEventListener("click", async () => {
+    const agr = selAgr.value;
+    const valores = [...selFVal.selectedOptions].map(o => o.value);
+    const config = { tipo: "medida", agregacao: agr };
+    if (agr !== "contagem") config.coluna = selCol.value;
+    if (selFCol.value && valores.length) config.filtros = [{ coluna: selFCol.value, valores }];
+    if (selPCol.value) config.periodo = { coluna: selPCol.value, janela: selPJan.value };
+
+    const nome = $("cc-nome").value.trim()
+      || `${AGREGACOES_CARTAO[agr]}${config.coluna ? ` — ${config.coluna}` : ""}${config.filtros ? ` (${valores.join(", ")})` : ""}`;
+
+    status.textContent = "criando...";
+    try {
+      await apiFetch(`/api/portais/${portalSlug}/paineis`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ uploadId: selUpload.value, nome, config }),
+      });
+      carregarPaineisPortal(portalSlug);
+    } catch (erro) {
+      status.textContent = "não deu: " + erro.message;
+    }
+  });
+}
+
 async function carregarPaineisPortal(portalSlug, opcoes = {}) {
   const painel = document.getElementById("tab-paineis");
   FILTRO_GLOBAL_POR_UPLOAD = new Map();
@@ -2363,8 +2537,9 @@ async function carregarPaineisPortal(portalSlug, opcoes = {}) {
       </div>
     `).join("") : `<p class="tela-intro">Nenhum painel criado ainda para este portal.</p>`;
 
-    painel.innerHTML = `<div id="bloco-vinculos">${blocoAdmin}</div>${blocoFiltros}` + lista;
+    painel.innerHTML = `<div id="bloco-vinculos">${blocoAdmin}</div>${renderCriadorDeCartao(uploads)}${blocoFiltros}` + lista;
     ligarVinculos(portalSlug);
+    ligarCriadorDeCartao(portalSlug);
     ligarBarraFiltros(painel, paineis);
 
     painel.querySelectorAll("[data-abrir]").forEach(b => {
