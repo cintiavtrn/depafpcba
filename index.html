@@ -222,6 +222,8 @@ body{background:var(--paper);color:var(--carvao);font-family:'IBM Plex Sans',san
 .dash-tabela tr.dim{opacity:0.35}
 .dash-tabela tr[data-cat]{cursor:pointer}
 .dash-tabela tr[data-cat]:hover{background:var(--paper-line)}
+.dash-tabela tr.selecionada{background:var(--paper-line);font-weight:700}
+.dash-tabela tr.selecionada td{border-color:var(--carvao)}
 .dash-tabela th.sortable{cursor:pointer;user-select:none}
 .dash-tabela th.sortable:hover{color:var(--carvao)}
 .dash-tabela th.sortable::after{content:"⇅";margin-left:4px;opacity:.4;font-size:9px}
@@ -667,7 +669,9 @@ function pieChartSVG(categorias, selectedLabel) {
     const pct = ((c.valor / total) * 100).toFixed(1);
     return `<button class="donut-leg" data-cat="${escapeAttr(c.label)}" style="cursor:pointer"><span class="sw" style="background:${corCategoria(i)}"></span><span class="lg-nome">${escapeHTML(c.label)}</span><span class="lg-valor" style="font-variant-numeric:tabular-nums;color:var(--carvao);opacity:.8">${c.valor.toLocaleString("pt-BR")}</span><span class="lg-pct">${pct}%</span></button>`;
   }).join("");
-  const totalMeio = `<text x="${cx}" y="${(cy - 3).toFixed(1)}" text-anchor="middle" font-family="'Space Grotesk',sans-serif" font-size="22" font-weight="700" fill="var(--carvao)">${total.toLocaleString("pt-BR")}</text><text x="${cx}" y="${(cy + 13).toFixed(1)}" text-anchor="middle" font-family="monospace" font-size="7.5" letter-spacing="1.5" fill="var(--carvao)" fill-opacity="0.6">TOTAL</text>`;
+  const totalTexto = formatarEixo(total);
+  const totalFontSize = totalTexto.length <= 5 ? 22 : totalTexto.length <= 7 ? 17 : 13;
+  const totalMeio = `<text x="${cx}" y="${(cy - 3).toFixed(1)}" text-anchor="middle" font-family="'Space Grotesk',sans-serif" font-size="${totalFontSize}" font-weight="700" fill="var(--carvao)"><title>${total.toLocaleString("pt-BR")}</title>${totalTexto}</text><text x="${cx}" y="${(cy + 13).toFixed(1)}" text-anchor="middle" font-family="monospace" font-size="7.5" letter-spacing="1.5" fill="var(--carvao)" fill-opacity="0.6">TOTAL</text>`;
   return `<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">${fatias}${rotulosFatia}${totalMeio}</svg><div class="donut-legenda">${legenda}</div>`;
 }
 
@@ -1561,7 +1565,7 @@ function tabelaDoPainel(dados, painel) {
   return [];
 }
 
-function renderPainel(resultado) {
+function renderPainel(resultado, selectedLabel = null) {
   const { painel, dados, upload } = resultado;
 
   // filtro que não sobrou nada: mostra "sem dados" em vez de derrubar o
@@ -1634,12 +1638,16 @@ function renderPainel(resultado) {
     const avisoN = dados.algumDenominadorPequeno
       ? `<p class="dash-chart-hint" style="border-left-color:var(--mostarda)"><b>Denominadores pequenos:</b> nos grupos marcados, um único registro muda a taxa em vários pontos. A distância entre 90% e 95% pode ser uma unidade de diferença, não desempenho — por isso ordenar por taxa aqui ordena ruído tanto quanto resultado.</p>`
       : "";
-    const linhasTab = dados.categorias.map(c => `
-      <tr>
+        const linhasTab = dados.categorias.map(c => {
+      const sel = selectedLabel === c.label;
+      const classe = selectedLabel ? (sel ? "selecionada" : "dim") : "";
+      return `
+      <tr data-cat="${escapeAttr(c.label)}" class="${classe}">
         <td>${escapeHTML(c.label)}</td>
         <td class="num">${c.valor === null ? "—" : c.valor + suf}</td>
         <td class="num">${c.numerador.toLocaleString("pt-BR")} de ${c.denominador.toLocaleString("pt-BR")}${c.denominadorPequeno ? ' <span style="color:var(--mostarda)">⚠</span>' : ""}</td>
-      </tr>`).join("")
+      </tr>`;
+    }).join("")
       + `<tr style="border-top:2px solid var(--carvao);font-weight:700">
            <td>TAXA GERAL</td>
            <td class="num">${dados.total === null ? "—" : dados.total + suf}</td>
@@ -1647,7 +1655,7 @@ function renderPainel(resultado) {
          </tr>`;
     return `${avisoFiltro}${renderResumos(dados.resumos)}${renderComoLer(dados.comoLer)}${avisoN}
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start">
-        <div>${barRankingChartSVG(pontos.map(p => ({ label: p.label, valor: p.valor })), null)}</div>
+        <div>${barRankingChartSVG(pontos.map(p => ({ label: p.label, valor: p.valor })), selectedLabel)}</div>
         <table class="dash-tabela"><thead><tr><th>GRUPO</th><th>TAXA</th><th>DE QUANTOS</th></tr></thead><tbody>${linhasTab}</tbody></table>
       </div>${rodape}`;
   }
@@ -1656,18 +1664,22 @@ function renderPainel(resultado) {
     // rosca e "% do total" pressupõem partes de um todo: com valor negativo
     // (estorno, glosa, saldo) não existe fatia, e o percentual passa de 100.
     // Nesse caso o ranking é a leitura honesta.
-    const temNegativo = dados.categorias.some(c => c.valor < 0);
+        const temNegativo = dados.categorias.some(c => c.valor < 0);
     const somaPct = dados.categorias.reduce((a, c) => a + c.percentualDoTotal, 0);
-    const tabela = dados.categorias.map(c => `<tr><td>${escapeHTML(c.label)}</td><td class="num"${c.valor !== null && c.valor < 0 ? ' style="color:var(--terracota)"' : ''}>${c.valor === null ? `<span title="menos de 5 registros — omitido">&lt;5</span>` : c.valor.toLocaleString("pt-BR")}</td><td class="num">${c.valor === null || temNegativo ? "—" : c.percentualDoTotal + "%"}</td></tr>`).join("")
-      // percentual arredondado raramente fecha 100 sozinho: mostra a soma real
+    const tabela = dados.categorias.map(c => {
+      const sel = selectedLabel === c.label;
+      const classe = selectedLabel ? (sel ? "selecionada" : "dim") : "";
+      return `<tr data-cat="${escapeAttr(c.label)}" class="${classe}"><td>${escapeHTML(c.label)}</td><td class="num"${c.valor !== null && c.valor < 0 ? ' style="color:var(--terracota)"' : ''}>${c.valor === null ? `<span title="menos de 5 registros — omitido">&lt;5</span>` : c.valor.toLocaleString("pt-BR")}</td><td class="num">${c.valor === null || temNegativo ? "—" : c.percentualDoTotal + "%"}</td></tr>`;
+    }).join("")
+
       + `<tr style="border-top:2px solid var(--carvao);font-weight:700"><td>TOTAL</td><td class="num">${dados.total.toLocaleString("pt-BR")}</td><td class="num">${temNegativo ? "—" : Math.round(somaPct * 10) / 10 + "%"}</td></tr>`;
 
     const avisoNegativo = temNegativo
       ? `<p class="dash-chart-hint" style="border-left-color:var(--terracota)"><b>Há valores negativos nesta série</b> (estorno, glosa ou saldo). Rosca e percentual do total ficam desativados: não existe fatia de valor negativo, e a soma dos percentuais não fecha 100. O ranking abaixo é a leitura correta.</p>`
       : "";
     const grafico = temNegativo
-      ? barRankingChartSVG(dados.categorias, null)
-      : pieChartSVG(dados.categorias, null);
+      ? barRankingChartSVG(dados.categorias, selectedLabel)
+      : pieChartSVG(dados.categorias, selectedLabel);
 
     return `${avisoFiltro}${renderResumos(dados.resumos)}${renderComoLer(dados.comoLer)}${avisoNegativo}
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start">
@@ -1694,24 +1706,62 @@ function renderPainel(resultado) {
   return `${avisoFiltro}${renderResumos(dados.resumos)}${renderComoLer(dados.comoLer)}<div style="overflow-x:auto">${cruzamentoSVG(dados)}</div>${rodape}`;
 }
 
-async function abrirPainel(painelId, alvoId, filtrosExtras = []) {
+const REGISTRO_PAINEIS_POR_GRUPO = new Map();
+
+function categoriasDoResultado(resultado) {
+  return new Set((resultado?.dados?.categorias || []).map((c) => c.label));
+}
+
+function propagarSelecaoNoGrupo(grupo, alvoIdOrigem, categoria) {
+  const mapa = REGISTRO_PAINEIS_POR_GRUPO.get(grupo);
+  if (!mapa) return;
+  for (const [alvoId, resultado] of mapa) {
+    if (alvoId === alvoIdOrigem) continue;
+    const alvo = document.getElementById(alvoId);
+    if (!alvo) continue;
+    const aplicavel = categoria === null || categoriasDoResultado(resultado).has(categoria);
+    desenharPainel(alvo, resultado, aplicavel ? categoria : null, grupo, alvoId);
+  }
+}
+
+function destacarNoPainel(alvo, resultado, selecionado, grupo = null, alvoId = null) {
+  const categoriaDe = (el) => el.closest("[data-cat]")?.dataset.cat ?? null;
+  alvo.querySelectorAll("[data-cat]").forEach((el) => {
+    el.addEventListener("click", () => {
+      const cat = categoriaDe(el);
+      if (cat === null) return;
+      const novo = selecionado === cat ? null : cat;
+      desenharPainel(alvo, resultado, novo, grupo, alvoId);
+      if (grupo && alvoId) propagarSelecaoNoGrupo(grupo, alvoId, novo);
+    });
+  });
+}
+
+function desenharPainel(alvo, resultado, selecionado = null, grupo = null, alvoId = null) {
+  alvo.innerHTML = renderPainel(resultado, selecionado);
+  adicionarControlesGrafico(alvo);
+  alvo.querySelectorAll("[data-baixar-tabela]").forEach((b) => {
+    b.addEventListener("click", () => {
+      const guardado = TABELAS_PARA_BAIXAR.get(b.dataset.baixarTabela);
+      if (!guardado) return;
+      const nomeArquivo = guardado.nome.replace(/[^\w\s-]/g, "").trim().replace(/\s+/g, "-").toLowerCase() || "painel";
+      baixarCSV(`${nomeArquivo}.csv`, guardado.tabela);
+    });
+  });
+  destacarNoPainel(alvo, resultado, selecionado, grupo, alvoId);
+  if (grupo && alvoId) {
+    if (!REGISTRO_PAINEIS_POR_GRUPO.has(grupo)) REGISTRO_PAINEIS_POR_GRUPO.set(grupo, new Map());
+    REGISTRO_PAINEIS_POR_GRUPO.get(grupo).set(alvoId, resultado);
+  }
+}
+
+async function abrirPainel(painelId, alvoId, filtrosExtras = [], grupo = null) {
   const alvo = document.getElementById(alvoId);
   alvo.innerHTML = `<p class="font-mono" style="font-size:11px;color:#9AA3B2">Calculando...</p>`;
   try {
-    // filtrosExtras é o filtro global do portal (o "slicer") — nunca é
-    // salvo no painel, só afeta esta consulta. Some da URL quando vazio.
     const qs = filtrosExtras.length ? `?filtros=${encodeURIComponent(JSON.stringify(filtrosExtras))}` : "";
     const resultado = await apiFetch(`/api/paineis/${painelId}/dados${qs}`);
-    alvo.innerHTML = renderPainel(resultado);
-    adicionarControlesGrafico(alvo);
-    alvo.querySelectorAll("[data-baixar-tabela]").forEach((b) => {
-      b.addEventListener("click", () => {
-        const guardado = TABELAS_PARA_BAIXAR.get(b.dataset.baixarTabela);
-        if (!guardado) return;
-        const nomeArquivo = guardado.nome.replace(/[^\w\s-]/g, "").trim().replace(/\s+/g, "-").toLowerCase() || "painel";
-        baixarCSV(`${nomeArquivo}.csv`, guardado.tabela);
-      });
-    });
+    desenharPainel(alvo, resultado, null, grupo, alvoId);
   } catch (erro) {
     alvo.innerHTML = `<p class="font-mono" style="font-size:11px;color:var(--terracota)">Não consegui calcular: ${escapeHTML(erro.message)}</p>`;
   }
