@@ -1414,8 +1414,16 @@ function multiLinhaSVG(series, labels) {
 }
 
 // matriz de cruzamento com totais de linha e coluna — inclui o total geral
-function cruzamentoSVG(dados) {
+// colA/colB são os NOMES das colunas cruzadas. Eles viram data-col nos
+// rótulos, pra que clicar em "Delegado" na lateral saiba que está filtrando
+// por Cargo, e clicar num cabeçalho saiba que é pela outra coluna — sem isso
+// o cruzamento não teria como participar do filtro cruzado do grupo, que era
+// o motivo de um dashboard só de cruzamentos não reagir a clique nenhum.
+  function cruzamentoSVG(dados, colA = null, colB = null) {
   const linhas = dados.linhas, colunas = dados.colunas;
+  const clicavel = (conteudo, valor, coluna) => coluna
+    ? `<g data-cat="${escapeAttr(valor)}" data-col="${escapeAttr(coluna)}" style="cursor:pointer">${conteudo}</g>`
+    : conteudo;
   const MAX_ROTULO = 18;
   const cellW = 52, gap = 1, padL = 190;
   // altura da linha acompanha o maior nome — nome de 3 linhas precisa de
@@ -1433,14 +1441,14 @@ function cruzamentoSVG(dados) {
   colunas.forEach((c, j) => {
     const x = padL + j * (cellW + gap) + cellW / 2;
     const y = padT - 12;
-    cabecalho += textoSVG(c.label, x, y, { maxChars: 14, anchor: "start", fontSize: 10, opacidade: 0.8, alturaLinha: 11, transform: `rotate(-35 ${x.toFixed(1)} ${y.toFixed(1)})` });
+    cabecalho += clicavel(textoSVG(c.label, x, y, { maxChars: 14, anchor: "start", fontSize: 10, opacidade: 0.8, alturaLinha: 11, transform: `rotate(-35 ${x.toFixed(1)} ${y.toFixed(1)})` }), c.label, colB);
   });
   const xTotalCol = padL + colunas.length * (cellW + gap) + cellW / 2;
   cabecalho += textoSVG("TOTAL", xTotalCol, padT - 12, { maxChars: 10, anchor: "start", fontSize: 10, peso: 700, transform: `rotate(-35 ${xTotalCol.toFixed(1)} ${(padT - 12).toFixed(1)})` });
 
   linhas.forEach((l, i) => {
     const y = padT + i * (cellH + gap);
-    corpo += textoSVG(l.label, padL - 10, y + cellH / 2, { maxChars: MAX_ROTULO, anchor: "end", fontSize: 10.5, alturaLinha: 12 });
+        corpo += clicavel(textoSVG(l.label, padL - 10, y + cellH / 2, { maxChars: MAX_ROTULO, anchor: "end", fontSize: 10.5, alturaLinha: 12 }), l.label, colA);
     l.valores.forEach((v, j) => {
       const x = padL + j * (cellW + gap);
       // null = célula suprimida por ter poucos registros (dado pessoal)
@@ -1762,13 +1770,13 @@ function renderPainel(resultado, selectedLabel = null) {
         <h5 class="font-mono" style="font-size:12px;letter-spacing:.08em;color:var(--carvao);margin-bottom:6px;padding-left:8px;border-left:3px solid var(--tinta)">
           ${escapeHTML(painel.config.colunaSegmento)}: ${escapeHTML(seg.nome)} — total ${seg.total.toLocaleString("pt-BR")}
         </h5>
-        <div style="overflow-x:auto">${cruzamentoSVG(seg)}</div>
+        <div style="overflow-x:auto">${cruzamentoSVG(seg, painel.config?.colunaA, painel.config?.colunaB)}</div>
       </div>`).join("");
     return `${avisoFiltro}${renderResumos(dados.resumos)}${renderComoLer(dados.comoLer)}
       <div style="margin-top:14px">${blocos}</div>${rodape}`;
   }
 
-  return `${avisoFiltro}${renderResumos(dados.resumos)}${renderComoLer(dados.comoLer)}<div style="overflow-x:auto">${cruzamentoSVG(dados)}</div>${rodape}`;
+  return `${avisoFiltro}${renderResumos(dados.resumos)}${renderComoLer(dados.comoLer)}<div style="overflow-x:auto">${cruzamentoSVG(dados, painel.config?.colunaA, painel.config?.colunaB)}</div>${rodape}`;
 }
 
 const REGISTRO_PAINEIS_POR_GRUPO = new Map();
@@ -1793,10 +1801,12 @@ function colunaClicavelDoResultado(resultado) {
 // planilha (upload.id igual): painéis de planilhas diferentes reunidos no
 // mesmo grupo não têm garantia de que "Bom" de um signifique a mesma coisa
 // no outro, então nesse caso não filtra nada.
-function propagarSelecaoNoGrupo(grupo, alvoIdOrigem, resultadoOrigem, categoria) {
+function propagarSelecaoNoGrupo(grupo, alvoIdOrigem, resultadoOrigem, categoria, colunaDeclarada = null) {
   const mapa = REGISTRO_PAINEIS_POR_GRUPO.get(grupo);
   if (!mapa) return;
-  const colunaOrigem = colunaClicavelDoResultado(resultadoOrigem);
+  // Cruzamento declara a coluna no próprio elemento clicado (data-col), já
+  // que ele tem duas; composição/taxa têm uma só e caem no config.
+  const colunaOrigem = colunaDeclarada || colunaClicavelDoResultado(resultadoOrigem);
   for (const [alvoId, resultado] of mapa) {
     if (alvoId === alvoIdOrigem) continue;
     const painelId = ALVO_PARA_PAINEL.get(alvoId);
@@ -1816,14 +1826,13 @@ function propagarSelecaoNoGrupo(grupo, alvoIdOrigem, resultadoOrigem, categoria)
 // grupo (ver `propagarSelecaoNoGrupo`). Cobre composição/razão — evolução e
 // cruzamento ainda não têm esse destaque.
 function destacarNoPainel(alvo, resultado, selecionado, grupo = null, alvoId = null) {
-  const categoriaDe = (el) => el.closest("[data-cat]")?.dataset.cat ?? null;
   alvo.querySelectorAll("[data-cat]").forEach((el) => {
     el.addEventListener("click", () => {
-      const cat = categoriaDe(el);
+      const cat = el.dataset.cat ?? null;
       if (cat === null) return;
       const novo = selecionado === cat ? null : cat;
       desenharPainel(alvo, resultado, novo, grupo, alvoId);
-      if (grupo && alvoId) propagarSelecaoNoGrupo(grupo, alvoId, resultado, novo);
+      if (grupo && alvoId) propagarSelecaoNoGrupo(grupo, alvoId, resultado, novo, el.dataset.col || null);
     });
   });
 }
