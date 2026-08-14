@@ -1746,23 +1746,49 @@ function renderPainel(resultado, selectedLabel = null) {
 }
 
 const REGISTRO_PAINEIS_POR_GRUPO = new Map();
+// alvoId -> painelId do que está desenhado ali agora, pra saber quem
+// recarregar quando o clique de outro painel do grupo pedir refiltragem.
+const ALVO_PARA_PAINEL = new Map();
 
 function categoriasDoResultado(resultado) {
   return new Set((resultado?.dados?.categorias || []).map((c) => c.label));
 }
 
-function propagarSelecaoNoGrupo(grupo, alvoIdOrigem, categoria) {
+// Coluna que originou as categorias deste painel — é ela que vira filtro nos
+// vizinhos quando se clica numa fatia/barra.
+function colunaClicavelDoResultado(resultado) {
+  return resultado?.painel?.config?.colunaCategoria || null;
+}
+
+// Reunir painéis num grupo reproduz o cruzamento de filtros do Power BI:
+// clicar numa fatia/barra de um painel FILTRA de verdade os outros painéis
+// do grupo (recarrega cada vizinho com a categoria clicada como filtro
+// extra) — não é só destaque visual. Só propaga entre painéis da MESMA
+// planilha (upload.id igual): painéis de planilhas diferentes reunidos no
+// mesmo grupo não têm garantia de que "Bom" de um signifique a mesma coisa
+// no outro, então nesse caso não filtra nada.
+function propagarSelecaoNoGrupo(grupo, alvoIdOrigem, resultadoOrigem, categoria) {
   const mapa = REGISTRO_PAINEIS_POR_GRUPO.get(grupo);
   if (!mapa) return;
+  const colunaOrigem = colunaClicavelDoResultado(resultadoOrigem);
   for (const [alvoId, resultado] of mapa) {
     if (alvoId === alvoIdOrigem) continue;
-    const alvo = document.getElementById(alvoId);
-    if (!alvo) continue;
-    const aplicavel = categoria === null || categoriasDoResultado(resultado).has(categoria);
-    desenharPainel(alvo, resultado, aplicavel ? categoria : null, grupo, alvoId);
+    const painelId = ALVO_PARA_PAINEL.get(alvoId);
+    if (!painelId) continue;
+    const mesmaPlanilha = resultado?.upload?.id && resultado.upload.id === resultadoOrigem?.upload?.id;
+    const filtros = (categoria !== null && colunaOrigem && mesmaPlanilha)
+      ? [{ coluna: colunaOrigem, valores: [categoria] }]
+      : [];
+    abrirPainel(painelId, alvoId, filtros, grupo);
   }
 }
 
+// Clique em fatia/coluna do gráfico OU linha da tabela destaca a mesma
+// categoria nos dois no PRÓPRIO painel — não precisa recarregar nada, só
+// re-renderiza localmente. Clicar de novo desmarca. Se o painel faz parte
+// de um grupo, o clique também FILTRA de verdade os outros painéis do
+// grupo (ver `propagarSelecaoNoGrupo`). Cobre composição/razão — evolução e
+// cruzamento ainda não têm esse destaque.
 function destacarNoPainel(alvo, resultado, selecionado, grupo = null, alvoId = null) {
   const categoriaDe = (el) => el.closest("[data-cat]")?.dataset.cat ?? null;
   alvo.querySelectorAll("[data-cat]").forEach((el) => {
@@ -1771,7 +1797,7 @@ function destacarNoPainel(alvo, resultado, selecionado, grupo = null, alvoId = n
       if (cat === null) return;
       const novo = selecionado === cat ? null : cat;
       desenharPainel(alvo, resultado, novo, grupo, alvoId);
-      if (grupo && alvoId) propagarSelecaoNoGrupo(grupo, alvoId, novo);
+      if (grupo && alvoId) propagarSelecaoNoGrupo(grupo, alvoId, resultado, novo);
     });
   });
 }
@@ -1796,8 +1822,12 @@ function desenharPainel(alvo, resultado, selecionado = null, grupo = null, alvoI
 
 async function abrirPainel(painelId, alvoId, filtrosExtras = [], grupo = null) {
   const alvo = document.getElementById(alvoId);
+  if (grupo && alvoId) ALVO_PARA_PAINEL.set(alvoId, painelId);
   alvo.innerHTML = `<p class="font-mono" style="font-size:11px;color:#9AA3B2">Calculando...</p>`;
   try {
+    // filtrosExtras é o filtro global do portal (o "slicer") OU o filtro
+    // vindo do clique num painel vizinho do mesmo grupo — nenhum dos dois é
+    // salvo no painel, só afeta esta consulta. Some da URL quando vazio.
     const qs = filtrosExtras.length ? `?filtros=${encodeURIComponent(JSON.stringify(filtrosExtras))}` : "";
     const resultado = await apiFetch(`/api/paineis/${painelId}/dados${qs}`);
     desenharPainel(alvo, resultado, null, grupo, alvoId);
@@ -1805,7 +1835,6 @@ async function abrirPainel(painelId, alvoId, filtrosExtras = [], grupo = null) {
     alvo.innerHTML = `<p class="font-mono" style="font-size:11px;color:var(--terracota)">Não consegui calcular: ${escapeHTML(erro.message)}</p>`;
   }
 }
-
 /**
  * Painéis marcados como destaque, mostrados na aba "Visão Geral".
  * É isto que faz a Visão Geral refletir dado real: em vez de números
@@ -1912,6 +1941,7 @@ async function carregarDestaques(portalSlug) {
   const alvo = document.getElementById("bloco-destaques");
   if (!alvo) return;
   REGISTRO_PAINEIS_POR_GRUPO.clear();
+  ALVO_PARA_PAINEL.clear();
   try {
     const paineis = await apiFetch(`/api/portais/${portalSlug}/paineis`);
     const destaques = paineis.filter(pn => pn.destaque);
