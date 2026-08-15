@@ -224,15 +224,16 @@ body{background:var(--paper);color:var(--carvao);font-family:'IBM Plex Sans',san
 .dash-tabela tr[data-cat]:hover{background:var(--paper-line)}
 .dash-tabela tr.selecionada{background:var(--paper-line);font-weight:700}
 .dash-tabela tr.selecionada td{border-color:var(--carvao)}
-.grade-destaques{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;align-items:start}
-.grade-destaques>.dash-chart-box{margin-bottom:0;min-width:0;grid-column:span 2}
-.grade-destaques>.card-medida{grid-column:span 1}
-.grade-destaques>.card-cruzamento,.grade-destaques>.card-evolucao{grid-column:span 4}
-@media(max-width:900px){
-  .grade-destaques{grid-template-columns:repeat(2,minmax(0,1fr))}
-  .grade-destaques>.dash-chart-box,.grade-destaques>.card-cruzamento,.grade-destaques>.card-evolucao{grid-column:span 2}
-  .grade-destaques>.card-medida{grid-column:span 1}
-}
+.faixa-cartoes{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:10px;margin-bottom:10px}
+.faixa-cartoes>.dash-chart-box{margin-bottom:0;min-width:0}
+.grade-destaques{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:10px;align-items:start}
+.grade-destaques>.dash-chart-box{margin-bottom:0;min-width:0}
+.grade-destaques>.card-cruzamento,.grade-destaques>.card-evolucao{grid-column:1/-1}
+.grade-destaques .kpi-row,.faixa-cartoes .kpi-row{gap:6px;margin-bottom:6px}
+.grade-destaques .kpi-card,.faixa-cartoes .kpi-card{border:none;background:transparent;padding:0}
+.grade-destaques .kpi-value,.faixa-cartoes .kpi-value{font-size:15px}
+.grade-destaques .kpi-label,.faixa-cartoes .kpi-label{font-size:10px}
+.grade-destaques p[style*="--oliva"],.faixa-cartoes p[style*="--oliva"]{font-size:9.5px!important;opacity:.75;margin-top:2px!important}
 .painel-detalhes{margin-top:8px}
 .painel-detalhes>summary{cursor:pointer;font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:#6B7280;letter-spacing:.04em;list-style:none}
 .painel-detalhes>summary::-webkit-details-marker{display:none}
@@ -683,7 +684,12 @@ function pieChartSVG(categorias, selectedLabel) {
     const pct = ((c.valor / total) * 100).toFixed(1);
     return `<button class="donut-leg" data-cat="${escapeAttr(c.label)}" style="cursor:pointer"><span class="sw" style="background:${corCategoria(i)}"></span><span class="lg-nome">${escapeHTML(c.label)}</span><span class="lg-valor" style="font-variant-numeric:tabular-nums;color:var(--carvao);opacity:.8">${c.valor.toLocaleString("pt-BR")}</span><span class="lg-pct">${pct}%</span></button>`;
   }).join("");
-  const totalTexto = formatarEixo(total);
+  // Número por extenso, encolhendo conforme cresce. Abreviar ("1k") só entra
+  // quando nem o menor corpo cabe: no miolo da rosca esse é O número do
+  // painel, e "1k" no lugar de "1.033" perde precisão justamente onde ela
+  // mais importa. 9 dígitos ainda cabem em 13px dentro do furo.
+  const totalPorExtenso = total.toLocaleString("pt-BR");
+  const totalTexto = totalPorExtenso.length <= 9 ? totalPorExtenso : formatarEixo(total);
   const totalFontSize = totalTexto.length <= 5 ? 22 : totalTexto.length <= 7 ? 17 : 13;
   const totalMeio = `<text x="${cx}" y="${(cy - 3).toFixed(1)}" text-anchor="middle" font-family="'Space Grotesk',sans-serif" font-size="${totalFontSize}" font-weight="700" fill="var(--carvao)"><title>${total.toLocaleString("pt-BR")}</title>${totalTexto}</text><text x="${cx}" y="${(cy + 13).toFixed(1)}" text-anchor="middle" font-family="monospace" font-size="7.5" letter-spacing="1.5" fill="var(--carvao)" fill-opacity="0.6">TOTAL</text>`;
   return `<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">${fatias}${rotulosFatia}${totalMeio}</svg><div class="donut-legenda">${legenda}</div>`;
@@ -2040,12 +2046,23 @@ async function carregarDestaques(portalSlug) {
       // Cartões primeiro: são os números-título do grupo, e é essa faixa em
       // cima que faz a leitura ser direta. Os gráficos vêm embaixo, na ordem
       // em que foram criados.
-      const ordenado = [...grupo.filter(pn => pn.tipo === "medida"), ...grupo.filter(pn => pn.tipo !== "medida")];
-      const corpo = `<div class="grade-destaques">` + ordenado.map(pn => `
+      // Duas grades em vez de uma: os cartões numa faixa própria em cima, os
+      // gráficos numa grade abaixo. Numa grade só, um cartão (1 coluna) ao
+      // lado de um gráfico (2 colunas) deixava a 4ª coluna órfã e jogava o
+      // gráfico seguinte pra linha de baixo — sobrava metade da tela vazia.
+      // Separados, o `auto-fit` dos gráficos colapsa as colunas que ninguém
+      // ocupa e os que restam esticam pra largura toda; a faixa usa
+      // `auto-fill` pra um cartão sozinho não virar um retângulo gigante.
+      const caixa = pn => `
         <div class="dash-chart-box card-${escapeAttr(pn.tipo)}">
           <h4>${escapeHTML(pn.nome)}</h4>
           <div id="destaque-corpo-${pn.id}"><p class="font-mono" style="font-size:11px;color:#9AA3B2">Calculando...</p></div>
-        </div>`).join("") + `</div>`;
+        </div>`;
+      const cartoes = grupo.filter(pn => pn.tipo === "medida");
+      const graficos = grupo.filter(pn => pn.tipo !== "medida");
+      const corpo =
+        (cartoes.length ? `<div class="faixa-cartoes">${cartoes.map(caixa).join("")}</div>` : "") +
+        (graficos.length ? `<div class="grade-destaques">${graficos.map(caixa).join("")}</div>` : "");
       if (!chave) return corpo;
       return `
         <div class="grupo-dashboard" style="border-left:3px solid var(--tinta);padding-left:14px;margin:18px 0 24px">
