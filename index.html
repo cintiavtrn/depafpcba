@@ -287,6 +287,11 @@ body{background:var(--paper);color:var(--carvao);font-family:'IBM Plex Sans',san
 @media(max-width:640px){.tela-head .mini-rosa{display:none}}
 .cota-grupo{flex:1;min-width:160px;max-width:240px;color:#6E7F9E;line-height:0;opacity:.85}
 .cota-grupo svg{width:100%;height:auto;display:block}
+.grade-acessos{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:8px}
+.acesso-portal{display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--paper);padding:7px 10px;min-width:0}
+.acesso-portal .acesso-nome{font-family:'IBM Plex Mono',monospace;font-size:var(--fs-ui-sm);color:var(--carvao);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.acesso-portal .dash-toggle{flex:none}
+.acesso-portal .dash-toggle-btn{padding:6px 8px;min-height:28px;font-size:var(--fs-ui-xs)}
 .painel-detalhes{margin-top:8px}
 .painel-detalhes>summary{cursor:pointer;font-family:'IBM Plex Mono',monospace;font-size:var(--fs-ui-sm);color:#8B93A3;letter-spacing:.04em;list-style:none}
 .painel-detalhes>summary::-webkit-details-marker{display:none}
@@ -501,6 +506,7 @@ select:focus-visible,input:focus-visible{
   </div>
   <div style="display:flex;align-items:center;gap:10px">
     <span id="usuario-badge" class="font-mono" style="font-size:var(--fs-ui-sm);color:#9AA3B2;display:none"></span>
+    <button class="voltar show" id="btn-abrir-usuarios" style="margin-right:8px;display:none">👤 ACESSOS</button>
     <button class="voltar show" id="btn-abrir-upload" style="margin-right:8px;background:var(--tinta,#22D3EE);display:none">⬆ SUBIR PLANILHA</button>
     <button class="voltar" id="btn-sair" style="display:none">SAIR</button>
     <button class="voltar" id="voltar-btn">← VOLTAR AO PORTAL</button>
@@ -572,6 +578,21 @@ select:focus-visible,input:focus-visible{
   </p>
   <p id="upload-status" class="font-mono" style="font-size:var(--fs-ui);color:#9AA3B2;margin-bottom:16px"></p>
   <div id="upload-resultado"></div>
+</section>
+
+<section class="tela" id="tela-usuarios" hidden>
+  <div class="tela-head" style="--tela-color:var(--dourado)">
+    <div>
+      <h2>Acessos</h2>
+      <div class="artigos">QUEM ENTROU NO SISTEMA E O QUE CADA UM PODE VER</div>
+    </div>
+  </div>
+  <p class="tela-intro">
+    Toda conta de um domínio autorizado que faz login aparece aqui. Um novo login entra
+    sem acesso a portal nenhum — e fica vendo a tela vazia até alguém decidir. Esta tela
+    registra <b>quem</b> entrou e <b>quando</b>, não o que a pessoa consultou ou alterou.
+  </p>
+  <div id="lista-usuarios"></div>
 </section>
 
 <footer>
@@ -1134,8 +1155,11 @@ function mostrarTelaLogin(mensagem) {
   document.getElementById("tela-inicio").hidden = true;
   document.getElementById("tela-conteudo").hidden = true;
   document.getElementById("tela-upload").hidden = true;
+  const tu = document.getElementById("tela-usuarios");
+  if (tu) tu.hidden = true;
   document.getElementById("usuario-badge").style.display = "none";
   document.getElementById("btn-abrir-upload").style.display = "none";
+  document.getElementById("btn-abrir-usuarios").style.display = "none";
   document.getElementById("btn-sair").style.display = "none";
   document.getElementById("voltar-btn").classList.remove("show");
   if (mensagem) document.getElementById("login-status").textContent = mensagem;
@@ -1148,6 +1172,8 @@ function mostrarAppLogado(usuario) {
   badge.textContent = `${usuario.nome} · ${usuario.papel}`;
   badge.style.display = "inline";
   document.getElementById("btn-abrir-upload").style.display = "inline-block";
+  // Administrar acesso é assunto de quem responde pelo sistema inteiro.
+  document.getElementById("btn-abrir-usuarios").style.display = usuario.papel === "admin" ? "inline-block" : "none";
   document.getElementById("btn-sair").style.display = "inline-block";
 }
 
@@ -3155,8 +3181,184 @@ async function abrirTela(id) {
 }
 
 
+// ---------- administração de acessos ----------
+// Só admin global chega aqui (o botão nem é renderizado pros outros, e o
+// backend recusa de qualquer forma). A tela responde duas perguntas: quem
+// entrou, e o que essa pessoa pode ver. Não responde "o que ela fez" — isso
+// é registro de auditoria, outra decisão, e não entra de carona nesta.
+function dataCurta(iso) {
+  if (!iso) return "—";
+  return new Date(iso).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
+}
+
+function renderCartaoUsuario(u, portais, souEu) {
+  const chips = portais.map(p => {
+    const atual = u.acessos.find(a => a.portalId === p.id);
+    const nivel = atual ? atual.papel : "";
+    return `
+      <div class="acesso-portal" data-usuario="${escapeAttr(u.id)}" data-portal="${escapeAttr(p.id)}">
+        <span class="acesso-nome">${escapeHTML(p.label)}</span>
+        <div class="dash-toggle">
+          <button class="dash-toggle-btn${nivel === "" ? " active" : ""}" data-nivel="">SEM ACESSO</button>
+          <button class="dash-toggle-btn${nivel === "leitor" ? " active" : ""}" data-nivel="leitor">LEITOR</button>
+          <button class="dash-toggle-btn${nivel === "editor" ? " active" : ""}" data-nivel="editor">EDITOR</button>
+        </div>
+      </div>`;
+  }).join("");
+
+  const selos = [
+    u.aguardandoDecisao ? `<span class="tag" style="background:var(--mostarda);color:var(--paper)">AGUARDANDO DECISÃO</span>` : "",
+    !u.ativo ? `<span class="tag" style="background:var(--terracota);color:var(--paper)">DESATIVADO</span>` : "",
+    u.sessoesAtivas > 0 ? `<span class="tag" style="background:var(--oliva);color:var(--paper)">● ${u.sessoesAtivas} SESSÃO(ÕES) ABERTA(S)</span>` : "",
+    souEu ? `<span class="tag tag-pendente">VOCÊ</span>` : "",
+  ].join("");
+
+  return `
+    <div class="dash-chart-box" style="margin-bottom:10px${u.aguardandoDecisao ? ";border-left:3px solid var(--mostarda)" : ""}">
+      <div class="dash-chart-head">
+        <div style="min-width:0">
+          <h4 style="margin-bottom:2px">${escapeHTML(u.nome || u.email)}</h4>
+          <p class="font-mono" style="font-size:var(--fs-ui-sm);color:#8B93A3;margin:0;word-break:break-all">${escapeHTML(u.email)}</p>
+        </div>
+        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+          <button class="dash-toggle-btn" data-papel="${escapeAttr(u.id)}" data-valor="${u.papel === "admin" ? "membro" : "admin"}" ${souEu ? "disabled title='Você não pode alterar o próprio papel'" : ""} style="${u.papel === "admin" ? "background:var(--dourado);color:var(--paper)" : ""}">${u.papel === "admin" ? "★ ADMIN" : "☆ TORNAR ADMIN"}</button>
+          ${u.sessoesAtivas > 0 ? `<button class="dash-toggle-btn" data-encerrar="${escapeAttr(u.id)}" title="Derruba a sessão sem tirar o acesso — útil se ficou logado numa máquina compartilhada">ENCERRAR SESSÃO</button>` : ""}
+          <button class="${u.ativo ? "btn-perigo" : "dash-toggle-btn"}" data-ativo="${escapeAttr(u.id)}" data-valor="${u.ativo ? "0" : "1"}" ${souEu ? "disabled title='Você não pode desativar a própria conta'" : ""}>${u.ativo ? "DESATIVAR" : "REATIVAR"}</button>
+        </div>
+      </div>
+      <div style="margin:2px 0 10px">${selos}</div>
+      <p class="font-mono" style="font-size:var(--fs-ui-sm);color:#8B93A3;margin-bottom:10px">
+        primeiro acesso: ${dataCurta(u.primeiroAcesso)} · último acesso: ${dataCurta(u.ultimoAcesso)}
+      </p>
+      ${u.papel === "admin"
+        ? `<p class="dash-chart-hint">Administrador vê e edita <b>todos</b> os portais — os acessos individuais abaixo não se aplicam enquanto ela tiver esse papel.</p>`
+        : ""}
+      <div class="grade-acessos" style="${u.papel === "admin" ? "opacity:.45;pointer-events:none" : ""}">${chips}</div>
+    </div>`;
+}
+
+async function abrirTelaUsuarios() {
+  telaConteudo.hidden = true;
+  telaInicio.style.display = "none";
+  document.getElementById("tela-upload").hidden = true;
+  const tela = document.getElementById("tela-usuarios");
+  tela.hidden = false;
+  voltarBtn.classList.add("show");
+  window.scrollTo({ top: 0, behavior: "smooth" });
+
+  const alvo = document.getElementById("lista-usuarios");
+  alvo.innerHTML = htmlCarregando("Carregando contas");
+  try {
+    const [usuarios, portais] = await Promise.all([
+      apiFetch("/api/usuarios"),
+      apiFetch("/api/portais"),
+    ]);
+    const meuId = obterSessao()?.usuario?.id;
+    const pendentes = usuarios.filter(u => u.aguardandoDecisao).length;
+    const aviso = pendentes
+      ? `<p class="dash-chart-hint" style="border-left-color:var(--mostarda)"><b>${pendentes} conta(s) aguardando decisão.</b> Já entraram no sistema e não veem nada até você conceder acesso a algum portal.</p>`
+      : "";
+    alvo.innerHTML = aviso + usuarios.map(u => renderCartaoUsuario(u, portais, u.id === meuId)).join("");
+    ligarAcoesUsuarios();
+  } catch (erro) {
+    alvo.innerHTML = `<p class="font-mono" style="font-size:var(--fs-ui-sm);color:var(--terracota)">Não consegui carregar: ${escapeHTML(erro.message)}</p>`;
+  }
+}
+
+function ligarAcoesUsuarios() {
+  const tela = document.getElementById("tela-usuarios");
+
+  // Clicar num nível já grava. O PUT substitui a lista inteira, então
+  // remontamos o estado atual da tela e mandamos completo.
+  tela.querySelectorAll(".acesso-portal .dash-toggle-btn").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const caixa = btn.closest(".acesso-portal");
+      const usuarioId = caixa.dataset.usuario;
+      caixa.querySelectorAll(".dash-toggle-btn").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+
+      const acessos = [...tela.querySelectorAll(`.acesso-portal[data-usuario="${usuarioId}"]`)]
+        .map(c => ({ portalId: c.dataset.portal, papel: c.querySelector(".dash-toggle-btn.active")?.dataset.nivel }))
+        .filter(a => a.papel);
+      try {
+        await apiFetch(`/api/usuarios/${usuarioId}/acessos`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ acessos }),
+        });
+        toastOk(`Acesso atualizado — ${acessos.length} portal(is).`);
+      } catch (erro) {
+        toastErro("Não consegui salvar o acesso: " + erro.message);
+        abrirTelaUsuarios();
+      }
+    });
+  });
+
+  tela.querySelectorAll("[data-papel]").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const virandoAdmin = btn.dataset.valor === "admin";
+      const confirmado = await confirmarAcao({
+        titulo: virandoAdmin ? "Tornar esta conta administradora?" : "Rebaixar esta conta?",
+        alvo: btn.closest(".dash-chart-box").querySelector("p").textContent.trim(),
+        texto: virandoAdmin
+          ? "Administrador vê e edita todos os portais, sobe e apaga planilhas, e administra os acessos das outras contas."
+          : "A conta perde o acesso total e passa a ver só os portais concedidos individualmente.",
+        rotuloConfirmar: virandoAdmin ? "TORNAR ADMIN" : "REBAIXAR",
+      });
+      if (!confirmado) return;
+      try {
+        await apiFetch(`/api/usuarios/${btn.dataset.papel}/papel`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ papel: btn.dataset.valor }),
+        });
+        toastOk("Papel alterado.");
+        abrirTelaUsuarios();
+      } catch (erro) { toastErro("Não consegui alterar: " + erro.message); }
+    });
+  });
+
+  tela.querySelectorAll("[data-ativo]").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const desativando = btn.dataset.valor === "0";
+      if (desativando) {
+        const confirmado = await confirmarAcao({
+          titulo: "Desativar esta conta?",
+          alvo: btn.closest(".dash-chart-box").querySelector("p").textContent.trim(),
+          texto: "A pessoa é desconectada na hora e não consegue mais entrar, mesmo que o e-mail dela continue autorizado. Os acessos ficam guardados caso você reative depois.",
+          rotuloConfirmar: "DESATIVAR CONTA",
+        });
+        if (!confirmado) return;
+      }
+      try {
+        const r = await apiFetch(`/api/usuarios/${btn.dataset.ativo}/ativo`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ativo: !desativando }),
+        });
+        toastOk(desativando ? `Conta desativada — ${r.sessoesEncerradas || 0} sessão(ões) encerrada(s).` : "Conta reativada.");
+        abrirTelaUsuarios();
+      } catch (erro) { toastErro("Não consegui alterar: " + erro.message); }
+    });
+  });
+
+  tela.querySelectorAll("[data-encerrar]").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      try {
+        const r = await apiFetch(`/api/usuarios/${btn.dataset.encerrar}/encerrar-sessoes`, { method: "POST" });
+        toastOk(`${r.sessoesEncerradas} sessão(ões) encerrada(s). A conta continua autorizada.`);
+        abrirTelaUsuarios();
+      } catch (erro) { toastErro("Não consegui encerrar: " + erro.message); }
+    });
+  });
+}
+
+document.getElementById("btn-abrir-usuarios").addEventListener("click", abrirTelaUsuarios);
+
 function fecharTela() {
   telaConteudo.hidden = true;
+  const telaUsuarios = document.getElementById("tela-usuarios");
+  if (telaUsuarios) telaUsuarios.hidden = true;
   const telaUpload = document.getElementById("tela-upload");
   if (telaUpload) telaUpload.hidden = true;
   telaInicio.style.display = "";
@@ -3172,6 +3374,7 @@ document.getElementById("brand-home-btn").addEventListener("click", fecharTela);
 // =====================================================================
 function abrirTelaUpload() {
   telaConteudo.hidden = true;
+  document.getElementById("tela-usuarios").hidden = true;
   telaInicio.style.display = "none";
   document.getElementById("tela-upload").hidden = false;
   voltarBtn.classList.add("show");
