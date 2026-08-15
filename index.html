@@ -1179,6 +1179,7 @@ function mostrarAppLogado(usuario) {
   // verdade se esta pessoa sobe planilha.
   atualizarBotoesPorPapel();
   document.getElementById("btn-sair").style.display = "inline-block";
+}
 
 async function aoReceberCredencialGoogle(response) {
   document.getElementById("login-status").textContent = "Entrando...";
@@ -2971,7 +2972,7 @@ async function carregarPaineisPortal(portalSlug, opcoes = {}) {
     const blocoFiltros = await montarBarraFiltros(paineis);
 
     const podeEditar = podeEditarPortal(portalSlug);
-` const lista = paineis.length ? paineis.map(pn => \``
+    const lista = paineis.length ? paineis.map(pn => `
       <div class="dash-chart-box" style="margin-bottom:2px">
         <div class="dash-chart-head">
           <h4>${escapeHTML(pn.nome)}</h4>
