@@ -224,16 +224,19 @@ body{background:var(--paper);color:var(--carvao);font-family:'IBM Plex Sans',san
 .dash-tabela tr[data-cat]:hover{background:var(--paper-line)}
 .dash-tabela tr.selecionada{background:var(--paper-line);font-weight:700}
 .dash-tabela tr.selecionada td{border-color:var(--carvao)}
-.faixa-cartoes{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:10px;margin-bottom:10px}
-.faixa-cartoes>.dash-chart-box{margin-bottom:0;min-width:0}
+.faixa-cartoes{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px;margin-bottom:10px}
+.faixa-cartoes>.dash-chart-box{margin-bottom:0;min-width:0;padding:14px 16px}
+.faixa-cartoes>.dash-chart-box>h4{font-size:12.5px;line-height:1.3;margin-bottom:6px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .grade-destaques{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:10px;align-items:start}
 .grade-destaques>.dash-chart-box{margin-bottom:0;min-width:0}
 .grade-destaques>.card-cruzamento,.grade-destaques>.card-evolucao{grid-column:1/-1}
-.grade-destaques .kpi-row,.faixa-cartoes .kpi-row{gap:6px;margin-bottom:6px}
-.grade-destaques .kpi-card,.faixa-cartoes .kpi-card{border:none;background:transparent;padding:0}
-.grade-destaques .kpi-value,.faixa-cartoes .kpi-value{font-size:15px}
-.grade-destaques .kpi-label,.faixa-cartoes .kpi-label{font-size:10px}
+.grade-destaques .kpi-row,.faixa-cartoes .kpi-row{background:none;border:none;gap:16px;margin-bottom:8px;grid-template-columns:repeat(auto-fit,minmax(90px,1fr))}
+.grade-destaques .kpi-card,.faixa-cartoes .kpi-card{background:none;border:none;border-top:none;padding:0;box-shadow:none;border-radius:0}
+.grade-destaques .kpi-card:hover,.faixa-cartoes .kpi-card:hover{transform:none;box-shadow:none}
+.grade-destaques .kpi-value,.faixa-cartoes .kpi-value{font-size:16px;margin-top:2px}
+.grade-destaques .kpi-label,.faixa-cartoes .kpi-label{font-size:9.5px}
 .grade-destaques p[style*="--oliva"],.faixa-cartoes p[style*="--oliva"]{font-size:9.5px!important;opacity:.75;margin-top:2px!important}
+.grade-destaques p[style*="--mostarda"],.faixa-cartoes p[style*="--mostarda"]{font-size:9.5px!important;opacity:.8;margin-bottom:4px!important}
 .painel-detalhes{margin-top:8px}
 .painel-detalhes>summary{cursor:pointer;font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:#6B7280;letter-spacing:.04em;list-style:none}
 .painel-detalhes>summary::-webkit-details-marker{display:none}
@@ -1562,6 +1565,48 @@ function renderComoLer(cl) {
 // erra. Guardamos a tabela de cada painel aqui pra poder exportar.
 const TABELAS_PARA_BAIXAR = new Map();
 
+// O CSV é montado aqui no navegador; o XLSX vem pronto do servidor (é lá que
+// mora a biblioteca que escreve o formato). Por isso este caminho não usa
+// apiFetch, que espera JSON de volta — precisa do corpo binário.
+async function baixarArquivoDaApi(caminho, botao) {
+  const sessao = obterSessao();
+  const textoOriginal = botao ? botao.textContent : null;
+  if (botao) { botao.disabled = true; botao.textContent = "GERANDO..."; }
+  try {
+    const resposta = await fetch(`${API_CONFIG.BASE_URL}${caminho}`, {
+      headers: sessao ? { Authorization: `Bearer ${sessao.token}` } : {},
+    });
+    if (resposta.status === 401) {
+      limparSessao();
+      mostrarTelaLogin("Sua sessão expirou — entre de novo.");
+      return;
+    }
+    if (!resposta.ok) {
+      let msg = `Erro ${resposta.status}`;
+      try { msg = (await resposta.json()).erro || msg; } catch { /* corpo não era JSON */ }
+      throw new Error(msg);
+    }
+    // O nome do arquivo vem no cabeçalho, já tratado pelo servidor.
+    const disp = resposta.headers.get("Content-Disposition") || "";
+    const casou = disp.match(/filename\*=UTF-8''([^;]+)/) || disp.match(/filename="([^"]+)"/);
+    const nome = casou ? decodeURIComponent(casou[1]) : "painel.xlsx";
+
+    const blob = await resposta.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = nome;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  } catch (erro) {
+    alert("Não consegui gerar a planilha: " + erro.message + "\n\nO Excel é gerado pelo servidor — confira se a API está rodando (npm start).");
+  } finally {
+    if (botao) { botao.disabled = false; botao.textContent = textoOriginal; }
+  }
+}
+
 function baixarCSV(nomeArquivo, linhas) {
   if (!linhas || !linhas.length) return;
   const escapar = (v) => {
@@ -1588,6 +1633,14 @@ function baixarCSV(nomeArquivo, linhas) {
 
 // monta a tabela exportável a partir do resultado, por tipo de painel
 function tabelaDoPainel(dados, painel) {
+  if (dados.tipo === "medida") {
+    return [{
+      Medida: painel.nome,
+      Valor: dados.valor,
+      "Registros na conta": dados.linhasNaConta,
+      "Sem valor (fora da conta)": dados.linhasSemValor,
+    }];
+  }
   if (dados.tipo === "composicao") {
     return dados.categorias.map((c) => ({
       Categoria: c.label,
@@ -1697,7 +1750,10 @@ function renderPainel(resultado, selectedLabel = null, compacto = false) {
   const tabela = tabelaDoPainel(dados, painel);
   if (tabela.length) TABELAS_PARA_BAIXAR.set(painel.id, { tabela, nome: painel.nome });
   const botaoTabela = tabela.length
-    ? `<div style="text-align:right;margin:6px 0"><button class="dash-toggle-btn" data-baixar-tabela="${escapeAttr(painel.id)}">⬇ BAIXAR TABELA (CSV)</button></div>`
+    ? `<div style="text-align:right;margin:6px 0;display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap">
+         <button class="dash-toggle-btn" data-baixar-excel="${escapeAttr(painel.id)}" title="Planilha formatada, com os dados como Tabela do Excel e uma aba de contexto">⬇ EXCEL (.XLSX)</button>
+         <button class="dash-toggle-btn" data-baixar-tabela="${escapeAttr(painel.id)}" title="Texto puro, pra jogar em outro sistema">⬇ CSV</button>
+       </div>`
     : "";
 
   const avisoSupressaoExcessiva = dados.supressaoExcessiva
@@ -1730,7 +1786,7 @@ function renderPainel(resultado, selectedLabel = null, compacto = false) {
       : `${dados.linhasNaConta.toLocaleString("pt-BR")} ${dados.contadoPorEntidade ? "registros distintos" : "registros"} na conta${dados.linhasSemValor ? ` · ${dados.linhasSemValor.toLocaleString("pt-BR")} sem valor, fora dela` : ""}`;
     const corpo = `
       <div style="text-align:center;padding:20px 8px 12px">
-        <div style="font-family:'IBM Plex Mono',monospace;font-weight:700;font-size:${tamanho}px;line-height:1.1;color:var(--tinta);word-break:break-word">${escapeHTML(texto)}</div>
+        <div style="font-family:'IBM Plex Mono',monospace;font-weight:700;font-size:${tamanho}px;line-height:1.1;color:var(--tinta);white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${escapeAttr(texto)}">${escapeHTML(texto)}</div>
         <div class="font-mono" style="font-size:11px;color:#6B7280;margin-top:8px">${escapeHTML(tituloDaMedida)}</div>
         <div class="font-mono" style="font-size:10.5px;color:#9AA3B2;margin-top:2px">${escapeHTML(detalhe)}</div>
       </div>`;
@@ -1893,6 +1949,9 @@ function desenharPainel(alvo, resultado, selecionado = null, grupo = null, alvoI
       const nomeArquivo = guardado.nome.replace(/[^\w\s-]/g, "").trim().replace(/\s+/g, "-").toLowerCase() || "painel";
       baixarCSV(`${nomeArquivo}.csv`, guardado.tabela);
     });
+  });
+  alvo.querySelectorAll("[data-baixar-excel]").forEach((b) => {
+    b.addEventListener("click", () => baixarArquivoDaApi(`/api/paineis/${b.dataset.baixarExcel}/excel`, b));
   });
   destacarNoPainel(alvo, resultado, selecionado, grupo, alvoId, compacto);
   if (grupo && alvoId) {
@@ -2069,7 +2128,15 @@ async function carregarDestaques(portalSlug) {
           <h3 class="font-mono" style="font-size:13px;letter-spacing:.06em;color:var(--tinta);margin-bottom:10px;text-transform:uppercase">${escapeHTML(chave)}</h3>
           ${corpo}
         </div>`;
-    }).join("") + `<div style="height:20px"></div>`;
+        }).join("") + `
+      <div style="text-align:right;margin:4px 0 20px">
+        <button class="dash-toggle-btn" id="btn-excel-visao-geral" title="Uma pasta de trabalho com todos os painéis em destaque: uma aba por painel, mais capa e contexto">⬇ BAIXAR VISÃO GERAL (EXCEL)</button>
+      </div>`;
+
+    const btnExcelGeral = document.getElementById("btn-excel-visao-geral");
+    if (btnExcelGeral) {
+      btnExcelGeral.addEventListener("click", () => baixarArquivoDaApi(`/api/portais/${portalSlug}/paineis/excel`, btnExcelGeral));
+    }
 
     for (const pn of destaques) await abrirPainel(pn.id, `destaque-corpo-${pn.id}`, [], pn.grupoDashboard || null, true);
   } catch (erro) {
@@ -2566,8 +2633,12 @@ function ligarCriadorDeCartao(portalSlug) {
     if (selFCol.value && valores.length) config.filtros = [{ coluna: selFCol.value, valores }];
     if (selPCol.value) config.periodo = { coluna: selPCol.value, janela: selPJan.value };
 
+    // Nome automático curto. O rótulo do dropdown ("Média de uma coluna")
+    // descreve a operação pra quem está montando; como título de cartão ele
+    // vira uma linha longa que estoura a caixa e não diz nada a mais.
+    const NOME_CURTO = { contagem: "Quantos", distintos: "Valores distintos de", soma: "Total de", media: "Média de", minimo: "Menor", maximo: "Maior" };
     const nome = $("cc-nome").value.trim()
-      || `${AGREGACOES_CARTAO[agr]}${config.coluna ? ` — ${config.coluna}` : ""}${config.filtros ? ` (${valores.join(", ")})` : ""}`;
+      || `${NOME_CURTO[agr]}${config.coluna ? ` ${config.coluna}` : ""}${config.filtros ? ` — ${valores.join(", ")}` : ""}`;
 
     status.textContent = "criando...";
     try {
