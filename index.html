@@ -337,7 +337,7 @@ body{background:var(--paper);color:var(--carvao);font-family:'IBM Plex Sans',san
 .dash-chart-hint{font-family:'IBM Plex Mono',monospace;font-size:var(--fs-ui-sm);line-height:1.55;color:#8B93A3;margin:0 0 12px;padding:8px 10px;background:var(--paper);border-left:3px solid var(--tela-color,var(--carvao))}
 .dash-chart-hint b{color:var(--carvao)}
 .dash-chart-hint i{font-style:normal;color:var(--carvao);opacity:.75}
-.dash-toggle-btn{font-family:'IBM Plex Mono',monospace;font-size:var(--fs-ui-xs);letter-spacing:0.04em;background:var(--paper);color:var(--carvao);border:none;padding:5px 9px;cursor:pointer}
+.dash-toggle-btn{font-family:'IBM Plex Mono',monospace;font-size:var(--fs-ui-xs);letter-spacing:0.04em;background:var(--paper);color:var(--carvao);border:none;padding:8px 12px;cursor:pointer}
 .dash-toggle-btn+.dash-toggle-btn{border-left:1.5px solid var(--carvao)}
 .dash-toggle-btn.active{background:var(--carvao);color:var(--paper)}
 .dash-export-row{display:flex;justify-content:flex-end;margin-bottom:16px}
@@ -2152,10 +2152,6 @@ async function abrirPainel(painelId, alvoId, filtrosExtras = [], grupo = null, c
     alvo.innerHTML = htmlCarregando();
   }
   try {
-  const alvo = document.getElementById(alvoId);
-  if (grupo && alvoId) ALVO_PARA_PAINEL.set(alvoId, painelId);
-  alvo.innerHTML = htmlCarregando();
-  try {
     // filtrosExtras é o filtro global do portal (o "slicer") OU o filtro
     // vindo do clique num painel vizinho do mesmo grupo — nenhum dos dois é
     // salvo no painel, só afeta esta consulta. Some da URL quando vazio.
@@ -3012,7 +3008,13 @@ async function carregarUploadsPortal(portalId) {
         ev.stopPropagation();
         // apagar a planilha apaga os painéis feitos com ela — a confirmação
         // precisa dizer isso, senão a pessoa perde trabalho sem saber
-        if (!confirm(`Remover "${b.dataset.nome}"?\n\nOs painéis criados a partir dela também serão apagados. Esta ação não pode ser desfeita.`)) return;
+          const confirmado = await confirmarAcao({
+          titulo: "Remover esta planilha?",
+          alvo: b.dataset.nome,
+          texto: "Os painéis criados a partir dela também serão apagados. Esta ação não pode ser desfeita.",
+          rotuloConfirmar: "REMOVER PLANILHA",
+        });
+        if (!confirmado) return;
         b.disabled = true; b.textContent = "removendo...";
         try {
           const r = await apiFetch(`/api/uploads/${b.dataset.apagarUpload}`, { method: "DELETE" });
