@@ -1139,6 +1139,9 @@ async function carregarPortais() {
       cor: "#" + item.corHex,
       artigos: item.artigos || [],
     }));
+    PAPEL_POR_PORTAL.clear();
+    for (const item of lista) PAPEL_POR_PORTAL.set(item.slug, item.meuPapel || "leitor");
+    atualizarBotoesPorPapel();
     buildHub();
   } catch (erro) {
     document.querySelector("#tela-inicio .intro p").textContent =
@@ -1171,11 +1174,11 @@ function mostrarAppLogado(usuario) {
   const badge = document.getElementById("usuario-badge");
   badge.textContent = `${usuario.nome} · ${usuario.papel}`;
   badge.style.display = "inline";
-  document.getElementById("btn-abrir-upload").style.display = "inline-block";
-  // Administrar acesso é assunto de quem responde pelo sistema inteiro.
-  document.getElementById("btn-abrir-usuarios").style.display = usuario.papel === "admin" ? "inline-block" : "none";
+    // Os papéis por portal só chegam depois de carregarPortais(), que roda
+  // logo em seguida e chama esta função de novo — é lá que dá pra decidir de
+  // verdade se esta pessoa sobe planilha.
+  atualizarBotoesPorPapel();
   document.getElementById("btn-sair").style.display = "inline-block";
-}
 
 async function aoReceberCredencialGoogle(response) {
   document.getElementById("login-status").textContent = "Entrando...";
@@ -1251,6 +1254,32 @@ function escapeHTML(s) {
 }
 function escapeAttr(s) {
   return escapeHTML(s).replace(/"/g,"&quot;");
+}
+
+// Papel por portal, guardado quando a lista de portais é carregada. Antes a
+// tela só sabia perguntar "sou admin?", e por isso quem recebia "editor" via
+// exatamente a mesma coisa que quem só lê — o papel existia no banco, era
+// aceito pela API, e não tinha como ser exercido. Agora cada controle de
+// edição pergunta pelo portal em que está.
+const PAPEL_POR_PORTAL = new Map();
+
+function podeEditarPortal(slug) {
+  if (souAdmin()) return true;
+  return PAPEL_POR_PORTAL.get(slug) === "editor";
+}
+
+// Subir planilha é ato de edição: quem não edita em lugar nenhum não sobe.
+function podeSubirPlanilha() {
+  if (souAdmin()) return true;
+  return [...PAPEL_POR_PORTAL.values()].includes("editor");
+}
+
+function atualizarBotoesPorPapel() {
+  const btnUpload = document.getElementById("btn-abrir-upload");
+  const btnAcessos = document.getElementById("btn-abrir-usuarios");
+  if (btnUpload) btnUpload.style.display = podeSubirPlanilha() ? "inline-block" : "none";
+  // Administrar acesso é assunto de quem responde pelo sistema inteiro.
+  if (btnAcessos) btnAcessos.style.display = souAdmin() ? "inline-block" : "none";
 }
 
 function souAdmin() {
@@ -2336,7 +2365,7 @@ async function carregarDestaques(portalSlug) {
     const paineis = await apiFetch(`/api/portais/${portalSlug}/paineis`);
     const destaques = paineis.filter(pn => pn.destaque);
     if (!destaques.length) {
-      alvo.innerHTML = souAdmin()
+      alvo.innerHTML = podeEditarPortal(portalSlug)
         ? `<p class="font-mono" style="font-size:var(--fs-ui-sm);color:#8B93A3;margin-bottom:16px">Nenhum painel em destaque. Na aba PAINÉIS, marque com ★ os que devem aparecer aqui na visão geral.</p>`
         : "";
       return;
@@ -2419,7 +2448,7 @@ async function carregarDestaques(portalSlug) {
 // sem pular pra uma seção separada lá embaixo. Antes eram dois blocos
 // desconhecidos entre si; "ver painéis disponíveis" ficava fora de vista.
 async function renderAdminPlanilhas(portalSlug, uploads) {
-  if (!souAdmin()) return "";
+if (!podeEditarPortal(portalSlug)) return "";
   if (!uploads.length) {
     return `<p class="tela-intro">Suba uma planilha vinculada a este portal primeiro (botão "SUBIR PLANILHA" no topo) pra poder criar painéis.</p>`;
   }
@@ -2788,8 +2817,8 @@ const JANELAS_CARTAO = {
 const CAMPO_CARTAO = "background:var(--paper);color:var(--carvao);border:1px solid var(--paper-line);padding:6px;font-family:'IBM Plex Mono',monospace;font-size:var(--fs-ui-sm);width:100%;box-sizing:border-box";
 const ROTULO_CARTAO = "font-family:'IBM Plex Mono',monospace;font-size:var(--fs-ui-sm);color:#8B93A3;display:block;margin-bottom:3px;text-transform:uppercase;letter-spacing:.04em";
 
-function renderCriadorDeCartao(uploads) {
-  if (!souAdmin() || !uploads.length) return "";
+function renderCriadorDeCartao(uploads, portalSlug) {
+if (!podeEditarPortal(portalSlug) || !uploads.length) return "";
   const opt = (obj) => Object.entries(obj).map(([v, t]) => `<option value="${escapeAttr(v)}">${escapeHTML(t)}</option>`).join("");
   return `
     <details class="dash-chart-box" id="criador-cartao" style="margin-bottom:10px">
@@ -2941,22 +2970,23 @@ async function carregarPaineisPortal(portalSlug, opcoes = {}) {
     const blocoAdmin = await renderAdminPlanilhas(portalSlug, uploads);
     const blocoFiltros = await montarBarraFiltros(paineis);
 
-        const lista = paineis.length ? paineis.map(pn => `
+    const podeEditar = podeEditarPortal(portalSlug);
+` const lista = paineis.length ? paineis.map(pn => \``
       <div class="dash-chart-box" style="margin-bottom:2px">
         <div class="dash-chart-head">
           <h4>${escapeHTML(pn.nome)}</h4>
           <div style="display:flex;gap:6px;align-items:center">
-            ${souAdmin() && pn.destaque ? `<input type="text" class="input-grupo-dashboard" data-grupo-painel="${pn.id}" value="${escapeAttr(pn.grupoDashboard || "")}" placeholder="reunir sob..." title="Painéis com o mesmo nome aqui aparecem juntos na Visão Geral, sob esse título" style="width:130px;background:var(--paper);color:var(--carvao);border:1px solid var(--paper-line);padding:4px 6px;font-family:'IBM Plex Mono',monospace;font-size:var(--fs-ui-sm)">` : ""}
+            ${podeEditar && pn.destaque ? `<input type="text" class="input-grupo-dashboard" data-grupo-painel="${pn.id}" value="${escapeAttr(pn.grupoDashboard || "")}" placeholder="reunir sob..." title="Painéis com o mesmo nome aqui aparecem juntos na Visão Geral, sob esse título" style="width:130px;background:var(--paper);color:var(--carvao);border:1px solid var(--paper-line);padding:4px 6px;font-family:'IBM Plex Mono',monospace;font-size:var(--fs-ui-sm)">` : ""}
             <button class="dash-toggle-btn" data-abrir="${pn.id}">VER</button>
-            ${souAdmin() ? `<button class="dash-toggle-btn" data-destaque="${pn.id}" data-valor="${pn.destaque ? "0" : "1"}" title="Mostrar na Visão Geral" style="${pn.destaque ? "background:var(--mostarda);color:var(--paper)" : ""}">${pn.destaque ? "★ NA VISÃO GERAL" : "☆ DESTACAR"}</button>` : ""}
-            ${souAdmin() ? `<button class="btn-perigo" data-apagar="${pn.id}">REMOVER</button>` : ""}
+            ${podeEditar ? `<button class="dash-toggle-btn" data-destaque="${pn.id}" data-valor="${pn.destaque ? "0" : "1"}" title="Mostrar na Visão Geral" style="${pn.destaque ? "background:var(--mostarda);color:var(--paper)" : ""}">${pn.destaque ? "★ NA VISÃO GERAL" : "☆ DESTACAR"}</button>` : ""}
+            ${podeEditar ? `<button class="btn-perigo" data-apagar="${pn.id}">REMOVER</button>` : ""}
           </div>
         </div>
         <div id="painel-corpo-${pn.id}"></div>
       </div>
     `).join("") : `<p class="tela-intro">Nenhum painel criado ainda para este portal.</p>`;
 
-    painel.innerHTML = `<div id="bloco-vinculos">${blocoAdmin}</div>${renderCriadorDeCartao(uploads)}${blocoFiltros}` + lista;
+    painel.innerHTML = `<div id="bloco-vinculos">${blocoAdmin}</div>${renderCriadorDeCartao(uploads, portalSlug)}${blocoFiltros}` + lista;
     ligarVinculos(portalSlug);
     ligarCriadorDeCartao(portalSlug);
     ligarBarraFiltros(painel, paineis);
@@ -3044,7 +3074,7 @@ async function carregarUploadsPortal(portalId) {
       painel.innerHTML = `<p class="tela-intro">Nenhuma planilha enviada pra este portal ainda. Use o botão "SUBIR PLANILHA" no topo e escolha este portal na hora de enviar.</p>`;
       return;
     }
-    const podeApagar = souAdmin();
+    const podeApagar = podeEditarPortal(portalId);
     const linhasHtml = uploads.map(u => `
       <tr data-upload-id="${escapeAttr(u.id)}">
         <td style="cursor:pointer" data-ver="1">${escapeHTML(u.nomeArquivo)}</td>
@@ -3114,13 +3144,14 @@ async function abrirTela(id) {
 
   const p = { ...pBase, intro: detalhe.intro, dados: detalhe.indicadores, projetos: detalhe.projetos };
 
-  const botaoEditarIndicadores = souAdmin() ? `<button class="btn-exportar-xlsx" id="btn-editar-indicadores" style="margin-bottom:14px">✎ EDITAR INDICADORES</button>` : "";
+  const podeEditarEste = podeEditarPortal(id);
+  const botaoEditarIndicadores = podeEditarEste ? `<button class="btn-exportar-xlsx" id="btn-editar-indicadores" style="margin-bottom:14px">✎ EDITAR INDICADORES</button>` : "";
   // Projeto é assunto de um portal só. O botão aparecia em todos, convidando
   // a cadastrar projeto no portal de frota ou de normas, onde ele não tem
   // significado nenhum. A condição extra (já ter projeto cadastrado) existe
   // pra não esconder conteúdo que alguém tenha criado antes desta regra.
   const portalDeProjetos = id === "projetos" || (p.projetos && p.projetos.length > 0);
-  const botaoEditarProjetos = souAdmin() && portalDeProjetos ? `<button class="btn-exportar-xlsx" id="btn-editar-projetos" style="margin:14px 0">✎ EDITAR PROJETOS</button>` : "";
+  const botaoEditarProjetos = podeEditarEste && portalDeProjetos ? `<button class="btn-exportar-xlsx" id="btn-editar-projetos" style="margin:14px 0">✎ EDITAR PROJETOS</button>` : "";
 
   let corpoGeral = `
     <div id="bloco-destaques"></div>
@@ -3381,7 +3412,8 @@ function abrirTelaUpload() {
   window.scrollTo({ top: 0, behavior: "smooth" });
 
   const select = document.getElementById("select-portal-upload");
-  const opcoesPortais = PORTAIS.map(p => `<option value="${p.id}">${escapeHTML(p.label)}</option>`).join("");
+  // Oferecer um portal onde a pessoa não edita seria convidá-la a um 403.
+  const opcoesPortais = PORTAIS.filter(p => podeEditarPortal(p.id)).map(p => `<option value="${p.id}">${escapeHTML(p.label)}</option>`).join("");
   select.innerHTML = `<option value="">Não vincular — só gerar e ver na hora</option>${opcoesPortais}`;
 }
 document.getElementById("btn-abrir-upload").addEventListener("click", abrirTelaUpload);
@@ -3738,7 +3770,7 @@ document.getElementById("btn-gerar-dashboard").addEventListener("click", async (
     status.textContent = `Pronto — ${dashboard.charts.length} gráfico(s) sugerido(s) a partir de ${dashboard.schema ? Object.keys(dashboard.schema).length : "?"} coluna(s)${vinculo}.`;
     renderDashboardGenerico(dashboard);
 
-    if (portalSlug && souAdmin()) {
+    if (portalSlug && podeEditarPortal(portalSlug)) {
       document.getElementById("upload-resultado").insertAdjacentHTML("beforeend",
         `<p class="dash-chart-hint" style="margin-top:20px">Planilha salva neste portal. Pra transformar em painel, vá na aba <b>PAINÉIS</b> do portal e escolha as perguntas que ela pode responder.</p>`);
     }
