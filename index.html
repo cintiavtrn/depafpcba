@@ -110,7 +110,7 @@ body{background:var(--paper);color:var(--carvao);font-family:'IBM Plex Sans',san
 /* ---------- hub / rosa dos ventos ---------- */
 .hub-container{display:flex;justify-content:center;margin:44px auto 8px}
 .hub{position:relative;width:min(640px,92vw);aspect-ratio:1/1}
-.hub svg.rings{position:absolute;inset:0;width:100%;height:100%;color:#33415C}
+.hub svg.rings{position:absolute;inset:0;width:100%;height:100%;color:#6E7F9E}
 .hub-brasao{
   position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
   width:15%;color:var(--carvao);
@@ -186,7 +186,7 @@ body{background:var(--paper);color:var(--carvao);font-family:'IBM Plex Sans',san
 .dash-chart-box h4::before{content:"";position:absolute;left:0;top:2px;bottom:2px;width:4px;background:var(--tela-color,var(--carvao))}
 .hub-node .dot{box-shadow:0 0 14px -2px var(--node-glow,transparent);border-color:var(--node-color,var(--carvao));color:var(--node-color,var(--carvao))}
 .hub-node:hover .dot{box-shadow:0 0 0 8px var(--node-glow,rgba(255,255,255,.06))}
-.hub .cardeal{font-family:'IBM Plex Mono',monospace;font-size:var(--fs-ui-sm);letter-spacing:.1em;fill:#5B6472}
+.hub .cardeal{font-family:'IBM Plex Mono',monospace;font-size:var(--fs-corpo);letter-spacing:.1em;fill:#6E7F9E}
 @keyframes girar-anel{to{stroke-dashoffset:-240}}
 .hub .anel-vivo{animation:girar-anel 24s linear infinite}
 .filter-chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;min-height:0}
@@ -282,6 +282,11 @@ body{background:var(--paper);color:var(--carvao);font-family:'IBM Plex Sans',san
   .radar-carregando::before,.carimbo-protocolo,.barra-progresso.indeterminada>i{animation:none}
   .carimbo-protocolo{opacity:.9}
 }
+.tela-head .mini-rosa{margin-left:auto;flex:none;color:#6E7F9E;line-height:0}
+.tela-head .mini-rosa svg{display:block}
+@media(max-width:640px){.tela-head .mini-rosa{display:none}}
+.cota-grupo{flex:1;min-width:160px;max-width:240px;color:#6E7F9E;line-height:0;opacity:.85}
+.cota-grupo svg{width:100%;height:auto;display:block}
 .painel-detalhes{margin-top:8px}
 .painel-detalhes>summary{cursor:pointer;font-family:'IBM Plex Mono',monospace;font-size:var(--fs-ui-sm);color:#8B93A3;letter-spacing:.04em;list-style:none}
 .painel-detalhes>summary::-webkit-details-marker{display:none}
@@ -610,6 +615,28 @@ function seloSVG(label = "DEPAF", sub = "PROTOCOLO") {
   <line x1="28" y1="64" x2="92" y2="64" />
   <text x="60" y="80" text-anchor="middle" font-family="monospace" font-size="8" letter-spacing="3" fill="currentColor" stroke="none">${sub}</text>
 </svg>`;
+}
+
+// A rosa dos ventos em miniatura, com o raio deste portal aceso. Existe por
+// um motivo estrutural, não decorativo: o hub ensina que os portais são
+// direções de uma bússola, e essa leitura morria assim que a pessoa entrava
+// num deles — dentro do portal não havia nada dizendo onde ela estava no
+// círculo que acabou de ver. Isto é o "você está aqui" do mapa.
+function miniRosaSVG(indiceAtivo, total, cor) {
+  const s = 46, c = s / 2, rExt = 19, rInt = 5.5;
+  let desenho =
+    `<circle cx="${c}" cy="${c}" r="${rExt}" fill="none" stroke="currentColor" stroke-width="1.2" opacity=".5"/>` +
+    `<circle cx="${c}" cy="${c}" r="${(rExt * 0.6).toFixed(1)}" fill="none" stroke="currentColor" stroke-width="1" opacity=".3"/>`;
+  for (let i = 0; i < total; i++) {
+    const ang = ((-90 + i * (360 / total)) * Math.PI) / 180;
+    const x1 = c + rInt * Math.cos(ang), y1 = c + rInt * Math.sin(ang);
+    const x2 = c + rExt * Math.cos(ang), y2 = c + rExt * Math.sin(ang);
+    const ativo = i === indiceAtivo;
+    desenho += `<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" stroke="${ativo ? cor : "currentColor"}" stroke-width="${ativo ? 2.4 : 1}" opacity="${ativo ? 1 : 0.38}"/>`;
+    if (ativo) desenho += `<circle cx="${x2.toFixed(1)}" cy="${y2.toFixed(1)}" r="3.4" fill="${cor}"/>`;
+  }
+  desenho += `<circle cx="${c}" cy="${c}" r="2" fill="currentColor" opacity=".65"/>`;
+  return `<svg viewBox="0 0 ${s} ${s}" width="${s}" height="${s}" role="img" aria-label="Posição deste portal na rosa dos ventos">${desenho}</svg>`;
 }
 
 function cotaHorizontalSVG(value = "64,00", width = 240) {
@@ -991,7 +1018,7 @@ function buildHub() {
   ringsSvg.classList.add("rings");
   let ringsMarkup = "";
   [0.2, 0.37, 0.46].forEach((f, i) => {
-    ringsMarkup += `<circle cx="${center}" cy="${center}" r="${size * f}" fill="none" stroke="currentColor" stroke-width="${1.4 + i * 0.3}" opacity="0.5" />`;
+    ringsMarkup += `<circle cx="${center}" cy="${center}" r="${size * f}" fill="none" stroke="currentColor" stroke-width="${1.4 + i * 0.3}" opacity="0.85" />`;
   });
   for (let deg = 0; deg < 360; deg += 15) {
     const rad = (deg * Math.PI) / 180;
@@ -1000,7 +1027,7 @@ function buildHub() {
     const r2 = size * 0.48;
     const x1 = center + r1 * Math.cos(rad), y1 = center + r1 * Math.sin(rad);
     const x2 = center + r2 * Math.cos(rad), y2 = center + r2 * Math.sin(rad);
-    ringsMarkup += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="currentColor" stroke-width="${long ? 2.2 : 1.4}" opacity="0.6" />`;
+    ringsMarkup += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="currentColor" stroke-width="${long ? 2.2 : 1.4}" opacity="0.9" />`;
   }
   const n = PORTAIS.length;
   PORTAIS.forEach((p, i) => {
@@ -1013,7 +1040,7 @@ function buildHub() {
     ringsMarkup += `<line x1="${x0}" y1="${y0}" x2="${x}" y2="${y}" stroke="url(#spoke-${i})" stroke-width="2" opacity="0.85" />`;
   });
 
-  ringsMarkup += `<circle class="anel-vivo" cx="${center}" cy="${center}" r="${(size * 0.49).toFixed(1)}" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="2 11" opacity="0.6" />`;
+  ringsMarkup += `<circle class="anel-vivo" cx="${center}" cy="${center}" r="${(size * 0.49).toFixed(1)}" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="2 11" opacity="0.85" />`;
 
   const card = size * 0.49;
   const cardeais = [["N", 0, -card], ["L", card, 0], ["S", 0, card], ["O", -card, 0]];
@@ -2320,9 +2347,18 @@ async function carregarDestaques(portalSlug) {
         (cartoes.length ? `<div class="faixa-cartoes">${cartoes.map(caixa).join("")}</div>` : "") +
         (graficos.length ? `<div class="grade-destaques">${graficos.map(caixa).join("")}</div>` : "");
       if (!chave) return corpo;
+      // A cota de desenho técnico estava desenhada no arquivo e nunca era
+      // chamada. Aqui ela mede algo de verdade — a extensão do grupo — em vez
+      // de virar enfeite: é a mesma linguagem do brasão, do selo e das miras
+      // de canto, e é ela que faz a Visão Geral parecer instrumento e não
+      // relatório genérico.
+      const cota = `<span class="cota-grupo" aria-hidden="true">${cotaHorizontalSVG(`${grupo.length} ${grupo.length === 1 ? "PAINEL" : "PAINÉIS"}`, 240)}</span>`;
       return `
         <div class="grupo-dashboard" style="border-left:3px solid var(--tinta);padding-left:14px;margin:18px 0 24px">
-          <h3 class="font-mono" style="font-size:var(--fs-corpo);letter-spacing:.06em;color:var(--tinta);margin-bottom:10px;text-transform:uppercase">${escapeHTML(chave)}</h3>
+          <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:10px">
+            <h3 class="font-mono" style="font-size:var(--fs-corpo);letter-spacing:.06em;color:var(--tinta);margin:0;text-transform:uppercase">${escapeHTML(chave)}</h3>
+            ${cota}
+          </div>
           ${corpo}
         </div>`;
         }).join("") + `
@@ -3076,6 +3112,7 @@ async function abrirTela(id) {
         <h2>${p.label}</h2>
         ${p.artigos.length ? `<div class="artigos">ART. 27${p.artigos.length > 1 ? ", INCISOS" : ", INCISO"} ${p.artigos.join(", ")}</div>` : ""}
       </div>
+      <span class="mini-rosa" title="Este portal na rosa dos ventos do DEPAF">${miniRosaSVG(PORTAIS.findIndex(x => x.id === id), PORTAIS.length, p.cor)}</span>
     </div>
     <p class="tela-intro">${p.intro}</p>
     <div class="tabs">
