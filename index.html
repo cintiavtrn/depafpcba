@@ -850,7 +850,16 @@ function pieChartSVG(categorias, selectedLabel) {
 
 function barRankingChartSVG(categorias, selectedLabel) {
   const MAX_ROTULO = 20;
-  const w = 380, padL = 170, padR = 46, padT = 10;
+  const padL = 170, padT = 10, larguraPlot = 164;
+
+  // A margem da direita acompanha o maior número escrito, em vez de ser fixa.
+  // Com contagem isso nunca importou (3 dígitos cabem em qualquer margem), mas
+  // em reais na casa dos milhões o rótulo "84.261.778,97" tem 13 caracteres e
+  // era cortado pela borda do SVG — o número aparecia como "84.261.7".
+  const textosValor = categorias.map((c) => (c.valor === null ? "<5" : Number(c.valor).toLocaleString("pt-BR")));
+  const maiorTexto = Math.max(2, ...textosValor.map((t) => t.length));
+  const padR = Math.max(46, Math.round(maiorTexto * 5.8) + 14);
+  const w = padL + larguraPlot + padR;
   // linha alta o bastante pro maior nome quebrado — em vez de cortar o texto
   const maxLinhas = Math.max(1, ...categorias.map(c => linhasDoTexto(c.label, MAX_ROTULO)));
   const rowH = Math.max(26, maxLinhas * 12 + 10);
@@ -864,7 +873,6 @@ function barRankingChartSVG(categorias, selectedLabel) {
   const maxV = valores.reduce((a, v) => (v > a ? v : a), 0);
   const minV = valores.reduce((a, v) => (v < a ? v : a), 0);
   const amplitude = (maxV - minV) || 1;
-  const larguraPlot = w - padL - padR;
   const xDe = (v) => padL + ((v - minV) / amplitude) * larguraPlot;
   const xZero = xDe(0);
   const temNegativo = minV < 0;
@@ -897,12 +905,18 @@ function barRankingChartSVG(categorias, selectedLabel) {
     // Negativo em cor própria, como já é feito nas barras verticais: não é o
     // mesmo número com sinal, é outra coisa.
     const cor = negativo ? "var(--terracota)" : corCategoria(i);
-    const xTexto = negativo ? xBarra - 6 : xBarra + largura + 6;
+    // O número do negativo fica à DIREITA da linha do zero, nunca à esquerda.
+    // À esquerda ele colidia com o nome da categoria: quando o negativo é
+    // pequeno perto da amplitude (2,3 milhões contra 86), a barra vira uma
+    // lasca colada na margem, e o rótulo — alinhado à direita — caía por cima
+    // do nome, que termina exatamente ali. À direita do zero o espaço daquela
+    // linha está sempre livre, porque cada linha tem uma barra só.
+    const xTexto = negativo ? xZero + 6 : xBarra + largura + 6;
 
     linhas += `<g class="rank-bar" data-cat="${escapeAttr(c.label)}" style="cursor:pointer" opacity="${dim ? 0.35 : 1}">
       ${rotulo}
       <rect class="barra" x="${xBarra.toFixed(1)}" y="${yBarra.toFixed(1)}" width="${Math.max(largura, 0.5).toFixed(1)}" height="${alturaBarra}" fill="${cor}"><title>${escapeHTML(c.label)}: ${c.valor.toLocaleString("pt-BR")}</title></rect>
-      <text x="${xTexto.toFixed(1)}" y="${(y + rowH / 2 + 3).toFixed(1)}" text-anchor="${negativo ? "end" : "start"}" font-family="monospace" font-size="9.5" font-weight="700" fill="${negativo ? "var(--terracota)" : "var(--carvao)"}">${c.valor.toLocaleString("pt-BR")}</text>
+      <text x="${xTexto.toFixed(1)}" y="${(y + rowH / 2 + 3).toFixed(1)}" font-family="monospace" font-size="9.5" font-weight="700" fill="${negativo ? "var(--terracota)" : "var(--carvao)"}">${c.valor.toLocaleString("pt-BR")}</text>
     </g>`;
   });
   return `<svg viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg">${linhas}</svg>`;
