@@ -350,6 +350,12 @@ body{background:var(--paper);color:var(--carvao);font-family:'IBM Plex Sans',san
 .dash-toggle-btn{font-family:'IBM Plex Mono',monospace;font-size:var(--fs-ui-xs);letter-spacing:0.04em;background:var(--paper);color:var(--carvao);border:none;padding:8px 12px;cursor:pointer}
 .dash-toggle-btn+.dash-toggle-btn{border-left:1.5px solid var(--carvao)}
 .dash-toggle-btn.active{background:var(--carvao);color:var(--paper)}
+/* Troca de desenho do painel. Alinhado à direita, acima do gráfico: é controle
+   de leitura, não título — não pode competir com o nome do painel. */
+.linha-troca-grafico{display:flex;justify-content:flex-end;margin:0 0 8px}
+/* Na Visão Geral aperta só a margem, nunca o alvo do clique: encolher o botão
+   pra ganhar densidade desfaria os 32px mínimos já decididos (Lei de Fitts). */
+.grade-destaques .linha-troca-grafico,.faixa-cartoes .linha-troca-grafico{margin-bottom:6px}
 .dash-export-row{display:flex;justify-content:flex-end;margin-bottom:16px}
 .btn-exportar-xlsx{font-family:'IBM Plex Mono',monospace;font-size:var(--fs-ui-sm);letter-spacing:0.06em;background:var(--tinta);color:var(--paper);border:2px solid var(--carvao);padding:9px 16px;cursor:pointer}
 .btn-exportar-xlsx:hover{background:var(--mostarda);color:var(--carvao)}
@@ -788,7 +794,15 @@ function simpleLineChartSVG(pontos, cor) {
     const [x, y] = pts[i];
     const ultimo = i === n - 1;
     const raio = n > 30 ? 2 : (ultimo ? 5 : 3.4); // planilha com muita linha: ponto menor, senão vira uma mancha
-    nodos += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${raio}" fill="${ultimo ? cor : "var(--surface)"}" stroke="${cor}" stroke-width="1.6"><title>${p.label}: ${p.valor}</title></circle>`;
+        // No painel acumulado, cada ponto carrega TAMBÉM quanto entrou no período.
+    // A barra de acumulado mostra os dois números na tela justamente pra
+    // ninguém ler "180" como "180 adquiridas em 2026"; a linha não tem espaço
+    // pra isso, então o segundo número vai pra dica — some da tela, não do
+    // gráfico.
+    const dica = p.incremento != null
+      ? `${p.label}: ${Number(p.valor).toLocaleString("pt-BR")} acumulado · +${Number(p.incremento).toLocaleString("pt-BR")} no período`
+      : `${p.label}: ${Number(p.valor).toLocaleString("pt-BR")}`;
+    nodos += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${raio}" fill="${ultimo ? cor : "var(--surface)"}" stroke="${cor}" stroke-width="1.6"><title>${escapeHTML(dica)}</title></circle>`;
     if (i % passo === 0 || ultimo) {
       labels += `<text x="${x.toFixed(1)}" y="${baseY + 16}" text-anchor="middle" font-family="monospace" font-size="9" fill="var(--carvao)" fill-opacity="${ultimo ? 1 : 0.55}" font-weight="${ultimo ? 700 : 400}">${p.label}</text>`;
     }
@@ -841,19 +855,54 @@ function barRankingChartSVG(categorias, selectedLabel) {
   const maxLinhas = Math.max(1, ...categorias.map(c => linhasDoTexto(c.label, MAX_ROTULO)));
   const rowH = Math.max(26, maxLinhas * 12 + 10);
   const h = padT + categorias.length * rowH + 6;
-  const max = maxSeguro(categorias.map(c => c.valor));
-  let linhas = "";
+    // Domínio real, com zero dentro. A conta antiga era largura × (valor ÷ máximo),
+  // que devolve número negativo quando o valor é negativo (estorno, glosa,
+  // saldo) — e <rect> com largura negativa não desenha nada: a barra sumia e o
+  // navegador registrava erro. É a mesma correção que simpleBarChartSVG já
+  // tinha; aqui a barra passa a sair do zero e crescer pra esquerda.
+  const valores = categorias.map(c => (c.valor === null ? 0 : Number(c.valor) || 0));
+  const maxV = valores.reduce((a, v) => (v > a ? v : a), 0);
+  const minV = valores.reduce((a, v) => (v < a ? v : a), 0);
+  const amplitude = (maxV - minV) || 1;
+  const larguraPlot = w - padL - padR;
+  const xDe = (v) => padL + ((v - minV) / amplitude) * larguraPlot;
+  const xZero = xDe(0);
+  const temNegativo = minV < 0;
+
+  let linhas = temNegativo
+    ? `<line x1="${xZero.toFixed(1)}" y1="${padT}" x2="${xZero.toFixed(1)}" y2="${(h - 6).toFixed(1)}" stroke="var(--carvao)" stroke-width="1.5" />`
+    : "";
+
   categorias.forEach((c, i) => {
-    const cor = corCategoria(i);
     const y = padT + i * rowH;
-    const larg = (w - padL - padR) * (c.valor / max);
     const dim = selectedLabel && selectedLabel !== c.label;
     const alturaBarra = Math.min(rowH - 8, 18);
     const yBarra = y + (rowH - alturaBarra) / 2;
+        const rotulo = textoSVG(c.label, padL - 8, y + rowH / 2, { maxChars: MAX_ROTULO, anchor: "end", fontSize: 9.5, peso: selectedLabel === c.label ? 700 : 400, alturaLinha: 11 });
+
+    // Célula suprimida por ter menos de 5 registros: sem barra, e escrito
+    // "<5" igual à tabela ao lado — antes saía o texto "null" na tela.
+    if (c.valor === null) {
+      linhas += `<g class="rank-bar" data-cat="${escapeAttr(c.label)}" style="cursor:pointer" opacity="${dim ? 0.35 : 1}">
+        ${rotulo}
+        <text x="${(xZero + 6).toFixed(1)}" y="${(y + rowH / 2 + 3).toFixed(1)}" font-family="monospace" font-size="9.5" fill="var(--carvao)" fill-opacity="0.45"><title>menos de 5 registros — omitido para não identificar pessoas</title>&lt;5</text>
+      </g>`;
+      return;
+    }
+
+    const negativo = c.valor < 0;
+    const xValor = xDe(c.valor);
+    const xBarra = Math.min(xValor, xZero);
+    const largura = Math.abs(xValor - xZero);
+    // Negativo em cor própria, como já é feito nas barras verticais: não é o
+    // mesmo número com sinal, é outra coisa.
+    const cor = negativo ? "var(--terracota)" : corCategoria(i);
+    const xTexto = negativo ? xBarra - 6 : xBarra + largura + 6;
+
     linhas += `<g class="rank-bar" data-cat="${escapeAttr(c.label)}" style="cursor:pointer" opacity="${dim ? 0.35 : 1}">
-      ${textoSVG(c.label, padL - 8, y + rowH / 2, { maxChars: MAX_ROTULO, anchor: "end", fontSize: 9.5, peso: selectedLabel === c.label ? 700 : 400, alturaLinha: 11 })}
-      <rect class="barra" x="${padL}" y="${yBarra.toFixed(1)}" width="${larg.toFixed(1)}" height="${alturaBarra}" fill="${cor}"><title>${escapeHTML(c.label)}: ${c.valor}</title></rect>
-      <text x="${(padL + larg + 6).toFixed(1)}" y="${(y + rowH / 2 + 3).toFixed(1)}" font-family="monospace" font-size="9.5" font-weight="700" fill="var(--carvao)">${c.valor}</text>
+      ${rotulo}
+      <rect class="barra" x="${xBarra.toFixed(1)}" y="${yBarra.toFixed(1)}" width="${Math.max(largura, 0.5).toFixed(1)}" height="${alturaBarra}" fill="${cor}"><title>${escapeHTML(c.label)}: ${c.valor.toLocaleString("pt-BR")}</title></rect>
+      <text x="${xTexto.toFixed(1)}" y="${(y + rowH / 2 + 3).toFixed(1)}" text-anchor="${negativo ? "end" : "start"}" font-family="monospace" font-size="9.5" font-weight="700" fill="${negativo ? "var(--terracota)" : "var(--carvao)"}">${c.valor.toLocaleString("pt-BR")}</text>
     </g>`;
   });
   return `<svg viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg">${linhas}</svg>`;
@@ -1761,6 +1810,121 @@ function multiLinhaSVG(series, labels) {
 // barras do acumulado: a altura é o total acumulado, e em cima vai "+N"
 // (o que entrou naquele período). Sem os dois números, a última barra se lê
 // como "180 adquiridas em 2026" — que é falso.
+// ---------- cruzamento desenhado como barras empilhadas ----------
+// Mesmos dados da matriz, outra leitura. A matriz é boa pra achar a célula
+// alta; ela é ruim em duas coisas que aparecem na hora numa barra: comparar o
+// TAMANHO de cada linha (na matriz isso exige ler a coluna TOTAL número por
+// número) e enxergar o FORMATO da composição dentro de cada linha. Por isso é
+// alternativa, não substituta — a matriz continua sendo o padrão.
+//
+// A transposição automática abaixo é o que faz isto valer a pena. Barra
+// empilhada só funciona com poucos segmentos e muitas linhas; um cruzamento
+// como "Status × Unidade_Lotação" tem o oposto disso (3 status, 20 unidades).
+// Virando o eixo, os 3 status viram os segmentos e as 20 unidades viram as
+// barras — que é exatamente a leitura útil.
+function cruzamentoBarrasSVG(dados, colA = null, colB = null, proporcao = false) {
+  const transpor = dados.colunas.length > dados.linhas.length;
+  const linhasDados = transpor
+    ? dados.colunas.map((c, j) => ({
+        label: c.label,
+        total: c.total,
+        valores: dados.linhas.map((l) => l.valores[j]),
+      }))
+    : dados.linhas;
+  const colunasDados = transpor
+    ? dados.linhas.map((l) => ({ label: l.label, total: l.total }))
+    : dados.colunas;
+  const colLinha = transpor ? colB : colA;
+  const colSegmento = transpor ? colA : colB;
+
+  const MAX_ROTULO = 22;
+  const w = 620, padL = 178, padR = 58, padT = 12;
+  const larguraPlot = w - padL - padR;
+  const maxLinhasRotulo = Math.max(1, ...linhasDados.map((l) => linhasDoTexto(l.label, MAX_ROTULO)));
+  const rowH = Math.max(30, maxLinhasRotulo * 12 + 12);
+  const alturaBarra = Math.min(rowH - 10, 20);
+
+  const porLinhaLegenda = 3;
+  const linhasLegenda = Math.ceil((colunasDados.length + 1) / porLinhaLegenda);
+  const alturaLegenda = linhasLegenda * 17 + 14;
+  const h = padT + linhasDados.length * rowH + alturaLegenda;
+
+  const maxTotal = maxSeguro(linhasDados.map((l) => l.total));
+  const COR_OMITIDO = "var(--paper-line)";
+
+  const clicavel = (conteudo, valor, coluna) =>
+    coluna
+      ? `<g data-cat="${escapeAttr(valor)}" data-col="${escapeAttr(coluna)}" style="cursor:pointer">${conteudo}</g>`
+      : conteudo;
+
+  let corpo = "";
+  linhasDados.forEach((l, i) => {
+    const y = padT + i * rowH;
+    const yBarra = y + (rowH - alturaBarra) / 2;
+    const total = l.total || 0;
+
+    // Célula suprimida (menos de 5 registros) não pode virar zero: a barra
+    // encolheria e passaria a mentir sobre o tamanho da linha. O que falta pro
+    // total conhecido vira um segmento neutro, marcado como omitido — o
+    // comprimento da barra continua sendo o total de verdade.
+    const somaVisivel = l.valores.reduce((a, v) => a + (v === null ? 0 : v), 0);
+    const omitido = Math.max(0, Math.round((total - somaVisivel) * 100) / 100);
+
+    // No modo proporção cada barra ocupa a largura toda; no absoluto ela é
+    // proporcional ao total da linha, pra dar também a comparação de tamanho.
+    const larguraDaLinha = proporcao ? larguraPlot : larguraPlot * (total / maxTotal);
+    const base = total || 1;
+
+    corpo += clicavel(
+      textoSVG(l.label, padL - 10, y + rowH / 2, {
+        maxChars: MAX_ROTULO, anchor: "end", fontSize: 9.5, alturaLinha: 11,
+      }),
+      l.label,
+      colLinha
+    );
+
+    let x = padL;
+    l.valores.forEach((v, j) => {
+      if (v === null || v === 0) return;
+      const larg = larguraDaLinha * (v / base);
+      if (larg <= 0) return;
+      const pct = (v / base) * 100;
+      corpo += `<rect class="barra" x="${x.toFixed(1)}" y="${yBarra.toFixed(1)}" width="${larg.toFixed(1)}" height="${alturaBarra}" fill="${corCategoria(j)}"><title>${escapeHTML(l.label)} × ${escapeHTML(colunasDados[j].label)}: ${v.toLocaleString("pt-BR")} (${pct.toFixed(1)}%)</title></rect>`;
+      // Número dentro do segmento só quando cabe — senão vira borrão sobreposto.
+      if (larg >= 34) {
+        corpo += `<text x="${(x + larg / 2).toFixed(1)}" y="${(yBarra + alturaBarra / 2 + 3.5).toFixed(1)}" text-anchor="middle" font-family="monospace" font-size="9" font-weight="700" fill="var(--paper)" style="pointer-events:none">${proporcao ? pct.toFixed(0) + "%" : v.toLocaleString("pt-BR")}</text>`;
+      }
+      x += larg;
+    });
+
+    if (omitido > 0) {
+      const larg = larguraDaLinha * (omitido / base);
+      corpo += `<rect x="${x.toFixed(1)}" y="${yBarra.toFixed(1)}" width="${Math.max(larg, 0.5).toFixed(1)}" height="${alturaBarra}" fill="${COR_OMITIDO}"><title>omitido: células com menos de ${dados.nMinimoCelula || 5} registros</title></rect>`;
+      x += larg;
+    }
+
+    corpo += `<text x="${(padL + larguraDaLinha + 8).toFixed(1)}" y="${(y + rowH / 2 + 3.5).toFixed(1)}" font-family="monospace" font-size="9.5" font-weight="700" fill="var(--carvao)">${total.toLocaleString("pt-BR")}</text>`;
+  });
+
+  // A legenda é quem diz de qual coluna são os segmentos — sem ela, depois da
+  // transposição ninguém sabe o que a cor representa.
+  const yLegenda = padT + linhasDados.length * rowH + 10;
+  let legenda = "";
+  const itens = [
+    ...colunasDados.map((c, j) => ({ label: c.label, cor: corCategoria(j), valor: c.label })),
+    ...(dados.houveSupressao ? [{ label: `omitido (<${dados.nMinimoCelula || 5})`, cor: COR_OMITIDO, valor: null }] : []),
+  ];
+  itens.forEach((it, k) => {
+    const lx = 8 + (k % porLinhaLegenda) * (w / porLinhaLegenda);
+    const ly = yLegenda + Math.floor(k / porLinhaLegenda) * 17;
+    const texto = it.label.length > 22 ? it.label.slice(0, 21) + "…" : it.label;
+    const bloco = `<rect x="${lx}" y="${ly - 8}" width="10" height="10" fill="${it.cor}" /><text x="${lx + 15}" y="${ly + 1}" font-family="monospace" font-size="9.5" fill="var(--carvao)"><title>${escapeHTML(it.label)}</title>${escapeHTML(texto)}</text>`;
+    legenda += it.valor ? clicavel(bloco, it.valor, colSegmento) : bloco;
+  });
+
+  return `<svg viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg">${corpo}${legenda}</svg>`;
+}
+
 function barrasAcumuladoSVG(pontos, cor) {
   const w = 620, h = 250, padL = 44, padR = 16, padT = 26, baseY = h - 42;
   const n = pontos.length || 1;
@@ -1944,7 +2108,124 @@ function tabelaDoPainel(dados, painel) {
   return [];
 }
 
-function renderPainel(resultado, selectedLabel = null, compacto = false) {
+// ---------- qual desenho usar pra cada pergunta ----------
+// Até aqui o desenho era DEDUZIDO do tipo do painel: composição virava rosca,
+// ponto final. Medindo o cardápio das 8 planilhas reais, composição é 39% e
+// cruzamento 33% das sugestões — ou seja, 72% de tudo que o sistema oferece
+// desembocava em dois desenhos. A escolha agora é um valor guardado, não uma
+// dedução; o padrão continua sendo exatamente o que era antes, então nenhum
+// painel existente muda de aparência sozinho.
+const GRAFICOS_POR_TIPO = {
+  composicao: [
+    { id: "rosca", rotulo: "◕ ROSCA" },
+    { id: "ranking", rotulo: "▤ BARRAS" },
+  ],
+   cruzamento: [
+    { id: "matriz", rotulo: "▦ MATRIZ" },
+    { id: "barras", rotulo: "▥ BARRAS" },
+    { id: "proporcao", rotulo: "% PROPORÇÃO" },
+  ],
+  evolucao: [
+    { id: "barra", rotulo: "▮ BARRAS" },
+    { id: "linha", rotulo: "╱ LINHA" },
+  ],
+};
+
+// A paleta tem 6 cores. Empilhar mais segmentos que isso faria duas categorias
+// diferentes receberem a mesma cor — aí o gráfico não fica só feio, fica
+// errado. Acima do limite, a matriz continua sendo a única opção.
+const MAX_SEGMENTOS_EMPILHADOS = 6;
+
+function gradesDoCruzamento(dados) {
+  return dados?.segmentado ? (dados.segmentos || []) : [dados];
+}
+
+function graficosDisponiveis(dados) {
+  const lista = GRAFICOS_POR_TIPO[dados?.tipo];
+  if (!lista) return [];
+
+  // Valor negativo (estorno, glosa, saldo) não tem fatia. A rosca sai do
+  // cardápio em vez de aparecer desabilitada: oferecer e depois recusar é pior
+  // do que não oferecer. É a mesma regra que o código já aplicava sozinho.
+  if (dados.tipo === "composicao" && dados.categorias?.some((c) => c.valor < 0)) {
+    return lista.filter((g) => g.id !== "rosca");
+  }
+
+    if (dados.tipo === "evolucao") {
+    // Multi-série já É uma linha, e a alternativa seria uma barra agrupada que
+    // ainda não existe — sem segunda opção de verdade, não mostra botão.
+    if (dados.series?.length) return [];
+    // Com um ponto só não há linha pra traçar nem tendência pra comparar.
+    if ((dados.pontos?.length ?? 0) < 2) return [];
+    return lista;
+  }
+
+  if (dados.tipo === "cruzamento") {
+    const grades = gradesDoCruzamento(dados).filter(Boolean);
+    if (!grades.length) return [];
+    // O desenho transpõe sozinho pra empilhar sempre a dimensão menor, então
+    // quem manda é a menor das duas — e, com segmento, o pior caso entre eles.
+    const segmentosNecessarios = Math.max(
+      ...grades.map((g) => Math.min(g.linhas?.length ?? 0, g.colunas?.length ?? 0))
+    );
+    if (!segmentosNecessarios || segmentosNecessarios > MAX_SEGMENTOS_EMPILHADOS) return [];
+    return lista;
+  }
+
+  return lista;
+}
+
+function desenhoDoCruzamento(grade, config, escolhido) {
+  if (escolhido === "barras") return cruzamentoBarrasSVG(grade, config?.colunaA, config?.colunaB, false);
+  if (escolhido === "proporcao") return cruzamentoBarrasSVG(grade, config?.colunaA, config?.colunaB, true);
+  return cruzamentoSVG(grade, config?.colunaA, config?.colunaB);
+}
+
+// A escolha vive no navegador de quem está lendo, por painel. Não é um dado do
+// portal: duas pessoas podem preferir leituras diferentes do mesmo painel sem
+// uma alterar o que a outra vê.
+const CHAVE_GRAFICOS = "depaf_graficos";
+
+function lerGraficoSalvo(painelId) {
+  try {
+    return JSON.parse(localStorage.getItem(CHAVE_GRAFICOS) || "{}")[painelId] ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function salvarGrafico(painelId, grafico) {
+  try {
+    const todos = JSON.parse(localStorage.getItem(CHAVE_GRAFICOS) || "{}");
+    todos[painelId] = grafico;
+    localStorage.setItem(CHAVE_GRAFICOS, JSON.stringify(todos));
+  } catch {
+    /* navegador sem localStorage: a escolha vale só enquanto a tela estiver aberta */
+  }
+}
+
+// Resolve o desenho válido pra este resultado. Um id salvo que não serve mais
+// (o painel passou a ter valor negativo, por exemplo) cai no primeiro da lista
+// em vez de desenhar errado.
+function graficoEfetivo(dados, pedido) {
+  const opcoes = graficosDisponiveis(dados);
+  if (!opcoes.length) return null;
+  return opcoes.some((g) => g.id === pedido) ? pedido : opcoes[0].id;
+}
+
+function barraDeGraficos(dados, escolhido) {
+  const opcoes = graficosDisponiveis(dados);
+  if (opcoes.length < 2) return "";
+  const botoes = opcoes
+    .map(
+      (g) =>
+        `<button class="dash-toggle-btn${g.id === escolhido ? " active" : ""}" data-grafico="${escapeAttr(g.id)}" title="Mesma pergunta, outra leitura">${escapeHTML(g.rotulo)}</button>`
+    )
+    .join("");
+  return `<div class="linha-troca-grafico"><div class="dash-toggle">${botoes}</div></div>`;
+}
+
+function renderPainel(resultado, selectedLabel = null, compacto = false, grafico = null) {
   const { painel, upload } = resultado;
   let { dados } = resultado;
   // Guardado antes do enxugamento abaixo, que zera o "como ler" — o cartão
@@ -2047,13 +2328,20 @@ function renderPainel(resultado, selectedLabel = null, compacto = false) {
     return `${avisoFiltro}${periodo}${corpo}${renderComoLer(dados.comoLer)}${rodape}`;
   }
 
-  if (dados.tipo === "evolucao") {
+    if (dados.tipo === "evolucao") {
+    // Barra e linha respondem a mesma pergunta e servem a leituras diferentes:
+    // a barra compara períodos entre si (cada um é um bloco fechado), a linha
+    // mostra a forma do percurso — onde acelerou, onde estancou. Com muitos
+    // pontos a barra vira serrilha e a linha ganha; com poucos, o contrário.
+    const escolhidoEvo = graficoEfetivo(dados, grafico);
     const corpo = dados.series.length
       ? multiLinhaSVG(dados.series, dados.pontos.map(p => p.label))
-      : dados.acumulado
-        ? barrasAcumuladoSVG(dados.pontos, "var(--tinta)")
-        : simpleBarChartSVG(dados.pontos.map(p => ({ label: p.label, valor: p.valor })), "var(--tinta)");
-    return `${avisoFiltro}${renderResumos(dados.resumos)}${renderComoLer(dados.comoLer)}
+      : escolhidoEvo === "linha"
+        ? simpleLineChartSVG(dados.pontos, "var(--tinta)")
+        : dados.acumulado
+          ? barrasAcumuladoSVG(dados.pontos, "var(--tinta)")
+          : simpleBarChartSVG(dados.pontos.map(p => ({ label: p.label, valor: p.valor })), "var(--tinta)");
+    return `${avisoFiltro}${renderResumos(dados.resumos)}${renderComoLer(dados.comoLer)}${barraDeGraficos(dados, escolhidoEvo)}
       <div style="margin-top:12px">${corpo}</div>${rodape}`;
   }
 
@@ -2104,13 +2392,18 @@ function renderPainel(resultado, selectedLabel = null, compacto = false) {
     const avisoNegativo = temNegativo
       ? `<p class="dash-chart-hint" style="border-left-color:var(--terracota)"><b>Há valores negativos nesta série</b> (estorno, glosa ou saldo). Rosca e percentual do total ficam desativados: não existe fatia de valor negativo, e a soma dos percentuais não fecha 100. O ranking abaixo é a leitura correta.</p>`
       : "";
-    const grafico = temNegativo
+        // Rosca e ranking respondem a mesma pergunta e erram em lugares opostos: a
+    // rosca mostra bem quando UMA categoria domina, e o olho não compara ângulo
+    // quando elas têm tamanho parecido ou passam de meia dúzia — que é onde o
+    // ranking ganha. Por isso a escolha é de quem lê, não do código.
+    const escolhido = graficoEfetivo(dados, grafico);
+    const desenho = escolhido === "ranking"
       ? barRankingChartSVG(dados.categorias, selectedLabel)
       : pieChartSVG(dados.categorias, selectedLabel);
 
-    return `${avisoFiltro}${renderResumos(dados.resumos)}${renderComoLer(dados.comoLer)}${avisoNegativo}
+    return `${avisoFiltro}${renderResumos(dados.resumos)}${renderComoLer(dados.comoLer)}${avisoNegativo}${barraDeGraficos(dados, escolhido)}
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start">
-        <div>${grafico}</div>
+        <div>${desenho}</div>
         <table class="dash-tabela"><thead><tr><th>CATEGORIA</th><th>VALOR</th><th>%</th></tr></thead><tbody>${tabela}</tbody></table>
       </div>${rodape}`;
   }
@@ -2118,19 +2411,21 @@ function renderPainel(resultado, selectedLabel = null, compacto = false) {
   // cruzamento com 3ª coluna: uma matriz por valor dela, cada uma com seus
   // próprios totais — e um card no topo com o total geral, pra não precisar
   // somar as matrizes na mão
-  if (dados.segmentado) {
+    if (dados.segmentado) {
+    const escolhidoSeg = graficoEfetivo(dados, grafico);
     const blocos = dados.segmentos.map(seg => `
       <div style="margin-bottom:22px">
         <h5 class="font-mono" style="font-size:var(--fs-ui);letter-spacing:.08em;color:var(--carvao);margin-bottom:6px;padding-left:8px;border-left:3px solid var(--tinta)">
           ${escapeHTML(painel.config.colunaSegmento)}: ${escapeHTML(seg.nome)} — total ${seg.total.toLocaleString("pt-BR")}
         </h5>
-        <div style="overflow-x:auto">${cruzamentoSVG(seg, painel.config?.colunaA, painel.config?.colunaB)}</div>
+        <div style="overflow-x:auto">${desenhoDoCruzamento(seg, painel.config, escolhidoSeg)}</div>
       </div>`).join("");
-    return `${avisoFiltro}${renderResumos(dados.resumos)}${renderComoLer(dados.comoLer)}
+    return `${avisoFiltro}${renderResumos(dados.resumos)}${renderComoLer(dados.comoLer)}${barraDeGraficos(dados, escolhidoSeg)}
       <div style="margin-top:14px">${blocos}</div>${rodape}`;
   }
 
-  return `${avisoFiltro}${renderResumos(dados.resumos)}${renderComoLer(dados.comoLer)}<div style="overflow-x:auto">${cruzamentoSVG(dados, painel.config?.colunaA, painel.config?.colunaB)}</div>${rodape}`;
+  const escolhidoCruz = graficoEfetivo(dados, grafico);
+  return `${avisoFiltro}${renderResumos(dados.resumos)}${renderComoLer(dados.comoLer)}${barraDeGraficos(dados, escolhidoCruz)}<div style="overflow-x:auto">${desenhoDoCruzamento(dados, painel.config, escolhidoCruz)}</div>${rodape}`;
 }
 
 const REGISTRO_PAINEIS_POR_GRUPO = new Map();
@@ -2181,20 +2476,28 @@ function propagarSelecaoNoGrupo(grupo, alvoIdOrigem, resultadoOrigem, categoria,
 // de um grupo, o clique também FILTRA de verdade os outros painéis do
 // grupo (ver `propagarSelecaoNoGrupo`). Cobre composição/razão — evolução e
 // cruzamento ainda não têm esse destaque.
-function destacarNoPainel(alvo, resultado, selecionado, grupo = null, alvoId = null, compacto = false) {
+function destacarNoPainel(alvo, resultado, selecionado, grupo = null, alvoId = null, compacto = false, grafico = null) {
   alvo.querySelectorAll("[data-cat]").forEach((el) => {
     el.addEventListener("click", () => {
       const cat = el.dataset.cat ?? null;
       if (cat === null) return;
       const novo = selecionado === cat ? null : cat;
-      desenharPainel(alvo, resultado, novo, grupo, alvoId, compacto);
+      // `grafico` viaja junto: clicar numa categoria não pode devolver o painel
+      // pro desenho padrão e desfazer a escolha de quem está lendo.
+      desenharPainel(alvo, resultado, novo, grupo, alvoId, compacto, grafico);
       if (grupo && alvoId) propagarSelecaoNoGrupo(grupo, alvoId, resultado, novo, el.dataset.col || null);
     });
   });
 }
 
-function desenharPainel(alvo, resultado, selecionado = null, grupo = null, alvoId = null, compacto = false) {
-  alvo.innerHTML = renderPainel(resultado, selecionado, compacto);
+function desenharPainel(alvo, resultado, selecionado = null, grupo = null, alvoId = null, compacto = false, grafico = null) {
+  // Ordem de preferência: o que acabou de ser clicado, o que esta pessoa já
+  // tinha escolhido antes pra este painel, e por último o padrão do tipo.
+  const escolhido = graficoEfetivo(
+    resultado.dados,
+    grafico ?? lerGraficoSalvo(resultado.painel?.id)
+  );
+  alvo.innerHTML = renderPainel(resultado, selecionado, compacto, escolhido);
   // Marca que aqui existe resultado de verdade — é o que permite a abrirPainel
   // preservar o conteúdo em vez de apagá-lo quando a próxima consulta falhar.
   alvo.dataset.desenhado = "1";
@@ -2207,10 +2510,19 @@ function desenharPainel(alvo, resultado, selecionado = null, grupo = null, alvoI
       baixarCSV(`${nomeArquivo}.csv`, guardado.tabela);
     });
   });
-  alvo.querySelectorAll("[data-baixar-excel]").forEach((b) => {
+    alvo.querySelectorAll("[data-baixar-excel]").forEach((b) => {
     b.addEventListener("click", () => baixarArquivoDaApi(`/api/paineis/${b.dataset.baixarExcel}/excel`, b));
   });
-  destacarNoPainel(alvo, resultado, selecionado, grupo, alvoId, compacto);
+  // Trocar o desenho é redesenho local, igual ao clique de categoria: não vai
+  // ao servidor, e preserva a categoria destacada e o filtro do grupo.
+  alvo.querySelectorAll("[data-grafico]").forEach((b) => {
+    b.addEventListener("click", () => {
+      if (b.dataset.grafico === escolhido) return;
+      salvarGrafico(resultado.painel?.id, b.dataset.grafico);
+      desenharPainel(alvo, resultado, selecionado, grupo, alvoId, compacto, b.dataset.grafico);
+    });
+  });
+  destacarNoPainel(alvo, resultado, selecionado, grupo, alvoId, compacto, escolhido);
   if (grupo && alvoId) {
     if (!REGISTRO_PAINEIS_POR_GRUPO.has(grupo)) REGISTRO_PAINEIS_POR_GRUPO.set(grupo, new Map());
     REGISTRO_PAINEIS_POR_GRUPO.get(grupo).set(alvoId, resultado);
