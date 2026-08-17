@@ -927,6 +927,159 @@ function barRankingChartSVG(categorias, selectedLabel) {
 // Troque GOOGLE_CLIENT_ID pelo Client ID do Google Auth Platform (Clients
 // → seu Web application) — não precisa do Client Secret.
 // =====================================================================
+// ---------- histograma: o formato dos valores de uma coluna ----------
+// Diferente de todos os outros: aqui o eixo X é uma escala contínua, não uma
+// lista de categorias. Por isso as barras se tocam — o buraco entre elas
+// sugeriria que existe valor impossível ali no meio, o que seria falso.
+// A mediana entra desenhada porque é ela, e não a média, que diz onde está o
+// meio quando a cauda é longa.
+function histogramaSVG(dados) {
+  const faixas = dados.faixas || [];
+  const n = faixas.length;
+  if (!n) return `<p class="dash-chart-hint">Nenhum valor numérico legível nesta coluna depois dos filtros.</p>`;
+
+  const w = 620, padL = 46, padR = 16, padT = 16;
+  const alturaRotulos = 58;
+  const h = 250;
+  const baseInf = h - alturaRotulos;
+  const plotH = baseInf - padT;
+  const larguraPlot = w - padL - padR;
+  const bw = larguraPlot / n;
+  const maxC = maxSeguro(faixas.map((f) => f.contagem));
+  const total = dados.linhasNaConta || 1;
+
+  let grade = "", eixoY = "";
+  [0, 0.25, 0.5, 0.75, 1].forEach((f) => {
+    const y = baseInf - plotH * f;
+    grade += `<line x1="${padL}" y1="${y.toFixed(1)}" x2="${(w - padR).toFixed(1)}" y2="${y.toFixed(1)}" stroke="var(--paper-line)" stroke-width="1" stroke-dasharray="${f === 0 ? "0" : "2 4"}" />`;
+    eixoY += `<text x="${(padL - 6).toFixed(1)}" y="${(y + 3).toFixed(1)}" text-anchor="end" font-family="monospace" font-size="8.5" fill="var(--carvao)" fill-opacity="0.55">${formatarEixo(maxC * f)}</text>`;
+  });
+
+  const passo = passoRotulo(n, 12);
+  let barras = "", rotulos = "";
+  faixas.forEach((f, i) => {
+    const x = padL + bw * i;
+    const alt = plotH * (f.contagem / maxC);
+    const y = baseInf - alt;
+    const pct = ((f.contagem / total) * 100).toFixed(1);
+    // Barras encostadas (1px de folga só pra separar visualmente), porque a
+    // escala é contínua.
+    barras += `<rect class="barra" x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${Math.max(bw - 1, 1).toFixed(1)}" height="${Math.max(alt, 0.5).toFixed(1)}" fill="${f.contagem ? "var(--tinta)" : "var(--paper-line)"}" ><title>${escapeHTML(f.label)}: ${f.contagem.toLocaleString("pt-BR")} registros (${pct}%)</title></rect>`;
+    if (n <= 14 && f.contagem) {
+      barras += `<text x="${(x + bw / 2).toFixed(1)}" y="${(y - 4).toFixed(1)}" text-anchor="middle" font-family="monospace" font-size="8.5" font-weight="700" fill="var(--carvao)">${f.contagem}</text>`;
+    }
+    // O rótulo marca o INÍCIO da faixa, na borda esquerda da barra — é assim
+    // que se lê um eixo contínuo, e evita a ambiguidade de um número centrado
+    // que não pertence a nenhum dos dois lados.
+    if (i % passo === 0 || i === n - 1) {
+      rotulos += `<text x="${x.toFixed(1)}" y="${(baseInf + 12).toFixed(1)}" text-anchor="end" transform="rotate(-42 ${x.toFixed(1)} ${(baseInf + 12).toFixed(1)})" font-family="monospace" font-size="8.5" fill="var(--carvao)" fill-opacity="0.7">${escapeHTML(String(f.label).split(" a ")[0])}</text>`;
+    }
+  });
+  // Fecha a escala com o fim da última faixa.
+  const xFim = padL + larguraPlot;
+  rotulos += `<text x="${xFim.toFixed(1)}" y="${(baseInf + 12).toFixed(1)}" text-anchor="end" transform="rotate(-42 ${xFim.toFixed(1)} ${(baseInf + 12).toFixed(1)})" font-family="monospace" font-size="8.5" fill="var(--carvao)" fill-opacity="0.7">${escapeHTML(String(faixas[n - 1].label).split(" a ")[1] || "")}</text>`;
+
+  // Marcador da mediana: metade dos registros está de cada lado dela.
+  let marcaMediana = "";
+  if (dados.mediana != null && dados.larguraFaixa) {
+    const inicio = faixas[0].inicio;
+    const fim = faixas[n - 1].fim;
+    if (fim > inicio) {
+      const xm = padL + ((dados.mediana - inicio) / (fim - inicio)) * larguraPlot;
+      if (xm >= padL && xm <= padL + larguraPlot) {
+        marcaMediana = `<line x1="${xm.toFixed(1)}" y1="${padT}" x2="${xm.toFixed(1)}" y2="${baseInf}" stroke="var(--mostarda)" stroke-width="1.6" stroke-dasharray="5 3" />`
+          + `<text x="${(xm + 4).toFixed(1)}" y="${(padT + 9).toFixed(1)}" font-family="monospace" font-size="8.5" font-weight="700" fill="var(--mostarda)">mediana ${Number(dados.mediana).toLocaleString("pt-BR", { maximumFractionDigits: 2 })}</text>`;
+      }
+    }
+  }
+
+  return `<svg viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg">${grade}${eixoY}${barras}${marcaMediana}${rotulos}</svg>`;
+}
+
+// ---------- Pareto: barras ordenadas + curva do acumulado ----------
+// Sai de graça porque o servidor JÁ entrega as categorias da composição
+// ordenadas do maior pro menor — ordem de Pareto. Falta só a curva por cima.
+//
+// Responde uma pergunta que nem a rosca nem o ranking respondem: o quanto o
+// total está CONCENTRADO. "6 de 40 fornecedores respondem por 80% do gasto" é
+// uma frase que muda decisão, e ela não sai de um gráfico de fatia — na rosca
+// isso vira um punhado de fatias grandes e uma nuvem de lascas.
+function paretoSVG(categorias, selectedLabel) {
+  const validas = categorias.filter((c) => c.valor !== null && c.valor > 0);
+  const n = validas.length;
+  if (!n) return "";
+
+  const total = validas.reduce((a, c) => a + c.valor, 0) || 1;
+  const w = 620, padL = 54, padR = 44, padT = 40;
+  const alturaRotulos = 76;
+  const h = 300;
+  const baseInf = h - alturaRotulos;
+  const plotH = baseInf - padT;
+  const larguraPlot = w - padL - padR;
+  const bw = larguraPlot / n;
+  const barW = Math.min(bw * 0.72, 34);
+  const maxV = validas[0].valor; // já vem ordenado desc
+
+  const yValor = (v) => baseInf - (v / maxV) * plotH;
+  const yPct = (p) => baseInf - (p / 100) * plotH;
+
+  let acumulado = 0;
+  const pontos = validas.map((c, i) => {
+    acumulado += c.valor;
+    return { i, label: c.label, valor: c.valor, pct: (acumulado / total) * 100 };
+  });
+  // Os "poucos vitais": quantas categorias bastam pra fechar 80% do total.
+  const corte = pontos.findIndex((p) => p.pct >= 80);
+  const vitais = corte === -1 ? n : corte + 1;
+
+  let grade = "", eixoEsq = "", eixoDir = "";
+  [0, 0.25, 0.5, 0.75, 1].forEach((f) => {
+    const y = baseInf - plotH * f;
+    grade += `<line x1="${padL}" y1="${y.toFixed(1)}" x2="${(w - padR).toFixed(1)}" y2="${y.toFixed(1)}" stroke="var(--paper-line)" stroke-width="1" stroke-dasharray="${f === 0 ? "0" : "2 4"}" />`;
+    eixoEsq += `<text x="${(padL - 6).toFixed(1)}" y="${(y + 3).toFixed(1)}" text-anchor="end" font-family="monospace" font-size="8.5" fill="var(--carvao)" fill-opacity="0.55">${formatarEixo(maxV * f)}</text>`;
+    eixoDir += `<text x="${(w - padR + 6).toFixed(1)}" y="${(y + 3).toFixed(1)}" font-family="monospace" font-size="8.5" fill="var(--mostarda)" fill-opacity="0.8">${Math.round(f * 100)}%</text>`;
+  });
+
+  // A linha dos 80% é a régua da leitura: é ela que transforma a curva num
+  // número acionável em vez de um desenho bonito.
+  const y80 = yPct(80);
+  const regua = `<line x1="${padL}" y1="${y80.toFixed(1)}" x2="${(w - padR).toFixed(1)}" y2="${y80.toFixed(1)}" stroke="var(--mostarda)" stroke-width="1.4" stroke-dasharray="6 4" opacity="0.9" />`
+    + `<text x="${(padL + 4).toFixed(1)}" y="${(y80 - 5).toFixed(1)}" font-family="monospace" font-size="9" font-weight="700" fill="var(--mostarda)">80%</text>`;
+
+  const passo = passoRotulo(n, 14);
+  let barras = "", rotulos = "";
+  pontos.forEach((p) => {
+    const cx = padL + bw * p.i + bw / 2;
+    const yTopo = yValor(p.valor);
+    const dim = selectedLabel && selectedLabel !== p.label;
+    const dentro = p.i < vitais;
+    barras += `<g class="rank-bar" data-cat="${escapeAttr(p.label)}" style="cursor:pointer" opacity="${dim ? 0.3 : 1}">
+      <rect class="barra" x="${(cx - barW / 2).toFixed(1)}" y="${yTopo.toFixed(1)}" width="${barW.toFixed(1)}" height="${Math.max(baseInf - yTopo, 0.5).toFixed(1)}" fill="${dentro ? "var(--tinta)" : corGlow("var(--tinta)")}" stroke="var(--tinta)" stroke-width="1.1"><title>${escapeHTML(p.label)}: ${p.valor.toLocaleString("pt-BR")} · acumulado ${p.pct.toFixed(1)}%</title></rect>
+    </g>`;
+    // Nome sempre pros que formam os 80% — são esses que a pessoa vai anotar.
+    // Do resto, um a cada N, só pra dar noção da cauda.
+    if (dentro || p.i % passo === 0 || p.i === n - 1) {
+      const curto = p.label.length > 16 ? p.label.slice(0, 15) + "…" : p.label;
+      rotulos += `<text x="${cx.toFixed(1)}" y="${(baseInf + 12).toFixed(1)}" text-anchor="end" transform="rotate(-40 ${cx.toFixed(1)} ${(baseInf + 12).toFixed(1)})" font-family="monospace" font-size="8.5" font-weight="${dentro ? 700 : 400}" fill="var(--carvao)" fill-opacity="${dentro ? 1 : 0.55}"><title>${escapeHTML(p.label)}</title>${escapeHTML(curto)}</text>`;
+    }
+  });
+
+  const curva = "M " + pontos.map((p) => `${(padL + bw * p.i + bw / 2).toFixed(1)} ${yPct(p.pct).toFixed(1)}`).join(" L ");
+  const linhaAcum = `<path d="${curva}" fill="none" stroke="var(--mostarda)" stroke-width="2.2" stroke-linejoin="round" />`;
+  const nodos = pontos
+    .map((p) => {
+      const cx = padL + bw * p.i + bw / 2;
+      const r = n > 30 ? 1.8 : 3;
+      return `<circle cx="${cx.toFixed(1)}" cy="${yPct(p.pct).toFixed(1)}" r="${r}" fill="var(--mostarda)"><title>${escapeHTML(p.label)}: ${p.pct.toFixed(1)}% acumulado</title></circle>`;
+    })
+    .join("");
+
+  const frase = `${vitais} de ${n} ${vitais === 1 ? "categoria responde" : "categorias respondem"} por ${Math.min(100, pontos[vitais - 1]?.pct ?? 100).toFixed(0)}% do total`;
+  const titulo = `<text x="${padL}" y="20" font-family="monospace" font-size="10.5" font-weight="700" fill="var(--carvao)">${escapeHTML(frase)}</text>`;
+
+  return `<svg viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg">${grade}${eixoEsq}${eixoDir}${barras}${regua}${linhaAcum}${nodos}${rotulos}${titulo}</svg>`;
+}
+
 const API_CONFIG = {
   BASE_URL: "http://localhost:3333",
   GOOGLE_CLIENT_ID: "27568374447-jlc9f4iq888d0mdob43dlabgbfo2rl6h.apps.googleusercontent.com",
@@ -2065,6 +2218,15 @@ function baixarCSV(nomeArquivo, linhas) {
 
 // monta a tabela exportável a partir do resultado, por tipo de painel
 function tabelaDoPainel(dados, painel) {
+  if (dados.tipo === "distribuicao") {
+    return (dados.faixas || []).map((f) => ({
+      Faixa: f.label,
+      De: f.inicio,
+      "Até": f.fim,
+      Registros: f.contagem,
+      "% do total": dados.linhasNaConta ? Math.round((f.contagem / dados.linhasNaConta) * 1000) / 10 : 0,
+    }));
+  }
   if (dados.tipo === "medida") {
     return [{
       Medida: painel.nome,
@@ -2130,9 +2292,10 @@ function tabelaDoPainel(dados, painel) {
 // dedução; o padrão continua sendo exatamente o que era antes, então nenhum
 // painel existente muda de aparência sozinho.
 const GRAFICOS_POR_TIPO = {
-  composicao: [
+    composicao: [
     { id: "rosca", rotulo: "◕ ROSCA" },
     { id: "ranking", rotulo: "▤ BARRAS" },
+    { id: "pareto", rotulo: "◪ PARETO" },
   ],
    cruzamento: [
     { id: "matriz", rotulo: "▦ MATRIZ" },
@@ -2161,8 +2324,19 @@ function graficosDisponiveis(dados) {
   // Valor negativo (estorno, glosa, saldo) não tem fatia. A rosca sai do
   // cardápio em vez de aparecer desabilitada: oferecer e depois recusar é pior
   // do que não oferecer. É a mesma regra que o código já aplicava sozinho.
-  if (dados.tipo === "composicao" && dados.categorias?.some((c) => c.valor < 0)) {
-    return lista.filter((g) => g.id !== "rosca");
+    if (dados.tipo === "composicao") {
+    // Rosca e Pareto pressupõem partes de um todo positivo: com valor negativo
+    // não existe fatia, e a curva do acumulado passa de 100% e volta, virando
+    // um desenho sem leitura. Os dois saem do cardápio.
+    if (dados.categorias?.some((c) => c.valor < 0)) {
+      return lista.filter((g) => g.id !== "rosca" && g.id !== "pareto");
+    }
+    // Pareto com duas ou três categorias não diz nada: "concentração" só
+    // significa alguma coisa quando existe uma cauda pra comparar.
+    if ((dados.categorias?.filter((c) => c.valor !== null && c.valor > 0).length ?? 0) < 4) {
+      return lista.filter((g) => g.id !== "pareto");
+    }
+    return lista;
   }
 
     if (dados.tipo === "evolucao") {
@@ -2322,6 +2496,19 @@ function renderPainel(resultado, selectedLabel = null, compacto = false, grafico
         ? `<details class="painel-detalhes"><summary>detalhes</summary>${complementar}</details>`
         : "")
     : avisosBase + mudaSignificado + avisoSupressao + avisoSupressaoExcessiva + avisoSoma + botaoTabela + fonteHtml;
+    if (dados.tipo === "distribuicao") {
+    const tabelaFaixas = dados.faixas.map(f => `
+      <tr><td>${escapeHTML(f.label)}</td><td class="num">${f.contagem.toLocaleString("pt-BR")}</td><td class="num">${dados.linhasNaConta ? ((f.contagem / dados.linhasNaConta) * 100).toFixed(1) + "%" : "—"}</td></tr>`).join("");
+    const avisoVazios = dados.linhasSemValor
+      ? `<p class="font-mono" style="font-size:var(--fs-ui-sm);color:#8B93A3;margin-top:6px">${dados.linhasSemValor.toLocaleString("pt-BR")} registro(s) sem número legível em "${escapeHTML(dados.coluna)}" — fora da conta</p>`
+      : "";
+    const corpoDist = `<div>${histogramaSVG(dados)}</div>${avisoVazios}
+      <details class="painel-detalhes"><summary>ver as faixas em tabela</summary>
+        <table class="dash-tabela" style="margin-top:8px"><thead><tr><th>FAIXA</th><th>REGISTROS</th><th>%</th></tr></thead><tbody>${tabelaFaixas}</tbody></table>
+      </details>`;
+    return `${avisoFiltro}${renderResumos(dados.resumos)}${renderComoLer(dados.comoLer)}${corpoDist}${rodape}`;
+  }
+
   if (dados.tipo === "medida") {
     const periodo = dados.periodoAplicado
       ? `<p class="font-mono" style="font-size:var(--fs-ui-sm);color:var(--oliva);margin-top:2px">${escapeHTML(dados.periodoAplicado.descricao)}: <b>${escapeHTML(dados.periodoAplicado.rotulo)}</b> — ${dados.periodoAplicado.linhasDepois} de ${dados.periodoAplicado.linhasAntes} registros${dados.periodoAplicado.linhasSemData ? ` · ${dados.periodoAplicado.linhasSemData} sem data, fora da conta` : ""}</p>`
@@ -2410,16 +2597,26 @@ function renderPainel(resultado, selectedLabel = null, compacto = false, grafico
     // rosca mostra bem quando UMA categoria domina, e o olho não compara ângulo
     // quando elas têm tamanho parecido ou passam de meia dúzia — que é onde o
     // ranking ganha. Por isso a escolha é de quem lê, não do código.
-    const escolhido = graficoEfetivo(dados, grafico);
+        const escolhido = graficoEfetivo(dados, grafico);
     const desenho = escolhido === "ranking"
       ? barRankingChartSVG(dados.categorias, selectedLabel)
-      : pieChartSVG(dados.categorias, selectedLabel);
+      : escolhido === "pareto"
+        ? paretoSVG(dados.categorias, selectedLabel)
+        : pieChartSVG(dados.categorias, selectedLabel);
 
-    return `${avisoFiltro}${renderResumos(dados.resumos)}${renderComoLer(dados.comoLer)}${avisoNegativo}${barraDeGraficos(dados, escolhido)}
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start">
+    const tabelaHtml = `<table class="dash-tabela"><thead><tr><th>CATEGORIA</th><th>VALOR</th><th>%</th></tr></thead><tbody>${tabela}</tbody></table>`;
+    // Rosca e ranking convivem bem com a tabela ao lado. O Pareto não: ele é
+    // largo por natureza (uma barra por categoria, mais a curva, mais os nomes
+    // deitados no eixo) e espremido em meia tela os rótulos ficam ilegíveis.
+    // Nesse caso o gráfico ocupa a largura toda e a tabela vai pra baixo.
+    const corpo = escolhido === "pareto"
+      ? `<div>${desenho}</div><div style="margin-top:14px">${tabelaHtml}</div>`
+      : `<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start">
         <div>${desenho}</div>
-        <table class="dash-tabela"><thead><tr><th>CATEGORIA</th><th>VALOR</th><th>%</th></tr></thead><tbody>${tabela}</tbody></table>
-      </div>${rodape}`;
+        ${tabelaHtml}
+      </div>`;
+
+    return `${avisoFiltro}${renderResumos(dados.resumos)}${renderComoLer(dados.comoLer)}${avisoNegativo}${barraDeGraficos(dados, escolhido)}${corpo}${rodape}`;
   }
 
   // cruzamento com 3ª coluna: uma matriz por valor dela, cada uma com seus
