@@ -5378,13 +5378,17 @@ function adicionarControlesGrafico(container) {
     let wrapper = jaEnvolvido ? svg.parentElement : document.createElement("div");
     if (!jaEnvolvido) {
       wrapper.className = "grafico-com-controles";
-      wrapper.style.cssText = "position:relative";
+      // padding-top RESERVA uma faixa vazia só pros botões — sem isso eles
+      // ficam sobrepostos em cima do próprio desenho (aconteceu no mapa de
+      // calor, que tem conteúdo colado no topo do SVG, e no treemap, que às
+      // vezes tem um bloco bem ali no canto superior direito).
+      wrapper.style.cssText = "position:relative;padding-top:24px";
       svg.parentNode.insertBefore(wrapper, svg);
       wrapper.appendChild(svg);
     }
 
     const toolbar = document.createElement("div");
-    toolbar.style.cssText = "position:absolute;top:0;right:0;display:flex;gap:3px;opacity:.75";
+    toolbar.style.cssText = "position:absolute;top:2px;right:0;display:flex;gap:3px;opacity:.75";
     toolbar.innerHTML = `
       <button type="button" title="Ampliar" style="background:var(--carvao);color:var(--paper);border:none;width:22px;height:22px;cursor:pointer;font-size:var(--fs-ui);line-height:1">⤢</button>
       <button type="button" title="Baixar como imagem" style="background:var(--carvao);color:var(--paper);border:none;width:22px;height:22px;cursor:pointer;font-size:var(--fs-ui-sm);line-height:1">⬇</button>
