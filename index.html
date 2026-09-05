@@ -3828,7 +3828,7 @@ function agruparPorMesCriticidade(lista) {
 // existe no arquivo) porque aquela função colore por ÍNDICE na paleta
 // sequencial genérica (TONS) — aqui a cor tem que ser a mesma pílula/rampa de
 // criticidade em todo lugar do módulo, não uma cor qualquer da vez.
-function barraCriticidadeHorizontalSVG(linhasArea) {
+function barraCriticidadeHorizontalSVG(linhasArea, modo = "proporcao") {
   const presentes = CRITICIDADE_VISUAL.filter((cv) => linhasArea.some((l) => l.porCrit[cv.label]));
   const MAX_ROTULO = 20;
   const padL = 150, padR = 10, padT = 6;
@@ -3838,21 +3838,31 @@ function barraCriticidadeHorizontalSVG(linhasArea) {
   const alturaLegenda = Math.ceil(presentes.length / 3) * 16 + 14;
   const h = padT + linhasArea.length * rowH + alturaLegenda;
   const w = padL + larguraPlot + padR;
+  // "proporcao" (padrão): toda linha ocupa a largura toda, então dá pra
+  // comparar a COMPOSIÇÃO de cada área lado a lado. "absoluto": a barra
+  // encolhe conforme o total da área, então dá pra comparar o TAMANHO das
+  // áreas entre si — mesma troca que cruzamentoBarrasSVG já oferece noutros
+  // painéis do sistema, replicada aqui com a paleta de criticidade.
+  const maxTotalGeral = modo === "absoluto" ? maxSeguro(linhasArea.map((l) => l.total)) : 1;
 
   let corpo = "";
   linhasArea.forEach((l, i) => {
     const y = padT + i * rowH;
     const yBarra = y + (rowH - alturaBarra) / 2;
+    const larguraLinha = modo === "absoluto" ? larguraPlot * (l.total / maxTotalGeral) : larguraPlot;
     let linha = `<rect class="area-hit" x="0" y="${y.toFixed(1)}" width="${w}" height="${rowH}" fill="transparent" />`;
     linha += textoSVG(l.label, padL - 8, y + rowH / 2, { maxChars: MAX_ROTULO, anchor: "end", fontSize: 9, alturaLinha: 10 });
     let x = padL;
     presentes.forEach((cv) => {
       const v = l.porCrit[cv.label] || 0;
       if (!v) return;
-      const larg = larguraPlot * (v / l.total);
+      const larg = larguraLinha * (v / l.total);
       linha += `<rect x="${x.toFixed(1)}" y="${yBarra.toFixed(1)}" width="${larg.toFixed(1)}" height="${alturaBarra}" fill="${cv.cor}" fill-opacity="${cv.opacidade}"><title>${escapeHTML(l.label)} — ${escapeHTML(cv.label)}: ${v} de ${l.total}</title></rect>`;
       x += larg;
     });
+    if (modo === "absoluto") {
+      linha += `<text x="${(padL + larguraLinha + 6).toFixed(1)}" y="${(yBarra + alturaBarra / 2 + 3.5).toFixed(1)}" font-family="monospace" font-size="8.5" font-weight="700" fill="var(--carvao)">${l.total}</text>`;
+    }
     corpo += `<g data-cat="${escapeAttr(l.label)}" style="cursor:pointer">${linha}</g>`;
   });
 
@@ -3917,6 +3927,72 @@ function colunaCriticidadeEmpilhadaSVG(meses, mesSelecionado = "") {
   });
 
   return `<svg viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg">${grade}${eixoY}${barras}${rotulos}${legenda}</svg>`;
+}
+
+// Mesma pergunta de colunaCriticidadeEmpilhadaSVG, outra leitura: colunas
+// empilhadas comparam bem o TOTAL de cada mês; linha por criticidade mostra
+// melhor a TENDÊNCIA de cada faixa isolada ao longo do tempo (ex.: "os
+// críticos estão subindo mês a mês?", que numa pilha fica escondido atrás
+// das outras cores). Mantém o clique-pra-isolar mês igual à versão em coluna.
+function linhaCriticidadePorMesSVG(meses, mesSelecionado = "") {
+  const presentes = CRITICIDADE_VISUAL.filter((cv) => meses.some((m) => m.porCrit[cv.label]));
+  const w = 620, padL = 40, padR = 10, padT = 10;
+  const alturaPlot = 180, alturaRotulos = 30;
+  const alturaLegenda = Math.ceil(presentes.length / 4) * 14 + 10;
+  const h = padT + alturaPlot + alturaRotulos + alturaLegenda;
+  const baseY = padT + alturaPlot;
+  const n = meses.length || 1;
+  const stepX = (w - padL - padR) / (n - 1 || 1);
+  const maxTotal = maxSeguro(presentes.flatMap((cv) => meses.map((m) => m.porCrit[cv.label] || 0)));
+
+  let grade = "", eixoY = "";
+  [0, 0.5, 1].forEach((f) => {
+    const y = baseY - alturaPlot * f;
+    grade += `<line x1="${padL}" y1="${y.toFixed(1)}" x2="${w - padR}" y2="${y.toFixed(1)}" stroke="var(--paper-line)" stroke-width="1" stroke-dasharray="${f === 0 ? "0" : "2 4"}" />`;
+    eixoY += `<text x="${(padL - 6).toFixed(1)}" y="${(y + 3).toFixed(1)}" text-anchor="end" font-family="monospace" font-size="8.5" fill="var(--carvao)" fill-opacity="0.55">${formatarEixo(maxTotal * f)}</text>`;
+  });
+
+  // Faixa clicável por mês — mesmo papel do hit-rect da versão em coluna,
+  // aqui desenhada primeiro (fica atrás da linha) e marca visualmente o mês
+  // selecionado com um fundo sutil, já que não tem barra pra destacar.
+  let marcadores = "";
+  meses.forEach((m, i) => {
+    const cx = padL + stepX * i;
+    const dim = mesSelecionado && mesSelecionado !== m.label;
+    marcadores += `<rect data-mes="${escapeAttr(m.label)}" style="cursor:pointer" x="${(cx - stepX / 2).toFixed(1)}" y="${padT}" width="${stepX.toFixed(1)}" height="${alturaPlot}" fill="${mesSelecionado === m.label ? "var(--paper-line)" : "transparent"}" opacity="${dim ? 0.5 : 1}" />`;
+  });
+
+  let linhas = "", pontos = "";
+  presentes.forEach((cv) => {
+    const coords = meses.map((m, i) => [padL + stepX * i, baseY - alturaPlot * ((m.porCrit[cv.label] || 0) / maxTotal)]);
+    linhas += `<path d="M ${coords.map(([x, y]) => `${x.toFixed(1)} ${y.toFixed(1)}`).join(" L ")}" fill="none" stroke="${cv.cor}" stroke-width="2" stroke-linejoin="round" style="pointer-events:none" />`;
+    meses.forEach((m, i) => {
+      const v = m.porCrit[cv.label] || 0;
+      if (!v) return;
+      const [x, y] = coords[i];
+      const dim = mesSelecionado && mesSelecionado !== m.label;
+      pontos += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3" fill="${cv.cor}" opacity="${dim ? 0.35 : 1}" style="pointer-events:none"><title>${escapeHTML(m.label)} — ${escapeHTML(cv.label)}: ${v}</title></circle>`;
+    });
+  });
+
+  const passo = passoRotulo(n, 14);
+  let rotulos = "";
+  meses.forEach((m, i) => {
+    if (i % passo === 0 || i === n - 1 || m.label === mesSelecionado) {
+      const cx = padL + stepX * i;
+      rotulos += `<text x="${cx.toFixed(1)}" y="${(baseY + 14).toFixed(1)}" text-anchor="middle" font-family="monospace" font-size="8" fill="var(--carvao)" fill-opacity="${mesSelecionado === m.label ? 1 : 0.7}" font-weight="${mesSelecionado === m.label ? 700 : 400}">${escapeHTML(m.label)}</text>`;
+    }
+  });
+
+  const yLeg = baseY + alturaRotulos;
+  let legenda = "";
+  presentes.forEach((cv, k) => {
+    const lx = padL + (k % 4) * 130;
+    const ly = yLeg + Math.floor(k / 4) * 14;
+    legenda += `<rect x="${lx.toFixed(1)}" y="${(ly - 7).toFixed(1)}" width="8" height="8" fill="${cv.cor}" /><text x="${(lx + 12).toFixed(1)}" y="${ly.toFixed(1)}" font-family="monospace" font-size="8" fill="var(--carvao)">${escapeHTML(cv.label.replace(/\s*\(.*\)/, ""))}</text>`;
+  });
+
+  return `<svg viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg">${grade}${eixoY}${marcadores}${linhas}${pontos}${rotulos}${legenda}</svg>`;
 }
 
 // "Detalhamento por Área Gestora" — matriz com uma coluna por criticidade e
@@ -4006,6 +4082,7 @@ function renderGerencialContratos(lista, resumo) {
   const alvo = document.getElementById("contratos-sub-gerencial");
   const areasDisponiveis = [...new Set(lista.map((c) => c.unidadeGestora || "(sem unidade)"))].sort();
   let filtroArea = "";
+  let modoBarra = lerGraficoSalvo("cpg-gerencial-barra") || "proporcao";
 
   alvo.innerHTML = `
     <div class="dash-filtros">
@@ -4024,11 +4101,23 @@ function renderGerencialContratos(lista, resumo) {
       </div>
       <div class="dash-chart-box">
         <h4>Contratos por Criticidade e Área Gestora</h4>
+        <div class="linha-troca-grafico"><div class="dash-toggle" id="ger-barra-toggle">
+          <button class="dash-toggle-btn" data-modo="proporcao" title="Compara a composição de criticidade de cada área">% POR ÁREA</button>
+          <button class="dash-toggle-btn" data-modo="absoluto" title="Compara o tamanho das áreas entre si">QTD POR ÁREA</button>
+        </div></div>
         <div id="ger-barra"></div>
       </div>
     </div>
     <div class="kpi-row" style="margin-top:2px;grid-template-columns:repeat(auto-fit,minmax(180px,1fr))" id="ger-rodape"></div>
   `;
+
+  document.getElementById("ger-barra-toggle").addEventListener("click", (ev) => {
+    const btn = ev.target.closest("[data-modo]");
+    if (!btn || btn.dataset.modo === modoBarra) return;
+    modoBarra = btn.dataset.modo;
+    salvarGrafico("cpg-gerencial-barra", modoBarra);
+    atualizar();
+  });
 
   // Clicar numa linha da matriz ou numa barra do gráfico faz a MESMA coisa
   // que escolher aquela área no filtro de cima — é o "clicar no gráfico pra
@@ -4079,7 +4168,10 @@ function renderGerencialContratos(lista, resumo) {
         <div class="kpi-card"><div class="kpi-label">Valor Global Atual Total</div><div class="kpi-value">R$ ${formatarEixo(valorAtual)}</div></div>
       </div>`;
     document.getElementById("ger-matriz").innerHTML = renderMatrizAreaGestora(porArea);
-    document.getElementById("ger-barra").innerHTML = barraCriticidadeHorizontalSVG(porArea);
+    document.getElementById("ger-barra").innerHTML = barraCriticidadeHorizontalSVG(porArea, modoBarra);
+    document.querySelectorAll("#ger-barra-toggle [data-modo]").forEach((btn) => {
+      btn.classList.toggle("active", btn.dataset.modo === modoBarra);
+    });
     // Estes não estão nas 3 páginas do Power BI que a coordenação mostrou,
     // mas já existiam na primeira versão deste painel e são úteis pra
     // acompanhamento — ficam como um segundo bloco, separado dos cartões
@@ -4104,6 +4196,7 @@ function renderTaticoContratos(lista) {
   const tiposDisponiveis = [...new Set(lista.map((c) => c.tipoObjeto || "(sem tipo)"))].sort();
   let filtroTipo = "";
   let filtroMes = "";
+  let modoMes = lerGraficoSalvo("cpg-tatico-mes") || "colunas";
   const filtrosCriticidade = new Set();
 
   alvo.innerHTML = `
@@ -4120,7 +4213,11 @@ function renderTaticoContratos(lista) {
     </div>
     <div class="dash-chart-box" style="margin-bottom:16px">
       <h4>Contratos por Vencimento e Criticidade</h4>
-      <p class="dash-chart-hint">Clique numa barra pra isolar só aquele mês de vencimento na tabela abaixo — clique de novo pra voltar a ver todos os meses.</p>
+      <p class="dash-chart-hint">Clique numa barra ou num ponto pra isolar só aquele mês de vencimento na tabela abaixo — clique de novo pra voltar a ver todos os meses.</p>
+      <div class="linha-troca-grafico"><div class="dash-toggle" id="tat-mes-toggle">
+        <button class="dash-toggle-btn" data-modo="colunas" title="Compara o total de cada mês">COLUNAS</button>
+        <button class="dash-toggle-btn" data-modo="linha" title="Mostra a tendência de cada faixa de criticidade mês a mês">LINHA</button>
+      </div></div>
       <div id="tat-grafico-mes"></div>
     </div>
     <h4 style="font-family:'Space Grotesk',sans-serif;font-size:var(--fs-subtitulo);margin-bottom:8px">Detalhamento dos Contratos</h4>
@@ -4153,10 +4250,23 @@ function renderTaticoContratos(lista) {
     const alvoClicado = ev.target.closest("[data-mes]");
     if (alvoClicado) selecionarMes(alvoClicado.dataset.mes);
   });
+  document.getElementById("tat-mes-toggle").addEventListener("click", (ev) => {
+    const btn = ev.target.closest("[data-modo]");
+    if (!btn || btn.dataset.modo === modoMes) return;
+    modoMes = btn.dataset.modo;
+    salvarGrafico("cpg-tatico-mes", modoMes);
+    atualizar();
+  });
 
   function atualizar() {
     const filtrada = listaFiltrada();
-    document.getElementById("tat-grafico-mes").innerHTML = colunaCriticidadeEmpilhadaSVG(agruparPorMesCriticidade(listaSemMes()), filtroMes);
+    const porMes = agruparPorMesCriticidade(listaSemMes());
+    document.getElementById("tat-grafico-mes").innerHTML = modoMes === "linha"
+      ? linhaCriticidadePorMesSVG(porMes, filtroMes)
+      : colunaCriticidadeEmpilhadaSVG(porMes, filtroMes);
+    document.querySelectorAll("#tat-mes-toggle [data-modo]").forEach((btn) => {
+      btn.classList.toggle("active", btn.dataset.modo === modoMes);
+    });
     document.getElementById("tat-chip-filtro").innerHTML = filtroMes
       ? `<div class="filter-chips"><span class="filter-chip">Isolando mês: ${escapeHTML(filtroMes)}<button type="button" data-limpar-mes title="Voltar a ver todos os meses">✕</button></span></div>`
       : "";
