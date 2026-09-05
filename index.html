@@ -4018,70 +4018,62 @@ function colunaCriticidadeEmpilhadaSVG(meses, mesSelecionado = "") {
   return `<svg viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg">${grade}${eixoY}${barras}${rotulos}${legenda}</svg>`;
 }
 
-// Mesma pergunta de colunaCriticidadeEmpilhadaSVG, outra leitura: colunas
-// empilhadas comparam bem o TOTAL de cada mês; linha por criticidade mostra
-// melhor a TENDÊNCIA de cada faixa isolada ao longo do tempo (ex.: "os
-// críticos estão subindo mês a mês?", que numa pilha fica escondido atrás
-// das outras cores). Mantém o clique-pra-isolar mês igual à versão em coluna.
-function linhaCriticidadePorMesSVG(meses, mesSelecionado = "") {
-  const presentes = CRITICIDADE_VISUAL.filter((cv) => meses.some((m) => m.porCrit[cv.label]));
-  const w = 620, padL = 40, padR = 10, padT = 10;
-  const alturaPlot = 180, alturaRotulos = 30;
-  const alturaLegenda = Math.ceil(presentes.length / 4) * 14 + 10;
-  const h = padT + alturaPlot + alturaRotulos + alturaLegenda;
-  const baseY = padT + alturaPlot;
-  const n = meses.length || 1;
-  const stepX = (w - padL - padR) / (n - 1 || 1);
-  const maxTotal = maxSeguro(presentes.flatMap((cv) => meses.map((m) => m.porCrit[cv.label] || 0)));
+// Linha do tempo (Gantt): cada contrato é uma barra de data_início até
+// data_fim, colorida pela criticidade — o visual clássico pra vigência de
+// contrato, e uma leitura bem diferente da coluna empilhada (aqui dá pra ver
+// CADA contrato individual, não só o total do mês). Ordenado pela mesma
+// prioridade das pílulas (mais urgente primeiro), pra quem olha de cima pra
+// baixo bater direto nos contratos que precisam de atenção agora.
+// Não participa do clique-pra-isolar mês (o eixo aqui é tempo contínuo, não
+// uma lista de meses) — em compensação, cada barra usa o mesmo tooltip de
+// detalhe ao passar o mouse que a tabela já tem (ligarTooltipLinhas).
+function ganttContratosSVG(lista) {
+  const comDatas = lista.filter((c) => c.dataInicio && c.dataFim);
+  if (!comDatas.length) return { svg: `<p class="tela-intro">Nenhum contrato com data de início e término preenchidas.</p>`, alturaPx: 0 };
 
-  let grade = "", eixoY = "";
-  [0, 0.5, 1].forEach((f) => {
-    const y = baseY - alturaPlot * f;
-    grade += `<line x1="${padL}" y1="${y.toFixed(1)}" x2="${w - padR}" y2="${y.toFixed(1)}" stroke="var(--paper-line)" stroke-width="1" stroke-dasharray="${f === 0 ? "0" : "2 4"}" />`;
-    eixoY += `<text x="${(padL - 6).toFixed(1)}" y="${(y + 3).toFixed(1)}" text-anchor="end" font-family="monospace" font-size="8.5" fill="var(--carvao)" fill-opacity="0.55">${formatarEixo(maxTotal * f)}</text>`;
+  const ordenados = [...comDatas].sort((a, b) => a.criticidadeOrdem - b.criticidadeOrdem || new Date(a.dataFim) - new Date(b.dataFim));
+  const w = 620, padL = 90, padR = 14, padT = 22, rowH = 15, alturaBarra = 10;
+  const alturaLegenda = 24;
+  const h = padT + ordenados.length * rowH + alturaLegenda;
+  const larguraPlot = w - padL - padR;
+
+  const hoje = new Date();
+  const minData = new Date(Math.min(...ordenados.map((c) => new Date(c.dataInicio).getTime()), hoje.getTime()));
+  const maxData = new Date(Math.max(...ordenados.map((c) => new Date(c.dataFim).getTime()), hoje.getTime()));
+  const spanMs = Math.max(maxData - minData, 86400000);
+  const x = (data) => padL + ((new Date(data).getTime() - minData.getTime()) / spanMs) * larguraPlot;
+
+  // Uma linha vertical por ano — o portfólio inteiro cobre bem mais de um
+  // ano (tem contrato de 2011 ainda vigente), então o ano é a grade que faz
+  // sentido, não o mês.
+  let grade = "";
+  const anoInicial = minData.getUTCFullYear(), anoFinal = maxData.getUTCFullYear();
+  for (let ano = anoInicial; ano <= anoFinal; ano++) {
+    const xa = x(new Date(Date.UTC(ano, 0, 1)));
+    if (xa < padL || xa > w - padR) continue;
+    grade += `<line x1="${xa.toFixed(1)}" y1="${padT}" x2="${xa.toFixed(1)}" y2="${(padT + ordenados.length * rowH).toFixed(1)}" stroke="var(--paper-line)" stroke-width="1" stroke-dasharray="2 4" />`;
+    grade += `<text x="${xa.toFixed(1)}" y="${(padT - 8).toFixed(1)}" text-anchor="middle" font-family="monospace" font-size="8" fill="var(--carvao)" fill-opacity="0.6">${ano}</text>`;
+  }
+  const xHoje = x(hoje);
+  grade += `<line x1="${xHoje.toFixed(1)}" y1="${padT}" x2="${xHoje.toFixed(1)}" y2="${(padT + ordenados.length * rowH).toFixed(1)}" stroke="var(--tinta)" stroke-width="1.4" />`;
+  grade += `<text x="${xHoje.toFixed(1)}" y="${(padT - 8).toFixed(1)}" text-anchor="middle" font-family="monospace" font-size="8" font-weight="700" fill="var(--tinta)">HOJE</text>`;
+
+  let barras = "";
+  ordenados.forEach((c, i) => {
+    const y = padT + i * rowH;
+    const cor = (CRITICIDADE_VISUAL.find((cv) => cv.label === c.criticidade) || {}).cor || "var(--crit-neutro)";
+    const x0 = x(c.dataInicio), x1 = x(c.dataFim);
+    barras += textoSVG(c.numeroContrato, padL - 6, y + rowH / 2, { maxChars: 13, anchor: "end", fontSize: 8, alturaLinha: 9 });
+    barras += `<rect class="linha-contrato" data-contrato-id="${escapeAttr(c.id)}" x="${x0.toFixed(1)}" y="${(y + (rowH - alturaBarra) / 2).toFixed(1)}" width="${Math.max(x1 - x0, 1.2).toFixed(1)}" height="${alturaBarra}" rx="1.5" fill="${cor}" style="cursor:default" />`;
   });
 
-  // Faixa clicável por mês — mesmo papel do hit-rect da versão em coluna,
-  // aqui desenhada primeiro (fica atrás da linha) e marca visualmente o mês
-  // selecionado com um fundo sutil, já que não tem barra pra destacar.
-  let marcadores = "";
-  meses.forEach((m, i) => {
-    const cx = padL + stepX * i;
-    const dim = mesSelecionado && mesSelecionado !== m.label;
-    marcadores += `<rect data-mes="${escapeAttr(m.label)}" style="cursor:pointer" x="${(cx - stepX / 2).toFixed(1)}" y="${padT}" width="${stepX.toFixed(1)}" height="${alturaPlot}" fill="${mesSelecionado === m.label ? "var(--paper-line)" : "transparent"}" opacity="${dim ? 0.5 : 1}" />`;
-  });
+  const legenda = CRITICIDADE_VISUAL.filter((cv) => ordenados.some((c) => c.criticidade === cv.label))
+    .map((cv, k) => {
+      const lx = padL + (k % 4) * 130, ly = padT + ordenados.length * rowH + 16;
+      return `<rect x="${lx.toFixed(1)}" y="${(ly - 7).toFixed(1)}" width="8" height="8" fill="${cv.cor}" /><text x="${(lx + 12).toFixed(1)}" y="${ly.toFixed(1)}" font-family="monospace" font-size="8" fill="var(--carvao)">${escapeHTML(cv.label.replace(/\s*\(.*\)/, ""))}</text>`;
+    }).join("");
 
-  let linhas = "", pontos = "";
-  presentes.forEach((cv) => {
-    const coords = meses.map((m, i) => [padL + stepX * i, baseY - alturaPlot * ((m.porCrit[cv.label] || 0) / maxTotal)]);
-    linhas += `<path d="M ${coords.map(([x, y]) => `${x.toFixed(1)} ${y.toFixed(1)}`).join(" L ")}" fill="none" stroke="${cv.cor}" stroke-width="2" stroke-linejoin="round" style="pointer-events:none" />`;
-    meses.forEach((m, i) => {
-      const v = m.porCrit[cv.label] || 0;
-      if (!v) return;
-      const [x, y] = coords[i];
-      const dim = mesSelecionado && mesSelecionado !== m.label;
-      pontos += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3" fill="${cv.cor}" opacity="${dim ? 0.35 : 1}" style="pointer-events:none"><title>${escapeHTML(m.label)} — ${escapeHTML(cv.label)}: ${v}</title></circle>`;
-    });
-  });
-
-  const passo = passoRotulo(n, 14);
-  let rotulos = "";
-  meses.forEach((m, i) => {
-    if (i % passo === 0 || i === n - 1 || m.label === mesSelecionado) {
-      const cx = padL + stepX * i;
-      rotulos += `<text x="${cx.toFixed(1)}" y="${(baseY + 14).toFixed(1)}" text-anchor="middle" font-family="monospace" font-size="8" fill="var(--carvao)" fill-opacity="${mesSelecionado === m.label ? 1 : 0.7}" font-weight="${mesSelecionado === m.label ? 700 : 400}">${escapeHTML(m.label)}</text>`;
-    }
-  });
-
-  const yLeg = baseY + alturaRotulos;
-  let legenda = "";
-  presentes.forEach((cv, k) => {
-    const lx = padL + (k % 4) * 130;
-    const ly = yLeg + Math.floor(k / 4) * 14;
-    legenda += `<rect x="${lx.toFixed(1)}" y="${(ly - 7).toFixed(1)}" width="8" height="8" fill="${cv.cor}" /><text x="${(lx + 12).toFixed(1)}" y="${ly.toFixed(1)}" font-family="monospace" font-size="8" fill="var(--carvao)">${escapeHTML(cv.label.replace(/\s*\(.*\)/, ""))}</text>`;
-  });
-
-  return `<svg viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg">${grade}${eixoY}${marcadores}${linhas}${pontos}${rotulos}${legenda}</svg>`;
+  return { svg: `<svg viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg">${grade}${barras}${legenda}</svg>`, alturaPx: h };
 }
 
 // "Detalhamento por Área Gestora" — matriz com uma coluna por criticidade e
@@ -4305,10 +4297,10 @@ function renderTaticoContratos(lista) {
     </div>
     <div class="dash-chart-box" style="margin-bottom:16px">
       <h4>Contratos por Vencimento e Criticidade</h4>
-      <p class="dash-chart-hint">Clique numa barra ou num ponto pra isolar só aquele mês de vencimento na tabela abaixo — clique de novo pra voltar a ver todos os meses.</p>
+      <p class="dash-chart-hint" id="tat-grafico-hint">Clique numa barra pra isolar só aquele mês de vencimento na tabela abaixo — clique de novo pra voltar a ver todos os meses.</p>
       <div class="linha-troca-grafico"><div class="dash-toggle" id="tat-mes-toggle">
         <button class="dash-toggle-btn" data-modo="colunas" title="Compara o total de cada mês">COLUNAS</button>
-        <button class="dash-toggle-btn" data-modo="linha" title="Mostra a tendência de cada faixa de criticidade mês a mês">LINHA</button>
+        <button class="dash-toggle-btn" data-modo="gantt" title="Mostra a vigência de cada contrato numa linha do tempo">GANTT</button>
       </div></div>
       <div id="tat-grafico-mes"></div>
     </div>
@@ -4352,10 +4344,16 @@ function renderTaticoContratos(lista) {
 
   function atualizar() {
     const filtrada = listaFiltrada();
-    const porMes = agruparPorMesCriticidade(listaSemMes());
-    document.getElementById("tat-grafico-mes").innerHTML = modoMes === "linha"
-      ? linhaCriticidadePorMesSVG(porMes, filtroMes)
-      : colunaCriticidadeEmpilhadaSVG(porMes, filtroMes);
+    if (modoMes === "gantt") {
+      const graficoGantt = document.getElementById("tat-grafico-mes");
+      graficoGantt.innerHTML = ganttContratosSVG(listaSemMes()).svg;
+      ligarTooltipLinhas(graficoGantt, porId);
+      document.getElementById("tat-grafico-hint").textContent = "Passe o mouse numa barra pra ver o detalhe do contrato — a linha vertical marca a data de hoje.";
+    } else {
+      const porMes = agruparPorMesCriticidade(listaSemMes());
+      document.getElementById("tat-grafico-mes").innerHTML = colunaCriticidadeEmpilhadaSVG(porMes, filtroMes);
+      document.getElementById("tat-grafico-hint").textContent = "Clique numa barra pra isolar só aquele mês de vencimento na tabela abaixo — clique de novo pra voltar a ver todos os meses.";
+    }
     document.querySelectorAll("#tat-mes-toggle [data-modo]").forEach((btn) => {
       btn.classList.toggle("active", btn.dataset.modo === modoMes);
     });
