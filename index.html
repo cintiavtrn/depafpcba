@@ -3757,43 +3757,163 @@ function gaugeSVG(pct, corVar, tamanho = 112) {
     </svg>`;
 }
 
-function renderResumoContratos(resumo, filtroAtivo) {
-  const cartoes = [
-    { rotulo: "Contratos", valor: resumo.qtdContratos.toLocaleString("pt-BR") },
-    { rotulo: "Vigentes", valor: resumo.qtdVigentes.toLocaleString("pt-BR"), cor: "var(--oliva)" },
-    { rotulo: "A Vencer (≤90d)", valor: resumo.qtdAVencer.toLocaleString("pt-BR"), cor: "var(--mostarda)" },
-    { rotulo: "Vencidos", valor: resumo.qtdVencidos.toLocaleString("pt-BR"), cor: "var(--terracota)" },
-    { rotulo: "A Contratar", valor: resumo.qtdAContratar.toLocaleString("pt-BR") },
-    { rotulo: "Valor Global Atual", valor: "R$ " + formatarEixo(resumo.valorGlobalAtualTotal) },
-    { rotulo: "Média de Aditivos", valor: resumo.mediaAditivosPorContrato === null ? "—" : resumo.mediaAditivosPorContrato.toLocaleString("pt-BR", { maximumFractionDigits: 1 }) },
-    { rotulo: "% com Garantia", valor: resumo.percentualComGarantia === null ? "—" : (resumo.percentualComGarantia * 100).toLocaleString("pt-BR", { maximumFractionDigits: 1 }) + "%" },
-  ];
+// Cor de gráfico por criticidade — mesma rampa ordinal das pílulas
+// (terracota → mostarda → oliva), só que aqui precisa do valor real da var,
+// não da classe CSS, porque vai dentro de atributo fill de SVG. A dupla
+// intensidade (Vencido cheio / Crítico meio-tom, Alto cheio / Médio meio-tom)
+// é o que deixa 6 categorias legíveis com só 3 matizes.
+const CRITICIDADE_VISUAL = [
+  { label: "Vencido", cor: "var(--terracota)", opacidade: 1 },
+  { label: "Crítico (≤30 dias)", cor: "var(--terracota)", opacidade: 0.5 },
+  { label: "Alto (31–60 dias)", cor: "var(--mostarda)", opacidade: 1 },
+  { label: "Médio (61–90 dias)", cor: "var(--mostarda)", opacidade: 0.5 },
+  { label: "Baixo (>90 dias)", cor: "var(--oliva)", opacidade: 1 },
+  { label: "A Contratar", cor: "#5B6473", opacidade: 1 },
+  { label: "Sem data de vigência", cor: "#3A4152", opacidade: 1 },
+];
 
-  const pendentes = [
-    resumo.valorExecutadoTotal === null ? "Valor Executado" : null,
-    resumo.saldoDisponivelTotal === null ? "Saldo Disponível" : null,
-    resumo.qtdUnidadesBeneficiadas === null ? "Unidades Beneficiadas" : null,
-  ].filter(Boolean);
+function agruparPorAreaCriticidade(lista) {
+  const mapa = new Map();
+  for (const c of lista) {
+    const area = c.unidadeGestora || "(sem unidade)";
+    if (!mapa.has(area)) mapa.set(area, { label: area, total: 0, porCrit: {} });
+    const g = mapa.get(area);
+    g.total++;
+    g.porCrit[c.criticidade] = (g.porCrit[c.criticidade] || 0) + 1;
+  }
+  return [...mapa.values()].sort((a, b) => b.total - a.total);
+}
 
-  const legenda = ORDEM_CRITICIDADE
-    .filter((rotulo) => resumo.porCriticidade[rotulo])
-    .map((rotulo) => `
-      <button class="pill-criticidade ${CRITICIDADE_CLASSE[rotulo]}${filtroAtivo === rotulo ? " ativo" : ""}" data-filtro-criticidade="${escapeAttr(rotulo)}">
-        ${escapeHTML(rotulo)} · ${resumo.porCriticidade[rotulo]}
-      </button>`).join("");
+function agruparPorMesCriticidade(lista) {
+  const mapa = new Map();
+  for (const c of lista) {
+    if (!c.dataFim) continue;
+    const d = new Date(c.dataFim);
+    const chave = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
+    if (!mapa.has(chave)) mapa.set(chave, { label: chave, total: 0, porCrit: {} });
+    const g = mapa.get(chave);
+    g.total++;
+    g.porCrit[c.criticidade] = (g.porCrit[c.criticidade] || 0) + 1;
+  }
+  return [...mapa.values()].sort((a, b) => a.label.localeCompare(b.label));
+}
 
+// "Contratos por Criticidade e Área Gestora" — barra 100% empilhada
+// horizontal, uma linha por área. Não reaproveita cruzamentoBarrasSVG (que já
+// existe no arquivo) porque aquela função colore por ÍNDICE na paleta
+// sequencial genérica (TONS) — aqui a cor tem que ser a mesma pílula/rampa de
+// criticidade em todo lugar do módulo, não uma cor qualquer da vez.
+function barraCriticidadeHorizontalSVG(linhasArea) {
+  const presentes = CRITICIDADE_VISUAL.filter((cv) => linhasArea.some((l) => l.porCrit[cv.label]));
+  const MAX_ROTULO = 20;
+  const padL = 150, padR = 10, padT = 6;
+  const larguraPlot = 300;
+  const rowH = 22;
+  const alturaBarra = 15;
+  const alturaLegenda = Math.ceil(presentes.length / 3) * 16 + 14;
+  const h = padT + linhasArea.length * rowH + alturaLegenda;
+  const w = padL + larguraPlot + padR;
+
+  let corpo = "";
+  linhasArea.forEach((l, i) => {
+    const y = padT + i * rowH;
+    const yBarra = y + (rowH - alturaBarra) / 2;
+    corpo += textoSVG(l.label, padL - 8, y + rowH / 2, { maxChars: MAX_ROTULO, anchor: "end", fontSize: 9, alturaLinha: 10 });
+    let x = padL;
+    presentes.forEach((cv) => {
+      const v = l.porCrit[cv.label] || 0;
+      if (!v) return;
+      const larg = larguraPlot * (v / l.total);
+      corpo += `<rect x="${x.toFixed(1)}" y="${yBarra.toFixed(1)}" width="${larg.toFixed(1)}" height="${alturaBarra}" fill="${cv.cor}" fill-opacity="${cv.opacidade}"><title>${escapeHTML(l.label)} — ${escapeHTML(cv.label)}: ${v} de ${l.total}</title></rect>`;
+      x += larg;
+    });
+  });
+
+  const yLeg = padT + linhasArea.length * rowH + 10;
+  let legenda = "";
+  presentes.forEach((cv, k) => {
+    const lx = padL + (k % 3) * ((larguraPlot + 30) / 3);
+    const ly = yLeg + Math.floor(k / 3) * 16;
+    legenda += `<rect x="${lx.toFixed(1)}" y="${(ly - 8).toFixed(1)}" width="9" height="9" fill="${cv.cor}" fill-opacity="${cv.opacidade}" /><text x="${(lx + 13).toFixed(1)}" y="${ly.toFixed(1)}" font-family="monospace" font-size="8" fill="var(--carvao)">${escapeHTML(cv.label.replace(/\s*\(.*\)/, ""))}</text>`;
+  });
+
+  return `<svg viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg">${corpo}${legenda}</svg>`;
+}
+
+// "Contratos por Vencimento e Criticidade" — colunas empilhadas por mês de
+// vencimento (ano_mes de data_fim), mesma rampa de cor.
+function colunaCriticidadeEmpilhadaSVG(meses) {
+  const presentes = CRITICIDADE_VISUAL.filter((cv) => meses.some((m) => m.porCrit[cv.label]));
+  const w = 620, padL = 40, padR = 10, padT = 10;
+  const alturaPlot = 180, alturaRotulos = 30;
+  const alturaLegenda = Math.ceil(presentes.length / 4) * 14 + 10;
+  const h = padT + alturaPlot + alturaRotulos + alturaLegenda;
+  const baseY = padT + alturaPlot;
+  const n = meses.length || 1;
+  const bw = (w - padL - padR) / n;
+  const barW = Math.min(bw * 0.6, 30);
+  const maxTotal = maxSeguro(meses.map((m) => m.total));
+
+  let grade = "", eixoY = "";
+  [0, 0.5, 1].forEach((f) => {
+    const y = baseY - alturaPlot * f;
+    grade += `<line x1="${padL}" y1="${y.toFixed(1)}" x2="${w - padR}" y2="${y.toFixed(1)}" stroke="var(--paper-line)" stroke-width="1" stroke-dasharray="${f === 0 ? "0" : "2 4"}" />`;
+    eixoY += `<text x="${(padL - 6).toFixed(1)}" y="${(y + 3).toFixed(1)}" text-anchor="end" font-family="monospace" font-size="8.5" fill="var(--carvao)" fill-opacity="0.55">${formatarEixo(maxTotal * f)}</text>`;
+  });
+
+  const passo = passoRotulo(n, 14);
+  let barras = "", rotulos = "";
+  meses.forEach((m, i) => {
+    const cx = padL + bw * i + bw / 2;
+    let y = baseY;
+    presentes.forEach((cv) => {
+      const v = m.porCrit[cv.label] || 0;
+      if (!v) return;
+      const alt = alturaPlot * (v / maxTotal);
+      barras += `<rect x="${(cx - barW / 2).toFixed(1)}" y="${(y - alt).toFixed(1)}" width="${barW.toFixed(1)}" height="${alt.toFixed(1)}" fill="${cv.cor}" fill-opacity="${cv.opacidade}"><title>${escapeHTML(m.label)} — ${escapeHTML(cv.label)}: ${v}</title></rect>`;
+      y -= alt;
+    });
+    if (i % passo === 0 || i === n - 1) {
+      rotulos += `<text x="${cx.toFixed(1)}" y="${(baseY + 14).toFixed(1)}" text-anchor="middle" font-family="monospace" font-size="8" fill="var(--carvao)" fill-opacity="0.7">${escapeHTML(m.label)}</text>`;
+    }
+  });
+
+  const yLeg = baseY + alturaRotulos;
+  let legenda = "";
+  presentes.forEach((cv, k) => {
+    const lx = padL + (k % 4) * 130;
+    const ly = yLeg + Math.floor(k / 4) * 14;
+    legenda += `<rect x="${lx.toFixed(1)}" y="${(ly - 7).toFixed(1)}" width="8" height="8" fill="${cv.cor}" fill-opacity="${cv.opacidade}" /><text x="${(lx + 12).toFixed(1)}" y="${ly.toFixed(1)}" font-family="monospace" font-size="8" fill="var(--carvao)">${escapeHTML(cv.label.replace(/\s*\(.*\)/, ""))}</text>`;
+  });
+
+  return `<svg viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg">${grade}${eixoY}${barras}${rotulos}${legenda}</svg>`;
+}
+
+// "Detalhamento por Área Gestora" — matriz com uma coluna por criticidade e
+// linha de TOTAL, réplica direta da tabela do Power BI.
+function renderMatrizAreaGestora(linhasArea) {
+  const colunasCrit = CRITICIDADE_VISUAL.map((cv) => cv.label).filter((l) => linhasArea.some((a) => a.porCrit[l]));
+  const totalGeral = { total: 0, porCrit: {} };
+  linhasArea.forEach((a) => {
+    totalGeral.total += a.total;
+    colunasCrit.forEach((l) => { totalGeral.porCrit[l] = (totalGeral.porCrit[l] || 0) + (a.porCrit[l] || 0); });
+  });
+  const linhasHtml = linhasArea.map((a) => `
+    <tr>
+      <td>${escapeHTML(a.label)}</td>
+      <td class="num">${a.total}</td>
+      ${colunasCrit.map((l) => `<td class="num">${a.porCrit[l] || ""}</td>`).join("")}
+    </tr>`).join("");
   return `
-    <div class="kpi-row">${cartoes.map(c => `
-      <div class="kpi-card" style="--kpi-cor:${c.cor || "var(--carvao)"}">
-        <div class="kpi-label">${c.rotulo}</div>
-        <div class="kpi-value">${c.valor}</div>
-      </div>`).join("")}
-    </div>
-    ${pendentes.length ? `<p class="dash-chart-hint" style="margin:-8px 0 16px">Aguardando planilha da Coordenação: ${pendentes.join(", ")}.</p>` : ""}
-    <div class="legenda-criticidade" id="contratos-legenda">
-      <button class="pill-criticidade pill-neutro${filtroAtivo === null ? " ativo" : ""}" data-filtro-criticidade="">TODOS</button>
-      ${legenda}
-    </div>`;
+    <table class="dash-tabela">
+      <thead><tr><th>ÁREA GESTORA</th><th>QTD CONTRATOS</th>${colunasCrit.map((l) => `<th>QTD ${escapeHTML(l.replace(/\s*\(.*\)/, "").toUpperCase())}</th>`).join("")}</tr></thead>
+      <tbody>${linhasHtml}
+        <tr style="border-top:2px solid var(--carvao);font-weight:700">
+          <td>TOTAL</td><td class="num">${totalGeral.total}</td>
+          ${colunasCrit.map((l) => `<td class="num">${totalGeral.porCrit[l] || ""}</td>`).join("")}
+        </tr>
+      </tbody>
+    </table>`;
 }
 
 function tooltipContratoHTML(c) {
@@ -3816,22 +3936,239 @@ function tooltipContratoHTML(c) {
     </dl>`;
 }
 
-function renderTabelaContratos(lista) {
-  if (!lista.length) return `<p class="tela-intro">Nenhum contrato nessa faixa.</p>`;
-  const linhas = lista.map(c => `
-    <tr class="linha-contrato" data-contrato-id="${escapeAttr(c.id)}">
-      <td>${escapeHTML(c.numeroContrato)}</td>
-      <td>${escapeHTML(c.empresa)}</td>
-      <td>${escapeHTML(c.unidadeGestora || "—")}</td>
-      <td>${pillCriticidade(c.criticidade)}</td>
-      <td class="num">${formatarDiasBR(c.diasParaVencer)}</td>
-      <td class="num">${formatarMoedaBR(c.valorGlobalAtual)}</td>
-    </tr>`).join("");
-  return `
-    <table class="dash-tabela">
-      <thead><tr><th>CONTRATO</th><th>EMPRESA</th><th>UNIDADE</th><th>CRITICIDADE</th><th>VENCIMENTO</th><th>VALOR ATUAL</th></tr></thead>
-      <tbody>${linhas}</tbody>
-    </table>`;
+// Tooltip flutuante compartilhado entre as sub-abas (mesmo elemento, uma
+// instância só) — é a réplica da página "Detalhe do Contrato (Tooltip)" do
+// Power BI, que aparece ao passar o mouse em qualquer tabela de contrato.
+let TOOLTIP_CONTRATO_EL = null;
+function tooltipContratoEl() {
+  if (!TOOLTIP_CONTRATO_EL) {
+    TOOLTIP_CONTRATO_EL = document.createElement("div");
+    TOOLTIP_CONTRATO_EL.id = "tooltip-contrato-flutuante";
+    TOOLTIP_CONTRATO_EL.className = "tooltip-contrato";
+    TOOLTIP_CONTRATO_EL.hidden = true;
+    document.body.appendChild(TOOLTIP_CONTRATO_EL);
+  }
+  return TOOLTIP_CONTRATO_EL;
+}
+function ligarTooltipLinhas(container, porId) {
+  const tooltip = tooltipContratoEl();
+  container.querySelectorAll(".linha-contrato").forEach((tr) => {
+    const c = porId.get(tr.dataset.contratoId);
+    if (!c) return;
+    tr.addEventListener("mouseenter", () => {
+      tooltip.innerHTML = tooltipContratoHTML(c);
+      tooltip.hidden = false;
+    });
+    tr.addEventListener("mousemove", (ev) => {
+      const largura = 320, altura = tooltip.offsetHeight || 220;
+      let x = ev.clientX + 18, y = ev.clientY + 18;
+      if (x + largura > window.innerWidth) x = ev.clientX - largura - 18;
+      if (y + altura > window.innerHeight) y = Math.max(8, window.innerHeight - altura - 8);
+      tooltip.style.left = x + "px";
+      tooltip.style.top = y + "px";
+    });
+    tr.addEventListener("mouseleave", () => { tooltip.hidden = true; });
+  });
+}
+
+// ---------- Gerencial: cartões de portfólio + matriz e barra por área ----------
+function renderGerencialContratos(lista, resumo) {
+  const alvo = document.getElementById("contratos-sub-gerencial");
+  const areasDisponiveis = [...new Set(lista.map((c) => c.unidadeGestora || "(sem unidade)"))].sort();
+  let filtroArea = "";
+
+  alvo.innerHTML = `
+    <div class="dash-filtros">
+      <div class="dash-filtro">
+        <label>ÁREA GESTORA</label>
+        <select id="ger-filtro-area"><option value="">Todos</option>${areasDisponiveis.map((a) => `<option value="${escapeAttr(a)}">${escapeHTML(a)}</option>`).join("")}</select>
+      </div>
+    </div>
+    <div id="ger-kpis" style="margin-bottom:16px"></div>
+    <div class="dash-charts" style="grid-template-columns:1.1fr 1fr">
+      <div class="dash-chart-box">
+        <h4>Detalhamento por Área Gestora</h4>
+        <div id="ger-matriz" style="max-height:380px;overflow-y:auto"></div>
+      </div>
+      <div class="dash-chart-box">
+        <h4>Contratos por Criticidade e Área Gestora</h4>
+        <div id="ger-barra"></div>
+      </div>
+    </div>
+    <div class="kpi-row" style="margin-top:2px;grid-template-columns:repeat(auto-fit,minmax(180px,1fr))" id="ger-rodape"></div>
+  `;
+
+  function atualizar() {
+    const filtrada = filtroArea ? lista.filter((c) => (c.unidadeGestora || "(sem unidade)") === filtroArea) : lista;
+    const qtdVencidos = filtrada.filter((c) => c.statusVigencia === "Vencido").length;
+    const qtdAVencer = filtrada.filter((c) => c.statusVigencia === "A Vencer").length;
+    const valorInicial = filtrada.reduce((a, c) => a + (c.valorGlobalInicial || 0), 0);
+    const valorAtual = filtrada.reduce((a, c) => a + (c.valorGlobalAtual || 0), 0);
+    const qtdBaixo = filtrada.filter((c) => c.criticidade === "Baixo (>90 dias)").length;
+    const pctBaixo = filtrada.length ? (qtdBaixo / filtrada.length) * 100 : 0;
+    const porArea = agruparPorAreaCriticidade(filtrada);
+
+    document.getElementById("ger-kpis").innerHTML = `
+      <div class="kpi-row">
+        <div class="kpi-card"><div class="kpi-label">Qtd Contratos</div><div class="kpi-value">${filtrada.length.toLocaleString("pt-BR")}</div></div>
+        <div class="kpi-card" style="--kpi-cor:var(--terracota)"><div class="kpi-label">Qtd Contratos Vencidos</div><div class="kpi-value">${qtdVencidos.toLocaleString("pt-BR")}</div></div>
+        <div class="kpi-card" style="--kpi-cor:var(--mostarda)"><div class="kpi-label">Qtd Contratos A Vencer</div><div class="kpi-value">${qtdAVencer.toLocaleString("pt-BR")}</div></div>
+        <div class="kpi-card"><div class="kpi-label">Valor Global Inicial Total</div><div class="kpi-value">R$ ${formatarEixo(valorInicial)}</div></div>
+        <div class="kpi-card"><div class="kpi-label">Valor Global Atual Total</div><div class="kpi-value">R$ ${formatarEixo(valorAtual)}</div></div>
+      </div>`;
+    document.getElementById("ger-matriz").innerHTML = renderMatrizAreaGestora(porArea);
+    document.getElementById("ger-barra").innerHTML = barraCriticidadeHorizontalSVG(porArea);
+    document.getElementById("ger-rodape").innerHTML = `
+      <div class="kpi-card" style="--kpi-cor:var(--oliva)"><div class="kpi-label">% Contratos Baixo</div><div class="kpi-value">${pctBaixo.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}%</div></div>`;
+  }
+
+  document.getElementById("ger-filtro-area").addEventListener("change", (ev) => { filtroArea = ev.target.value; atualizar(); });
+  atualizar();
+}
+
+// ---------- Tático: controle de prazos + evolução mensal + tabela ----------
+function renderTaticoContratos(lista) {
+  const alvo = document.getElementById("contratos-sub-tatico");
+  const porId = new Map(lista.map((c) => [c.id, c]));
+  let busca = "";
+  const filtrosCriticidade = new Set();
+
+  alvo.innerHTML = `
+    <div class="dash-filtros">
+      <div class="dash-filtro" style="flex:1;min-width:260px">
+        <label>Nº CONTRATO, CONTRATADO OU OBJETO</label>
+        <input type="text" id="tat-busca" placeholder="buscar..." style="font-family:'IBM Plex Mono',monospace;font-size:var(--fs-ui);padding:6px 8px;border:2px solid var(--carvao);background:var(--paper);color:var(--carvao)">
+      </div>
+    </div>
+    <h4 style="font-family:'Space Grotesk',sans-serif;font-size:var(--fs-subtitulo);margin-bottom:8px">Controle de Prazos</h4>
+    <div class="dash-toggle" id="tat-toggle-criticidade" style="margin-bottom:18px;flex-wrap:wrap">
+      <button class="dash-toggle-btn active" data-crit="">SELECIONAR TUDO</button>
+      ${ORDEM_CRITICIDADE.filter((l) => lista.some((c) => c.criticidade === l)).map((l) => `<button class="dash-toggle-btn" data-crit="${escapeAttr(l)}">${escapeHTML(l.toUpperCase())}</button>`).join("")}
+    </div>
+    <div class="dash-chart-box" style="margin-bottom:16px">
+      <h4>Contratos por Vencimento e Criticidade</h4>
+      <div id="tat-grafico-mes"></div>
+    </div>
+    <h4 style="font-family:'Space Grotesk',sans-serif;font-size:var(--fs-subtitulo);margin-bottom:8px">Detalhamento dos Contratos</h4>
+    <p class="font-mono" style="font-size:var(--fs-ui-sm);color:#8B93A3;margin-bottom:8px">Passe o mouse numa linha pra ver o detalhe do contrato.</p>
+    <div id="tat-tabela"></div>
+  `;
+
+  function listaFiltrada() {
+    return lista.filter((c) =>
+      (!filtrosCriticidade.size || filtrosCriticidade.has(c.criticidade)) &&
+      (!busca || [c.numeroContrato, c.empresa, c.objeto].some((v) => v?.toLowerCase().includes(busca)))
+    );
+  }
+
+  function atualizar() {
+    const filtrada = listaFiltrada();
+    document.getElementById("tat-grafico-mes").innerHTML = colunaCriticidadeEmpilhadaSVG(agruparPorMesCriticidade(filtrada));
+    document.getElementById("tat-tabela").innerHTML = filtrada.length
+      ? `<table class="dash-tabela">
+          <thead><tr><th>Nº CONTRATO</th><th>ÁREA GESTORA</th><th>EMPRESA</th><th>OBJETO</th></tr></thead>
+          <tbody>${filtrada.map((c) => `
+            <tr class="linha-contrato" data-contrato-id="${escapeAttr(c.id)}">
+              <td>${escapeHTML(c.numeroContrato)}</td><td>${escapeHTML(c.unidadeGestora || "—")}</td><td>${escapeHTML(c.empresa)}</td><td>${escapeHTML(c.objeto || "—")}</td>
+            </tr>`).join("")}</tbody>
+        </table>`
+      : `<p class="tela-intro">Nenhum contrato nessa faixa.</p>`;
+    ligarTooltipLinhas(document.getElementById("tat-tabela"), porId);
+    document.querySelectorAll("#tat-toggle-criticidade [data-crit]").forEach((btn) => {
+      btn.classList.toggle("active", btn.dataset.crit ? filtrosCriticidade.has(btn.dataset.crit) : filtrosCriticidade.size === 0);
+    });
+  }
+
+  document.getElementById("tat-busca").addEventListener("input", (ev) => { busca = ev.target.value.trim().toLowerCase(); atualizar(); });
+  document.getElementById("tat-toggle-criticidade").addEventListener("click", (ev) => {
+    const btn = ev.target.closest("[data-crit]");
+    if (!btn) return;
+    if (!btn.dataset.crit) filtrosCriticidade.clear();
+    else if (filtrosCriticidade.has(btn.dataset.crit)) filtrosCriticidade.delete(btn.dataset.crit);
+    else filtrosCriticidade.add(btn.dataset.crit);
+    atualizar();
+  });
+
+  atualizar();
+}
+
+// ---------- Operacional: drill-down de um contrato (setor → contrato) ----------
+function renderOperacionalContratos(lista) {
+  const alvo = document.getElementById("contratos-sub-operacional");
+  const porId = new Map(lista.map((c) => [c.id, c]));
+  const setores = [...new Set(lista.map((c) => c.unidadeGestora || "(sem unidade)"))].sort();
+  let setor = "", contratoId = "";
+
+  alvo.innerHTML = `
+    <div class="dash-filtros">
+      <div class="dash-filtro">
+        <label>SELECIONE O SETOR</label>
+        <select id="op-select-setor"><option value="">Todos</option>${setores.map((s) => `<option value="${escapeAttr(s)}">${escapeHTML(s)}</option>`).join("")}</select>
+      </div>
+      <div class="dash-filtro" style="flex:1;min-width:280px">
+        <label>SELECIONE O CONTRATO</label>
+        <select id="op-select-contrato"></select>
+      </div>
+    </div>
+    <div id="op-campos-selecionados" style="margin-bottom:16px"></div>
+    <div id="op-kpis" style="margin-bottom:16px"></div>
+    <div class="dash-charts" style="grid-template-columns:1.3fr 1fr">
+      <div class="dash-chart-box">
+        <h4>Gestor e Fiscal do Contrato</h4>
+        <div id="op-gestor-fiscal"></div>
+      </div>
+      <div class="dash-chart-box" style="text-align:center">
+        <h4>Execução do Prazo</h4>
+        <div id="op-gauge" style="display:flex;justify-content:center"></div>
+      </div>
+    </div>
+  `;
+
+  function contratosDoSetor() {
+    return setor ? lista.filter((c) => (c.unidadeGestora || "(sem unidade)") === setor) : lista;
+  }
+
+  function atualizar() {
+    const emContexto = contratosDoSetor();
+    const selecionado = contratoId ? porId.get(contratoId) : null;
+    const valorAtualTotal = emContexto.reduce((a, c) => a + (c.valorGlobalAtual || 0), 0);
+    const qtdAditivosTotal = emContexto.reduce((a, c) => a + (c.qtdAditivos || 0), 0);
+
+    document.getElementById("op-campos-selecionados").innerHTML = `
+      <div class="dados-grid">
+        <div class="dado"><div class="valor" style="font-size:var(--fs-titulo);line-height:1.2">${selecionado ? escapeHTML(selecionado.objeto || "—") : "--"}</div><div class="rotulo">Objeto Selecionado</div></div>
+        <div class="dado"><div class="valor" style="font-size:var(--fs-titulo)">${selecionado ? escapeHTML(selecionado.empresa) : "--"}</div><div class="rotulo">Empresa Selecionada</div></div>
+        <div class="dado"><div class="valor">${selecionado ? formatarDataBR(selecionado.dataInicio) : "--"}</div><div class="rotulo">Data Início Selecionada</div></div>
+        <div class="dado"><div class="valor">${selecionado ? formatarDataBR(selecionado.dataFim) : "--"}</div><div class="rotulo">Data Término Selecionada</div></div>
+        <div class="dado"><div class="valor">${selecionado ? formatarDiasBR(selecionado.diasParaVencer) : "--"}</div><div class="rotulo">Dias Para Vencer Selecionado</div></div>
+        <div class="dado">${selecionado ? pillCriticidade(selecionado.criticidade) : `<div class="valor">--</div>`}<div class="rotulo">Criticidade Selecionada</div></div>
+      </div>`;
+
+    document.getElementById("op-kpis").innerHTML = `
+      <div class="kpi-row">
+        <div class="kpi-card"><div class="kpi-label">Valor Global Atual Total</div><div class="kpi-value">R$ ${formatarEixo(selecionado ? (selecionado.valorGlobalAtual || 0) : valorAtualTotal)}</div></div>
+        <div class="kpi-card"><div class="kpi-label">Valor Executado Total</div><div class="kpi-value">—</div></div>
+        <div class="kpi-card"><div class="kpi-label">Saldo Disponível Total</div><div class="kpi-value">—</div></div>
+        <div class="kpi-card"><div class="kpi-label">Qtd Total de Aditivos</div><div class="kpi-value">${(selecionado ? selecionado.qtdAditivos : qtdAditivosTotal).toLocaleString("pt-BR")}</div></div>
+      </div>`;
+
+    const pessoas = selecionado
+      ? selecionado.pessoas.map((p) => ({ ...p, numeroContrato: selecionado.numeroContrato }))
+      : emContexto.flatMap((c) => c.pessoas.map((p) => ({ ...p, numeroContrato: c.numeroContrato })));
+    document.getElementById("op-gestor-fiscal").innerHTML = pessoas.length
+      ? `<table class="dash-tabela"><thead><tr>${selecionado ? "" : "<th>CONTRATO</th>"}<th>PAPEL</th><th>NOME</th></tr></thead><tbody>${pessoas.map((p) => `<tr>${selecionado ? "" : `<td>${escapeHTML(p.numeroContrato)}</td>`}<td>${escapeHTML(p.papel)}</td><td>${escapeHTML(p.nomePessoa)}</td></tr>`).join("")}</tbody></table>`
+      : `<p class="tela-intro">Nenhum gestor/fiscal cadastrado.</p>`;
+
+    document.getElementById("op-gauge").innerHTML = gaugeSVG(selecionado ? selecionado.percentualExecucaoPrazo : null, "var(--tinta)", 130);
+
+    const selContrato = document.getElementById("op-select-contrato");
+    selContrato.innerHTML = `<option value="">Todos</option>` + emContexto.map((c) => `<option value="${escapeAttr(c.id)}"${c.id === contratoId ? " selected" : ""}>${escapeHTML(c.numeroContrato)} — ${escapeHTML(c.empresa)}</option>`).join("");
+  }
+
+  document.getElementById("op-select-setor").addEventListener("change", (ev) => { setor = ev.target.value; contratoId = ""; atualizar(); });
+  document.getElementById("op-select-contrato").addEventListener("change", (ev) => { contratoId = ev.target.value; atualizar(); });
+
+  atualizar();
 }
 
 async function carregarContratosPortal(portalSlug) {
@@ -3849,103 +4186,33 @@ async function carregarContratosPortal(portalSlug) {
     return;
   }
 
-  const porId = new Map(lista.map(c => [c.id, c]));
-  const comPrazo = lista.filter(c => c.percentualExecucaoPrazo !== null);
-  const mediaPrazo = comPrazo.length ? comPrazo.reduce((a, c) => a + c.percentualExecucaoPrazo, 0) / comPrazo.length : null;
-
-  let filtroCriticidade = null;
-  let busca = "";
-
-  function listaFiltrada() {
-    return lista.filter(c =>
-      (!filtroCriticidade || c.criticidade === filtroCriticidade) &&
-      (!busca || [c.numeroContrato, c.empresa, c.objeto].some(v => v?.toLowerCase().includes(busca)))
-    );
-  }
-
-  // O medidor não reaproveita a rampa terracota/mostarda/oliva das pílulas —
-  // aquela escala é de URGÊNCIA de vencimento, esta é de EXECUÇÃO de prazo
-  // (quanto do contrato já se foi), uma pergunta diferente. Fica na cor
-  // "tinta", a mesma usada em medida neutra no resto do sistema.
-  function desenharGauge(pct, rotulo, fonte) {
-    document.getElementById("contratos-gauge-svg").innerHTML = gaugeSVG(pct, "var(--tinta)", 112);
-    document.getElementById("contratos-gauge-titulo").textContent = rotulo;
-    document.getElementById("contratos-gauge-fonte").textContent = fonte;
-  }
-
-  function redesenharTabela() {
-    document.getElementById("contratos-tabela-wrap").innerHTML = renderTabelaContratos(listaFiltrada());
-    ligarHoverTabela();
-  }
-
-  function ligarHoverTabela() {
-    let tooltip = document.getElementById("tooltip-contrato-flutuante");
-    if (!tooltip) {
-      tooltip = document.createElement("div");
-      tooltip.id = "tooltip-contrato-flutuante";
-      tooltip.className = "tooltip-contrato";
-      tooltip.hidden = true;
-      document.body.appendChild(tooltip);
-    }
-    painel.querySelectorAll(".linha-contrato").forEach(tr => {
-      const c = porId.get(tr.dataset.contratoId);
-      if (!c) return;
-      tr.addEventListener("mouseenter", () => {
-        tooltip.innerHTML = tooltipContratoHTML(c);
-        tooltip.hidden = false;
-        if (c.percentualExecucaoPrazo !== null) {
-          desenharGauge(c.percentualExecucaoPrazo, `Execução — ${c.numeroContrato}`, "contrato sob o cursor");
-        }
-      });
-      tr.addEventListener("mousemove", (ev) => {
-        const largura = 320, altura = tooltip.offsetHeight || 220;
-        let x = ev.clientX + 18, y = ev.clientY + 18;
-        if (x + largura > window.innerWidth) x = ev.clientX - largura - 18;
-        if (y + altura > window.innerHeight) y = Math.max(8, window.innerHeight - altura - 8);
-        tooltip.style.left = x + "px";
-        tooltip.style.top = y + "px";
-      });
-      tr.addEventListener("mouseleave", () => {
-        tooltip.hidden = true;
-        desenharGauge(mediaPrazo, "Execução média do prazo", "contratos vigentes/a vencer, portfólio inteiro");
-      });
-    });
-  }
-
+  // Mesma organização em 3 páginas do painel de Power BI (contratos-2026/
+  // painelgerencialcontratos.pbip) — Gerencial, Tático, Operacional — pra
+  // ficar o mais fiel possível ao modelo de referência.
   painel.innerHTML = `
-    <div id="contratos-resumo"></div>
-    <div class="gauge-prazo">
-      <div id="contratos-gauge-svg">${gaugeSVG(mediaPrazo, "var(--tinta)")}</div>
-      <div class="legenda-gauge">
-        <h4 id="contratos-gauge-titulo">Execução média do prazo</h4>
-        <p>Dias já decorridos do contrato sobre a duração total (data_fim − data_início), média do portfólio.</p>
-        <p class="fonte" id="contratos-gauge-fonte">contratos vigentes/a vencer, portfólio inteiro</p>
-      </div>
+    <div class="tabs" style="margin-bottom:0">
+      <button class="tab-btn active" data-subtab-contratos="gerencial">GERENCIAL</button>
+      <button class="tab-btn" data-subtab-contratos="tatico">TÁTICO</button>
+      <button class="tab-btn" data-subtab-contratos="operacional">OPERACIONAL</button>
     </div>
-    <div class="dash-filtros">
-      <div class="dash-filtro" style="flex:1;min-width:220px">
-        <label>BUSCAR</label>
-        <input type="text" id="contratos-busca" placeholder="número, empresa ou objeto..." style="font-family:'IBM Plex Mono',monospace;font-size:var(--fs-ui);padding:6px 8px;border:2px solid var(--carvao);background:var(--paper);color:var(--carvao)">
-      </div>
-    </div>
-    <div id="contratos-tabela-wrap"></div>
+    <div class="tab-panel" id="contratos-sub-gerencial"></div>
+    <div class="tab-panel" id="contratos-sub-tatico" hidden></div>
+    <div class="tab-panel" id="contratos-sub-operacional" hidden></div>
   `;
 
-  document.getElementById("contratos-resumo").innerHTML = renderResumoContratos(resumo, filtroCriticidade);
-  redesenharTabela();
-
-  document.getElementById("contratos-resumo").addEventListener("click", (ev) => {
-    const btn = ev.target.closest("[data-filtro-criticidade]");
-    if (!btn) return;
-    filtroCriticidade = btn.dataset.filtroCriticidade || null;
-    document.getElementById("contratos-resumo").innerHTML = renderResumoContratos(resumo, filtroCriticidade);
-    redesenharTabela();
+  const SUBABAS_CONTRATOS = ["gerencial", "tatico", "operacional"];
+  painel.querySelectorAll("[data-subtab-contratos]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      painel.querySelectorAll("[data-subtab-contratos]").forEach((b) => b.classList.remove("active"));
+      btn.classList.add("active");
+      const alvo = btn.dataset.subtabContratos;
+      SUBABAS_CONTRATOS.forEach((nome) => { painel.querySelector(`#contratos-sub-${nome}`).hidden = alvo !== nome; });
+    });
   });
 
-  document.getElementById("contratos-busca").addEventListener("input", (ev) => {
-    busca = ev.target.value.trim().toLowerCase();
-    redesenharTabela();
-  });
+  renderGerencialContratos(lista, resumo);
+  renderTaticoContratos(lista);
+  renderOperacionalContratos(lista);
 }
 
 async function abrirTela(id) {
