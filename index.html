@@ -244,6 +244,42 @@ body{background:var(--paper);color:var(--carvao);font-family:'IBM Plex Sans',san
 .dash-tabela tr[data-cat]:hover{background:var(--paper-line)}
 .dash-tabela tr.selecionada{background:var(--paper-line);font-weight:700}
 .dash-tabela tr.selecionada td{border-color:var(--carvao)}
+/* CPG - Contratos: pílula de criticidade, medidor de execução de prazo e
+   popover de detalhe ao passar o mouse na tabela (equivalente à página
+   "Detalhe do Contrato (Tooltip)" do painel de Power BI). Sem paleta nova —
+   criticidade é uma variável ORDINAL (mais grave → menos grave), então usa a
+   rampa que já existe pra isso: terracota (perigo) → mostarda (atenção) →
+   oliva (ok). "A Contratar"/"Sem data" não são gravidade, são ausência de
+   informação — ficam num cinza neutro, fora da rampa. */
+.pill-criticidade{display:inline-flex;align-items:center;gap:5px;font-family:'IBM Plex Mono',monospace;font-size:var(--fs-ui-sm);letter-spacing:.03em;padding:3px 10px;border:1px solid transparent;white-space:nowrap}
+.pill-criticidade::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor;flex:none}
+.pill-vencido{background:var(--terracota);color:var(--paper);border-color:var(--terracota);font-weight:700}
+.pill-critico{background:var(--terracota-glow);color:var(--terracota);border-color:var(--terracota)}
+.pill-alto{background:var(--mostarda-glow);color:var(--mostarda);border-color:var(--mostarda)}
+.pill-medio{background:transparent;color:var(--mostarda);border-color:var(--mostarda)}
+.pill-baixo{background:var(--oliva-glow);color:var(--oliva);border-color:var(--oliva)}
+.pill-neutro{background:rgba(255,255,255,.05);color:#9AA3B2;border-color:#2b3142}
+
+.legenda-criticidade{display:flex;flex-wrap:wrap;gap:8px;margin:2px 0 20px}
+.legenda-criticidade button{cursor:pointer;font:inherit;border-radius:999px;opacity:.55;transition:opacity .15s ease}
+.legenda-criticidade button.ativo,.legenda-criticidade button:hover{opacity:1}
+
+.gauge-prazo{display:flex;align-items:center;gap:20px;background:var(--surface);border:2px solid var(--carvao);padding:16px 20px;margin-bottom:18px}
+.gauge-prazo svg{width:112px;height:112px;flex:none}
+.gauge-prazo .legenda-gauge{min-width:0}
+.gauge-prazo .legenda-gauge h4{font-family:'Space Grotesk',sans-serif;font-size:var(--fs-subtitulo);margin-bottom:4px}
+.gauge-prazo .legenda-gauge p{font-size:var(--fs-corpo);color:#C7CDD9}
+.gauge-prazo .legenda-gauge .fonte{font-family:'IBM Plex Mono',monospace;font-size:var(--fs-ui-sm);color:#9AA3B2;margin-top:6px}
+
+.linha-contrato:hover{background:var(--paper-line);cursor:default}
+.tooltip-contrato{position:fixed;z-index:200;width:320px;max-width:calc(100vw - 24px);background:var(--surface);border:2px solid var(--carvao);box-shadow:var(--shadow-lg);padding:16px 18px;pointer-events:none}
+.tooltip-contrato h4{font-family:'Space Grotesk',sans-serif;font-size:var(--fs-subtitulo);margin-bottom:2px;padding-right:74px;line-height:1.25}
+.tooltip-contrato .obj{font-size:var(--fs-ui-sm);color:#C7CDD9;margin-bottom:10px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.tooltip-contrato dl{display:grid;grid-template-columns:auto 1fr;gap:5px 10px;font-size:var(--fs-ui-sm)}
+.tooltip-contrato dt{font-family:'IBM Plex Mono',monospace;color:#9AA3B2;text-transform:uppercase;letter-spacing:.05em}
+.tooltip-contrato dd{color:var(--carvao);text-align:right;font-variant-numeric:tabular-nums}
+.tooltip-contrato .pill-criticidade{position:absolute;top:16px;right:16px}
+
 .faixa-cartoes{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px;margin-bottom:10px}
 .faixa-cartoes>.dash-chart-box{margin-bottom:0;min-width:0;padding:14px 16px}
 .faixa-cartoes>.dash-chart-box>h4{font-size:var(--fs-ui);line-height:1.3;margin-bottom:6px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
@@ -1231,6 +1267,14 @@ const MESES = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov"
 
 const TONS = ["var(--tinta)", "var(--mostarda)", "var(--terracota)", "var(--oliva)", "var(--dourado)", "var(--vinho)"];
 function corCategoria(i) { return TONS[i % TONS.length]; }
+
+// Subaba dentro de um portal — mais barato que um portal-filho de verdade no
+// banco (Portal não tem hierarquia) e resolve o pedido real: uma seção extra
+// na tela do portal, com sua própria aba, sem mexer no hub/rosa dos ventos.
+// Se um dia surgir mais de um subportal por portal, é só empilhar aqui.
+const SUBPORTAIS = {
+  orcamento: [{ tab: "contratos", rotulo: "CPG - CONTRATOS" }],
+};
 
 // =====================================================================
 // 4. LÓGICA DA INTERFACE (DOM)
@@ -3648,6 +3692,262 @@ async function carregarUploadsPortal(portalId) {
   }
 }
 
+// ---------- CPG - Contratos ----------
+// Réplica, em HTML/SVG à mão, dos três visuais do painel de Power BI
+// (contratos-2026/painelgerencialcontratos.pbip) que o Power BI Pro ainda não
+// libera pra equipe ver: pílula de criticidade (Cor Criticidade), medidor de
+// execução de prazo (% Execução do Prazo) e a tabela com o detalhe do
+// contrato ao passar o mouse (página "Detalhe do Contrato (Tooltip)").
+// Os números vêm de /api/portais/orcamento/contratos/*, que replica em JS as
+// mesmas medidas DAX (ver src/services/contratos.service.js).
+const CRITICIDADE_CLASSE = {
+  "Vencido": "pill-vencido",
+  "Crítico (≤30 dias)": "pill-critico",
+  "Alto (31–60 dias)": "pill-alto",
+  "Médio (61–90 dias)": "pill-medio",
+  "Baixo (>90 dias)": "pill-baixo",
+  "A Contratar": "pill-neutro",
+  "Sem data de vigência": "pill-neutro",
+};
+const ORDEM_CRITICIDADE = ["Vencido", "Crítico (≤30 dias)", "Alto (31–60 dias)", "Médio (61–90 dias)", "Baixo (>90 dias)", "A Contratar", "Sem data de vigência"];
+
+function pillCriticidade(rotulo) {
+  const classe = CRITICIDADE_CLASSE[rotulo] || "pill-neutro";
+  return `<span class="pill-criticidade ${classe}">${escapeHTML(rotulo)}</span>`;
+}
+
+function formatarMoedaBR(v) {
+  if (v === null || v === undefined) return "—";
+  return "R$ " + Number(v).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+function formatarDataBR(iso) {
+  if (!iso) return "—";
+  return new Date(iso).toLocaleDateString("pt-BR", { timeZone: "UTC" });
+}
+function formatarDiasBR(dias) {
+  if (dias === null || dias === undefined) return "—";
+  if (dias < 0) return `venceu há ${Math.abs(dias)} dia(s)`;
+  if (dias === 0) return "vence hoje";
+  return `${dias} dia(s)`;
+}
+
+// Medidor de execução de prazo: arco de 270° (como um velocímetro), mesmo
+// método de "círculo + stroke-dasharray" já usado na rosa dos ventos do hub
+// — não é um widget de biblioteca, é geometria calculada igual ao resto do
+// arquivo.
+function gaugeSVG(pct, corVar, tamanho = 112) {
+  const raio = tamanho * 0.41;
+  const perimetro = 2 * Math.PI * raio;
+  const fracaoArco = 0.75;
+  const arco = perimetro * fracaoArco;
+  const vazio = perimetro - arco;
+  const cx = tamanho / 2, cy = tamanho / 2;
+  const p = pct === null ? null : Math.max(0, Math.min(1, pct));
+  const preenchido = (p ?? 0) * arco;
+  return `
+    <svg viewBox="0 0 ${tamanho} ${tamanho}">
+      <circle cx="${cx}" cy="${cy}" r="${raio.toFixed(1)}" fill="none" stroke="var(--paper-line)" stroke-width="10"
+        stroke-linecap="round" stroke-dasharray="${arco.toFixed(1)} ${vazio.toFixed(1)}"
+        transform="rotate(135 ${cx} ${cy})" />
+      <circle cx="${cx}" cy="${cy}" r="${raio.toFixed(1)}" fill="none" stroke="${corVar}" stroke-width="10"
+        stroke-linecap="round" stroke-dasharray="${preenchido.toFixed(1)} ${(perimetro - preenchido).toFixed(1)}"
+        transform="rotate(135 ${cx} ${cy})" style="transition:stroke-dasharray .25s ease" />
+      <text x="${cx}" y="${(cy + tamanho * 0.02).toFixed(1)}" text-anchor="middle" font-family="'Space Grotesk',sans-serif" font-size="${tamanho * 0.19}" font-weight="700" fill="var(--carvao)">${p === null ? "—" : Math.round(p * 100) + "%"}</text>
+      <text x="${cx}" y="${(cy + tamanho * 0.17).toFixed(1)}" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="${tamanho * 0.07}" letter-spacing="1.5" fill="#9AA3B2">PRAZO</text>
+    </svg>`;
+}
+
+function renderResumoContratos(resumo, filtroAtivo) {
+  const cartoes = [
+    { rotulo: "Contratos", valor: resumo.qtdContratos.toLocaleString("pt-BR") },
+    { rotulo: "Vigentes", valor: resumo.qtdVigentes.toLocaleString("pt-BR"), cor: "var(--oliva)" },
+    { rotulo: "A Vencer (≤90d)", valor: resumo.qtdAVencer.toLocaleString("pt-BR"), cor: "var(--mostarda)" },
+    { rotulo: "Vencidos", valor: resumo.qtdVencidos.toLocaleString("pt-BR"), cor: "var(--terracota)" },
+    { rotulo: "A Contratar", valor: resumo.qtdAContratar.toLocaleString("pt-BR") },
+    { rotulo: "Valor Global Atual", valor: "R$ " + formatarEixo(resumo.valorGlobalAtualTotal) },
+    { rotulo: "Média de Aditivos", valor: resumo.mediaAditivosPorContrato === null ? "—" : resumo.mediaAditivosPorContrato.toLocaleString("pt-BR", { maximumFractionDigits: 1 }) },
+    { rotulo: "% com Garantia", valor: resumo.percentualComGarantia === null ? "—" : (resumo.percentualComGarantia * 100).toLocaleString("pt-BR", { maximumFractionDigits: 1 }) + "%" },
+  ];
+
+  const pendentes = [
+    resumo.valorExecutadoTotal === null ? "Valor Executado" : null,
+    resumo.saldoDisponivelTotal === null ? "Saldo Disponível" : null,
+    resumo.qtdUnidadesBeneficiadas === null ? "Unidades Beneficiadas" : null,
+  ].filter(Boolean);
+
+  const legenda = ORDEM_CRITICIDADE
+    .filter((rotulo) => resumo.porCriticidade[rotulo])
+    .map((rotulo) => `
+      <button class="pill-criticidade ${CRITICIDADE_CLASSE[rotulo]}${filtroAtivo === rotulo ? " ativo" : ""}" data-filtro-criticidade="${escapeAttr(rotulo)}">
+        ${escapeHTML(rotulo)} · ${resumo.porCriticidade[rotulo]}
+      </button>`).join("");
+
+  return `
+    <div class="kpi-row">${cartoes.map(c => `
+      <div class="kpi-card" style="--kpi-cor:${c.cor || "var(--carvao)"}">
+        <div class="kpi-label">${c.rotulo}</div>
+        <div class="kpi-value">${c.valor}</div>
+      </div>`).join("")}
+    </div>
+    ${pendentes.length ? `<p class="dash-chart-hint" style="margin:-8px 0 16px">Aguardando planilha da Coordenação: ${pendentes.join(", ")}.</p>` : ""}
+    <div class="legenda-criticidade" id="contratos-legenda">
+      <button class="pill-criticidade pill-neutro${filtroAtivo === null ? " ativo" : ""}" data-filtro-criticidade="">TODOS</button>
+      ${legenda}
+    </div>`;
+}
+
+function tooltipContratoHTML(c) {
+  const pessoasPorPapel = (papel) => c.pessoas.filter(p => p.papel === papel).map(p => p.nomePessoa).join(", ") || "—";
+  return `
+    <h4>${escapeHTML(c.numeroContrato)}</h4>
+    <p class="obj">${escapeHTML(c.objeto || "(objeto não identificado)")}</p>
+    ${pillCriticidade(c.criticidade)}
+    <dl>
+      <dt>Empresa</dt><dd>${escapeHTML(c.empresa)}</dd>
+      <dt>CNPJ/CPF</dt><dd>${escapeHTML(c.cnpjCpf || "—")}</dd>
+      <dt>Processo</dt><dd>${escapeHTML(c.processo || "—")}</dd>
+      <dt>Início</dt><dd>${formatarDataBR(c.dataInicio)}</dd>
+      <dt>Término</dt><dd>${formatarDataBR(c.dataFim)}</dd>
+      <dt>Situação</dt><dd>${formatarDiasBR(c.diasParaVencer)}</dd>
+      <dt>Gestor</dt><dd>${escapeHTML(pessoasPorPapel("Gestor"))}</dd>
+      <dt>Fiscal</dt><dd>${escapeHTML(pessoasPorPapel("Fiscal"))}</dd>
+      <dt>Valor Atual</dt><dd>${formatarMoedaBR(c.valorGlobalAtual)}</dd>
+      <dt>Aditivos</dt><dd>${c.qtdAditivos}</dd>
+    </dl>`;
+}
+
+function renderTabelaContratos(lista) {
+  if (!lista.length) return `<p class="tela-intro">Nenhum contrato nessa faixa.</p>`;
+  const linhas = lista.map(c => `
+    <tr class="linha-contrato" data-contrato-id="${escapeAttr(c.id)}">
+      <td>${escapeHTML(c.numeroContrato)}</td>
+      <td>${escapeHTML(c.empresa)}</td>
+      <td>${escapeHTML(c.unidadeGestora || "—")}</td>
+      <td>${pillCriticidade(c.criticidade)}</td>
+      <td class="num">${formatarDiasBR(c.diasParaVencer)}</td>
+      <td class="num">${formatarMoedaBR(c.valorGlobalAtual)}</td>
+    </tr>`).join("");
+  return `
+    <table class="dash-tabela">
+      <thead><tr><th>CONTRATO</th><th>EMPRESA</th><th>UNIDADE</th><th>CRITICIDADE</th><th>VENCIMENTO</th><th>VALOR ATUAL</th></tr></thead>
+      <tbody>${linhas}</tbody>
+    </table>`;
+}
+
+async function carregarContratosPortal(portalSlug) {
+  const painel = document.getElementById("tab-contratos");
+  painel.innerHTML = `<p class="tela-intro">Carregando contratos...</p>`;
+
+  let resumo, lista;
+  try {
+    [resumo, lista] = await Promise.all([
+      apiFetch(`/api/portais/${portalSlug}/contratos/resumo`),
+      apiFetch(`/api/portais/${portalSlug}/contratos`),
+    ]);
+  } catch (erro) {
+    painel.innerHTML = `<p class="tela-intro">Não consegui carregar os contratos: ${escapeHTML(erro.message)}</p>`;
+    return;
+  }
+
+  const porId = new Map(lista.map(c => [c.id, c]));
+  const comPrazo = lista.filter(c => c.percentualExecucaoPrazo !== null);
+  const mediaPrazo = comPrazo.length ? comPrazo.reduce((a, c) => a + c.percentualExecucaoPrazo, 0) / comPrazo.length : null;
+
+  let filtroCriticidade = null;
+  let busca = "";
+
+  function listaFiltrada() {
+    return lista.filter(c =>
+      (!filtroCriticidade || c.criticidade === filtroCriticidade) &&
+      (!busca || [c.numeroContrato, c.empresa, c.objeto].some(v => v?.toLowerCase().includes(busca)))
+    );
+  }
+
+  // O medidor não reaproveita a rampa terracota/mostarda/oliva das pílulas —
+  // aquela escala é de URGÊNCIA de vencimento, esta é de EXECUÇÃO de prazo
+  // (quanto do contrato já se foi), uma pergunta diferente. Fica na cor
+  // "tinta", a mesma usada em medida neutra no resto do sistema.
+  function desenharGauge(pct, rotulo, fonte) {
+    document.getElementById("contratos-gauge-svg").innerHTML = gaugeSVG(pct, "var(--tinta)", 112);
+    document.getElementById("contratos-gauge-titulo").textContent = rotulo;
+    document.getElementById("contratos-gauge-fonte").textContent = fonte;
+  }
+
+  function redesenharTabela() {
+    document.getElementById("contratos-tabela-wrap").innerHTML = renderTabelaContratos(listaFiltrada());
+    ligarHoverTabela();
+  }
+
+  function ligarHoverTabela() {
+    let tooltip = document.getElementById("tooltip-contrato-flutuante");
+    if (!tooltip) {
+      tooltip = document.createElement("div");
+      tooltip.id = "tooltip-contrato-flutuante";
+      tooltip.className = "tooltip-contrato";
+      tooltip.hidden = true;
+      document.body.appendChild(tooltip);
+    }
+    painel.querySelectorAll(".linha-contrato").forEach(tr => {
+      const c = porId.get(tr.dataset.contratoId);
+      if (!c) return;
+      tr.addEventListener("mouseenter", () => {
+        tooltip.innerHTML = tooltipContratoHTML(c);
+        tooltip.hidden = false;
+        if (c.percentualExecucaoPrazo !== null) {
+          desenharGauge(c.percentualExecucaoPrazo, `Execução — ${c.numeroContrato}`, "contrato sob o cursor");
+        }
+      });
+      tr.addEventListener("mousemove", (ev) => {
+        const largura = 320, altura = tooltip.offsetHeight || 220;
+        let x = ev.clientX + 18, y = ev.clientY + 18;
+        if (x + largura > window.innerWidth) x = ev.clientX - largura - 18;
+        if (y + altura > window.innerHeight) y = Math.max(8, window.innerHeight - altura - 8);
+        tooltip.style.left = x + "px";
+        tooltip.style.top = y + "px";
+      });
+      tr.addEventListener("mouseleave", () => {
+        tooltip.hidden = true;
+        desenharGauge(mediaPrazo, "Execução média do prazo", "contratos vigentes/a vencer, portfólio inteiro");
+      });
+    });
+  }
+
+  painel.innerHTML = `
+    <div id="contratos-resumo"></div>
+    <div class="gauge-prazo">
+      <div id="contratos-gauge-svg">${gaugeSVG(mediaPrazo, "var(--tinta)")}</div>
+      <div class="legenda-gauge">
+        <h4 id="contratos-gauge-titulo">Execução média do prazo</h4>
+        <p>Dias já decorridos do contrato sobre a duração total (data_fim − data_início), média do portfólio.</p>
+        <p class="fonte" id="contratos-gauge-fonte">contratos vigentes/a vencer, portfólio inteiro</p>
+      </div>
+    </div>
+    <div class="dash-filtros">
+      <div class="dash-filtro" style="flex:1;min-width:220px">
+        <label>BUSCAR</label>
+        <input type="text" id="contratos-busca" placeholder="número, empresa ou objeto..." style="font-family:'IBM Plex Mono',monospace;font-size:var(--fs-ui);padding:6px 8px;border:2px solid var(--carvao);background:var(--paper);color:var(--carvao)">
+      </div>
+    </div>
+    <div id="contratos-tabela-wrap"></div>
+  `;
+
+  document.getElementById("contratos-resumo").innerHTML = renderResumoContratos(resumo, filtroCriticidade);
+  redesenharTabela();
+
+  document.getElementById("contratos-resumo").addEventListener("click", (ev) => {
+    const btn = ev.target.closest("[data-filtro-criticidade]");
+    if (!btn) return;
+    filtroCriticidade = btn.dataset.filtroCriticidade || null;
+    document.getElementById("contratos-resumo").innerHTML = renderResumoContratos(resumo, filtroCriticidade);
+    redesenharTabela();
+  });
+
+  document.getElementById("contratos-busca").addEventListener("input", (ev) => {
+    busca = ev.target.value.trim().toLowerCase();
+    redesenharTabela();
+  });
+}
+
 async function abrirTela(id) {
   const pBase = PORTAIS.find(x => x.id === id);
   if (!pBase) return;
@@ -3700,13 +4000,15 @@ async function abrirTela(id) {
       <button class="tab-btn active" data-tab="geral">VISÃO GERAL</button>
       <button class="tab-btn" data-tab="paineis">PAINÉIS</button>
       <button class="tab-btn" data-tab="planilhas">PLANILHAS ENVIADAS</button>
+      ${SUBPORTAIS[id] ? SUBPORTAIS[id].map(sp => `<button class="tab-btn" data-tab="${sp.tab}">${sp.rotulo}</button>`).join("") : ""}
     </div>
     <div class="tab-panel" id="tab-geral">${corpoGeral}</div>
     <div class="tab-panel" id="tab-paineis" hidden><p class="tela-intro">Carregando...</p></div>
     <div class="tab-panel" id="tab-planilhas" hidden><p class="tela-intro">Carregando...</p></div>
+    ${SUBPORTAIS[id] ? SUBPORTAIS[id].map(sp => `<div class="tab-panel" id="tab-${sp.tab}" hidden><p class="tela-intro">Carregando...</p></div>`).join("") : ""}
   `;
 
-  const PAINEIS = ["geral", "paineis", "planilhas"];
+  const PAINEIS = ["geral", "paineis", "planilhas", ...(SUBPORTAIS[id] ? SUBPORTAIS[id].map(sp => sp.tab) : [])];
   telaConteudo.querySelectorAll(".tab-btn").forEach(btn => {
     btn.addEventListener("click", () => {
       telaConteudo.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
@@ -3715,6 +4017,7 @@ async function abrirTela(id) {
       PAINEIS.forEach(nome => { telaConteudo.querySelector(`#tab-${nome}`).hidden = alvo !== nome; });
       if (alvo === "planilhas") carregarUploadsPortal(p.id);
       if (alvo === "paineis") carregarPaineisPortal(p.id);
+      if (alvo === "contratos") carregarContratosPortal(p.id);
       // recarrega os destaques ao voltar pra Visão Geral: marcar um painel na
       // aba PAINÉIS precisa refletir aqui sem ter que sair e entrar no portal
       if (alvo === "geral") carregarDestaques(p.id);
