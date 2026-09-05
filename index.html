@@ -4040,7 +4040,21 @@ function barraCriticidadeHorizontalSVG(linhasArea, modo = "proporcao") {
       const v = l.porCrit[cv.label] || 0;
       if (!v) return;
       const larg = larguraLinha * (v / l.total);
-      linha += `<rect x="${x.toFixed(1)}" y="${yBarra.toFixed(1)}" width="${larg.toFixed(1)}" height="${alturaBarra}" fill="${cv.cor}" fill-opacity="${cv.opacidade}"><title>${escapeHTML(l.label)} — ${escapeHTML(cv.label)}: ${v} de ${l.total}</title></rect>`;
+      const pct = (v / l.total) * 100;
+      linha += `<rect x="${x.toFixed(1)}" y="${yBarra.toFixed(1)}" width="${larg.toFixed(1)}" height="${alturaBarra}" fill="${cv.cor}" fill-opacity="${cv.opacidade}"><title>${escapeHTML(l.label)} — ${escapeHTML(cv.label)}: ${v} de ${l.total} (${pct.toFixed(1)}%)</title></rect>`;
+      // Qtd + % escritos dentro do próprio pedaço, não só no hover — só
+      // quando modo="proporcao" (aqui a barra some inteira em composição, e
+      // sem o número de cada faixa a leitura fica só visual/relativa) e só
+      // quando o pedaço é largo o bastante pra não virar borrão sobreposto.
+      if (modo === "proporcao") {
+        const texto = `${v} (${pct.toFixed(0)}%)`;
+        const soPct = `${pct.toFixed(0)}%`;
+        if (larg >= 38) {
+          linha += `<text x="${(x + larg / 2).toFixed(1)}" y="${(yBarra + alturaBarra / 2 + 3).toFixed(1)}" text-anchor="middle" font-family="monospace" font-size="8" font-weight="700" fill="var(--paper)" style="pointer-events:none">${texto}</text>`;
+        } else if (larg >= 18) {
+          linha += `<text x="${(x + larg / 2).toFixed(1)}" y="${(yBarra + alturaBarra / 2 + 3).toFixed(1)}" text-anchor="middle" font-family="monospace" font-size="8" font-weight="700" fill="var(--paper)" style="pointer-events:none">${soPct}</text>`;
+        }
+      }
       x += larg;
     });
     if (modo === "absoluto") {
