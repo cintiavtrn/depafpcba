@@ -3912,6 +3912,100 @@ function treemapAreaCriticidadeSVG(linhasAreaOriginal) {
   return `<svg viewBox="0 0 ${w} ${h + alturaLegenda}" xmlns="http://www.w3.org/2000/svg">${corpo}${legenda}</svg>`;
 }
 
+// Abreviação exibida no cabeçalho de coluna do mapa de calor — os rótulos
+// completos de CRITICIDADE_VISUAL (com a faixa de dias entre parênteses) não
+// cabem na largura de uma coluna sem quebrar em várias linhas confusas.
+const ABREVIACAO_CRITICIDADE = {
+  "Vencido": "Vencido", "Crítico (≤30 dias)": "Crítico", "Alto (31–60 dias)": "Alto",
+  "Médio (61–90 dias)": "Médio", "Baixo (>90 dias)": "Baixo",
+  "A Contratar": "A Contratar", "Sem data de vigência": "Sem data",
+};
+
+// Mapa de calor: linha = área gestora, coluna = faixa de criticidade — a
+// MESMA informação da matriz numérica (renderMatrizAreaGestora), só que lida
+// pela cor em vez do número. Cor = a rampa de criticidade de sempre;
+// intensidade (opacidade) ∝ volume de contratos daquela célula relativo ao
+// maior valor da matriz inteira, então além de "qual a pior criticidade" (o
+// que o treemap já responde) dá pra ver ONDE está concentrado o volume.
+// Mesma clicabilidade por linha das outras visões (cross-filter por área).
+function heatmapAreaCriticidadeSVG(linhasArea) {
+  const presentes = CRITICIDADE_VISUAL.filter((cv) => linhasArea.some((l) => l.porCrit[cv.label]));
+  const MAX_ROTULO = 20;
+  const padL = 150, padT = 26;
+  const colW = 60, rowH = 24;
+  const w = padL + presentes.length * colW + 8;
+  const h = padT + linhasArea.length * rowH + 18;
+  const maxCelula = maxSeguro(linhasArea.flatMap((l) => presentes.map((cv) => l.porCrit[cv.label] || 0)));
+
+  let cabecalho = "";
+  presentes.forEach((cv, j) => {
+    const cx = padL + j * colW + colW / 2;
+    cabecalho += textoSVG(ABREVIACAO_CRITICIDADE[cv.label] || cv.label, cx, padT - 8, { maxChars: 9, fontSize: 8, peso: 700, alturaLinha: 9 });
+  });
+
+  let corpo = "";
+  linhasArea.forEach((l, i) => {
+    const y = padT + i * rowH;
+    let linha = `<rect class="area-hit" x="0" y="${y.toFixed(1)}" width="${w}" height="${rowH}" fill="transparent" />`;
+    linha += textoSVG(l.label, padL - 8, y + rowH / 2, { maxChars: MAX_ROTULO, anchor: "end", fontSize: 9, alturaLinha: 10 });
+    presentes.forEach((cv, j) => {
+      const v = l.porCrit[cv.label] || 0;
+      const x = padL + j * colW;
+      const intensidade = maxCelula ? v / maxCelula : 0;
+      const corTexto = v && intensidade > 0.55 ? "var(--paper)" : "var(--carvao)";
+      linha += `<rect x="${(x + 1.5).toFixed(1)}" y="${(y + 2).toFixed(1)}" width="${(colW - 3).toFixed(1)}" height="${(rowH - 4).toFixed(1)}" rx="2" fill="${v ? cv.cor : "var(--paper-line)"}" fill-opacity="${(v ? Math.max(0.22, intensidade) : 0.4).toFixed(2)}"><title>${escapeHTML(l.label)} — ${escapeHTML(cv.label)}: ${v}</title></rect>`;
+      if (v) {
+        linha += `<text x="${(x + colW / 2).toFixed(1)}" y="${(y + rowH / 2 + 3).toFixed(1)}" text-anchor="middle" font-family="monospace" font-size="9" font-weight="700" fill="${corTexto}" style="pointer-events:none">${v}</text>`;
+      }
+    });
+    corpo += `<g data-cat="${escapeAttr(l.label)}" style="cursor:pointer">${linha}</g>`;
+  });
+
+  const yRodape = padT + linhasArea.length * rowH + 13;
+  const rodape = `<text x="${padL}" y="${yRodape.toFixed(1)}" font-family="monospace" font-size="8" fill="var(--carvao)" fill-opacity="0.6">cor = criticidade · intensidade = volume de contratos na célula</text>`;
+
+  return `<svg viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg">${cabecalho}${corpo}${rodape}</svg>`;
+}
+
+function agruparPorTipoObjeto(lista) {
+  const mapa = new Map();
+  for (const c of lista) {
+    const tipo = c.tipoObjeto || "(sem tipo)";
+    mapa.set(tipo, (mapa.get(tipo) || 0) + 1);
+  }
+  return [...mapa.entries()].map(([label, total]) => ({ label, total })).sort((a, b) => b.total - a.total);
+}
+
+// "Qual tipo de objeto reina mais" (pedido direto, espelhando o cartão
+// "Tipo de Objeto" do painel do TJMA) — barra horizontal simples, ordenada
+// da maior pra menor. Usa a paleta sequencial da casa (TONS/corCategoria),
+// não a rampa de criticidade: aqui a dimensão é OUTRA (tipo de contratação),
+// não urgência de vencimento, então misturar as duas cores confundiria.
+function barraTipoObjetoSVG(linhas, tipoSelecionado = "") {
+  const MAX_ROTULO = 24;
+  const padL = 170, padR = 34, padT = 6;
+  const larguraPlot = 250;
+  const rowH = 22, alturaBarra = 15;
+  const w = padL + larguraPlot + padR;
+  const h = padT + linhas.length * rowH + 4;
+  const maxTotal = maxSeguro(linhas.map((l) => l.total));
+
+  let corpo = "";
+  linhas.forEach((l, i) => {
+    const y = padT + i * rowH;
+    const yBarra = y + (rowH - alturaBarra) / 2;
+    const larg = maxTotal ? larguraPlot * (l.total / maxTotal) : 0;
+    const dim = tipoSelecionado && tipoSelecionado !== l.label;
+    corpo += `<g data-cat="${escapeAttr(l.label)}" style="cursor:pointer" opacity="${dim ? 0.4 : 1}">`;
+    corpo += `<rect class="area-hit" x="0" y="${y.toFixed(1)}" width="${w}" height="${rowH}" fill="transparent" />`;
+    corpo += textoSVG(l.label, padL - 8, y + rowH / 2, { maxChars: MAX_ROTULO, anchor: "end", fontSize: 9, alturaLinha: 10, peso: tipoSelecionado === l.label ? 700 : 400 });
+    corpo += `<rect x="${padL}" y="${yBarra.toFixed(1)}" width="${Math.max(larg, 1.5).toFixed(1)}" height="${alturaBarra}" fill="${corCategoria(i)}"><title>${escapeHTML(l.label)}: ${l.total} contrato(s)</title></rect>`;
+    corpo += `<text x="${(padL + larg + 6).toFixed(1)}" y="${(yBarra + alturaBarra / 2 + 3.5).toFixed(1)}" font-family="monospace" font-size="9" font-weight="700" fill="var(--carvao)">${l.total}</text>`;
+    corpo += `</g>`;
+  });
+  return `<svg viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg">${corpo}</svg>`;
+}
+
 // "Contratos por Criticidade e Área Gestora" — barra 100% empilhada
 // horizontal, uma linha por área. Não reaproveita cruzamentoBarrasSVG (que já
 // existe no arquivo) porque aquela função colore por ÍNDICE na paleta
@@ -4163,6 +4257,7 @@ function renderGerencialContratos(lista, resumo) {
   const alvo = document.getElementById("contratos-sub-gerencial");
   const areasDisponiveis = [...new Set(lista.map((c) => c.unidadeGestora || "(sem unidade)"))].sort();
   let filtroArea = "";
+  let filtroTipo = "";
   let modoBarra = lerGraficoSalvo("cpg-gerencial-barra") || "proporcao";
 
   alvo.innerHTML = `
@@ -4186,8 +4281,16 @@ function renderGerencialContratos(lista, resumo) {
           <button class="dash-toggle-btn" data-modo="proporcao" title="Compara a composição de criticidade de cada área">% POR ÁREA</button>
           <button class="dash-toggle-btn" data-modo="absoluto" title="Compara o tamanho das áreas entre si">QTD POR ÁREA</button>
           <button class="dash-toggle-btn" data-modo="treemap" title="Bloco = tamanho da área; cor = pior criticidade presente nela">MAPA</button>
+          <button class="dash-toggle-btn" data-modo="calor" title="Cor = criticidade; intensidade = volume de contratos na célula">MAPA DE CALOR</button>
         </div></div>
         <div id="ger-barra"></div>
+      </div>
+    </div>
+    <div class="dash-charts" style="grid-template-columns:1fr">
+      <div class="dash-chart-box">
+        <h4>Contratos por Tipo de Objeto</h4>
+        <p class="dash-chart-hint">Qual tipo de objeto reina mais no portfólio. Clique numa barra pra isolar aquele tipo — clique de novo pra voltar a ver todos.</p>
+        <div id="ger-tipo"></div>
       </div>
     </div>
     <div class="kpi-row" style="margin-top:2px;grid-template-columns:repeat(auto-fit,minmax(180px,1fr))" id="ger-rodape"></div>
@@ -4211,6 +4314,10 @@ function renderGerencialContratos(lista, resumo) {
     document.getElementById("ger-filtro-area").value = filtroArea;
     atualizar();
   }
+  function selecionarTipo(tipo) {
+    filtroTipo = filtroTipo === tipo ? "" : tipo;
+    atualizar();
+  }
   document.getElementById("ger-matriz").addEventListener("click", (ev) => {
     const tr = ev.target.closest("[data-cat]");
     if (tr) selecionarArea(tr.dataset.cat);
@@ -4219,14 +4326,26 @@ function renderGerencialContratos(lista, resumo) {
     const alvoClicado = ev.target.closest("[data-cat]");
     if (alvoClicado) selecionarArea(alvoClicado.dataset.cat);
   });
+  document.getElementById("ger-tipo").addEventListener("click", (ev) => {
+    const alvoClicado = ev.target.closest("[data-cat]");
+    if (alvoClicado) selecionarTipo(alvoClicado.dataset.cat);
+  });
 
   function atualizar() {
-    const filtrada = filtroArea ? lista.filter((c) => (c.unidadeGestora || "(sem unidade)") === filtroArea) : lista;
-    document.getElementById("ger-chip-filtro").innerHTML = filtroArea
-      ? `<div class="filter-chips"><span class="filter-chip">Isolando: ${escapeHTML(filtroArea)}<button type="button" data-limpar-area title="Voltar a ver todas as áreas">✕</button></span></div>`
+    const filtrada = lista.filter((c) =>
+      (!filtroArea || (c.unidadeGestora || "(sem unidade)") === filtroArea) &&
+      (!filtroTipo || (c.tipoObjeto || "(sem tipo)") === filtroTipo)
+    );
+    document.getElementById("ger-chip-filtro").innerHTML = (filtroArea || filtroTipo)
+      ? `<div class="filter-chips">
+          ${filtroArea ? `<span class="filter-chip">Isolando área: ${escapeHTML(filtroArea)}<button type="button" data-limpar-area title="Voltar a ver todas as áreas">✕</button></span>` : ""}
+          ${filtroTipo ? `<span class="filter-chip">Isolando tipo: ${escapeHTML(filtroTipo)}<button type="button" data-limpar-tipo title="Voltar a ver todos os tipos">✕</button></span>` : ""}
+        </div>`
       : "";
     const btnLimpar = document.querySelector("[data-limpar-area]");
     if (btnLimpar) btnLimpar.addEventListener("click", () => selecionarArea(filtroArea));
+    const btnLimparTipo = document.querySelector("[data-limpar-tipo]");
+    if (btnLimparTipo) btnLimparTipo.addEventListener("click", () => selecionarTipo(filtroTipo));
     const qtdVencidos = filtrada.filter((c) => c.statusVigencia === "Vencido").length;
     const qtdAVencer = filtrada.filter((c) => c.statusVigencia === "A Vencer").length;
     const qtdAContratar = filtrada.filter((c) => c.statusVigencia === "A Contratar").length;
@@ -4252,10 +4371,13 @@ function renderGerencialContratos(lista, resumo) {
     document.getElementById("ger-matriz").innerHTML = renderMatrizAreaGestora(porArea);
     document.getElementById("ger-barra").innerHTML = modoBarra === "treemap"
       ? treemapAreaCriticidadeSVG(porArea)
+      : modoBarra === "calor"
+      ? heatmapAreaCriticidadeSVG(porArea)
       : barraCriticidadeHorizontalSVG(porArea, modoBarra);
     document.querySelectorAll("#ger-barra-toggle [data-modo]").forEach((btn) => {
       btn.classList.toggle("active", btn.dataset.modo === modoBarra);
     });
+    document.getElementById("ger-tipo").innerHTML = barraTipoObjetoSVG(agruparPorTipoObjeto(filtrada), filtroTipo);
     // Estes não estão nas 3 páginas do Power BI que a coordenação mostrou,
     // mas já existiam na primeira versão deste painel e são úteis pra
     // acompanhamento — ficam como um segundo bloco, separado dos cartões
