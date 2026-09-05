@@ -4101,15 +4101,16 @@ function renderGerencialContratos(lista, resumo) {
 function renderTaticoContratos(lista) {
   const alvo = document.getElementById("contratos-sub-tatico");
   const porId = new Map(lista.map((c) => [c.id, c]));
-  let busca = "";
+  const tiposDisponiveis = [...new Set(lista.map((c) => c.tipoObjeto || "(sem tipo)"))].sort();
+  let filtroTipo = "";
   let filtroMes = "";
   const filtrosCriticidade = new Set();
 
   alvo.innerHTML = `
     <div class="dash-filtros">
       <div class="dash-filtro" style="flex:1;min-width:260px">
-        <label>Nº CONTRATO, CONTRATADO OU OBJETO</label>
-        <input type="text" id="tat-busca" placeholder="buscar..." style="font-family:'IBM Plex Mono',monospace;font-size:var(--fs-ui);padding:6px 8px;border:2px solid var(--carvao);background:var(--paper);color:var(--carvao)">
+        <label>TIPO DE OBJETO</label>
+        <select id="tat-filtro-tipo"><option value="">Todos</option>${tiposDisponiveis.map((t) => `<option value="${escapeAttr(t)}">${escapeHTML(t)}</option>`).join("")}</select>
       </div>
     </div>
     <h4 style="font-family:'Space Grotesk',sans-serif;font-size:var(--fs-subtitulo);margin-bottom:8px">Controle de Prazos</h4>
@@ -4136,7 +4137,7 @@ function renderTaticoContratos(lista) {
   function listaSemMes() {
     return lista.filter((c) =>
       (!filtrosCriticidade.size || filtrosCriticidade.has(c.criticidade)) &&
-      (!busca || [c.numeroContrato, c.empresa, c.objeto].some((v) => v?.toLowerCase().includes(busca)))
+      (!filtroTipo || (c.tipoObjeto || "(sem tipo)") === filtroTipo)
     );
   }
   function listaFiltrada() {
@@ -4176,7 +4177,7 @@ function renderTaticoContratos(lista) {
     });
   }
 
-  document.getElementById("tat-busca").addEventListener("input", (ev) => { busca = ev.target.value.trim().toLowerCase(); atualizar(); });
+  document.getElementById("tat-filtro-tipo").addEventListener("change", (ev) => { filtroTipo = ev.target.value; atualizar(); });
   document.getElementById("tat-toggle-criticidade").addEventListener("click", (ev) => {
     const btn = ev.target.closest("[data-crit]");
     if (!btn) return;
