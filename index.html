@@ -4139,16 +4139,24 @@ function ganttContratosSVG(lista) {
 
   // Uma linha vertical por ano — o portfólio inteiro cobre bem mais de um
   // ano (tem contrato de 2011 ainda vigente), então o ano é a grade que faz
-  // sentido, não o mês.
+  // sentido, não o mês. A linha de "HOJE" quase sempre cai perto de uma
+  // virada de ano (é a data corrente, óbvio) — sem tratar essa colisão o
+  // rótulo do ano e o "HOJE" ficam escritos um em cima do outro. Resolvido
+  // reservando uma faixa de exclusão em pixels ao redor de HOJE: nenhum
+  // rótulo de ano é desenhado ali (a linha pontilhada do ano continua, só o
+  // texto some — o "HOJE" já deixa claro onde estamos no tempo).
+  const xHoje = x(hoje);
+  const FAIXA_EXCLUSAO_HOJE = 20;
   let grade = "";
   const anoInicial = minData.getUTCFullYear(), anoFinal = maxData.getUTCFullYear();
   for (let ano = anoInicial; ano <= anoFinal; ano++) {
     const xa = x(new Date(Date.UTC(ano, 0, 1)));
     if (xa < padL || xa > w - padR) continue;
     grade += `<line x1="${xa.toFixed(1)}" y1="${padT}" x2="${xa.toFixed(1)}" y2="${(padT + ordenados.length * rowH).toFixed(1)}" stroke="var(--paper-line)" stroke-width="1" stroke-dasharray="2 4" />`;
-    grade += `<text x="${xa.toFixed(1)}" y="${(padT - 8).toFixed(1)}" text-anchor="middle" font-family="monospace" font-size="8" fill="var(--carvao)" fill-opacity="0.6">${ano}</text>`;
+    if (Math.abs(xa - xHoje) >= FAIXA_EXCLUSAO_HOJE) {
+      grade += `<text x="${xa.toFixed(1)}" y="${(padT - 8).toFixed(1)}" text-anchor="middle" font-family="monospace" font-size="8" fill="var(--carvao)" fill-opacity="0.6">${ano}</text>`;
+    }
   }
-  const xHoje = x(hoje);
   grade += `<line x1="${xHoje.toFixed(1)}" y1="${padT}" x2="${xHoje.toFixed(1)}" y2="${(padT + ordenados.length * rowH).toFixed(1)}" stroke="var(--tinta)" stroke-width="1.4" />`;
   grade += `<text x="${xHoje.toFixed(1)}" y="${(padT - 8).toFixed(1)}" text-anchor="middle" font-family="monospace" font-size="8" font-weight="700" fill="var(--tinta)">HOJE</text>`;
 
