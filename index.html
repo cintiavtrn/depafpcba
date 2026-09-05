@@ -3823,6 +3823,95 @@ function agruparPorMesCriticidade(lista) {
   return [...mapa.values()].sort((a, b) => a.label.localeCompare(b.label));
 }
 
+// Algoritmo "squarified treemap" (Bruls, Huizing, van Wijk 1999): divide um
+// retângulo em blocos proporcionais a um valor, tentando manter cada bloco o
+// mais próximo de um quadrado possível (em vez de tiras finas e compridas,
+// que são difíceis de comparar a olho). `valores` já vem em unidades de
+// ÁREA (soma = w*h) — normalização é responsabilidade de quem chama.
+function squarify(valores, x, y, w, h) {
+  const rects = [];
+  let itens = valores.slice();
+  function piorRazao(linha, lado) {
+    const soma = linha.reduce((a, b) => a + b, 0);
+    const max = Math.max(...linha), min = Math.min(...linha);
+    const ladoQ = lado * lado, somaQ = soma * soma;
+    return Math.max((ladoQ * max) / somaQ, somaQ / (ladoQ * min));
+  }
+  while (itens.length) {
+    const lado = Math.min(w, h);
+    let linha = [itens[0]];
+    let i = 1;
+    while (i < itens.length) {
+      const proposta = linha.concat(itens[i]);
+      if (piorRazao(proposta, lado) <= piorRazao(linha, lado)) { linha = proposta; i++; }
+      else break;
+    }
+    const somaLinha = linha.reduce((a, b) => a + b, 0);
+    const espessura = somaLinha / lado;
+    if (w >= h) {
+      let yy = y;
+      linha.forEach((v, idx) => {
+        const alt = (v / somaLinha) * h;
+        rects.push({ x, y: yy, w: espessura, h: alt, indice: rects.length });
+        yy += alt;
+      });
+      x += espessura; w -= espessura;
+    } else {
+      let xx = x;
+      linha.forEach((v) => {
+        const larg = (v / somaLinha) * w;
+        rects.push({ x: xx, y, w: larg, h: espessura, indice: rects.length });
+        xx += larg;
+      });
+      y += espessura; h -= espessura;
+    }
+    itens = itens.slice(linha.length);
+  }
+  return rects;
+}
+
+// Treemap: bloco = área gestora, TAMANHO = qtd de contratos, COR = pior
+// criticidade presente naquela área (não a mais comum) — um único contrato
+// vencido tem que acender a área inteira em vermelho, porque é assim que a
+// ferramenta serve pra monitorar risco: a exceção grave não pode se diluir
+// atrás da maioria tranquila.
+function treemapAreaCriticidadeSVG(linhasAreaOriginal) {
+  const linhasArea = [...linhasAreaOriginal].sort((a, b) => b.total - a.total);
+  const w = 500, h = 280;
+  const valores = linhasArea.map((l) => l.total);
+  const somaTotal = valores.reduce((a, b) => a + b, 0) || 1;
+  const escala = (w * h) / somaTotal;
+  const rects = squarify(valores.map((v) => v * escala), 0, 0, w, h);
+
+  let corpo = "";
+  linhasArea.forEach((l, i) => {
+    const r = rects[i];
+    if (!r) return;
+    const piorCrit = CRITICIDADE_VISUAL.find((cv) => l.porCrit[cv.label] > 0);
+    const cor = piorCrit ? piorCrit.cor : "var(--crit-neutro)";
+    const cabe = r.w > 46 && r.h > 22;
+    const cabeContagem = r.w > 30 && r.h > 34;
+    const maxChars = Math.max(6, Math.floor(r.w / 6));
+    const rotulo = l.label.length > maxChars ? l.label.slice(0, maxChars - 1) + "…" : l.label;
+    corpo += `<g data-cat="${escapeAttr(l.label)}" style="cursor:pointer">
+      <rect x="${r.x.toFixed(1)}" y="${r.y.toFixed(1)}" width="${Math.max(r.w - 1.5, 0.5).toFixed(1)}" height="${Math.max(r.h - 1.5, 0.5).toFixed(1)}" fill="${cor}" fill-opacity="0.82" stroke="var(--paper)" stroke-width="1.5"><title>${escapeHTML(l.label)} — ${l.total} contrato(s), pior criticidade: ${escapeHTML(piorCrit ? piorCrit.label : "—")}</title></rect>
+      ${cabe ? `<text x="${(r.x + 5).toFixed(1)}" y="${(r.y + 12).toFixed(1)}" font-family="monospace" font-size="8.5" font-weight="700" fill="var(--paper)" style="pointer-events:none">${escapeHTML(rotulo)}</text>` : ""}
+      ${cabeContagem ? `<text x="${(r.x + 5).toFixed(1)}" y="${(r.y + r.h - 8).toFixed(1)}" font-family="monospace" font-size="9" font-weight="700" fill="var(--paper)" style="pointer-events:none">${l.total}</text>` : ""}
+    </g>`;
+  });
+
+  const presentes = CRITICIDADE_VISUAL.filter((cv) => linhasArea.some((l) => l.porCrit[cv.label]));
+  const alturaLegenda = Math.ceil(presentes.length / 3) * 16 + 14;
+  let legenda = "";
+  presentes.forEach((cv, k) => {
+    const lx = (k % 3) * (w / 3);
+    const ly = h + 16 + Math.floor(k / 3) * 16;
+    legenda += `<rect x="${lx.toFixed(1)}" y="${(ly - 8).toFixed(1)}" width="9" height="9" fill="${cv.cor}" /><text x="${(lx + 13).toFixed(1)}" y="${ly.toFixed(1)}" font-family="monospace" font-size="8" fill="var(--carvao)">${escapeHTML(cv.label.replace(/\s*\(.*\)/, ""))}</text>`;
+  });
+
+  return `<svg viewBox="0 0 ${w} ${h + alturaLegenda}" xmlns="http://www.w3.org/2000/svg">${corpo}${legenda}</svg>`;
+}
+
 // "Contratos por Criticidade e Área Gestora" — barra 100% empilhada
 // horizontal, uma linha por área. Não reaproveita cruzamentoBarrasSVG (que já
 // existe no arquivo) porque aquela função colore por ÍNDICE na paleta
@@ -4104,6 +4193,7 @@ function renderGerencialContratos(lista, resumo) {
         <div class="linha-troca-grafico"><div class="dash-toggle" id="ger-barra-toggle">
           <button class="dash-toggle-btn" data-modo="proporcao" title="Compara a composição de criticidade de cada área">% POR ÁREA</button>
           <button class="dash-toggle-btn" data-modo="absoluto" title="Compara o tamanho das áreas entre si">QTD POR ÁREA</button>
+          <button class="dash-toggle-btn" data-modo="treemap" title="Bloco = tamanho da área; cor = pior criticidade presente nela">MAPA</button>
         </div></div>
         <div id="ger-barra"></div>
       </div>
@@ -4168,7 +4258,9 @@ function renderGerencialContratos(lista, resumo) {
         <div class="kpi-card"><div class="kpi-label">Valor Global Atual Total</div><div class="kpi-value">R$ ${formatarEixo(valorAtual)}</div></div>
       </div>`;
     document.getElementById("ger-matriz").innerHTML = renderMatrizAreaGestora(porArea);
-    document.getElementById("ger-barra").innerHTML = barraCriticidadeHorizontalSVG(porArea, modoBarra);
+    document.getElementById("ger-barra").innerHTML = modoBarra === "treemap"
+      ? treemapAreaCriticidadeSVG(porArea)
+      : barraCriticidadeHorizontalSVG(porArea, modoBarra);
     document.querySelectorAll("#ger-barra-toggle [data-modo]").forEach((btn) => {
       btn.classList.toggle("active", btn.dataset.modo === modoBarra);
     });
