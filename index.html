@@ -4281,6 +4281,7 @@ function renderGerencialContratos(lista, resumo) {
       <div class="dash-chart-box">
         <h4>Detalhamento por Área Gestora</h4>
         <p class="dash-chart-hint">Clique numa linha ou numa barra pra isolar só aquela área — clique de novo (ou em "Todos" acima) pra voltar a ver tudo.</p>
+        <div style="text-align:right;margin-bottom:6px"><button type="button" class="dash-toggle-btn" id="ger-matriz-baixar" title="Baixar esta tabela como imagem">⬇ TABELA (PNG)</button></div>
         <div id="ger-matriz" class="tabela-rolavel"></div>
       </div>
       <div class="dash-chart-box">
@@ -4338,6 +4339,8 @@ function renderGerencialContratos(lista, resumo) {
     const alvoClicado = ev.target.closest("[data-cat]");
     if (alvoClicado) selecionarTipo(alvoClicado.dataset.cat);
   });
+  document.getElementById("ger-matriz-baixar").addEventListener("click", () =>
+    baixarTabelaComoImagem(document.getElementById("ger-matriz"), "cpg-contratos-detalhamento-area-gestora.png"));
 
   function atualizar() {
     const filtrada = lista.filter((c) =>
@@ -4386,6 +4389,8 @@ function renderGerencialContratos(lista, resumo) {
       btn.classList.toggle("active", btn.dataset.modo === modoBarra);
     });
     document.getElementById("ger-tipo").innerHTML = barraTipoObjetoSVG(agruparPorTipoObjeto(filtrada), filtroTipo);
+    adicionarControlesGrafico(document.getElementById("ger-barra"));
+    adicionarControlesGrafico(document.getElementById("ger-tipo"));
     // Estes não estão nas 3 páginas do Power BI que a coordenação mostrou,
     // mas já existiam na primeira versão deste painel e são úteis pra
     // acompanhamento — ficam como um segundo bloco, separado dos cartões
@@ -4437,6 +4442,7 @@ function renderTaticoContratos(lista) {
     <h4 style="font-family:'Space Grotesk',sans-serif;font-size:var(--fs-subtitulo);margin-bottom:8px">Detalhamento dos Contratos</h4>
     <p class="font-mono" style="font-size:var(--fs-ui-sm);color:#8B93A3;margin-bottom:8px">Passe o mouse numa linha pra ver o detalhe do contrato.</p>
     <div id="tat-chip-filtro"></div>
+    <div style="text-align:right;margin-bottom:6px"><button type="button" class="dash-toggle-btn" id="tat-tabela-baixar" title="Baixar esta tabela como imagem">⬇ TABELA (PNG)</button></div>
     <div id="tat-tabela" class="tabela-rolavel"></div>
   `;
 
@@ -4484,6 +4490,7 @@ function renderTaticoContratos(lista) {
       document.getElementById("tat-grafico-mes").innerHTML = colunaCriticidadeEmpilhadaSVG(porMes, filtroMes);
       document.getElementById("tat-grafico-hint").textContent = "Clique numa barra pra isolar só aquele mês de vencimento na tabela abaixo — clique de novo pra voltar a ver todos os meses.";
     }
+    adicionarControlesGrafico(document.getElementById("tat-grafico-mes"));
     document.querySelectorAll("#tat-mes-toggle [data-modo]").forEach((btn) => {
       btn.classList.toggle("active", btn.dataset.modo === modoMes);
     });
@@ -4507,6 +4514,8 @@ function renderTaticoContratos(lista) {
     });
   }
 
+  document.getElementById("tat-tabela-baixar").addEventListener("click", () =>
+    baixarTabelaComoImagem(document.getElementById("tat-tabela"), "cpg-contratos-detalhamento-contratos.png"));
   document.getElementById("tat-filtro-tipo").addEventListener("change", (ev) => { filtroTipo = ev.target.value; atualizar(); });
   document.getElementById("tat-toggle-criticidade").addEventListener("click", (ev) => {
     const btn = ev.target.closest("[data-crit]");
@@ -4543,6 +4552,7 @@ function renderOperacionalContratos(lista) {
     <div class="dash-charts" style="grid-template-columns:1.3fr 1fr">
       <div class="dash-chart-box">
         <h4>Gestor e Fiscal do Contrato</h4>
+        <div style="text-align:right;margin-bottom:6px"><button type="button" class="dash-toggle-btn" id="op-gestor-fiscal-baixar" title="Baixar esta tabela como imagem">⬇ TABELA (PNG)</button></div>
         <div id="op-gestor-fiscal" class="tabela-rolavel" style="max-height:220px"></div>
       </div>
       <div class="dash-chart-box" style="text-align:center">
@@ -4588,6 +4598,7 @@ function renderOperacionalContratos(lista) {
       : `<p class="tela-intro">Nenhum gestor/fiscal cadastrado.</p>`;
 
     document.getElementById("op-gauge").innerHTML = gaugeSVG(selecionado ? selecionado.percentualExecucaoPrazo : null, "var(--tinta)", 130);
+    adicionarControlesGrafico(document.getElementById("op-gauge"));
 
     const selContrato = document.getElementById("op-select-contrato");
     selContrato.innerHTML = `<option value="">Todos</option>` + emContexto.map((c) => `<option value="${escapeAttr(c.id)}"${c.id === contratoId ? " selected" : ""}>${escapeHTML(c.numeroContrato)} — ${escapeHTML(c.empresa)}</option>`).join("");
@@ -4595,8 +4606,36 @@ function renderOperacionalContratos(lista) {
 
   document.getElementById("op-select-setor").addEventListener("change", (ev) => { setor = ev.target.value; contratoId = ""; atualizar(); });
   document.getElementById("op-select-contrato").addEventListener("change", (ev) => { contratoId = ev.target.value; atualizar(); });
+  document.getElementById("op-gestor-fiscal-baixar").addEventListener("click", () =>
+    baixarTabelaComoImagem(document.getElementById("op-gestor-fiscal"), "cpg-contratos-gestor-fiscal.png"));
 
   atualizar();
+}
+
+// Painel só de leitura (fica fechado, quem quiser abre) pra quem não olha
+// gráfico todo dia — pedido direto: Cintia compartilha o link com gente que
+// não vai saber interpretar sozinha, e a ideia é responder a pergunta ANTES
+// dela ser feita, não depois. Um bloco só, aberto uma vez pra qualquer
+// subaba (o vocabulário — cor de criticidade, cross-filter, tooltip — é o
+// mesmo nas 3 páginas), em vez de repetir a explicação em cada gráfico.
+function dicaLeituraContratosHTML() {
+  const legendaCores = CRITICIDADE_VISUAL.map((cv) =>
+    `<span style="white-space:nowrap;margin-right:14px"><span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:${cv.cor};margin-right:5px"></span>${escapeHTML(cv.label)}</span>`
+  ).join("");
+
+  return `
+    <details class="painel-detalhes" style="margin-bottom:14px;background:var(--paper);border-left:3px solid var(--tinta);padding:10px 14px 12px">
+      <summary style="font-weight:700">Como ler este painel (clique pra abrir)</summary>
+      <div style="margin-top:10px;font-family:'IBM Plex Mono',monospace;font-size:var(--fs-ui-sm);line-height:1.65;color:var(--carvao)">
+        <p style="margin:0 0 10px"><b>A cor é sempre a mesma coisa: urgência do vencimento.</b><br>${legendaCores}</p>
+        <p style="margin:0 0 6px"><b>Mapa</b> (blocos): bloco maior = mais contratos naquela área. A cor é a PIOR criticidade que existe ali dentro — um único contrato vencido pinta o bloco inteiro de vermelho, mesmo que os outros estejam tranquilos.</p>
+        <p style="margin:0 0 6px"><b>Mapa de calor</b> (grade colorida): mesma cor de criticidade de sempre; quanto mais forte a cor da célula, mais contratos tem ali.</p>
+        <p style="margin:0 0 6px"><b>Gantt</b> (linha do tempo, aba Tático): cada barra é um contrato, do início ao fim da vigência. A linha vertical marcada "HOJE" mostra onde estamos agora.</p>
+        <p style="margin:0 0 6px"><b>Clique pra filtrar:</b> clique numa barra, bloco ou linha de qualquer tabela/gráfico pra isolar só aquilo em todo o painel — clique de novo (ou em "Todos") pra desfazer.</p>
+        <p style="margin:0 0 6px"><b>Passe o mouse</b> numa linha de contrato (em qualquer tabela ou no Gantt) pra ver o detalhe completo — empresa, objeto, gestor, fiscal — num balão.</p>
+        <p style="margin:0"><b>⬇ PNG:</b> todo gráfico e tabela deste painel tem um botão pra baixar como imagem, pra colar numa apresentação ou relatório.</p>
+      </div>
+    </details>`;
 }
 
 async function carregarContratosPortal(portalSlug) {
@@ -4618,6 +4657,7 @@ async function carregarContratosPortal(portalSlug) {
   // painelgerencialcontratos.pbip) — Gerencial, Tático, Operacional — pra
   // ficar o mais fiel possível ao modelo de referência.
   painel.innerHTML = `
+    ${dicaLeituraContratosHTML()}
     <div class="tabs" style="margin-bottom:0">
       <button class="tab-btn active" data-subtab-contratos="gerencial">GERENCIAL</button>
       <button class="tab-btn" data-subtab-contratos="tatico">TÁTICO</button>
@@ -5198,6 +5238,131 @@ async function baixarGraficoComoImagem(svg, nomeArquivo = "grafico.png") {
     }, "image/png");
   } catch (erro) {
     toastErro("Não consegui gerar a imagem: " + erro.message);
+  }
+}
+
+// Pra gráfico (SVG puro) o truque de canvas.drawImage funciona liso. Pra
+// TABELA a tentação é a mesma receita trocando o SVG por um <foreignObject>
+// com uma cópia do HTML — só que isso "contamina" o canvas: qualquer
+// navegador marca como tainted uma imagem de SVG que contém foreignObject
+// com HTML embutido, e daí canvas.toBlob()/toDataURL() são bloqueados por
+// SecurityError mesmo sendo tudo same-origin (restrição do próprio browser,
+// testado e confirmado aqui). Sem saída por aí — a tabela é desenhada célula
+// por célula, direto no canvas, lendo a largura de cada coluna e a cor/fonte
+// reais da tabela na tela (getBoundingClientRect + getComputedStyle), com
+// quebra de linha própria (mede o texto com o canvas 2D, não CSS) pra caber
+// dentro da largura de cada coluna. Não tenta replicar 100% do CSS (não tem
+// pill/badge nas tabelas do CPG hoje) — se um dia aparecer uma, precisa de
+// tratamento à parte aqui.
+function quebrarTextoCanvas(ctx, texto, larguraMax) {
+  const palavras = String(texto).split(/\s+/).filter(Boolean);
+  if (!palavras.length) return [""];
+  const linhas = [];
+  let atual = palavras[0];
+  for (let i = 1; i < palavras.length; i++) {
+    const tentativa = atual + " " + palavras[i];
+    if (ctx.measureText(tentativa).width > larguraMax) { linhas.push(atual); atual = palavras[i]; }
+    else atual = tentativa;
+  }
+  linhas.push(atual);
+  return linhas;
+}
+
+async function baixarTabelaComoImagem(containerTabela, nomeArquivo = "tabela.png") {
+  const tabela = containerTabela && containerTabela.querySelector
+    ? (containerTabela.querySelector("table") || (containerTabela.tagName === "TABLE" ? containerTabela : null))
+    : null;
+  const linhasCabecalho = tabela ? [...tabela.querySelectorAll("thead tr")] : [];
+  const linhasCorpo = tabela ? [...tabela.querySelectorAll("tbody tr")] : [];
+  if (!tabela || (!linhasCabecalho.length && !linhasCorpo.length)) {
+    toastErro("Não há tabela pra baixar aqui ainda.");
+    return;
+  }
+  try {
+    const todasLinhas = [...linhasCabecalho, ...linhasCorpo];
+    const primeiraTh = tabela.querySelector("thead th");
+    const primeiroTd = tabela.querySelector("tbody td");
+    const csTh = primeiraTh ? getComputedStyle(primeiraTh) : null;
+    const csTd = primeiroTd ? getComputedStyle(primeiroTd) : null;
+    const corFundo = getComputedStyle(tabela).backgroundColor || "#10141D";
+    const corBorda = (csTd && csTd.borderColor) || "#1C2230";
+    const corTextoCorpo = (csTd && csTd.color) || "#E9EDF4";
+    const corFundoCabecalho = (csTh && csTh.backgroundColor) || corFundo;
+    const corTextoCabecalho = (csTh && csTh.color) || corTextoCorpo;
+    const fontCorpo = `${(csTd && parseFloat(csTd.fontSize)) || 13}px ${(csTd && csTd.fontFamily) || "sans-serif"}`;
+    const fontCorpoNegrito = `700 ${(csTd && parseFloat(csTd.fontSize)) || 13}px ${(csTd && csTd.fontFamily) || "sans-serif"}`;
+    const fontCabecalho = `700 ${(csTh && parseFloat(csTh.fontSize)) || 11}px ${(csTh && csTh.fontFamily) || "monospace"}`;
+
+    const linhaColunas = linhasCabecalho[0] || linhasCorpo[0];
+    const larguraColPx = [...linhaColunas.children].map((c) => c.getBoundingClientRect().width);
+    const larguraTotal = larguraColPx.reduce((a, b) => a + b, 0) || tabela.getBoundingClientRect().width || 500;
+
+    // 1x (não 2x/3x como no gráfico): o canvas 2D já desenha texto como
+    // vetor, então fica nítido mesmo sem supersampling — e uma tabela de mais
+    // de cem linhas em 2x passa fácil de 7MB, pesado demais pra anexar num
+    // e-mail ou mandar por WhatsApp.
+    const ESCALA = 1;
+    const PAD_CEL_X = 10, PAD_CEL_Y = 8, ALTURA_LINHA_TEXTO = 15, ALTURA_MIN_LINHA = 26;
+    const canvasMedida = document.createElement("canvas");
+    const ctxMedida = canvasMedida.getContext("2d");
+
+    const infoLinhas = todasLinhas.map((tr) => {
+      const ehCabecalho = tr.parentElement.tagName === "THEAD";
+      const ehNegrito = !ehCabecalho && parseInt(getComputedStyle(tr).fontWeight, 10) >= 600;
+      ctxMedida.font = ehCabecalho ? fontCabecalho : (ehNegrito ? fontCorpoNegrito : fontCorpo);
+      const celulas = [...tr.children].map((celula, j) => {
+        const larguraCel = larguraColPx[j] || 80;
+        const texto = quebrarTextoCanvas(ctxMedida, celula.textContent.trim().replace(/\s+/g, " "), larguraCel - PAD_CEL_X * 2);
+        return { texto, alinhamento: celula.classList.contains("num") ? "right" : "left" };
+      });
+      const alturaConteudo = Math.max(...celulas.map((c) => c.texto.length)) * ALTURA_LINHA_TEXTO + PAD_CEL_Y * 2;
+      return { ehCabecalho, ehNegrito, celulas, altura: Math.max(alturaConteudo, ALTURA_MIN_LINHA) };
+    });
+    const alturaTotal = infoLinhas.reduce((a, l) => a + l.altura, 0);
+
+    const canvas = document.createElement("canvas");
+    canvas.width = larguraTotal * ESCALA;
+    canvas.height = alturaTotal * ESCALA;
+    const ctx = canvas.getContext("2d");
+    ctx.scale(ESCALA, ESCALA);
+    ctx.fillStyle = corFundo;
+    ctx.fillRect(0, 0, larguraTotal, alturaTotal);
+
+    let y = 0;
+    infoLinhas.forEach((linha) => {
+      let x = 0;
+      ctx.font = linha.ehCabecalho ? fontCabecalho : (linha.ehNegrito ? fontCorpoNegrito : fontCorpo);
+      ctx.fillStyle = linha.ehCabecalho ? corFundoCabecalho : corFundo;
+      ctx.fillRect(0, y, larguraTotal, linha.altura);
+      linha.celulas.forEach((cel, j) => {
+        const larguraCel = larguraColPx[j] || 80;
+        ctx.strokeStyle = corBorda;
+        ctx.lineWidth = 1;
+        ctx.strokeRect(x + 0.5, y + 0.5, larguraCel, linha.altura);
+        ctx.fillStyle = linha.ehCabecalho ? corTextoCabecalho : corTextoCorpo;
+        ctx.textBaseline = "middle";
+        const alturaBlocoTexto = cel.texto.length * ALTURA_LINHA_TEXTO;
+        let yTexto = y + (linha.altura - alturaBlocoTexto) / 2 + ALTURA_LINHA_TEXTO / 2;
+        cel.texto.forEach((linhaTexto) => {
+          ctx.textAlign = cel.alinhamento === "right" ? "right" : "left";
+          ctx.fillText(linhaTexto, cel.alinhamento === "right" ? x + larguraCel - PAD_CEL_X : x + PAD_CEL_X, yTexto);
+          yTexto += ALTURA_LINHA_TEXTO;
+        });
+        x += larguraCel;
+      });
+      y += linha.altura;
+    });
+
+    const blobPng = await new Promise((resolve, reject) =>
+      canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("canvas vazio"))), "image/png"));
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blobPng);
+    a.download = nomeArquivo;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  } catch (erro) {
+    toastErro("Não consegui gerar a imagem da tabela: " + erro.message);
   }
 }
 
