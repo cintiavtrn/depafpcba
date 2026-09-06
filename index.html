@@ -3967,23 +3967,83 @@ function heatmapAreaCriticidadeSVG(linhasArea) {
   return `<svg viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg">${cabecalho}${corpo}${rodape}</svg>`;
 }
 
-function agruparPorTipoObjeto(lista) {
+// Conta contratos por um campo qualquer (tipo de objeto, analista...),
+// ordenado do maior pro menor grupo — a mesma pergunta "o que reina mais",
+// só muda QUAL coluna está sendo contada.
+function agruparContagemPorCampo(lista, campoFn, rotuloVazio = "(não informado)") {
   const mapa = new Map();
   for (const c of lista) {
-    const tipo = c.tipoObjeto || "(sem tipo)";
-    mapa.set(tipo, (mapa.get(tipo) || 0) + 1);
+    const chave = campoFn(c) || rotuloVazio;
+    mapa.set(chave, (mapa.get(chave) || 0) + 1);
   }
   return [...mapa.entries()].map(([label, total]) => ({ label, total })).sort((a, b) => b.total - a.total);
 }
 
-// "Qual tipo de objeto reina mais" (pedido direto, espelhando o cartão
-// "Tipo de Objeto" do painel do TJMA) — barra horizontal simples, ordenada
-// da maior pra menor. Usa a paleta sequencial da casa (TONS/corCategoria),
-// não a rampa de criticidade: aqui a dimensão é OUTRA (tipo de contratação),
-// não urgência de vencimento, então misturar as duas cores confundiria.
-function barraTipoObjetoSVG(linhas, tipoSelecionado = "") {
-  const MAX_ROTULO = 24;
-  const padL = 170, padR = 34, padT = 6;
+function agruparPorTipoObjeto(lista) {
+  return agruparContagemPorCampo(lista, (c) => c.tipoObjeto, "(sem tipo)");
+}
+
+// Não é uma linha do tempo (isso exigiria a data de CADA aditivo, que a
+// planilha não tem) — é a distribuição de "quantos aditivos esse contrato
+// já teve", por isso ordenada pelo próprio número (0, 1, 2...) e não por
+// frequência, ao contrário de agruparContagemPorCampo.
+function agruparPorQtdAditivos(lista) {
+  const mapa = new Map();
+  for (const c of lista) {
+    const qtd = c.qtdAditivos ?? 0;
+    mapa.set(qtd, (mapa.get(qtd) || 0) + 1);
+  }
+  return [...mapa.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(([qtd, total]) => ({ label: `${qtd} aditivo${qtd === 1 ? "" : "s"}`, total }));
+}
+
+function agruparTopContratosPorValor(lista, n = 10) {
+  return [...lista]
+    .filter((c) => c.valorGlobalAtual != null)
+    .sort((a, b) => b.valorGlobalAtual - a.valorGlobalAtual)
+    .slice(0, n)
+    .map((c) => ({ label: `${c.numeroContrato} — ${c.empresa}`, total: c.valorGlobalAtual, id: c.id }));
+}
+
+// Soma o valor de TODOS os contratos da mesma empresa antes de ordenar —
+// sem isso um fornecedor com 3 contratos médios ficaria escondido atrás de
+// um só contrato grande de outra empresa, quando na prática ele é quem mais
+// fatura com a casa.
+function agruparTopFornecedoresPorValor(lista, n = 10) {
+  const mapa = new Map();
+  for (const c of lista) {
+    if (c.valorGlobalAtual == null) continue;
+    const chave = c.empresa || "(empresa não identificada)";
+    if (!mapa.has(chave)) mapa.set(chave, { total: 0, qtd: 0 });
+    const g = mapa.get(chave);
+    g.total += c.valorGlobalAtual;
+    g.qtd += 1;
+  }
+  return [...mapa.entries()]
+    .map(([label, g]) => ({ label, total: g.total, qtd: g.qtd }))
+    .sort((a, b) => b.total - a.total)
+    .slice(0, n);
+}
+
+// Barra horizontal genérica ordenada da maior pra menor — usada em toda
+// "distribuição por X" ou "top N" do painel que NÃO é sobre criticidade
+// (aquela tem sua própria função com a rampa de cor fixa, ver
+// barraCriticidadeHorizontalSVG). Uma cor por categoria (paleta sequencial
+// da casa, TONS/corCategoria), rótulo à esquerda, valor formatável à
+// direita da barra. Quando a linha carrega um `id` (caso do Top 10
+// Contratos, onde cada barra É um contrato específico, não uma categoria),
+// o `<g>` ganha `class="linha-contrato" data-contrato-id`, pra reaproveitar
+// o mesmo tooltip de detalhe ao passar o mouse do resto do sistema — quem
+// chama ainda precisa rodar ligarTooltipLinhas() depois de desenhar.
+function barraContagemHorizontalSVG(linhas, opcoes = {}) {
+  const {
+    maxRotulo = 24,
+    formatarValor = (v) => v.toLocaleString("pt-BR"),
+    tituloTooltip = (l) => `${l.label}: ${formatarValor(l.total)}`,
+    selecionado = "",
+  } = opcoes;
+  const padL = 170, padR = 44, padT = 6;
   const larguraPlot = 250;
   const rowH = 22, alturaBarra = 15;
   const w = padL + larguraPlot + padR;
@@ -3995,15 +4055,27 @@ function barraTipoObjetoSVG(linhas, tipoSelecionado = "") {
     const y = padT + i * rowH;
     const yBarra = y + (rowH - alturaBarra) / 2;
     const larg = maxTotal ? larguraPlot * (l.total / maxTotal) : 0;
-    const dim = tipoSelecionado && tipoSelecionado !== l.label;
-    corpo += `<g data-cat="${escapeAttr(l.label)}" style="cursor:pointer" opacity="${dim ? 0.4 : 1}">`;
+    const dim = selecionado && selecionado !== l.label;
+    const atributosContrato = l.id ? ` class="linha-contrato" data-contrato-id="${escapeAttr(l.id)}"` : "";
+    corpo += `<g data-cat="${escapeAttr(l.label)}"${atributosContrato} style="cursor:${l.id ? "default" : "pointer"}" opacity="${dim ? 0.4 : 1}">`;
     corpo += `<rect class="area-hit" x="0" y="${y.toFixed(1)}" width="${w}" height="${rowH}" fill="transparent" />`;
-    corpo += textoSVG(l.label, padL - 8, y + rowH / 2, { maxChars: MAX_ROTULO, anchor: "end", fontSize: 9, alturaLinha: 10, peso: tipoSelecionado === l.label ? 700 : 400 });
-    corpo += `<rect x="${padL}" y="${yBarra.toFixed(1)}" width="${Math.max(larg, 1.5).toFixed(1)}" height="${alturaBarra}" fill="${corCategoria(i)}"><title>${escapeHTML(l.label)}: ${l.total} contrato(s)</title></rect>`;
-    corpo += `<text x="${(padL + larg + 6).toFixed(1)}" y="${(yBarra + alturaBarra / 2 + 3.5).toFixed(1)}" font-family="monospace" font-size="9" font-weight="700" fill="var(--carvao)">${l.total}</text>`;
+    corpo += textoSVG(l.label, padL - 8, y + rowH / 2, { maxChars: maxRotulo, anchor: "end", fontSize: 9, alturaLinha: 10, peso: selecionado === l.label ? 700 : 400 });
+    corpo += `<rect x="${padL}" y="${yBarra.toFixed(1)}" width="${Math.max(larg, 1.5).toFixed(1)}" height="${alturaBarra}" fill="${corCategoria(i)}"><title>${escapeHTML(tituloTooltip(l))}</title></rect>`;
+    corpo += `<text x="${(padL + larg + 6).toFixed(1)}" y="${(yBarra + alturaBarra / 2 + 3.5).toFixed(1)}" font-family="monospace" font-size="9" font-weight="700" fill="var(--carvao)">${escapeHTML(formatarValor(l.total))}</text>`;
     corpo += `</g>`;
   });
   return `<svg viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg">${corpo}</svg>`;
+}
+
+// "Qual tipo de objeto reina mais" (pedido direto, espelhando o cartão
+// "Tipo de Objeto" do painel do TJMA) — fina camada sobre a barra genérica,
+// só acrescentando o cross-filter por tipo (as outras distribuições do
+// Gerencial são só leitura, esta participa do filtro clicável da página).
+function barraTipoObjetoSVG(linhas, tipoSelecionado = "") {
+  return barraContagemHorizontalSVG(linhas, {
+    selecionado: tipoSelecionado,
+    tituloTooltip: (l) => `${l.label}: ${l.total} contrato(s)`,
+  });
 }
 
 // "Contratos por Criticidade e Área Gestora" — barra 100% empilhada
@@ -4277,6 +4349,7 @@ function ligarTooltipLinhas(container, porId) {
 // ---------- Gerencial: cartões de portfólio + matriz e barra por área ----------
 function renderGerencialContratos(lista, resumo) {
   const alvo = document.getElementById("contratos-sub-gerencial");
+  const porId = new Map(lista.map((c) => [c.id, c]));
   const areasDisponiveis = [...new Set(lista.map((c) => c.unidadeGestora || "(sem unidade)"))].sort();
   let filtroArea = "";
   let filtroTipo = "";
@@ -4314,6 +4387,29 @@ function renderGerencialContratos(lista, resumo) {
         <h4>Contratos por Tipo de Objeto</h4>
         <p class="dash-chart-hint">Qual tipo de objeto reina mais no portfólio. Clique numa barra pra isolar aquele tipo — clique de novo pra voltar a ver todos.</p>
         <div id="ger-tipo"></div>
+      </div>
+    </div>
+    <div class="dash-charts" style="grid-template-columns:1fr 1fr">
+      <div class="dash-chart-box">
+        <h4>Distribuição de Contratos por Analista</h4>
+        <div id="ger-analista"></div>
+      </div>
+      <div class="dash-chart-box">
+        <h4>Distribuição de Contratos por Nº de Aditivos</h4>
+        <p class="dash-chart-hint">Quantos contratos têm 0, 1, 2... aditivos. Não é uma linha do tempo — pra isso precisaria da data de CADA aditivo, que a planilha ainda não traz.</p>
+        <div id="ger-aditivos"></div>
+      </div>
+    </div>
+    <div class="dash-charts" style="grid-template-columns:1fr 1fr">
+      <div class="dash-chart-box">
+        <h4>Top 10 Maiores Contratos (Valor Atual)</h4>
+        <p class="dash-chart-hint">Passe o mouse numa barra pra ver o detalhe do contrato.</p>
+        <div id="ger-top-contratos"></div>
+      </div>
+      <div class="dash-chart-box">
+        <h4>Top 10 Maiores Fornecedores (Valor Atual)</h4>
+        <p class="dash-chart-hint">Soma o valor de todos os contratos da mesma empresa, quando ela tem mais de um.</p>
+        <div id="ger-top-fornecedores"></div>
       </div>
     </div>
     <div class="kpi-row" style="margin-top:2px;grid-template-columns:repeat(auto-fit,minmax(180px,1fr))" id="ger-rodape"></div>
@@ -4383,6 +4479,7 @@ function renderGerencialContratos(lista, resumo) {
     const comGarantiaInformada = filtrada.filter((c) => c.garantiaExigida != null && c.garantiaExigida !== "");
     const comGarantiaSim = comGarantiaInformada.filter((c) => c.garantiaExigida === "Sim");
     const pctGarantia = comGarantiaInformada.length ? (comGarantiaSim.length / comGarantiaInformada.length) * 100 : null;
+    const qtdGarantiaExigida = comGarantiaSim.length;
     const porArea = agruparPorAreaCriticidade(filtrada);
 
     document.getElementById("ger-kpis").innerHTML = `
@@ -4403,8 +4500,32 @@ function renderGerencialContratos(lista, resumo) {
       btn.classList.toggle("active", btn.dataset.modo === modoBarra);
     });
     document.getElementById("ger-tipo").innerHTML = barraTipoObjetoSVG(agruparPorTipoObjeto(filtrada), filtroTipo);
+    document.getElementById("ger-analista").innerHTML = barraContagemHorizontalSVG(
+      agruparContagemPorCampo(filtrada, (c) => c.analista, "(sem analista)"),
+      { tituloTooltip: (l) => `${l.label}: ${l.total} contrato(s)` }
+    );
+    document.getElementById("ger-aditivos").innerHTML = barraContagemHorizontalSVG(
+      agruparPorQtdAditivos(filtrada),
+      { tituloTooltip: (l) => `${l.label}: ${l.total} contrato(s)` }
+    );
+    document.getElementById("ger-top-contratos").innerHTML = barraContagemHorizontalSVG(
+      agruparTopContratosPorValor(filtrada, 10),
+      { formatarValor: (v) => "R$ " + formatarEixo(v), tituloTooltip: (l) => `${l.label}: ${formatarMoedaBR(l.total)}` }
+    );
+    ligarTooltipLinhas(document.getElementById("ger-top-contratos"), porId);
+    document.getElementById("ger-top-fornecedores").innerHTML = barraContagemHorizontalSVG(
+      agruparTopFornecedoresPorValor(filtrada, 10),
+      {
+        formatarValor: (v) => "R$ " + formatarEixo(v),
+        tituloTooltip: (l) => `${l.label}: ${formatarMoedaBR(l.total)} (${l.qtd} contrato${l.qtd > 1 ? "s" : ""})`,
+      }
+    );
     adicionarControlesGrafico(document.getElementById("ger-barra"));
     adicionarControlesGrafico(document.getElementById("ger-tipo"));
+    adicionarControlesGrafico(document.getElementById("ger-analista"));
+    adicionarControlesGrafico(document.getElementById("ger-aditivos"));
+    adicionarControlesGrafico(document.getElementById("ger-top-contratos"));
+    adicionarControlesGrafico(document.getElementById("ger-top-fornecedores"));
     // Estes não estão nas 3 páginas do Power BI que a coordenação mostrou,
     // mas já existiam na primeira versão deste painel e são úteis pra
     // acompanhamento — ficam como um segundo bloco, separado dos cartões
@@ -4415,7 +4536,8 @@ function renderGerencialContratos(lista, resumo) {
       <div class="kpi-card" style="--kpi-cor:var(--crit-neutro)"><div class="kpi-label">Qtd A Contratar</div><div class="kpi-value">${qtdAContratar.toLocaleString("pt-BR")}</div></div>
       <div class="kpi-card"><div class="kpi-label">Qtd Total de Aditivos</div><div class="kpi-value">${qtdTotalAditivos.toLocaleString("pt-BR")}</div></div>
       <div class="kpi-card"><div class="kpi-label">Média de Aditivos / Contrato</div><div class="kpi-value">${mediaAditivos.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}</div></div>
-      <div class="kpi-card"><div class="kpi-label">% com Garantia Exigida</div><div class="kpi-value">${pctGarantia === null ? "—" : pctGarantia.toLocaleString("pt-BR", { maximumFractionDigits: 1 }) + "%"}</div></div>`;
+      <div class="kpi-card"><div class="kpi-label">% com Garantia Exigida</div><div class="kpi-value">${pctGarantia === null ? "—" : pctGarantia.toLocaleString("pt-BR", { maximumFractionDigits: 1 }) + "%"}</div></div>
+      <div class="kpi-card"><div class="kpi-label">Contratos Garantia Exigida</div><div class="kpi-value">${qtdGarantiaExigida.toLocaleString("pt-BR")}</div></div>`;
   }
 
   document.getElementById("ger-filtro-area").addEventListener("change", (ev) => { filtroArea = ev.target.value; atualizar(); });
@@ -4594,6 +4716,8 @@ function renderOperacionalContratos(lista) {
         <div class="dado"><div class="valor">${selecionado ? formatarDataBR(selecionado.dataFim) : "--"}</div><div class="rotulo">Data Término Selecionada</div></div>
         <div class="dado"><div class="valor">${selecionado ? formatarDiasBR(selecionado.diasParaVencer) : "--"}</div><div class="rotulo">Dias Para Vencer Selecionado</div></div>
         <div class="dado">${selecionado ? pillCriticidade(selecionado.criticidade) : `<div class="valor">--</div>`}<div class="rotulo">Criticidade Selecionada</div></div>
+        <div class="dado"><div class="valor">${selecionado ? escapeHTML(selecionado.garantiaExigida || "—") : "--"}</div><div class="rotulo">Garantia Exigida</div></div>
+        <div class="dado"><div class="valor">${selecionado ? escapeHTML(selecionado.garantiaExigida === "Sim" ? (selecionado.garantiaForma || "—") : "—") : "--"}</div><div class="rotulo">Forma de Garantia</div></div>
       </div>`;
 
     document.getElementById("op-kpis").innerHTML = `
