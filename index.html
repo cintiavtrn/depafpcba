@@ -4215,7 +4215,11 @@ function colunaCriticidadeEmpilhadaSVG(meses, mesSelecionado = "") {
   // que some.
   const idxSelecionado = mesSelecionado ? meses.findIndex((m) => m.label === mesSelecionado) : -1;
   const cxSelecionado = idxSelecionado >= 0 ? padL + bw * idxSelecionado + bw / 2 : null;
-  const FAIXA_EXCLUSAO_MES = 16;
+  // Distância mínima pros DOIS rótulos ("YYYY-MM", sempre 7 caracteres) não
+  // se tocarem: soma das meia-larguras de cada um (o selecionado é negrito,
+  // logo um pouco mais largo) + uma folga pequena — não um número fixo
+  // escolhido no olho (foi exatamente isso que errou da primeira vez).
+  const MARGEM_ROTULO = 4;
   let barras = "", rotulos = "";
   meses.forEach((m, i) => {
     const cx = padL + bw * i + bw / 2;
@@ -4232,7 +4236,10 @@ function colunaCriticidadeEmpilhadaSVG(meses, mesSelecionado = "") {
     barras += `<g data-mes="${escapeAttr(m.label)}" style="cursor:pointer" opacity="${dim ? 0.35 : 1}">${coluna}</g>`;
     const ehSelecionado = m.label === mesSelecionado;
     const candidatoNormal = i % passo === 0 || i === n - 1;
-    const pertoDoSelecionado = cxSelecionado !== null && !ehSelecionado && Math.abs(cx - cxSelecionado) < FAIXA_EXCLUSAO_MES;
+    const distanciaMinima = cxSelecionado !== null
+      ? (larguraTextoMonoAprox(mesSelecionado, 8, true) + larguraTextoMonoAprox(m.label, 8, false)) / 2 + MARGEM_ROTULO
+      : 0;
+    const pertoDoSelecionado = cxSelecionado !== null && !ehSelecionado && Math.abs(cx - cxSelecionado) < distanciaMinima;
     if (ehSelecionado || (candidatoNormal && !pertoDoSelecionado)) {
       rotulos += `<text x="${cx.toFixed(1)}" y="${(baseY + 14).toFixed(1)}" text-anchor="middle" font-family="monospace" font-size="8" fill="var(--carvao)" fill-opacity="${ehSelecionado ? 1 : 0.7}" font-weight="${ehSelecionado ? 700 : 400}">${escapeHTML(m.label)}</text>`;
     }
@@ -4283,14 +4290,19 @@ function ganttContratosSVG(lista) {
   // rótulo de ano é desenhado ali (a linha pontilhada do ano continua, só o
   // texto some — o "HOJE" já deixa claro onde estamos no tempo).
   const xHoje = x(hoje);
-  const FAIXA_EXCLUSAO_HOJE = 20;
+  // Mesmo cálculo do Tático (ver larguraTextoMonoAprox): soma das
+  // meia-larguras de "HOJE" (negrito) e do rótulo do ano, não um número
+  // fixo — os dois textos têm 4 caracteres, então ficam parecidos, mas
+  // "HOJE" em negrito é um pouco mais largo.
+  const larguraHoje = larguraTextoMonoAprox("HOJE", 8, true);
   let grade = "";
   const anoInicial = minData.getUTCFullYear(), anoFinal = maxData.getUTCFullYear();
   for (let ano = anoInicial; ano <= anoFinal; ano++) {
     const xa = x(new Date(Date.UTC(ano, 0, 1)));
     if (xa < padL || xa > w - padR) continue;
     grade += `<line x1="${xa.toFixed(1)}" y1="${padT}" x2="${xa.toFixed(1)}" y2="${(padT + ordenados.length * rowH).toFixed(1)}" stroke="var(--paper-line)" stroke-width="1" stroke-dasharray="2 4" />`;
-    if (Math.abs(xa - xHoje) >= FAIXA_EXCLUSAO_HOJE) {
+    const distanciaMinima = (larguraHoje + larguraTextoMonoAprox(String(ano), 8, false)) / 2 + 4;
+    if (Math.abs(xa - xHoje) >= distanciaMinima) {
       grade += `<text x="${xa.toFixed(1)}" y="${(padT - 8).toFixed(1)}" text-anchor="middle" font-family="monospace" font-size="8" fill="var(--carvao)" fill-opacity="0.6">${ano}</text>`;
     }
   }
@@ -5399,6 +5411,20 @@ function quebrarTexto(texto, maxChars) {
   if (atual) linhas.push(atual);
   // palavra única maior que o limite (ex.: um código sem espaço): parte à força
   return linhas.flatMap(l => l.length > maxChars ? (l.match(new RegExp(`.{1,${maxChars}}`, "g")) || [l]) : [l]);
+}
+
+// Largura aproximada de um texto em fonte monoespaçada (IBM Plex Mono) —
+// cada caractere ocupa ~0,6× o tamanho da fonte, uma proporção típica de
+// monoespaçada. Usado pra decidir se DOIS rótulos cabem lado a lado sem se
+// tocar — bug real que já apareceu duas vezes (HOJE do Gantt, mês clicado no
+// Tático): calcular só a distância entre os CENTROS dos rótulos e comparar
+// com um número fixo "no olho" erra, porque não leva em conta que o texto
+// em si tem largura — "2026-12" (7 caracteres) é bem mais largo do que a
+// folga que parecia suficiente. Multiplicar aqui pelo peso (negrito é mais
+// largo) e comparar a SOMA das meia-larguras dos dois rótulos é o cálculo
+// certo, não um valor de exclusão arbitrário.
+function larguraTextoMonoAprox(texto, fontSize, negrito = false) {
+  return String(texto).length * fontSize * (negrito ? 0.66 : 0.6);
 }
 
 function textoSVG(texto, x, y, opcoes = {}) {
