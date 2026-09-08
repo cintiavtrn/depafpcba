@@ -4206,6 +4206,16 @@ function colunaCriticidadeEmpilhadaSVG(meses, mesSelecionado = "") {
   });
 
   const passo = passoRotulo(n, 14);
+  // O mês clicado precisa aparecer SEMPRE (por isso o "|| m.label ===
+  // mesSelecionado" abaixo, à parte do passo normal) — mas se ele cair perto
+  // demais de um rótulo já mostrado pelo passo, os dois colam um no outro
+  // (mesmo bug que já corrigimos no "HOJE" do Gantt). Resolvido do mesmo
+  // jeito: uma faixa de exclusão em pixels ao redor do mês selecionado, onde
+  // nenhum OUTRO rótulo é desenhado — a barra dele continua lá, só o texto
+  // que some.
+  const idxSelecionado = mesSelecionado ? meses.findIndex((m) => m.label === mesSelecionado) : -1;
+  const cxSelecionado = idxSelecionado >= 0 ? padL + bw * idxSelecionado + bw / 2 : null;
+  const FAIXA_EXCLUSAO_MES = 16;
   let barras = "", rotulos = "";
   meses.forEach((m, i) => {
     const cx = padL + bw * i + bw / 2;
@@ -4220,8 +4230,11 @@ function colunaCriticidadeEmpilhadaSVG(meses, mesSelecionado = "") {
       y -= alt;
     });
     barras += `<g data-mes="${escapeAttr(m.label)}" style="cursor:pointer" opacity="${dim ? 0.35 : 1}">${coluna}</g>`;
-    if (i % passo === 0 || i === n - 1 || m.label === mesSelecionado) {
-      rotulos += `<text x="${cx.toFixed(1)}" y="${(baseY + 14).toFixed(1)}" text-anchor="middle" font-family="monospace" font-size="8" fill="var(--carvao)" fill-opacity="${mesSelecionado === m.label ? 1 : 0.7}" font-weight="${mesSelecionado === m.label ? 700 : 400}">${escapeHTML(m.label)}</text>`;
+    const ehSelecionado = m.label === mesSelecionado;
+    const candidatoNormal = i % passo === 0 || i === n - 1;
+    const pertoDoSelecionado = cxSelecionado !== null && !ehSelecionado && Math.abs(cx - cxSelecionado) < FAIXA_EXCLUSAO_MES;
+    if (ehSelecionado || (candidatoNormal && !pertoDoSelecionado)) {
+      rotulos += `<text x="${cx.toFixed(1)}" y="${(baseY + 14).toFixed(1)}" text-anchor="middle" font-family="monospace" font-size="8" fill="var(--carvao)" fill-opacity="${ehSelecionado ? 1 : 0.7}" font-weight="${ehSelecionado ? 700 : 400}">${escapeHTML(m.label)}</text>`;
     }
   });
 
