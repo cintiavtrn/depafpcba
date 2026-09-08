@@ -1567,6 +1567,36 @@ function souAdmin() {
   return obterSessao()?.usuario?.papel === "admin";
 }
 
+// Portais cujas abas padrão (Visão Geral / Painéis / Planilhas Enviadas)
+// ficam ocultas por padrão — pedido direto: o link do CPG - Contratos vai
+// ser compartilhado com gente de fora, e essas abas (upload, edição de
+// indicador) não fazem sentido pra esse público e só confundem. Ficam
+// ocultas até pra quem é admin — a intenção é mesmo mostrar só o CPG —, mas
+// o admin ganha um aviso + botão fixo no topo do portal pra confirmar esse
+// estado e reverter quando quiser (ver abasPadraoOcultas/alternarAbasOcultas
+// logo abaixo). Preferência salva no localStorage DO PRÓPRIO admin — quem
+// não é admin nunca vê o botão nem tem como escrever essa chave, então as
+// abas continuam ocultas pra qualquer visitante, sempre.
+const PORTAIS_COM_ABAS_PADRAO_OCULTAS = ["orcamento"];
+
+function chaveMostrarAbasOcultas(portalId) {
+  return `depaf-mostrar-abas-ocultas-${portalId}`;
+}
+
+function abasPadraoOcultas(portalId) {
+  if (!PORTAIS_COM_ABAS_PADRAO_OCULTAS.includes(portalId)) return false;
+  if (!SUBPORTAIS[portalId] || !SUBPORTAIS[portalId].length) return false; // nada pra sobrar visível
+  if (souAdmin() && localStorage.getItem(chaveMostrarAbasOcultas(portalId)) === "1") return false;
+  return true;
+}
+
+function alternarAbasOcultas(portalId) {
+  const chave = chaveMostrarAbasOcultas(portalId);
+  const mostrando = localStorage.getItem(chave) === "1";
+  localStorage.setItem(chave, mostrando ? "0" : "1");
+  abrirTela(portalId);
+}
+
 function renderIndicadoresLeitura(indicadores) {
   if (!indicadores || !indicadores.length) return '<p class="tela-intro">Nenhum indicador cadastrado ainda.</p>';
   let html = `<div class="dados-grid">`;
@@ -4859,6 +4889,23 @@ async function abrirTela(id) {
   // (o bloco que montava o antigo "corpoDash" saiu: ele fazia uma chamada de
   //  API a cada portal aberto pra alimentar uma aba que não existe mais)
 
+  // Abas padrão (Visão Geral/Painéis/Planilhas) somem inteiras — nem o botão
+  // nem o painel entram no HTML — pra quem não é admin, ou pro admin que
+  // ainda não pediu pra ver. Isso muda também qual aba abre ativa: sem
+  // "geral" pra ser a primeira, é a primeira subaba (ex.: CPG - Contratos)
+  // que assume esse lugar.
+  const ocultarAbasPadrao = abasPadraoOcultas(id);
+  const primeiraSubaba = SUBPORTAIS[id]?.[0]?.tab;
+  const abaInicial = ocultarAbasPadrao ? primeiraSubaba : "geral";
+  const avisoAbasOcultas = souAdmin() && PORTAIS_COM_ABAS_PADRAO_OCULTAS.includes(id)
+    ? `<p class="dash-chart-hint" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+        <span>${ocultarAbasPadrao
+          ? "🔒 Só admin vê este aviso: as abas Visão Geral / Painéis / Planilhas Enviadas estão OCULTAS pra quem recebe o link deste portal."
+          : "👁 Só admin vê este aviso: as abas padrão estão VISÍVEIS pra quem abrir o link — inclusive quem não é admin."}</span>
+        <button type="button" class="dash-toggle-btn" id="btn-alternar-abas-ocultas">${ocultarAbasPadrao ? "MOSTRAR PRA MIM" : "OCULTAR DE NOVO"}</button>
+      </p>`
+    : "";
+
   telaConteudo.innerHTML = `
     <div class="tela-head" style="--tela-color:${p.cor}">
       <span class="icon-grande">${ICONS[p.icon]}</span>
@@ -4869,37 +4916,53 @@ async function abrirTela(id) {
       <span class="mini-rosa" title="Este portal na rosa dos ventos do DEPAF">${miniRosaSVG(PORTAIS.findIndex(x => x.id === id), PORTAIS.length, p.cor)}</span>
     </div>
     <p class="tela-intro">${p.intro}</p>
+    ${avisoAbasOcultas}
     <div class="tabs">
-      <button class="tab-btn active" data-tab="geral">VISÃO GERAL</button>
-      <button class="tab-btn" data-tab="paineis">PAINÉIS</button>
-      <button class="tab-btn" data-tab="planilhas">PLANILHAS ENVIADAS</button>
-      ${SUBPORTAIS[id] ? SUBPORTAIS[id].map(sp => `<button class="tab-btn" data-tab="${sp.tab}">${sp.rotulo}</button>`).join("") : ""}
+      ${ocultarAbasPadrao ? "" : `
+        <button class="tab-btn active" data-tab="geral">VISÃO GERAL</button>
+        <button class="tab-btn" data-tab="paineis">PAINÉIS</button>
+        <button class="tab-btn" data-tab="planilhas">PLANILHAS ENVIADAS</button>
+      `}
+      ${SUBPORTAIS[id] ? SUBPORTAIS[id].map(sp => `<button class="tab-btn${abaInicial === sp.tab ? " active" : ""}" data-tab="${sp.tab}">${sp.rotulo}</button>`).join("") : ""}
     </div>
-    <div class="tab-panel" id="tab-geral">${corpoGeral}</div>
-    <div class="tab-panel" id="tab-paineis" hidden><p class="tela-intro">Carregando...</p></div>
-    <div class="tab-panel" id="tab-planilhas" hidden><p class="tela-intro">Carregando...</p></div>
-    ${SUBPORTAIS[id] ? SUBPORTAIS[id].map(sp => `<div class="tab-panel" id="tab-${sp.tab}" hidden><p class="tela-intro">Carregando...</p></div>`).join("") : ""}
+    ${ocultarAbasPadrao ? "" : `
+      <div class="tab-panel" id="tab-geral">${corpoGeral}</div>
+      <div class="tab-panel" id="tab-paineis" hidden><p class="tela-intro">Carregando...</p></div>
+      <div class="tab-panel" id="tab-planilhas" hidden><p class="tela-intro">Carregando...</p></div>
+    `}
+    ${SUBPORTAIS[id] ? SUBPORTAIS[id].map(sp => `<div class="tab-panel" id="tab-${sp.tab}"${abaInicial === sp.tab ? "" : " hidden"}><p class="tela-intro">Carregando...</p></div>`).join("") : ""}
   `;
 
-  const PAINEIS = ["geral", "paineis", "planilhas", ...(SUBPORTAIS[id] ? SUBPORTAIS[id].map(sp => sp.tab) : [])];
+  const PAINEIS = [
+    ...(ocultarAbasPadrao ? [] : ["geral", "paineis", "planilhas"]),
+    ...(SUBPORTAIS[id] ? SUBPORTAIS[id].map(sp => sp.tab) : []),
+  ];
+  // Mesmo carregamento por trás do clique na aba e da aba que já abre ativa
+  // (quando as abas padrão estão ocultas, a subaba assume esse lugar sem
+  // nenhum clique acontecer) — reaproveitado nos dois casos abaixo.
+  function carregarConteudoAba(nome) {
+    if (nome === "planilhas") carregarUploadsPortal(p.id);
+    if (nome === "paineis") carregarPaineisPortal(p.id);
+    if (nome === "contratos") carregarContratosPortal(p.id);
+    // recarrega os destaques ao voltar pra Visão Geral: marcar um painel na
+    // aba PAINÉIS precisa refletir aqui sem ter que sair e entrar no portal
+    if (nome === "geral") carregarDestaques(p.id);
+  }
   telaConteudo.querySelectorAll(".tab-btn").forEach(btn => {
     btn.addEventListener("click", () => {
       telaConteudo.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
       btn.classList.add("active");
       const alvo = btn.dataset.tab;
       PAINEIS.forEach(nome => { telaConteudo.querySelector(`#tab-${nome}`).hidden = alvo !== nome; });
-      if (alvo === "planilhas") carregarUploadsPortal(p.id);
-      if (alvo === "paineis") carregarPaineisPortal(p.id);
-      if (alvo === "contratos") carregarContratosPortal(p.id);
-      // recarrega os destaques ao voltar pra Visão Geral: marcar um painel na
-      // aba PAINÉIS precisa refletir aqui sem ter que sair e entrar no portal
-      if (alvo === "geral") carregarDestaques(p.id);
+      carregarConteudoAba(alvo);
     });
   });
+  const btnAlternarAbas = document.getElementById("btn-alternar-abas-ocultas");
+  if (btnAlternarAbas) btnAlternarAbas.addEventListener("click", () => alternarAbasOcultas(id));
 
   ligarEdicaoIndicadores(p.id);
   ligarEdicaoProjetos(p.id);
-  carregarDestaques(p.id);
+  carregarConteudoAba(abaInicial);
 
   // (o antigo bloco de filtros do dashboard saiu junto com a aba DASHBOARD —
   //  quem responde essas perguntas agora são os painéis, um por pergunta)
