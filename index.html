@@ -4075,24 +4075,32 @@ function barraContagemHorizontalSVG(linhas, opcoes = {}) {
   } = opcoes;
   const padL = 170, padR = 44, padT = 6;
   const larguraPlot = 250;
-  const rowH = 22, alturaBarra = 15;
+  const ALTURA_LINHA_TEXTO = 10, alturaBarra = 15;
+  // Altura de linha FIXA não dava conta de rótulo comprido (nº do contrato +
+  // nome de empresa inteiro, no Top 10) — o texto quebrava em 2-3 linhas mas
+  // a barra de baixo continuava colada, então a segunda/terceira linha do
+  // rótulo invadia a linha vizinha. Cada linha agora tem a própria altura,
+  // calculada em cima de quantas linhas o rótulo DELA precisa.
+  const alturas = linhas.map((l) => Math.max(22, linhasDoTexto(l.label, maxRotulo) * ALTURA_LINHA_TEXTO + 12));
   const w = padL + larguraPlot + padR;
-  const h = padT + linhas.length * rowH + 4;
+  const h = padT + alturas.reduce((a, b) => a + b, 0) + 4;
   const maxTotal = maxSeguro(linhas.map((l) => l.total));
 
   let corpo = "";
+  let y = padT;
   linhas.forEach((l, i) => {
-    const y = padT + i * rowH;
+    const rowH = alturas[i];
     const yBarra = y + (rowH - alturaBarra) / 2;
     const larg = maxTotal ? larguraPlot * (l.total / maxTotal) : 0;
     const dim = selecionado && selecionado !== l.label;
     const atributosContrato = l.id ? ` class="linha-contrato" data-contrato-id="${escapeAttr(l.id)}"` : "";
     corpo += `<g data-cat="${escapeAttr(l.label)}"${atributosContrato} style="cursor:${l.id ? "default" : "pointer"}" opacity="${dim ? 0.4 : 1}">`;
     corpo += `<rect class="area-hit" x="0" y="${y.toFixed(1)}" width="${w}" height="${rowH}" fill="transparent" />`;
-    corpo += textoSVG(l.label, padL - 8, y + rowH / 2, { maxChars: maxRotulo, anchor: "end", fontSize: 9, alturaLinha: 10, peso: selecionado === l.label ? 700 : 400 });
+    corpo += textoSVG(l.label, padL - 8, y + rowH / 2, { maxChars: maxRotulo, anchor: "end", fontSize: 9, alturaLinha: ALTURA_LINHA_TEXTO, peso: selecionado === l.label ? 700 : 400 });
     corpo += `<rect x="${padL}" y="${yBarra.toFixed(1)}" width="${Math.max(larg, 1.5).toFixed(1)}" height="${alturaBarra}" fill="${corCategoria(i)}"><title>${escapeHTML(tituloTooltip(l))}</title></rect>`;
     corpo += `<text x="${(padL + larg + 6).toFixed(1)}" y="${(yBarra + alturaBarra / 2 + 3.5).toFixed(1)}" font-family="monospace" font-size="9" font-weight="700" fill="var(--carvao)">${escapeHTML(formatarValor(l.total))}</text>`;
     corpo += `</g>`;
+    y += rowH;
   });
   return `<svg viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg">${corpo}</svg>`;
 }
