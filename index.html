@@ -4391,6 +4391,7 @@ function renderGerencialContratos(lista, resumo) {
   const areasDisponiveis = [...new Set(lista.map((c) => c.unidadeGestora || "(sem unidade)"))].sort();
   let filtroArea = "";
   let filtroTipo = "";
+  let filtroStatusKpi = "";
   let modoBarra = lerGraficoSalvo("cpg-gerencial-barra") || "proporcao";
 
   alvo.innerHTML = `
@@ -4402,6 +4403,7 @@ function renderGerencialContratos(lista, resumo) {
     </div>
     <div id="ger-chip-filtro"></div>
     <div id="ger-kpis" style="margin-bottom:16px"></div>
+    <div id="ger-kpi-tabela" style="margin-bottom:16px"></div>
     <div class="dash-charts" style="grid-template-columns:1.1fr 1fr">
       <div class="dash-chart-box">
         <h4>Detalhamento por Área Gestora</h4>
@@ -4475,6 +4477,20 @@ function renderGerencialContratos(lista, resumo) {
     filtroTipo = filtroTipo === tipo ? "" : tipo;
     atualizar();
   }
+  // Clique no cartão "Qtd Contratos Vencidos"/"A Vencer" abre uma tabela logo
+  // abaixo com quais são — pedido direto: "clicar no cartão... é uma forma
+  // da pessoa visualizar mais rápido" em vez de ter que ir catando linha por
+  // linha na matriz ou no Tático. Não mexe em filtroArea/filtroTipo (continua
+  // um filtro À PARTE, só da tabela de baixo), mas RESPEITA os dois — a
+  // tabela mostra o mesmo recorte que already está nos cartões.
+  function selecionarStatusKpi(status) {
+    filtroStatusKpi = filtroStatusKpi === status ? "" : status;
+    atualizar();
+  }
+  document.getElementById("ger-kpis").addEventListener("click", (ev) => {
+    const card = ev.target.closest("[data-status]");
+    if (card) selecionarStatusKpi(card.dataset.status);
+  });
   document.getElementById("ger-matriz").addEventListener("click", (ev) => {
     const tr = ev.target.closest("[data-cat]");
     if (tr) selecionarArea(tr.dataset.cat);
@@ -4523,11 +4539,32 @@ function renderGerencialContratos(lista, resumo) {
     document.getElementById("ger-kpis").innerHTML = `
       <div class="kpi-row">
         <div class="kpi-card"><div class="kpi-label">Qtd Contratos</div><div class="kpi-value">${filtrada.length.toLocaleString("pt-BR")}</div></div>
-        <div class="kpi-card" style="--kpi-cor:var(--crit-vencido)"><div class="kpi-label">Qtd Contratos Vencidos</div><div class="kpi-value">${qtdVencidos.toLocaleString("pt-BR")}</div></div>
-        <div class="kpi-card" style="--kpi-cor:var(--crit-alto)"><div class="kpi-label">Qtd Contratos A Vencer</div><div class="kpi-value">${qtdAVencer.toLocaleString("pt-BR")}</div></div>
+        <div class="kpi-card kpi-clicavel" data-status="Vencido" title="Clique pra ver quais são" style="--kpi-cor:var(--crit-vencido);cursor:pointer;${filtroStatusKpi === "Vencido" ? "outline:2px solid var(--crit-vencido);outline-offset:-2px" : ""}"><div class="kpi-label">Qtd Contratos Vencidos</div><div class="kpi-value">${qtdVencidos.toLocaleString("pt-BR")}</div></div>
+        <div class="kpi-card kpi-clicavel" data-status="A Vencer" title="Clique pra ver quais são" style="--kpi-cor:var(--crit-alto);cursor:pointer;${filtroStatusKpi === "A Vencer" ? "outline:2px solid var(--crit-alto);outline-offset:-2px" : ""}"><div class="kpi-label">Qtd Contratos A Vencer</div><div class="kpi-value">${qtdAVencer.toLocaleString("pt-BR")}</div></div>
         <div class="kpi-card"><div class="kpi-label">Valor Global Inicial Total</div><div class="kpi-value">R$ ${formatarEixo(valorInicial)}</div></div>
         <div class="kpi-card"><div class="kpi-label">Valor Global Atual Total</div><div class="kpi-value">R$ ${formatarEixo(valorAtual)}</div></div>
       </div>`;
+    if (filtroStatusKpi) {
+      const contratosDoStatus = filtrada.filter((c) => c.statusVigencia === filtroStatusKpi);
+      document.getElementById("ger-kpi-tabela").innerHTML = `
+        <div class="dash-chart-box">
+          <h4>Contratos ${escapeHTML(filtroStatusKpi === "Vencido" ? "Vencidos" : "A Vencer")}</h4>
+          <p class="dash-chart-hint">Passe o mouse numa linha pra ver o detalhe do contrato. Clique de novo no cartão "${escapeHTML(filtroStatusKpi === "Vencido" ? "Qtd Contratos Vencidos" : "Qtd Contratos A Vencer")}" pra fechar.</p>
+          <div id="ger-kpi-tabela-conteudo" class="tabela-rolavel" style="max-height:320px"></div>
+        </div>`;
+      document.getElementById("ger-kpi-tabela-conteudo").innerHTML = contratosDoStatus.length
+        ? `<table class="dash-tabela">
+            <thead><tr><th>Nº CONTRATO</th><th>ÁREA GESTORA</th><th>EMPRESA</th><th>DIAS PARA VENCER</th><th>CRITICIDADE</th></tr></thead>
+            <tbody>${contratosDoStatus.map((c) => `
+              <tr class="linha-contrato" data-contrato-id="${escapeAttr(c.id)}">
+                <td>${escapeHTML(c.numeroContrato)}</td><td>${escapeHTML(c.unidadeGestora || "—")}</td><td>${escapeHTML(c.empresa)}</td><td class="num">${formatarDiasBR(c.diasParaVencer)}</td><td>${pillCriticidade(c.criticidade)}</td>
+              </tr>`).join("")}</tbody>
+          </table>`
+        : `<p class="tela-intro">Nenhum contrato nessa faixa.</p>`;
+      ligarTooltipLinhas(document.getElementById("ger-kpi-tabela-conteudo"), porId);
+    } else {
+      document.getElementById("ger-kpi-tabela").innerHTML = "";
+    }
     document.getElementById("ger-matriz").innerHTML = renderMatrizAreaGestora(porArea);
     document.getElementById("ger-barra").innerHTML = modoBarra === "treemap"
       ? treemapAreaCriticidadeSVG(porArea)
