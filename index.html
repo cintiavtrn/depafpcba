@@ -4116,6 +4116,88 @@ function barraTipoObjetoSVG(linhas, tipoSelecionado = "") {
   });
 }
 
+// Mesma ideia de agruparContagemPorCampo, mas SOMANDO valor em vez de contar
+// contrato — pedido direto de reunião: "quanto eu gasto em Tecnologia? Em
+// Transporte?" não dá pra responder com uma contagem, precisa do R$. Serve
+// tanto pra área gestora quanto tipo de objeto (mesma função, campo
+// diferente) — são DUAS perguntas parecidas mas não a mesma: uma é "onde"
+// (área), a outra é "no quê" (tipo de contratação).
+function agruparValorPorCampo(lista, campoFn, rotuloVazio = "(não informado)") {
+  const mapa = new Map();
+  for (const c of lista) {
+    if (c.valorGlobalAtual == null) continue;
+    const chave = campoFn(c) || rotuloVazio;
+    mapa.set(chave, (mapa.get(chave) || 0) + c.valorGlobalAtual);
+  }
+  return [...mapa.entries()].map(([label, total]) => ({ label, total })).sort((a, b) => b.total - a.total);
+}
+
+// Gestor e Fiscal vêm da tabela relacional ContratoPessoa (um contrato pode
+// ter mais de um gestor/fiscal, e a mesma pessoa aparece em vários
+// contratos) — bem diferente de Analista, que é um campo direto do
+// contrato. Conta CONTRATO distinto por pessoa (um Set por pessoa evita
+// contar duas vezes se por acaso a pessoa aparecer repetida no mesmo
+// contrato/papel).
+function agruparContratosPorPessoa(lista, papel) {
+  const mapa = new Map(); // nome -> Set(contratoId)
+  for (const c of lista) {
+    const nomes = new Set((c.pessoas || []).filter((p) => p.papel === papel).map((p) => p.nomePessoa));
+    for (const nome of nomes) {
+      if (!mapa.has(nome)) mapa.set(nome, new Set());
+      mapa.get(nome).add(c.id);
+    }
+  }
+  return [...mapa.entries()]
+    .map(([label, idsSet]) => ({ label, total: idsSet.size }))
+    .sort((a, b) => b.total - a.total);
+}
+
+// Busca por palavra-chave "de tudo" — pedido de reunião: a pessoa às vezes
+// não lembra do número do contrato nem da empresa, mas lembra do objeto, de
+// um valor, de uma data, da área, do gestor, do fiscal... Monta um texto
+// único por contrato com TODOS os campos plausíveis de busca, já em
+// minúsculo, uma vez só (não a cada tecla digitada) — quem chama guarda o
+// resultado e só filtra a lista pronta.
+function indiceBuscaContrato(c) {
+  const campos = [
+    c.numeroContrato, c.empresa, c.objeto, c.processo, c.analista, c.tipoObjeto,
+    c.unidadeGestora, c.areaGestora, c.cnpjCpf, c.garantiaExigida, c.garantiaForma,
+    formatarMoedaBR(c.valorGlobalInicial), formatarMoedaBR(c.valorGlobalAtual),
+    formatarDataBR(c.dataInicio), formatarDataBR(c.dataFim),
+    ...(c.pessoas || []).map((p) => p.nomePessoa),
+  ];
+  return campos.filter(Boolean).join(" ␟").toLowerCase();
+}
+
+// Liga uma caixa de busca a uma tabela de resultado — reaproveitado nas 3
+// páginas (Gerencial/Tático/Operacional), mesmo comportamento nas três: eu
+// digito qualquer pedaço de qualquer campo, aparece a lista de contratos que
+// batem, com o mesmo tooltip de detalhe do resto do sistema. Não mexe em
+// nenhum outro filtro/gráfico da tela — é uma busca À PARTE, só essa tabela.
+function ligarBuscaContratos(lista, porId, idInput, idResultado) {
+  const indexado = lista.map((c) => ({ c, indice: indiceBuscaContrato(c) }));
+  const input = document.getElementById(idInput);
+  const resultado = document.getElementById(idResultado);
+  input.addEventListener("input", () => {
+    const termo = input.value.trim().toLowerCase();
+    if (!termo) { resultado.innerHTML = ""; return; }
+    const encontrados = indexado.filter((x) => x.indice.includes(termo)).map((x) => x.c);
+    resultado.innerHTML = `
+      <div class="dash-chart-box" style="margin-top:10px">
+        <h4>Resultado da busca</h4>
+        <p class="dash-chart-hint">${encontrados.length} contrato(s) encontrado(s) pra "${escapeHTML(input.value.trim())}" — em número, empresa, objeto, valor, data, área, analista, gestor ou fiscal.</p>
+        ${encontrados.length ? `<div class="tabela-rolavel" style="max-height:320px"><table class="dash-tabela">
+          <thead><tr><th>Nº CONTRATO</th><th>ÁREA GESTORA</th><th>EMPRESA</th><th>OBJETO</th></tr></thead>
+          <tbody>${encontrados.map((c) => `
+            <tr class="linha-contrato" data-contrato-id="${escapeAttr(c.id)}">
+              <td>${escapeHTML(c.numeroContrato)}</td><td>${escapeHTML(c.unidadeGestora || "—")}</td><td>${escapeHTML(c.empresa)}</td><td>${escapeHTML(c.objeto || "—")}</td>
+            </tr>`).join("")}</tbody>
+        </table></div>` : ""}
+      </div>`;
+    ligarTooltipLinhas(resultado, porId);
+  });
+}
+
 // "Contratos por Criticidade e Área Gestora" — barra 100% empilhada
 // horizontal, uma linha por área. Não reaproveita cruzamentoBarrasSVG (que já
 // existe no arquivo) porque aquela função colore por ÍNDICE na paleta
@@ -4416,6 +4498,9 @@ function renderGerencialContratos(lista, resumo) {
   const areasDisponiveis = [...new Set(lista.map((c) => c.unidadeGestora || "(sem unidade)"))].sort();
   let filtroArea = "";
   let filtroTipo = "";
+  let filtroAnalista = "";
+  let filtroGestor = "";
+  let filtroFiscal = "";
   let filtroStatusKpi = "";
   let modoBarra = lerGraficoSalvo("cpg-gerencial-barra") || "proporcao";
 
@@ -4425,14 +4510,19 @@ function renderGerencialContratos(lista, resumo) {
         <label>ÁREA GESTORA</label>
         <select id="ger-filtro-area"><option value="">Todos</option>${areasDisponiveis.map((a) => `<option value="${escapeAttr(a)}">${escapeHTML(a)}</option>`).join("")}</select>
       </div>
+      <div class="dash-filtro" style="flex:1;min-width:280px">
+        <label>BUSCAR (Nº, EMPRESA, OBJETO, VALOR, DATA, ÁREA, ANALISTA, GESTOR, FISCAL...)</label>
+        <input type="text" id="ger-busca" placeholder="Digite qualquer parte do que lembrar..." />
+      </div>
     </div>
+    <div id="ger-busca-resultado"></div>
     <div id="ger-chip-filtro"></div>
     <div id="ger-kpis" style="margin-bottom:16px"></div>
     <div id="ger-kpi-tabela" style="margin-bottom:16px"></div>
     <div class="dash-charts" style="grid-template-columns:1.1fr 1fr">
       <div class="dash-chart-box">
         <h4>Detalhamento por Área Gestora</h4>
-        <p class="dash-chart-hint">Clique numa linha ou numa barra pra isolar só aquela área — clique de novo (ou em "Todos" acima) pra voltar a ver tudo.</p>
+        <p class="dash-chart-hint">Clique numa linha ou numa barra pra isolar só aquela área (a lista de contratos aparece logo abaixo dos cartões) — clique de novo (ou em "Todos" acima) pra voltar a ver tudo.</p>
         <div style="text-align:right;margin-bottom:6px"><button type="button" class="dash-toggle-btn" id="ger-matriz-baixar" title="Baixar esta tabela como imagem">⬇ TABELA (PNG)</button></div>
         <div id="ger-matriz" class="tabela-rolavel"></div>
       </div>
@@ -4449,20 +4539,45 @@ function renderGerencialContratos(lista, resumo) {
     </div>
     <div class="dash-charts" style="grid-template-columns:1fr">
       <div class="dash-chart-box">
+        <h4>Valor Total por Área Gestora</h4>
+        <p class="dash-chart-hint">Pra responder rápido "quanto se gasta em tal área" sem precisar somar na mão. Clique numa barra pra isolar aquela área.</p>
+        <div id="ger-valor-area"></div>
+      </div>
+    </div>
+    <div class="dash-charts" style="grid-template-columns:1fr 1fr">
+      <div class="dash-chart-box">
         <h4>Contratos por Tipo de Objeto</h4>
-        <p class="dash-chart-hint">Qual tipo de objeto reina mais no portfólio. Clique numa barra pra isolar aquele tipo — clique de novo pra voltar a ver todos.</p>
+        <p class="dash-chart-hint">Qual tipo de objeto reina mais no portfólio, em QUANTIDADE. Clique numa barra pra isolar aquele tipo.</p>
         <div id="ger-tipo"></div>
+      </div>
+      <div class="dash-chart-box">
+        <h4>Valor por Tipo de Objeto</h4>
+        <p class="dash-chart-hint">A mesma pergunta em R$ — ex.: quantos milhões se gasta em TIC. Clique numa barra pra isolar aquele tipo.</p>
+        <div id="ger-valor-tipo"></div>
       </div>
     </div>
     <div class="dash-charts" style="grid-template-columns:1fr 1fr">
       <div class="dash-chart-box">
         <h4>Distribuição de Contratos por Analista</h4>
+        <p class="dash-chart-hint">Clique num nome pra ver os contratos sob responsabilidade dele.</p>
         <div id="ger-analista"></div>
       </div>
       <div class="dash-chart-box">
         <h4>Distribuição de Contratos por Nº de Aditivos</h4>
         <p class="dash-chart-hint">Quantos contratos têm 0, 1, 2... aditivos. Não é uma linha do tempo — pra isso precisaria da data de CADA aditivo, que a planilha ainda não traz.</p>
         <div id="ger-aditivos"></div>
+      </div>
+    </div>
+    <div class="dash-charts" style="grid-template-columns:1fr 1fr">
+      <div class="dash-chart-box">
+        <h4>Distribuição de Contratos por Gestor</h4>
+        <p class="dash-chart-hint">Clique num nome pra ver os contratos sob responsabilidade dele.</p>
+        <div id="ger-gestor"></div>
+      </div>
+      <div class="dash-chart-box">
+        <h4>Distribuição de Contratos por Fiscal</h4>
+        <p class="dash-chart-hint">Clique num nome pra ver os contratos sob responsabilidade dele.</p>
+        <div id="ger-fiscal"></div>
       </div>
     </div>
     <div class="dash-charts" style="grid-template-columns:1fr 1fr">
@@ -4480,6 +4595,8 @@ function renderGerencialContratos(lista, resumo) {
     <div class="kpi-row" style="margin-top:2px;grid-template-columns:repeat(auto-fit,minmax(180px,1fr))" id="ger-rodape"></div>
   `;
 
+  ligarBuscaContratos(lista, porId, "ger-busca", "ger-busca-resultado");
+
   document.getElementById("ger-barra-toggle").addEventListener("click", (ev) => {
     const btn = ev.target.closest("[data-modo]");
     if (!btn || btn.dataset.modo === modoBarra) return;
@@ -4492,7 +4609,10 @@ function renderGerencialContratos(lista, resumo) {
   // que escolher aquela área no filtro de cima — é o "clicar no gráfico pra
   // isolar" que o Power BI faz nativamente (cross-filter), replicado aqui
   // como um filtro de verdade: cartões, matriz e barra recalculam juntos.
-  // Clicar de novo na mesma área desmarca (volta pra "Todos").
+  // Clicar de novo na mesma área desmarca (volta pra "Todos"). O mesmo
+  // padrão vale agora pra tipo, analista, gestor e fiscal — pedido direto de
+  // reunião: "ao clicar nos nomes, ver tudo que está sob responsabilidade
+  // deles", não só a contagem.
   function selecionarArea(area) {
     filtroArea = filtroArea === area ? "" : area;
     document.getElementById("ger-filtro-area").value = filtroArea;
@@ -4502,12 +4622,21 @@ function renderGerencialContratos(lista, resumo) {
     filtroTipo = filtroTipo === tipo ? "" : tipo;
     atualizar();
   }
-  // Clique no cartão "Qtd Contratos Vencidos"/"A Vencer" abre uma tabela logo
-  // abaixo com quais são — pedido direto: "clicar no cartão... é uma forma
-  // da pessoa visualizar mais rápido" em vez de ter que ir catando linha por
-  // linha na matriz ou no Tático. Não mexe em filtroArea/filtroTipo (continua
-  // um filtro À PARTE, só da tabela de baixo), mas RESPEITA os dois — a
-  // tabela mostra o mesmo recorte que already está nos cartões.
+  function selecionarAnalista(nome) {
+    filtroAnalista = filtroAnalista === nome ? "" : nome;
+    atualizar();
+  }
+  function selecionarGestor(nome) {
+    filtroGestor = filtroGestor === nome ? "" : nome;
+    atualizar();
+  }
+  function selecionarFiscal(nome) {
+    filtroFiscal = filtroFiscal === nome ? "" : nome;
+    atualizar();
+  }
+  // Clique no cartão "Qtd Contratos Vencidos"/"A Vencer" é um filtro À PARTE
+  // dos de cima (não mexe em área/tipo/pessoa) — mas ENTRA na mesma tabela
+  // de resultado combinada lá embaixo.
   function selecionarStatusKpi(status) {
     filtroStatusKpi = filtroStatusKpi === status ? "" : status;
     atualizar();
@@ -4524,9 +4653,29 @@ function renderGerencialContratos(lista, resumo) {
     const alvoClicado = ev.target.closest("[data-cat]");
     if (alvoClicado) selecionarArea(alvoClicado.dataset.cat);
   });
+  document.getElementById("ger-valor-area").addEventListener("click", (ev) => {
+    const alvoClicado = ev.target.closest("[data-cat]");
+    if (alvoClicado) selecionarArea(alvoClicado.dataset.cat);
+  });
   document.getElementById("ger-tipo").addEventListener("click", (ev) => {
     const alvoClicado = ev.target.closest("[data-cat]");
     if (alvoClicado) selecionarTipo(alvoClicado.dataset.cat);
+  });
+  document.getElementById("ger-valor-tipo").addEventListener("click", (ev) => {
+    const alvoClicado = ev.target.closest("[data-cat]");
+    if (alvoClicado) selecionarTipo(alvoClicado.dataset.cat);
+  });
+  document.getElementById("ger-analista").addEventListener("click", (ev) => {
+    const alvoClicado = ev.target.closest("[data-cat]");
+    if (alvoClicado) selecionarAnalista(alvoClicado.dataset.cat);
+  });
+  document.getElementById("ger-gestor").addEventListener("click", (ev) => {
+    const alvoClicado = ev.target.closest("[data-cat]");
+    if (alvoClicado) selecionarGestor(alvoClicado.dataset.cat);
+  });
+  document.getElementById("ger-fiscal").addEventListener("click", (ev) => {
+    const alvoClicado = ev.target.closest("[data-cat]");
+    if (alvoClicado) selecionarFiscal(alvoClicado.dataset.cat);
   });
   document.getElementById("ger-matriz-baixar").addEventListener("click", () =>
     baixarTabelaComoImagem(document.getElementById("ger-matriz"), "cpg-contratos-detalhamento-area-gestora.png"));
@@ -4534,18 +4683,30 @@ function renderGerencialContratos(lista, resumo) {
   function atualizar() {
     const filtrada = lista.filter((c) =>
       (!filtroArea || (c.unidadeGestora || "(sem unidade)") === filtroArea) &&
-      (!filtroTipo || (c.tipoObjeto || "(sem tipo)") === filtroTipo)
+      (!filtroTipo || (c.tipoObjeto || "(sem tipo)") === filtroTipo) &&
+      (!filtroAnalista || (c.analista || "(sem analista)") === filtroAnalista) &&
+      (!filtroGestor || (c.pessoas || []).some((p) => p.papel === "Gestor" && p.nomePessoa === filtroGestor)) &&
+      (!filtroFiscal || (c.pessoas || []).some((p) => p.papel === "Fiscal" && p.nomePessoa === filtroFiscal))
     );
-    document.getElementById("ger-chip-filtro").innerHTML = (filtroArea || filtroTipo)
-      ? `<div class="filter-chips">
-          ${filtroArea ? `<span class="filter-chip">Isolando área: ${escapeHTML(filtroArea)}<button type="button" data-limpar-area title="Voltar a ver todas as áreas">✕</button></span>` : ""}
-          ${filtroTipo ? `<span class="filter-chip">Isolando tipo: ${escapeHTML(filtroTipo)}<button type="button" data-limpar-tipo title="Voltar a ver todos os tipos">✕</button></span>` : ""}
-        </div>`
+
+    // Chips genéricos — um por filtro ativo, cada um sabe desligar a si
+    // mesmo. Cresceu de 2 pra 5 filtros possíveis (área, tipo, analista,
+    // gestor, fiscal) e repetir o bloco if/então 5 vezes ficaria ilegível;
+    // um array de {rotulo, limpar} escala sem repetição.
+    const chipsAtivos = [
+      filtroArea && { rotulo: `área: ${filtroArea}`, limpar: () => selecionarArea(filtroArea) },
+      filtroTipo && { rotulo: `tipo: ${filtroTipo}`, limpar: () => selecionarTipo(filtroTipo) },
+      filtroAnalista && { rotulo: `analista: ${filtroAnalista}`, limpar: () => selecionarAnalista(filtroAnalista) },
+      filtroGestor && { rotulo: `gestor: ${filtroGestor}`, limpar: () => selecionarGestor(filtroGestor) },
+      filtroFiscal && { rotulo: `fiscal: ${filtroFiscal}`, limpar: () => selecionarFiscal(filtroFiscal) },
+    ].filter(Boolean);
+    document.getElementById("ger-chip-filtro").innerHTML = chipsAtivos.length
+      ? `<div class="filter-chips">${chipsAtivos.map((c, i) => `<span class="filter-chip">Isolando ${escapeHTML(c.rotulo)}<button type="button" data-chip-limpar="${i}" title="Remover este filtro">✕</button></span>`).join("")}</div>`
       : "";
-    const btnLimpar = document.querySelector("[data-limpar-area]");
-    if (btnLimpar) btnLimpar.addEventListener("click", () => selecionarArea(filtroArea));
-    const btnLimparTipo = document.querySelector("[data-limpar-tipo]");
-    if (btnLimparTipo) btnLimparTipo.addEventListener("click", () => selecionarTipo(filtroTipo));
+    document.querySelectorAll("[data-chip-limpar]").forEach((btn) => {
+      btn.addEventListener("click", () => chipsAtivos[+btn.dataset.chipLimpar].limpar());
+    });
+
     const qtdVencidos = filtrada.filter((c) => c.statusVigencia === "Vencido").length;
     const qtdAVencer = filtrada.filter((c) => c.statusVigencia === "A Vencer").length;
     const qtdAContratar = filtrada.filter((c) => c.statusVigencia === "A Contratar").length;
@@ -4569,18 +4730,26 @@ function renderGerencialContratos(lista, resumo) {
         <div class="kpi-card"><div class="kpi-label">Valor Global Inicial Total</div><div class="kpi-value">R$ ${formatarEixo(valorInicial)}</div></div>
         <div class="kpi-card"><div class="kpi-label">Valor Global Atual Total</div><div class="kpi-value">R$ ${formatarEixo(valorAtual)}</div></div>
       </div>`;
-    if (filtroStatusKpi) {
-      const contratosDoStatus = filtrada.filter((c) => c.statusVigencia === filtroStatusKpi);
+
+    // Tabela combinada: aparece sempre que QUALQUER filtro de recorte estiver
+    // ativo (área, tipo, analista, gestor, fiscal — clicados direto no
+    // gráfico — ou o status Vencido/A Vencer, clicado no cartão). Pedido
+    // direto de reunião: "se eu clico e isolo, já quero ver os contratos",
+    // sem precisar mudar pra aba Operacional.
+    const partesTitulo = chipsAtivos.map((c) => c.rotulo);
+    if (filtroStatusKpi) partesTitulo.push(filtroStatusKpi === "Vencido" ? "vencidos" : "a vencer");
+    if (partesTitulo.length) {
+      const contratosTabela = filtroStatusKpi ? filtrada.filter((c) => c.statusVigencia === filtroStatusKpi) : filtrada;
       document.getElementById("ger-kpi-tabela").innerHTML = `
         <div class="dash-chart-box">
-          <h4>Contratos ${escapeHTML(filtroStatusKpi === "Vencido" ? "Vencidos" : "A Vencer")}</h4>
-          <p class="dash-chart-hint">Passe o mouse numa linha pra ver o detalhe do contrato. Clique de novo no cartão "${escapeHTML(filtroStatusKpi === "Vencido" ? "Qtd Contratos Vencidos" : "Qtd Contratos A Vencer")}" pra fechar.</p>
+          <h4>Contratos — ${escapeHTML(partesTitulo.join(" · "))}</h4>
+          <p class="dash-chart-hint">Passe o mouse numa linha pra ver o detalhe do contrato.</p>
           <div id="ger-kpi-tabela-conteudo" class="tabela-rolavel" style="max-height:320px"></div>
         </div>`;
-      document.getElementById("ger-kpi-tabela-conteudo").innerHTML = contratosDoStatus.length
+      document.getElementById("ger-kpi-tabela-conteudo").innerHTML = contratosTabela.length
         ? `<table class="dash-tabela">
             <thead><tr><th>Nº CONTRATO</th><th>ÁREA GESTORA</th><th>EMPRESA</th><th>DIAS PARA VENCER</th><th>CRITICIDADE</th></tr></thead>
-            <tbody>${contratosDoStatus.map((c) => `
+            <tbody>${contratosTabela.map((c) => `
               <tr class="linha-contrato" data-contrato-id="${escapeAttr(c.id)}">
                 <td>${escapeHTML(c.numeroContrato)}</td><td>${escapeHTML(c.unidadeGestora || "—")}</td><td>${escapeHTML(c.empresa)}</td><td class="num">${formatarDiasBR(c.diasParaVencer)}</td><td>${pillCriticidade(c.criticidade)}</td>
               </tr>`).join("")}</tbody>
@@ -4599,14 +4768,30 @@ function renderGerencialContratos(lista, resumo) {
     document.querySelectorAll("#ger-barra-toggle [data-modo]").forEach((btn) => {
       btn.classList.toggle("active", btn.dataset.modo === modoBarra);
     });
+    document.getElementById("ger-valor-area").innerHTML = barraContagemHorizontalSVG(
+      agruparValorPorCampo(filtrada, (c) => c.unidadeGestora, "(sem unidade)"),
+      { formatarValor: (v) => "R$ " + formatarEixo(v), tituloTooltip: (l) => `${l.label}: ${formatarMoedaBR(l.total)}`, selecionado: filtroArea }
+    );
     document.getElementById("ger-tipo").innerHTML = barraTipoObjetoSVG(agruparPorTipoObjeto(filtrada), filtroTipo);
+    document.getElementById("ger-valor-tipo").innerHTML = barraContagemHorizontalSVG(
+      agruparValorPorCampo(filtrada, (c) => c.tipoObjeto, "(sem tipo)"),
+      { formatarValor: (v) => "R$ " + formatarEixo(v), tituloTooltip: (l) => `${l.label}: ${formatarMoedaBR(l.total)}`, selecionado: filtroTipo }
+    );
     document.getElementById("ger-analista").innerHTML = barraContagemHorizontalSVG(
       agruparContagemPorCampo(filtrada, (c) => c.analista, "(sem analista)"),
-      { tituloTooltip: (l) => `${l.label}: ${l.total} contrato(s)` }
+      { tituloTooltip: (l) => `${l.label}: ${l.total} contrato(s)`, selecionado: filtroAnalista }
     );
     document.getElementById("ger-aditivos").innerHTML = barraContagemHorizontalSVG(
       agruparPorQtdAditivos(filtrada),
       { tituloTooltip: (l) => `${l.label}: ${l.total} contrato(s)` }
+    );
+    document.getElementById("ger-gestor").innerHTML = barraContagemHorizontalSVG(
+      agruparContratosPorPessoa(filtrada, "Gestor"),
+      { tituloTooltip: (l) => `${l.label}: ${l.total} contrato(s)`, selecionado: filtroGestor }
+    );
+    document.getElementById("ger-fiscal").innerHTML = barraContagemHorizontalSVG(
+      agruparContratosPorPessoa(filtrada, "Fiscal"),
+      { tituloTooltip: (l) => `${l.label}: ${l.total} contrato(s)`, selecionado: filtroFiscal }
     );
     document.getElementById("ger-top-contratos").innerHTML = barraContagemHorizontalSVG(
       agruparTopContratosPorValor(filtrada, 10),
@@ -4621,9 +4806,13 @@ function renderGerencialContratos(lista, resumo) {
       }
     );
     adicionarControlesGrafico(document.getElementById("ger-barra"));
+    adicionarControlesGrafico(document.getElementById("ger-valor-area"));
     adicionarControlesGrafico(document.getElementById("ger-tipo"));
+    adicionarControlesGrafico(document.getElementById("ger-valor-tipo"));
     adicionarControlesGrafico(document.getElementById("ger-analista"));
     adicionarControlesGrafico(document.getElementById("ger-aditivos"));
+    adicionarControlesGrafico(document.getElementById("ger-gestor"));
+    adicionarControlesGrafico(document.getElementById("ger-fiscal"));
     adicionarControlesGrafico(document.getElementById("ger-top-contratos"));
     adicionarControlesGrafico(document.getElementById("ger-top-fornecedores"));
     // Estes não estão nas 3 páginas do Power BI que a coordenação mostrou,
@@ -4660,7 +4849,12 @@ function renderTaticoContratos(lista) {
         <label>TIPO DE OBJETO</label>
         <select id="tat-filtro-tipo"><option value="">Todos</option>${tiposDisponiveis.map((t) => `<option value="${escapeAttr(t)}">${escapeHTML(t)}</option>`).join("")}</select>
       </div>
+      <div class="dash-filtro" style="flex:1;min-width:280px">
+        <label>BUSCAR (Nº, EMPRESA, OBJETO, VALOR, DATA, ÁREA, ANALISTA, GESTOR, FISCAL...)</label>
+        <input type="text" id="tat-busca" placeholder="Digite qualquer parte do que lembrar..." />
+      </div>
     </div>
+    <div id="tat-busca-resultado"></div>
     <h4 style="font-family:'Space Grotesk',sans-serif;font-size:var(--fs-subtitulo);margin-bottom:8px">Controle de Prazos</h4>
     <div class="dash-toggle" id="tat-toggle-criticidade" style="margin-bottom:18px;flex-wrap:wrap">
       <button class="dash-toggle-btn active" data-crit="">SELECIONAR TUDO</button>
@@ -4682,7 +4876,10 @@ function renderTaticoContratos(lista) {
     <div id="tat-tabela" class="tabela-rolavel"></div>
   `;
 
-  // A busca e o Controle de Prazos filtram tudo, inclusive o próprio gráfico
+  ligarBuscaContratos(lista, porId, "tat-busca", "tat-busca-resultado");
+
+  // O Controle de Prazos (e o slicer de Tipo) filtram tudo, inclusive o
+  // próprio gráfico
   // (pra ele só mostrar meses relevantes ao que já está filtrado). O mês
   // clicado no gráfico é um filtro À PARTE, aplicado só na tabela — assim o
   // gráfico continua mostrando todos os meses depois do clique, e dá pra
@@ -4783,6 +4980,13 @@ function renderOperacionalContratos(lista) {
         <select id="op-select-contrato"></select>
       </div>
     </div>
+    <div class="dash-filtros">
+      <div class="dash-filtro" style="flex:1;min-width:280px">
+        <label>BUSCAR (Nº, EMPRESA, OBJETO, VALOR, DATA, ÁREA, ANALISTA, GESTOR, FISCAL...)</label>
+        <input type="text" id="op-busca" placeholder="Digite qualquer parte do que lembrar..." />
+      </div>
+    </div>
+    <div id="op-busca-resultado"></div>
     <div id="op-campos-selecionados" style="margin-bottom:16px"></div>
     <div id="op-kpis" style="margin-bottom:16px"></div>
     <div class="dash-charts" style="grid-template-columns:1.3fr 1fr">
@@ -4797,6 +5001,8 @@ function renderOperacionalContratos(lista) {
       </div>
     </div>
   `;
+
+  ligarBuscaContratos(lista, porId, "op-busca", "op-busca-resultado");
 
   function contratosDoSetor() {
     return setor ? lista.filter((c) => (c.unidadeGestora || "(sem unidade)") === setor) : lista;
