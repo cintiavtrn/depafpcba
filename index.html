@@ -291,7 +291,7 @@ body{background:var(--paper);color:var(--carvao);font-family:'IBM Plex Sans',san
 .gauge-prazo .legenda-gauge p{font-size:var(--fs-corpo);color:#C7CDD9}
 .gauge-prazo .legenda-gauge .fonte{font-family:'IBM Plex Mono',monospace;font-size:var(--fs-ui-sm);color:#9AA3B2;margin-top:6px}
 
-.linha-contrato:hover{background:var(--paper-line);cursor:default}
+.linha-contrato:hover{background:var(--paper-line);cursor:pointer}
 .tooltip-contrato{position:fixed;z-index:200;width:320px;max-width:calc(100vw - 24px);background:var(--surface);border:2px solid var(--carvao);box-shadow:var(--shadow-lg);padding:16px 18px;pointer-events:none}
 .tooltip-contrato h4{font-family:'Space Grotesk',sans-serif;font-size:var(--fs-subtitulo);margin-bottom:2px;padding-right:74px;line-height:1.25}
 .tooltip-contrato .obj{font-size:var(--fs-ui-sm);color:#C7CDD9;margin-bottom:10px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
@@ -4094,7 +4094,7 @@ function barraContagemHorizontalSVG(linhas, opcoes = {}) {
     const larg = maxTotal ? larguraPlot * (l.total / maxTotal) : 0;
     const dim = selecionado && selecionado !== l.label;
     const atributosContrato = l.id ? ` class="linha-contrato" data-contrato-id="${escapeAttr(l.id)}"` : "";
-    corpo += `<g data-cat="${escapeAttr(l.label)}"${atributosContrato} style="cursor:${l.id ? "default" : "pointer"}" opacity="${dim ? 0.4 : 1}">`;
+    corpo += `<g data-cat="${escapeAttr(l.label)}"${atributosContrato} style="cursor:pointer" opacity="${dim ? 0.4 : 1}">`;
     corpo += `<rect class="area-hit" x="0" y="${y.toFixed(1)}" width="${w}" height="${rowH}" fill="transparent" />`;
     corpo += textoSVG(l.label, padL - 8, y + rowH / 2, { maxChars: maxRotulo, anchor: "end", fontSize: 9, alturaLinha: ALTURA_LINHA_TEXTO, peso: selecionado === l.label ? 700 : 400 });
     corpo += `<rect x="${padL}" y="${yBarra.toFixed(1)}" width="${Math.max(larg, 1.5).toFixed(1)}" height="${alturaBarra}" fill="${corCategoria(i)}"><title>${escapeHTML(tituloTooltip(l))}</title></rect>`;
@@ -4185,7 +4185,7 @@ function ligarBuscaContratos(lista, porId, idInput, idResultado) {
     resultado.innerHTML = `
       <div class="dash-chart-box" style="margin-top:10px">
         <h4>Resultado da busca</h4>
-        <p class="dash-chart-hint">${encontrados.length} contrato(s) encontrado(s) pra "${escapeHTML(input.value.trim())}" — em número, empresa, objeto, valor, data, área, analista, gestor ou fiscal.</p>
+        <p class="dash-chart-hint">${encontrados.length} contrato(s) encontrado(s) pra "${escapeHTML(input.value.trim())}" — em número, empresa, objeto, valor, data, área, analista, gestor ou fiscal. Clique numa linha pra abrir o panorama completo do contrato.</p>
         ${encontrados.length ? `<div class="tabela-rolavel" style="max-height:320px"><table class="dash-tabela">
           <thead><tr><th>Nº CONTRATO</th><th>ÁREA GESTORA</th><th>EMPRESA</th><th>OBJETO</th></tr></thead>
           <tbody>${encontrados.map((c) => `
@@ -4397,7 +4397,7 @@ function ganttContratosSVG(lista) {
     const cor = (CRITICIDADE_VISUAL.find((cv) => cv.label === c.criticidade) || {}).cor || "var(--crit-neutro)";
     const x0 = x(c.dataInicio), x1 = x(c.dataFim);
     barras += textoSVG(c.numeroContrato, padL - 6, y + rowH / 2, { maxChars: 13, anchor: "end", fontSize: 8, alturaLinha: 9 });
-    barras += `<rect class="linha-contrato" data-contrato-id="${escapeAttr(c.id)}" x="${x0.toFixed(1)}" y="${(y + (rowH - alturaBarra) / 2).toFixed(1)}" width="${Math.max(x1 - x0, 1.2).toFixed(1)}" height="${alturaBarra}" rx="1.5" fill="${cor}" style="cursor:default" />`;
+    barras += `<rect class="linha-contrato" data-contrato-id="${escapeAttr(c.id)}" x="${x0.toFixed(1)}" y="${(y + (rowH - alturaBarra) / 2).toFixed(1)}" width="${Math.max(x1 - x0, 1.2).toFixed(1)}" height="${alturaBarra}" rx="1.5" fill="${cor}" style="cursor:pointer" />`;
   });
 
   const legenda = CRITICIDADE_VISUAL.filter((cv) => ordenados.some((c) => c.criticidade === cv.label))
@@ -4470,6 +4470,36 @@ function tooltipContratoEl() {
   }
   return TOOLTIP_CONTRATO_EL;
 }
+
+// Clicar numa linha de contrato (busca, Top 10, tabela de área/pessoa
+// isolada, Gantt, Detalhamento no Tático — todo lugar que usa
+// ligarTooltipLinhas) leva pro "panorama" completo do contrato na aba
+// Operacional: objeto, empresa, datas, criticidade, garantia, gestor/
+// fiscal, medidor de execução do prazo. Pedido direto: o hover já mostra um
+// resumo rápido, mas some quando tira o mouse — "não só que ele aparecesse
+// com o tooltip", queriam uma visão persistente, e essa visão já existe
+// pronta em Operacional. Funciona de qualquer subaba porque
+// carregarContratosPortal renderiza as 3 (Gerencial/Tático/Operacional) de
+// uma vez só no carregamento — o <select> e o atualizar() de Operacional já
+// existem no documento mesmo com a aba escondida, só precisa selecionar o
+// contrato nele e trocar qual subaba está visível.
+function abrirContratoNoOperacional(contratoId) {
+  const painel = document.getElementById("tab-contratos");
+  const selSetor = painel?.querySelector("#op-select-setor");
+  const selContrato = painel?.querySelector("#op-select-contrato");
+  if (!selSetor || !selContrato) return;
+  // Limpa o setor PRIMEIRO — se estivesse filtrado por outro setor, o
+  // contrato clicado poderia nem estar entre as opções do <select> ainda.
+  if (selSetor.value !== "") {
+    selSetor.value = "";
+    selSetor.dispatchEvent(new Event("change", { bubbles: true }));
+  }
+  selContrato.value = contratoId;
+  selContrato.dispatchEvent(new Event("change", { bubbles: true }));
+  painel.querySelector('[data-subtab-contratos="operacional"]')?.click();
+  document.getElementById("contratos-sub-operacional")?.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
 function ligarTooltipLinhas(container, porId) {
   const tooltip = tooltipContratoEl();
   container.querySelectorAll(".linha-contrato").forEach((tr) => {
@@ -4488,6 +4518,10 @@ function ligarTooltipLinhas(container, porId) {
       tooltip.style.top = y + "px";
     });
     tr.addEventListener("mouseleave", () => { tooltip.hidden = true; });
+    tr.addEventListener("click", () => {
+      tooltip.hidden = true;
+      abrirContratoNoOperacional(c.id);
+    });
   });
 }
 
@@ -4583,7 +4617,7 @@ function renderGerencialContratos(lista, resumo) {
     <div class="dash-charts" style="grid-template-columns:1fr 1fr">
       <div class="dash-chart-box">
         <h4>Top 10 Maiores Contratos (Valor Atual)</h4>
-        <p class="dash-chart-hint">Passe o mouse numa barra pra ver o detalhe do contrato.</p>
+        <p class="dash-chart-hint">Passe o mouse numa barra pra ver o detalhe rápido — clique pra abrir o panorama completo do contrato.</p>
         <div id="ger-top-contratos"></div>
       </div>
       <div class="dash-chart-box">
@@ -4743,7 +4777,7 @@ function renderGerencialContratos(lista, resumo) {
       document.getElementById("ger-kpi-tabela").innerHTML = `
         <div class="dash-chart-box">
           <h4>Contratos — ${escapeHTML(partesTitulo.join(" · "))}</h4>
-          <p class="dash-chart-hint">Passe o mouse numa linha pra ver o detalhe do contrato.</p>
+          <p class="dash-chart-hint">Passe o mouse numa linha pra ver o detalhe rápido — clique pra abrir o panorama completo do contrato.</p>
           <div id="ger-kpi-tabela-conteudo" class="tabela-rolavel" style="max-height:320px"></div>
         </div>`;
       document.getElementById("ger-kpi-tabela-conteudo").innerHTML = contratosTabela.length
@@ -4870,7 +4904,7 @@ function renderTaticoContratos(lista) {
       <div id="tat-grafico-mes"></div>
     </div>
     <h4 style="font-family:'Space Grotesk',sans-serif;font-size:var(--fs-subtitulo);margin-bottom:8px">Detalhamento dos Contratos</h4>
-    <p class="font-mono" style="font-size:var(--fs-ui-sm);color:#8B93A3;margin-bottom:8px">Passe o mouse numa linha pra ver o detalhe do contrato.</p>
+    <p class="font-mono" style="font-size:var(--fs-ui-sm);color:#8B93A3;margin-bottom:8px">Passe o mouse numa linha pra ver o detalhe rápido — clique pra abrir o panorama completo do contrato.</p>
     <div id="tat-chip-filtro"></div>
     <div style="text-align:right;margin-bottom:6px"><button type="button" class="dash-toggle-btn" id="tat-tabela-baixar" title="Baixar esta tabela como imagem">⬇ TABELA (PNG)</button></div>
     <div id="tat-tabela" class="tabela-rolavel"></div>
@@ -4917,7 +4951,7 @@ function renderTaticoContratos(lista) {
       const graficoGantt = document.getElementById("tat-grafico-mes");
       graficoGantt.innerHTML = ganttContratosSVG(listaSemMes()).svg;
       ligarTooltipLinhas(graficoGantt, porId);
-      document.getElementById("tat-grafico-hint").textContent = "Passe o mouse numa barra pra ver o detalhe do contrato — a linha vertical marca a data de hoje.";
+      document.getElementById("tat-grafico-hint").textContent = "Passe o mouse numa barra pra ver o detalhe rápido, clique pra abrir o panorama completo — a linha vertical marca a data de hoje.";
     } else {
       const porMes = agruparPorMesCriticidade(listaSemMes());
       document.getElementById("tat-grafico-mes").innerHTML = colunaCriticidadeEmpilhadaSVG(porMes, filtroMes);
