@@ -5575,6 +5575,40 @@ function dicaLeituraContratosHTML() {
     </details>`;
 }
 
+// Resumo Rápido — a PRIMEIRA coisa que aparece, antes de qualquer clique.
+// Pedido direto, depois de eu ter sugerido umas ideias que não miravam
+// certo: "nenhuma dessas ideias é boa pra ajudar na visualização rápida e
+// reunião e achar informações perdidas" — o cenário real é "o delegado
+// geral pergunta na reunião 'quanto a gente gasta no total? nas áreas que
+// mais pesam?' e ela precisa responder na hora", sem abrir aba nem clicar
+// em gráfico. Isso é só leitura de propósito — não é outro filtro pra
+// aprender, é o retrato de 1 segundo antes de qualquer coisa.
+function renderResumoRapido(lista, resumo) {
+  const alvo = document.getElementById("contratos-resumo-rapido");
+  if (!alvo) return;
+  const top3Areas = agruparValorPorCampo(lista, (c) => c.unidadeGestora, "(sem unidade)").slice(0, 3);
+
+  alvo.innerHTML = `
+    <div class="dash-chart-box" style="margin-bottom:16px">
+      <h4>Resumo Rápido</h4>
+      <div class="kpi-row">
+        <div class="kpi-card"><div class="kpi-label">Qtd Contratos</div><div class="kpi-value">${resumo.qtdContratos.toLocaleString("pt-BR")}</div></div>
+        <div class="kpi-card"><div class="kpi-label">Valor Atual Total</div><div class="kpi-value">R$ ${formatarEixo(resumo.valorGlobalAtualTotal)}</div><div class="kpi-valor-exato">${formatarMoedaBR(resumo.valorGlobalAtualTotal)}</div></div>
+        <div class="kpi-card" style="--kpi-cor:var(--crit-vencido)"><div class="kpi-label">Vencidos</div><div class="kpi-value">${resumo.qtdVencidos.toLocaleString("pt-BR")}</div></div>
+        <div class="kpi-card" style="--kpi-cor:var(--crit-alto)"><div class="kpi-label">A Vencer (≤90 dias)</div><div class="kpi-value">${resumo.qtdAVencer.toLocaleString("pt-BR")}</div></div>
+      </div>
+      <p class="dash-chart-hint" style="margin:14px 0 6px">Onde mais se gasta (top 3 áreas gestoras por valor):</p>
+      <div class="kpi-row" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr))">
+        ${top3Areas.map((a) => `
+          <div class="kpi-card">
+            <div class="kpi-label">${escapeHTML(a.label)}</div>
+            <div class="kpi-value" style="font-size:var(--fs-subtitulo)">R$ ${formatarEixo(a.total)}</div>
+            <div class="kpi-valor-exato">${formatarMoedaBR(a.total)} · ${a.qtd} contrato${a.qtd === 1 ? "" : "s"}</div>
+          </div>`).join("")}
+      </div>
+    </div>`;
+}
+
 // Alerta de vencimento, logo ao abrir a página — pedido direto: hoje só dá
 // pra saber que tem contrato vencido/a vencer clicando num cartão lá dentro
 // do Gerencial; isso exige a pessoa lembrar de ir olhar. Isola vencidos + o
@@ -6077,6 +6111,7 @@ async function carregarContratosPortal(portalSlug) {
   // área, cai num perfil com abas temáticas), pedido direto depois de ela
   // usar aquele painel e comparar com este.
   painel.innerHTML = `
+    <div id="contratos-resumo-rapido"></div>
     <div id="contratos-alerta"></div>
     ${dicaLeituraContratosHTML()}
     <div class="tabs" style="margin-bottom:0">
@@ -6094,6 +6129,7 @@ async function carregarContratosPortal(portalSlug) {
     <div class="tab-panel" id="contratos-sub-porcategoria" hidden></div>
     <div class="tab-panel" id="contratos-sub-atualizados" hidden></div>
   `;
+  renderResumoRapido(lista, resumo);
   renderAlertaVencimentoContratos(lista, new Map(lista.map((c) => [c.id, c])), decisoesRenovacao);
 
   const SUBABAS_CONTRATOS = ["gerencial", "tatico", "operacional", "porarea", "porcategoria", "atualizados"];
