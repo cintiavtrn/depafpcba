@@ -270,6 +270,7 @@ body{background:var(--paper);color:var(--carvao);font-family:'IBM Plex Sans',san
 .renov-tramites label{cursor:pointer;flex:1;font-family:'IBM Plex Mono',monospace;font-size:var(--fs-ui-sm);line-height:1.4}
 .renov-tramites label.concluido{color:#8B93A3;text-decoration:line-through}
 .renov-tramite-data{display:block;opacity:.65;font-size:var(--fs-ui-xs);text-decoration:none}
+.renov-badge{font-family:'IBM Plex Mono',monospace;font-size:var(--fs-ui-xs);color:var(--crit-baixo);margin-top:3px;cursor:help}
 
 /* Rolagem DENTRO da tabela (como no Power BI) — o cabeçalho fica fixo e só o
    corpo rola, em vez da tabela empurrar a página inteira pra baixo quando
@@ -5288,14 +5289,27 @@ function renderOperacionalContratos(lista, portalSlug) {
           <input type="text" id="renov-responsavel" placeholder="Nome de quem está cuidando disso" />
         </div>
       </div>
-      <div class="dash-filtros" id="renov-campos-ja-renovado" style="margin-bottom:12px" hidden>
-        <div class="dash-filtro" style="flex:1;min-width:180px">
-          <label>Nº DO PROCESSO SEI DA RENOVAÇÃO</label>
-          <input type="text" id="renov-sei" placeholder="Ex.: 012.345.2026.0001-11" />
+      <div id="renov-campos-ja-renovado" hidden>
+        <div class="dash-filtros" style="margin-bottom:12px">
+          <div class="dash-filtro" style="flex:1;min-width:180px">
+            <label>Nº DO PROCESSO SEI DA RENOVAÇÃO</label>
+            <input type="text" id="renov-sei" placeholder="Ex.: 012.345.2026.0001-11" />
+          </div>
+          <div class="dash-filtro" style="flex:1;min-width:180px">
+            <label>DATA DA RENOVAÇÃO</label>
+            <input type="date" id="renov-data" />
+          </div>
         </div>
-        <div class="dash-filtro" style="flex:1;min-width:180px">
-          <label>DATA DA RENOVAÇÃO</label>
-          <input type="date" id="renov-data" />
+        <p class="dash-chart-hint" style="margin:0 0 8px">Preenchendo os dois campos abaixo, o painel INTEIRO passa a usar esses valores em vez do dado (desatualizado) da planilha — dias pra vencer, criticidade, KPI de valor, alerta — até a planilha ser reimportada com o aditivo já lançado nela. Sem preencher, só fica registrado que foi renovado, sem mudar nenhuma conta.</p>
+        <div class="dash-filtros" style="margin-bottom:12px">
+          <div class="dash-filtro" style="flex:1;min-width:180px">
+            <label>NOVA DATA DE VIGÊNCIA (FIM)</label>
+            <input type="date" id="renov-nova-data-fim" />
+          </div>
+          <div class="dash-filtro" style="flex:1;min-width:180px">
+            <label>NOVO VALOR GLOBAL ATUAL (R$)</label>
+            <input type="number" id="renov-novo-valor" step="0.01" min="0" placeholder="Ex.: 95261.00" />
+          </div>
         </div>
       </div>
       <div class="dash-filtro" style="margin-bottom:10px">
@@ -5321,6 +5335,8 @@ function renderOperacionalContratos(lista, portalSlug) {
     document.getElementById("renov-observacao").value = dados.observacao || "";
     document.getElementById("renov-sei").value = dados.processoSeiRenovacao || "";
     document.getElementById("renov-data").value = dados.dataRenovacao ? dados.dataRenovacao.slice(0, 10) : "";
+    document.getElementById("renov-nova-data-fim").value = dados.novaDataFim ? dados.novaDataFim.slice(0, 10) : "";
+    document.getElementById("renov-novo-valor").value = dados.novoValorGlobalAtual ?? "";
     document.getElementById("renov-status").textContent = dados.atualizadoEm ? `Última atualização: ${formatarDataBR(dados.atualizadoEm)}` : "";
 
     // Nº do SEI e data da renovação só fazem sentido quando "Já Renovado" —
@@ -5351,6 +5367,8 @@ function renderOperacionalContratos(lista, portalSlug) {
             // antes de salvar.
             processoSeiRenovacao: decisaoAtual === "Já Renovado" ? (document.getElementById("renov-sei").value || null) : null,
             dataRenovacao: decisaoAtual === "Já Renovado" ? (document.getElementById("renov-data").value || null) : null,
+            novaDataFim: decisaoAtual === "Já Renovado" ? (document.getElementById("renov-nova-data-fim").value || null) : null,
+            novoValorGlobalAtual: decisaoAtual === "Já Renovado" && document.getElementById("renov-novo-valor").value !== "" ? +document.getElementById("renov-novo-valor").value : null,
           }),
         });
         renderRenovacao(selecionado);
@@ -5387,12 +5405,20 @@ function renderOperacionalContratos(lista, portalSlug) {
     const valorAtualTotal = emContexto.reduce((a, c) => a + (c.valorGlobalAtual || 0), 0);
     const qtdAditivosTotal = emContexto.reduce((a, c) => a + (c.qtdAditivos || 0), 0);
 
+    // Pedido direto: quando "Já Renovado" veio com data/valor novos, o
+    // painel inteiro já usa esses valores (ver enriquecer(), backend) — mas
+    // a pessoa olhando o contrato precisa SABER que aquele número não é o
+    // da planilha, senão parece um erro de digitação. Mostra a origem e o
+    // valor antigo (planilha) lado a lado.
+    const rotuloRenovado = selecionado?.renovadoManualmente
+      ? `<div class="renov-badge" title="Valor da planilha: ${escapeAttr(formatarDataBR(selecionado.dataFimPlanilha))}">🔄 atualizado manualmente (renovação registrada)</div>`
+      : "";
     document.getElementById("op-campos-selecionados").innerHTML = `
       <div class="dados-grid">
         <div class="dado"><div class="valor" style="font-size:var(--fs-titulo);line-height:1.2">${selecionado ? escapeHTML(selecionado.objeto || "—") : "--"}</div><div class="rotulo">Objeto Selecionado</div></div>
         <div class="dado"><div class="valor" style="font-size:var(--fs-titulo)">${selecionado ? escapeHTML(selecionado.empresa) : "--"}</div><div class="rotulo">Empresa Selecionada</div></div>
         <div class="dado"><div class="valor">${selecionado ? formatarDataBR(selecionado.dataInicio) : "--"}</div><div class="rotulo">Data Início Selecionada</div></div>
-        <div class="dado"><div class="valor">${selecionado ? formatarDataBR(selecionado.dataFim) : "--"}</div><div class="rotulo">Data Término Selecionada</div></div>
+        <div class="dado"><div class="valor">${selecionado ? formatarDataBR(selecionado.dataFim) : "--"}</div><div class="rotulo">Data Término Selecionada</div>${rotuloRenovado}</div>
         <div class="dado"><div class="valor">${selecionado ? formatarDiasBR(selecionado.diasParaVencer) : "--"}</div><div class="rotulo">Dias Para Vencer Selecionado</div></div>
         <div class="dado">${selecionado ? pillCriticidade(selecionado.criticidade) : `<div class="valor">--</div>`}<div class="rotulo">Criticidade Selecionada</div></div>
         <div class="dado"><div class="valor">${selecionado ? escapeHTML(selecionado.garantiaExigida || "—") : "--"}</div><div class="rotulo">Garantia Exigida</div></div>
@@ -5401,7 +5427,7 @@ function renderOperacionalContratos(lista, portalSlug) {
 
     document.getElementById("op-kpis").innerHTML = `
       <div class="kpi-row">
-        <div class="kpi-card"><div class="kpi-label">Valor Global Atual Total</div><div class="kpi-value">R$ ${formatarEixo(selecionado ? (selecionado.valorGlobalAtual || 0) : valorAtualTotal)}</div></div>
+        <div class="kpi-card"><div class="kpi-label">Valor Global Atual Total${selecionado && selecionado.valorGlobalAtual !== selecionado.valorGlobalAtualPlanilha ? " 🔄" : ""}</div><div class="kpi-value">R$ ${formatarEixo(selecionado ? (selecionado.valorGlobalAtual || 0) : valorAtualTotal)}</div></div>
         <div class="kpi-card"><div class="kpi-label">Valor Executado Total</div><div class="kpi-value">—</div></div>
         <div class="kpi-card"><div class="kpi-label">Saldo Disponível Total</div><div class="kpi-value">—</div></div>
         <div class="kpi-card"><div class="kpi-label">Qtd Total de Aditivos</div><div class="kpi-value">${(selecionado ? selecionado.qtdAditivos : qtdAditivosTotal).toLocaleString("pt-BR")}</div></div>
