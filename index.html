@@ -178,6 +178,12 @@ body{background:var(--paper);color:var(--carvao);font-family:'IBM Plex Sans',san
 .kpi-card{	background:var(--surface);padding:16px 18px}
 .kpi-label{font-family:'IBM Plex Mono',monospace;font-size:var(--fs-ui-sm);letter-spacing:.08em;color:#9AA3B2;text-transform:uppercase}
 .kpi-value{font-family:'Space Grotesk',sans-serif;font-size:var(--fs-display);line-height:1;margin-top:6px;font-variant-numeric:tabular-nums}
+/* Valor exato por baixo do valor arredondado do KPI — pedido direto:
+   "isso pode ser ruim pra uma diretoria financeira que precisa trabalhar
+   com coisas exatas". O arredondado (R$ 37,9M) é só pra escanear rápido;
+   o número que de fato importa pra decisão fica sempre visível ali do
+   lado, sem precisar passar o mouse nem clicar em nada. */
+.kpi-valor-exato{font-family:'IBM Plex Mono',monospace;font-size:var(--fs-ui-xs);color:#9AA3B2;margin-top:2px;font-variant-numeric:tabular-nums}
 .kpi-delta{display:inline-flex;align-items:center;gap:3px;font-family:'IBM Plex Mono',monospace;font-size:var(--fs-ui-sm);margin-top:8px;padding:2px 6px}
 .kpi-delta.up{background:rgba(52,211,153,.14);color:var(--oliva)}
 .kpi-delta.down{background:rgba(251,113,133,.14);color:var(--terracota)}
@@ -3949,12 +3955,15 @@ const CRITICIDADE_VISUAL = [
   { label: "Sem data de vigência", cor: "var(--crit-semdata)", opacidade: 1 },
 ];
 
-function agruparPorAreaCriticidade(lista) {
+// campoFn/rotuloVazio generalizam pra qualquer dimensão (área OU categoria/
+// tipo de objeto) — default continua sendo área, pra não mudar nenhum dos
+// lugares que já chamavam isso sem os dois argumentos novos.
+function agruparPorAreaCriticidade(lista, campoFn = (c) => c.unidadeGestora, rotuloVazio = "(sem unidade)") {
   const mapa = new Map();
   for (const c of lista) {
-    const area = c.unidadeGestora || "(sem unidade)";
-    if (!mapa.has(area)) mapa.set(area, { label: area, total: 0, porCrit: {} });
-    const g = mapa.get(area);
+    const chave = campoFn(c) || rotuloVazio;
+    if (!mapa.has(chave)) mapa.set(chave, { label: chave, total: 0, porCrit: {} });
+    const g = mapa.get(chave);
     g.total++;
     g.porCrit[c.criticidade] = (g.porCrit[c.criticidade] || 0) + 1;
   }
@@ -5004,8 +5013,8 @@ function renderGerencialContratos(lista, resumo) {
         <div class="kpi-card"><div class="kpi-label">Qtd Contratos</div><div class="kpi-value">${filtrada.length.toLocaleString("pt-BR")}</div></div>
         <div class="kpi-card kpi-clicavel" data-status="Vencido" title="Clique pra ver quais são" style="--kpi-cor:var(--crit-vencido);cursor:pointer;${filtroStatusKpi === "Vencido" ? "outline:2px solid var(--crit-vencido);outline-offset:-2px" : ""}"><div class="kpi-label">Qtd Contratos Vencidos</div><div class="kpi-value">${qtdVencidos.toLocaleString("pt-BR")}</div></div>
         <div class="kpi-card kpi-clicavel" data-status="A Vencer" title="Clique pra ver quais são" style="--kpi-cor:var(--crit-alto);cursor:pointer;${filtroStatusKpi === "A Vencer" ? "outline:2px solid var(--crit-alto);outline-offset:-2px" : ""}"><div class="kpi-label">Qtd Contratos A Vencer</div><div class="kpi-value">${qtdAVencer.toLocaleString("pt-BR")}</div></div>
-        <div class="kpi-card"><div class="kpi-label">Valor Global Inicial Total</div><div class="kpi-value">R$ ${formatarEixo(valorInicial)}</div></div>
-        <div class="kpi-card"><div class="kpi-label">Valor Global Atual Total</div><div class="kpi-value">R$ ${formatarEixo(valorAtual)}</div></div>
+        <div class="kpi-card"><div class="kpi-label">Valor Global Inicial Total</div><div class="kpi-value">R$ ${formatarEixo(valorInicial)}</div><div class="kpi-valor-exato">${formatarMoedaBR(valorInicial)}</div></div>
+        <div class="kpi-card"><div class="kpi-label">Valor Global Atual Total</div><div class="kpi-value">R$ ${formatarEixo(valorAtual)}</div><div class="kpi-valor-exato">${formatarMoedaBR(valorAtual)}</div></div>
       </div>`;
 
     // Tabela combinada: aparece sempre que QUALQUER filtro de recorte estiver
@@ -5510,7 +5519,7 @@ function renderOperacionalContratos(lista, portalSlug) {
 
     document.getElementById("op-kpis").innerHTML = `
       <div class="kpi-row">
-        <div class="kpi-card"><div class="kpi-label">Valor Global Atual Total${selecionado && selecionado.valorGlobalAtual !== selecionado.valorGlobalAtualPlanilha ? " 🔄" : ""}</div><div class="kpi-value">R$ ${formatarEixo(selecionado ? (selecionado.valorGlobalAtual || 0) : valorAtualTotal)}</div></div>
+        <div class="kpi-card"><div class="kpi-label">Valor Global Atual Total${selecionado && selecionado.valorGlobalAtual !== selecionado.valorGlobalAtualPlanilha ? " 🔄" : ""}</div><div class="kpi-value">R$ ${formatarEixo(selecionado ? (selecionado.valorGlobalAtual || 0) : valorAtualTotal)}</div><div class="kpi-valor-exato">${formatarMoedaBR(selecionado ? (selecionado.valorGlobalAtual || 0) : valorAtualTotal)}</div></div>
         <div class="kpi-card"><div class="kpi-label">Valor Executado Total</div><div class="kpi-value">—</div></div>
         <div class="kpi-card"><div class="kpi-label">Saldo Disponível Total</div><div class="kpi-value">—</div></div>
         <div class="kpi-card"><div class="kpi-label">Qtd Total de Aditivos</div><div class="kpi-value">${(selecionado ? selecionado.qtdAditivos : qtdAditivosTotal).toLocaleString("pt-BR")}</div></div>
@@ -5637,371 +5646,404 @@ function renderAlertaVencimentoContratos(lista, porId, decisoesRenovacao = new M
   }
 }
 
-// ---------- Por Área Gestora: "perfil" de uma área, à la SEI Municípios ----------
+// ---------- "Perfil" de uma dimensão (Área Gestora OU Categoria), à la SEI Municípios ----------
 // Mesmo princípio do SEI Municípios (seleciona um município, cai num perfil
-// com abas temáticas: Educação, Saúde...): aqui a "entidade" é a área
-// gestora, e as abas temáticas são Visão Geral / Prazos e Vencimentos /
-// Financeiro / Pessoas. Reaproveita quase toda função de gráfico que já
-// existe no Gerencial — a única diferença é que aqui elas sempre recebem a
-// lista JÁ FILTRADA pra uma área só, e a apresentação vira "perfil" em vez
-// de portfólio inteiro.
-function renderPorAreaContratos(lista) {
-  const alvo = document.getElementById("contratos-sub-porarea");
+// com abas temáticas: Educação, Saúde...): aqui a "entidade" é uma
+// dimensão do contrato — área gestora ou tipo de objeto/categoria — e as
+// abas temáticas são Visão Geral / Prazos e Vencimentos / Financeiro /
+// Pessoas. Generalizada (pedido direto: "além dessa aba de agrupamento por
+// área, não podemos agrupar por categoria? e novos agrupamentos temáticos
+// como vc fez por pessoas, financeiros?") — a mesma função atende os dois
+// modos, só muda o `cfg` (qual campo agrupa, os textos, e qual é a
+// dimensão COMPLEMENTAR mostrada no Financeiro: dentro de "Por Categoria"
+// não faz sentido re-mostrar "valor por tipo" — a área gestora que ela
+// ainda não viu quebrada é o complemento que importa, e vice-versa).
+function configPorArea() {
+  return {
+    prefixo: "area",
+    campoAgrupador: (c) => c.unidadeGestora,
+    rotuloVazio: "(sem unidade)",
+    labelSelect: "SELECIONE A ÁREA GESTORA",
+    opcaoPadrao: "— Escolha uma área —",
+    labelBusca: "ÁREA",
+    labelTrocar: "← TROCAR DE ÁREA",
+    dicaLanding: "Escolha uma área gestora (no campo acima, ou clicando num cartão abaixo) pra ver o perfil completo dela — vencimentos, financeiro, pessoas.",
+    complementar: { campoFn: (c) => c.tipoObjeto, rotuloVazio: "(sem tipo)", titulo: "Valor por Tipo de Objeto" },
+  };
+}
+function configPorCategoria() {
+  return {
+    prefixo: "categoria",
+    campoAgrupador: (c) => c.tipoObjeto,
+    rotuloVazio: "(sem tipo)",
+    labelSelect: "SELECIONE A CATEGORIA (TIPO DE OBJETO)",
+    opcaoPadrao: "— Escolha uma categoria —",
+    labelBusca: "CATEGORIA",
+    labelTrocar: "← TROCAR DE CATEGORIA",
+    dicaLanding: "Escolha uma categoria (no campo acima, ou clicando num cartão abaixo) pra ver o perfil completo dela — vencimentos, financeiro, pessoas.",
+    complementar: { campoFn: (c) => c.unidadeGestora, rotuloVazio: "(sem unidade)", titulo: "Valor por Área Gestora" },
+  };
+}
+
+function renderPorDimensaoContratos(lista, cfg) {
+  const p = cfg.prefixo;
+  const el = (sufixo) => document.getElementById(`${p}-${sufixo}`);
+  const alvo = document.getElementById(`contratos-sub-por${p}`);
   const porId = new Map(lista.map((c) => [c.id, c]));
-  const areasDisponiveis = [...new Set(lista.map((c) => c.unidadeGestora || "(sem unidade)"))].sort();
-  let areaSelecionada = "";
-  let filtroTipoArea = "";
-  let filtroAditivosArea = null;
-  let filtroPessoaArea = null; // { tipo: "analista"|"gestor"|"fiscal", nome }
-  let filtroMesArea = "";
-  let modoMesArea = "colunas";
+  const valoresDisponiveis = [...new Set(lista.map((c) => cfg.campoAgrupador(c) || cfg.rotuloVazio))].sort();
+  let selecionada = "";
+  let filtroComplementar = "";
+  let filtroAditivos = null;
+  let filtroPessoa = null; // { tipo: "analista"|"gestor"|"fiscal", nome }
+  let filtroMes = "";
+  let modoMes = "colunas";
 
   alvo.innerHTML = `
     <div class="dash-filtros">
       <div class="dash-filtro" style="flex:1;min-width:280px">
-        <label>SELECIONE A ÁREA GESTORA</label>
-        <select id="area-select"><option value="">— Escolha uma área —</option>${areasDisponiveis.map((a) => `<option value="${escapeAttr(a)}">${escapeHTML(a)}</option>`).join("")}</select>
+        <label>${cfg.labelSelect}</label>
+        <select id="${p}-select"><option value="">${cfg.opcaoPadrao}</option>${valoresDisponiveis.map((a) => `<option value="${escapeAttr(a)}">${escapeHTML(a)}</option>`).join("")}</select>
       </div>
       <div class="dash-filtro" style="flex:1;min-width:280px">
         <label>BUSCAR (Nº, EMPRESA, OBJETO, VALOR, DATA, ÁREA, ANALISTA, GESTOR, FISCAL...)</label>
-        <input type="text" id="area-busca" placeholder="Digite qualquer parte do que lembrar..." />
+        <input type="text" id="${p}-busca" placeholder="Digite qualquer parte do que lembrar..." />
       </div>
     </div>
-    <div id="area-busca-resultado"></div>
-    <div id="area-landing"></div>
-    <div id="area-perfil" hidden>
-      <div class="dash-chart-box" id="area-cabecalho" style="margin-bottom:16px"></div>
+    <div id="${p}-busca-resultado"></div>
+    <div id="${p}-landing"></div>
+    <div id="${p}-perfil" hidden>
+      <div class="dash-chart-box" id="${p}-cabecalho" style="margin-bottom:16px"></div>
       <div class="tabs" style="margin-bottom:0">
-        <button class="tab-btn active" data-subtab-area="visao">VISÃO GERAL</button>
-        <button class="tab-btn" data-subtab-area="prazos">PRAZOS E VENCIMENTOS</button>
-        <button class="tab-btn" data-subtab-area="financeiro">FINANCEIRO</button>
-        <button class="tab-btn" data-subtab-area="pessoas">PESSOAS</button>
+        <button class="tab-btn active" data-subtab-${p}="visao">VISÃO GERAL</button>
+        <button class="tab-btn" data-subtab-${p}="prazos">PRAZOS E VENCIMENTOS</button>
+        <button class="tab-btn" data-subtab-${p}="financeiro">FINANCEIRO</button>
+        <button class="tab-btn" data-subtab-${p}="pessoas">PESSOAS</button>
       </div>
-      <div class="tab-panel" id="area-sub-visao"></div>
-      <div class="tab-panel" id="area-sub-prazos" hidden></div>
-      <div class="tab-panel" id="area-sub-financeiro" hidden></div>
-      <div class="tab-panel" id="area-sub-pessoas" hidden></div>
+      <div class="tab-panel" id="${p}-sub-visao"></div>
+      <div class="tab-panel" id="${p}-sub-prazos" hidden></div>
+      <div class="tab-panel" id="${p}-sub-financeiro" hidden></div>
+      <div class="tab-panel" id="${p}-sub-pessoas" hidden></div>
     </div>
   `;
 
-  ligarBuscaContratos(lista, porId, "area-busca", "area-busca-resultado");
+  ligarBuscaContratos(lista, porId, `${p}-busca`, `${p}-busca-resultado`);
 
-  const SUBABAS_AREA = ["visao", "prazos", "financeiro", "pessoas"];
-  alvo.querySelectorAll("[data-subtab-area]").forEach((btn) => {
+  const SUBABAS = ["visao", "prazos", "financeiro", "pessoas"];
+  alvo.querySelectorAll(`[data-subtab-${p}]`).forEach((btn) => {
     btn.addEventListener("click", () => {
-      alvo.querySelectorAll("[data-subtab-area]").forEach((b) => b.classList.remove("active"));
+      alvo.querySelectorAll(`[data-subtab-${p}]`).forEach((b) => b.classList.remove("active"));
       btn.classList.add("active");
-      const nomeAba = btn.dataset.subtabArea;
-      SUBABAS_AREA.forEach((nome) => { document.getElementById(`area-sub-${nome}`).hidden = nomeAba !== nome; });
+      const nomeAba = btn.dataset[`subtab${p[0].toUpperCase()}${p.slice(1)}`];
+      SUBABAS.forEach((nome) => { el(`sub-${nome}`).hidden = nomeAba !== nome; });
     });
   });
 
-  function selecionarArea(area) {
-    areaSelecionada = area;
-    document.getElementById("area-select").value = area;
-    filtroTipoArea = "";
-    filtroAditivosArea = null;
-    filtroPessoaArea = null;
-    filtroMesArea = "";
+  function selecionar(valor) {
+    selecionada = valor;
+    el("select").value = valor;
+    filtroComplementar = "";
+    filtroAditivos = null;
+    filtroPessoa = null;
+    filtroMes = "";
     atualizar();
     alvo.scrollIntoView?.({ behavior: "smooth", block: "start" });
   }
-  document.getElementById("area-select").addEventListener("change", (ev) => selecionarArea(ev.target.value));
+  el("select").addEventListener("change", (ev) => selecionar(ev.target.value));
 
-  // Landing (nenhuma área escolhida ainda): grade com TODAS as áreas de uma
-  // vez, qtd de contrato e valor — o equivalente ao mapa/lista de municípios
-  // do SEI antes de escolher um. Clicar num cartão também seleciona.
+  // Landing (nada escolhido ainda): grade com TODOS os valores de uma vez,
+  // qtd de contrato e valor — o equivalente ao mapa/lista de municípios do
+  // SEI antes de escolher um. Clicar num cartão também seleciona.
   function renderLanding() {
-    const porArea = agruparPorAreaCriticidade(lista);
-    const valorPorArea = new Map(agruparValorPorCampo(lista, (c) => c.unidadeGestora, "(sem unidade)").map((l) => [l.label, l]));
-    document.getElementById("area-landing").innerHTML = `
-      <p class="dash-chart-hint">Escolha uma área gestora (no campo acima, ou clicando num cartão abaixo) pra ver o perfil completo dela — vencimentos, financeiro, pessoas.</p>
-      <div class="kpi-row" style="grid-template-columns:repeat(auto-fill,minmax(200px,1fr));margin-top:10px" id="area-cards"></div>
+    const porGrupo = agruparPorAreaCriticidade(lista, cfg.campoAgrupador, cfg.rotuloVazio);
+    const valorPorGrupo = new Map(agruparValorPorCampo(lista, cfg.campoAgrupador, cfg.rotuloVazio).map((l) => [l.label, l]));
+    el("landing").innerHTML = `
+      <p class="dash-chart-hint">${cfg.dicaLanding}</p>
+      <div class="kpi-row" style="grid-template-columns:repeat(auto-fill,minmax(200px,1fr));margin-top:10px" id="${p}-cards"></div>
     `;
-    document.getElementById("area-cards").innerHTML = porArea.map((l) => {
-      const v = valorPorArea.get(l.label);
+    el("cards").innerHTML = porGrupo.map((l) => {
+      const v = valorPorGrupo.get(l.label);
       const piorCrit = CRITICIDADE_VISUAL.find((cv) => l.porCrit[cv.label] > 0);
-      return `<div class="kpi-card" data-area-card="${escapeAttr(l.label)}" style="cursor:pointer;--kpi-cor:${piorCrit ? piorCrit.cor : "var(--carvao)"}">
+      return `<div class="kpi-card" data-${p}-card="${escapeAttr(l.label)}" style="cursor:pointer;--kpi-cor:${piorCrit ? piorCrit.cor : "var(--carvao)"}">
         <div class="kpi-label">${escapeHTML(l.label)}</div>
         <div class="kpi-value" style="font-size:var(--fs-subtitulo)">${l.total} contrato${l.total === 1 ? "" : "s"}</div>
         <div class="font-mono" style="font-size:var(--fs-ui-sm);color:#8B93A3">${v ? formatarMoedaBR(v.total) : "—"}</div>
       </div>`;
     }).join("");
-    document.getElementById("area-cards").querySelectorAll("[data-area-card]").forEach((card) => {
-      card.addEventListener("click", () => selecionarArea(card.dataset.areaCard));
+    el("cards").querySelectorAll(`[data-${p}-card]`).forEach((card) => {
+      card.addEventListener("click", () => selecionar(card.dataset[`${p}Card`]));
     });
   }
 
-  function renderCabecalho(listaArea) {
-    const valorAtual = listaArea.reduce((a, c) => a + (c.valorGlobalAtual || 0), 0);
-    const qtdVencidos = listaArea.filter((c) => c.statusVigencia === "Vencido").length;
-    document.getElementById("area-cabecalho").innerHTML = `
+  function renderCabecalho(listaFiltrada) {
+    const valorAtual = listaFiltrada.reduce((a, c) => a + (c.valorGlobalAtual || 0), 0);
+    const qtdVencidos = listaFiltrada.filter((c) => c.statusVigencia === "Vencido").length;
+    el("cabecalho").innerHTML = `
       <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px">
         <div>
-          <h4 style="margin-bottom:2px">${escapeHTML(areaSelecionada)}</h4>
-          <p class="font-mono" style="font-size:var(--fs-ui-sm);color:#8B93A3">${listaArea.length} contrato(s) · ${formatarMoedaBR(valorAtual)} em valor atual${qtdVencidos ? ` · ${qtdVencidos} vencido(s)` : ""}</p>
+          <h4 style="margin-bottom:2px">${escapeHTML(selecionada)}</h4>
+          <p class="font-mono" style="font-size:var(--fs-ui-sm);color:#8B93A3">${listaFiltrada.length} contrato(s) · ${formatarMoedaBR(valorAtual)} em valor atual${qtdVencidos ? ` · ${qtdVencidos} vencido(s)` : ""}</p>
         </div>
-        <button type="button" class="dash-toggle-btn" id="area-trocar">← TROCAR DE ÁREA</button>
+        <button type="button" class="dash-toggle-btn" id="${p}-trocar">${cfg.labelTrocar}</button>
       </div>`;
-    document.getElementById("area-trocar").addEventListener("click", () => selecionarArea(""));
+    el("trocar").addEventListener("click", () => selecionar(""));
   }
 
-  function renderVisaoGeral(listaArea) {
-    const qtdVencidos = listaArea.filter((c) => c.statusVigencia === "Vencido").length;
-    const qtdAVencer = listaArea.filter((c) => c.statusVigencia === "A Vencer").length;
-    const qtdAContratar = listaArea.filter((c) => c.statusVigencia === "A Contratar").length;
-    const valorAtual = listaArea.reduce((a, c) => a + (c.valorGlobalAtual || 0), 0);
-    document.getElementById("area-sub-visao").innerHTML = `
+  function renderVisaoGeral(listaFiltrada) {
+    const qtdVencidos = listaFiltrada.filter((c) => c.statusVigencia === "Vencido").length;
+    const qtdAVencer = listaFiltrada.filter((c) => c.statusVigencia === "A Vencer").length;
+    const qtdAContratar = listaFiltrada.filter((c) => c.statusVigencia === "A Contratar").length;
+    const valorAtual = listaFiltrada.reduce((a, c) => a + (c.valorGlobalAtual || 0), 0);
+    el("sub-visao").innerHTML = `
       <div class="kpi-row" style="margin-bottom:16px">
-        <div class="kpi-card"><div class="kpi-label">Qtd Contratos</div><div class="kpi-value">${listaArea.length.toLocaleString("pt-BR")}</div></div>
+        <div class="kpi-card"><div class="kpi-label">Qtd Contratos</div><div class="kpi-value">${listaFiltrada.length.toLocaleString("pt-BR")}</div></div>
         <div class="kpi-card" style="--kpi-cor:var(--crit-vencido)"><div class="kpi-label">Vencidos</div><div class="kpi-value">${qtdVencidos.toLocaleString("pt-BR")}</div></div>
         <div class="kpi-card" style="--kpi-cor:var(--crit-alto)"><div class="kpi-label">A Vencer</div><div class="kpi-value">${qtdAVencer.toLocaleString("pt-BR")}</div></div>
         <div class="kpi-card" style="--kpi-cor:var(--crit-neutro)"><div class="kpi-label">A Contratar</div><div class="kpi-value">${qtdAContratar.toLocaleString("pt-BR")}</div></div>
-        <div class="kpi-card"><div class="kpi-label">Valor Atual Total</div><div class="kpi-value">R$ ${formatarEixo(valorAtual)}</div></div>
+        <div class="kpi-card"><div class="kpi-label">Valor Atual Total</div><div class="kpi-value">R$ ${formatarEixo(valorAtual)}</div><div class="kpi-valor-exato">${formatarMoedaBR(valorAtual)}</div></div>
       </div>
       <div class="dash-chart-box">
         <h4>Detalhamento dos Contratos</h4>
         <p class="dash-chart-hint">Passe o mouse numa linha pra ver o detalhe rápido — clique pra abrir o panorama completo do contrato.</p>
-        <div id="area-visao-tabela" class="tabela-rolavel" style="max-height:360px"></div>
+        <div id="${p}-visao-tabela" class="tabela-rolavel" style="max-height:360px"></div>
       </div>`;
-    document.getElementById("area-visao-tabela").innerHTML = tabelaContratosHTML(listaArea);
-    ligarTooltipLinhas(document.getElementById("area-visao-tabela"), porId);
+    el("visao-tabela").innerHTML = tabelaContratosHTML(listaFiltrada);
+    ligarTooltipLinhas(el("visao-tabela"), porId);
   }
 
-  // Antes só o Tático deixava clicar num mês do gráfico e ver os contratos
-  // daquele mês numa tabela — aqui (Por Área) o gráfico ficava só de
-  // enfeite, "só mês e ano", pedido direto de volta pra ser igual: clicável
-  // e reunindo informação, mesma lógica do resto do sistema.
-  function renderPrazos(listaArea) {
-    document.getElementById("area-sub-prazos").innerHTML = `
+  // Clicável e reunindo informação, mesma lógica do resto do sistema: clicar
+  // num mês isola aquele mês na tabela abaixo.
+  function renderPrazos(listaFiltrada) {
+    el("sub-prazos").innerHTML = `
       <div class="dash-chart-box">
         <h4>Contratos por Vencimento e Criticidade</h4>
-        <p class="dash-chart-hint" id="area-mes-hint"></p>
-        <div class="linha-troca-grafico"><div class="dash-toggle" id="area-mes-toggle">
+        <p class="dash-chart-hint" id="${p}-mes-hint"></p>
+        <div class="linha-troca-grafico"><div class="dash-toggle" id="${p}-mes-toggle">
           <button class="dash-toggle-btn" data-modo="colunas" title="Compara o total de cada mês">COLUNAS</button>
           <button class="dash-toggle-btn" data-modo="gantt" title="Mostra a vigência de cada contrato numa linha do tempo">GANTT</button>
         </div></div>
-        <div id="area-grafico-mes"></div>
+        <div id="${p}-grafico-mes"></div>
       </div>
-      <div id="area-mes-chip"></div>
-      <div id="area-prazos-tabela" style="margin-top:16px"></div>`;
+      <div id="${p}-mes-chip"></div>
+      <div id="${p}-prazos-tabela" style="margin-top:16px"></div>`;
     function desenharMes() {
-      const container = document.getElementById("area-grafico-mes");
-      if (modoMesArea === "gantt") {
-        container.innerHTML = ganttContratosSVG(listaArea).svg;
+      const container = el("grafico-mes");
+      if (modoMes === "gantt") {
+        container.innerHTML = ganttContratosSVG(listaFiltrada).svg;
         ligarTooltipLinhas(container, porId);
-        document.getElementById("area-mes-hint").textContent = "Passe o mouse numa barra pra ver o detalhe rápido, clique pra abrir o panorama completo — a linha vertical marca a data de hoje.";
+        el("mes-hint").textContent = "Passe o mouse numa barra pra ver o detalhe rápido, clique pra abrir o panorama completo — a linha vertical marca a data de hoje.";
       } else {
-        container.innerHTML = colunaCriticidadeEmpilhadaSVG(agruparPorMesCriticidade(listaArea), filtroMesArea);
-        document.getElementById("area-mes-hint").textContent = "Clique numa barra pra isolar só aquele mês de vencimento na tabela abaixo — clique de novo pra voltar a ver todos os meses.";
+        container.innerHTML = colunaCriticidadeEmpilhadaSVG(agruparPorMesCriticidade(listaFiltrada), filtroMes);
+        el("mes-hint").textContent = "Clique numa barra pra isolar só aquele mês de vencimento na tabela abaixo — clique de novo pra voltar a ver todos os meses.";
       }
       adicionarControlesGrafico(container);
-      document.querySelectorAll("#area-mes-toggle [data-modo]").forEach((btn) => {
-        btn.classList.toggle("active", btn.dataset.modo === modoMesArea);
+      alvo.querySelectorAll(`#${p}-mes-toggle [data-modo]`).forEach((btn) => {
+        btn.classList.toggle("active", btn.dataset.modo === modoMes);
       });
     }
     desenharMes();
-    document.getElementById("area-mes-toggle").addEventListener("click", (ev) => {
+    el("mes-toggle").addEventListener("click", (ev) => {
       const btn = ev.target.closest("[data-modo]");
-      if (!btn || btn.dataset.modo === modoMesArea) return;
-      modoMesArea = btn.dataset.modo;
+      if (!btn || btn.dataset.modo === modoMes) return;
+      modoMes = btn.dataset.modo;
       desenharMes();
     });
-    document.getElementById("area-grafico-mes").addEventListener("click", (ev) => {
+    el("grafico-mes").addEventListener("click", (ev) => {
       const alvoClicado = ev.target.closest("[data-mes]");
       if (!alvoClicado) return;
-      filtroMesArea = filtroMesArea === alvoClicado.dataset.mes ? "" : alvoClicado.dataset.mes;
-      renderPrazos(listaArea);
+      filtroMes = filtroMes === alvoClicado.dataset.mes ? "" : alvoClicado.dataset.mes;
+      renderPrazos(listaFiltrada);
     });
 
-    document.getElementById("area-mes-chip").innerHTML = filtroMesArea
-      ? `<div class="filter-chips"><span class="filter-chip">Isolando mês: ${escapeHTML(filtroMesArea)}<button type="button" data-limpar-mes-area title="Voltar a ver todos os meses">✕</button></span></div>`
+    el("mes-chip").innerHTML = filtroMes
+      ? `<div class="filter-chips"><span class="filter-chip">Isolando mês: ${escapeHTML(filtroMes)}<button type="button" data-limpar-mes-${p} title="Voltar a ver todos os meses">✕</button></span></div>`
       : "";
-    const btnLimparMesArea = document.querySelector("[data-limpar-mes-area]");
-    if (btnLimparMesArea) btnLimparMesArea.addEventListener("click", () => { filtroMesArea = ""; renderPrazos(listaArea); });
+    const btnLimparMes = alvo.querySelector(`[data-limpar-mes-${p}]`);
+    if (btnLimparMes) btnLimparMes.addEventListener("click", () => { filtroMes = ""; renderPrazos(listaFiltrada); });
 
-    if (filtroMesArea) {
-      const contratosDoMes = listaArea.filter((c) => chaveAnoMes(c.dataFim) === filtroMesArea);
-      document.getElementById("area-prazos-tabela").innerHTML = `
+    if (filtroMes) {
+      const contratosDoMes = listaFiltrada.filter((c) => chaveAnoMes(c.dataFim) === filtroMes);
+      el("prazos-tabela").innerHTML = `
         <div class="dash-chart-box">
-          <h4>Contratos com vencimento em ${escapeHTML(filtroMesArea)}</h4>
+          <h4>Contratos com vencimento em ${escapeHTML(filtroMes)}</h4>
           <p class="dash-chart-hint">Passe o mouse numa linha pra ver o detalhe rápido — clique pra abrir o panorama completo do contrato.</p>
-          <div class="tabela-rolavel" style="max-height:320px" id="area-prazos-tabela-conteudo"></div>
+          <div class="tabela-rolavel" style="max-height:320px" id="${p}-prazos-tabela-conteudo"></div>
         </div>`;
-      document.getElementById("area-prazos-tabela-conteudo").innerHTML = tabelaContratosHTML(contratosDoMes);
-      ligarTooltipLinhas(document.getElementById("area-prazos-tabela-conteudo"), porId);
+      el("prazos-tabela-conteudo").innerHTML = tabelaContratosHTML(contratosDoMes);
+      ligarTooltipLinhas(el("prazos-tabela-conteudo"), porId);
     } else {
-      document.getElementById("area-prazos-tabela").innerHTML = "";
+      el("prazos-tabela").innerHTML = "";
     }
   }
 
-  function renderFinanceiro(listaArea) {
-    document.getElementById("area-sub-financeiro").innerHTML = `
+  function renderFinanceiro(listaFiltrada) {
+    el("sub-financeiro").innerHTML = `
       <div class="dash-charts" style="grid-template-columns:1fr 1fr">
         <div class="dash-chart-box">
-          <h4>Valor por Tipo de Objeto</h4>
-          <div id="area-valor-tipo"></div>
+          <h4>${escapeHTML(cfg.complementar.titulo)}</h4>
+          <div id="${p}-complementar"></div>
         </div>
         <div class="dash-chart-box">
           <h4>Top 10 Maiores Contratos (Valor Atual)</h4>
           <p class="dash-chart-hint">Passe o mouse numa barra pra ver o detalhe rápido — clique pra abrir o panorama completo.</p>
-          <div id="area-top-contratos"></div>
+          <div id="${p}-top-contratos"></div>
         </div>
       </div>
       <div class="dash-charts" style="grid-template-columns:1fr">
         <div class="dash-chart-box">
           <h4>Distribuição por Nº de Aditivos</h4>
           <p class="dash-chart-hint">Clique numa barra pra ver quais contratos são e o número do SEI de cada aditivo.</p>
-          <div id="area-aditivos"></div>
+          <div id="${p}-aditivos"></div>
         </div>
       </div>
-      <div id="area-financeiro-tabela" style="margin-top:16px"></div>
+      <div id="${p}-financeiro-tabela" style="margin-top:16px"></div>
     `;
     // Cross-filter à la BI: clicar numa fatia da rosca não só destaca ela —
-    // filtra TAMBÉM o Top 10 e o gráfico de aditivos pro tipo escolhido
-    // (igual clicar num aspecto já isola o resto da tela em Gerencial). A
-    // própria rosca de Valor por Tipo continua mostrando TODOS os tipos
-    // (só com o escolhido em destaque), senão não daria pra trocar de fatia
-    // depois de escolher uma.
-    const filtrada = listaArea.filter((c) =>
-      (!filtroTipoArea || (c.tipoObjeto || "(sem tipo)") === filtroTipoArea) &&
-      (filtroAditivosArea === null || (c.qtdAditivos ?? 0) === filtroAditivosArea)
+    // filtra TAMBÉM o Top 10 e o gráfico de aditivos pro valor escolhido da
+    // dimensão complementar (igual clicar num aspecto já isola o resto da
+    // tela em Gerencial). A própria rosca continua mostrando TODOS os
+    // valores (só com o escolhido em destaque), senão não daria pra trocar
+    // de fatia depois de escolher uma.
+    const filtrada = listaFiltrada.filter((c) =>
+      (!filtroComplementar || (cfg.complementar.campoFn(c) || cfg.complementar.rotuloVazio) === filtroComplementar) &&
+      (filtroAditivos === null || (c.qtdAditivos ?? 0) === filtroAditivos)
     );
 
-    document.getElementById("area-valor-tipo").innerHTML = roscaValorPorCampoSVG(
-      agruparValorPorCampo(listaArea, (c) => c.tipoObjeto, "(sem tipo)"),
-      filtroTipoArea
+    el("complementar").innerHTML = roscaValorPorCampoSVG(
+      agruparValorPorCampo(listaFiltrada, cfg.complementar.campoFn, cfg.complementar.rotuloVazio),
+      filtroComplementar
     );
-    document.getElementById("area-top-contratos").innerHTML = barraContagemHorizontalSVG(
+    el("top-contratos").innerHTML = barraContagemHorizontalSVG(
       agruparTopContratosPorValor(filtrada, 10),
       { formatarValor: (v) => "R$ " + formatarEixo(v), tituloTooltip: (l) => `${l.label}: ${formatarMoedaBR(l.total)}` }
     );
-    ligarTooltipLinhas(document.getElementById("area-top-contratos"), porId);
-    document.getElementById("area-aditivos").innerHTML = barraContagemHorizontalSVG(
+    ligarTooltipLinhas(el("top-contratos"), porId);
+    el("aditivos").innerHTML = barraContagemHorizontalSVG(
       agruparPorQtdAditivos(filtrada),
       {
         tituloTooltip: (l) => `${l.label}: ${l.total} contrato(s)`,
-        selecionado: filtroAditivosArea !== null ? `${filtroAditivosArea} aditivo${filtroAditivosArea === 1 ? "" : "s"}` : "",
+        selecionado: filtroAditivos !== null ? `${filtroAditivos} aditivo${filtroAditivos === 1 ? "" : "s"}` : "",
       }
     );
-    adicionarControlesGrafico(document.getElementById("area-valor-tipo"));
-    adicionarControlesGrafico(document.getElementById("area-top-contratos"));
-    adicionarControlesGrafico(document.getElementById("area-aditivos"));
-    document.getElementById("area-valor-tipo").addEventListener("click", (ev) => {
+    adicionarControlesGrafico(el("complementar"));
+    adicionarControlesGrafico(el("top-contratos"));
+    adicionarControlesGrafico(el("aditivos"));
+    el("complementar").addEventListener("click", (ev) => {
       const alvoClicado = ev.target.closest("[data-cat]");
       if (!alvoClicado) return;
-      filtroTipoArea = filtroTipoArea === alvoClicado.dataset.cat ? "" : alvoClicado.dataset.cat;
-      renderFinanceiro(listaArea);
+      filtroComplementar = filtroComplementar === alvoClicado.dataset.cat ? "" : alvoClicado.dataset.cat;
+      renderFinanceiro(listaFiltrada);
     });
-    document.getElementById("area-aditivos").addEventListener("click", (ev) => {
+    el("aditivos").addEventListener("click", (ev) => {
       const alvoClicado = ev.target.closest("[data-valor]");
       if (!alvoClicado) return;
       const valor = +alvoClicado.dataset.valor;
-      filtroAditivosArea = filtroAditivosArea === valor ? null : valor;
-      renderFinanceiro(listaArea);
+      filtroAditivos = filtroAditivos === valor ? null : valor;
+      renderFinanceiro(listaFiltrada);
     });
 
     // Chip(s) do que está isolado — mesmo padrão do Gerencial: cada filtro
     // ativo sabe se desligar sozinho.
     const chipsFinanceiro = [
-      filtroTipoArea && { rotulo: `tipo: ${filtroTipoArea}`, limpar: () => { filtroTipoArea = ""; renderFinanceiro(listaArea); } },
-      filtroAditivosArea !== null && { rotulo: `${filtroAditivosArea} aditivo${filtroAditivosArea === 1 ? "" : "s"}`, limpar: () => { filtroAditivosArea = null; renderFinanceiro(listaArea); } },
+      filtroComplementar && { rotulo: `${cfg.complementar.titulo.replace(/^Valor por /, "").toLowerCase()}: ${filtroComplementar}`, limpar: () => { filtroComplementar = ""; renderFinanceiro(listaFiltrada); } },
+      filtroAditivos !== null && { rotulo: `${filtroAditivos} aditivo${filtroAditivos === 1 ? "" : "s"}`, limpar: () => { filtroAditivos = null; renderFinanceiro(listaFiltrada); } },
     ].filter(Boolean);
     if (chipsFinanceiro.length) {
-      document.getElementById("area-financeiro-tabela").innerHTML = `
-        <div class="filter-chips">${chipsFinanceiro.map((c, i) => `<span class="filter-chip">Isolando ${escapeHTML(c.rotulo)}<button type="button" data-chip-financeiro="${i}" title="Remover este filtro">✕</button></span>`).join("")}</div>
+      el("financeiro-tabela").innerHTML = `
+        <div class="filter-chips">${chipsFinanceiro.map((c, i) => `<span class="filter-chip">Isolando ${escapeHTML(c.rotulo)}<button type="button" data-chip-financeiro-${p}="${i}" title="Remover este filtro">✕</button></span>`).join("")}</div>
         <div class="dash-chart-box">
           <h4>Contratos — ${escapeHTML(chipsFinanceiro.map((c) => c.rotulo).join(" · "))}</h4>
-          <div class="tabela-rolavel" style="max-height:320px" id="area-financeiro-tabela-conteudo"></div>
+          <div class="tabela-rolavel" style="max-height:320px" id="${p}-financeiro-tabela-conteudo"></div>
         </div>`;
-      document.querySelectorAll("[data-chip-financeiro]").forEach((btn) => {
-        btn.addEventListener("click", () => chipsFinanceiro[+btn.dataset.chipFinanceiro].limpar());
+      alvo.querySelectorAll(`[data-chip-financeiro-${p}]`).forEach((btn) => {
+        btn.addEventListener("click", () => chipsFinanceiro[+btn.dataset[`chipFinanceiro${p[0].toUpperCase()}${p.slice(1)}`]].limpar());
       });
-      document.getElementById("area-financeiro-tabela-conteudo").innerHTML = tabelaContratosHTML(filtrada, { comSei: filtroAditivosArea !== null });
-      ligarTooltipLinhas(document.getElementById("area-financeiro-tabela-conteudo"), porId);
+      el("financeiro-tabela-conteudo").innerHTML = tabelaContratosHTML(filtrada, { comSei: filtroAditivos !== null });
+      ligarTooltipLinhas(el("financeiro-tabela-conteudo"), porId);
     } else {
-      document.getElementById("area-financeiro-tabela").innerHTML = "";
+      el("financeiro-tabela").innerHTML = "";
     }
   }
 
-  function renderPessoas(listaArea) {
-    document.getElementById("area-sub-pessoas").innerHTML = `
+  function renderPessoas(listaFiltrada) {
+    el("sub-pessoas").innerHTML = `
       <div class="dash-charts" style="grid-template-columns:1fr 1fr">
-        <div class="dash-chart-box"><h4>Por Analista</h4><div id="area-analista"></div></div>
-        <div class="dash-chart-box"><h4>Por Gestor</h4><div id="area-gestor"></div></div>
+        <div class="dash-chart-box"><h4>Por Analista</h4><div id="${p}-analista"></div></div>
+        <div class="dash-chart-box"><h4>Por Gestor</h4><div id="${p}-gestor"></div></div>
       </div>
       <div class="dash-charts" style="grid-template-columns:1fr">
-        <div class="dash-chart-box"><h4>Por Fiscal</h4><div id="area-fiscal"></div></div>
+        <div class="dash-chart-box"><h4>Por Fiscal</h4><div id="${p}-fiscal"></div></div>
       </div>
       <p class="dash-chart-hint">Clique num nome pra ver os contratos sob responsabilidade dele.</p>
-      <div id="area-pessoas-tabela"></div>
+      <div id="${p}-pessoas-tabela"></div>
     `;
-    document.getElementById("area-analista").innerHTML = barraContagemHorizontalSVG(
-      agruparContagemPorCampo(listaArea, (c) => c.analista, "(sem analista)"),
-      { tituloTooltip: (l) => `${l.label}: ${l.total} contrato(s)`, selecionado: filtroPessoaArea?.tipo === "analista" ? filtroPessoaArea.nome : "" }
+    el("analista").innerHTML = barraContagemHorizontalSVG(
+      agruparContagemPorCampo(listaFiltrada, (c) => c.analista, "(sem analista)"),
+      { tituloTooltip: (l) => `${l.label}: ${l.total} contrato(s)`, selecionado: filtroPessoa?.tipo === "analista" ? filtroPessoa.nome : "" }
     );
-    document.getElementById("area-gestor").innerHTML = barraContagemHorizontalSVG(
-      agruparContratosPorPessoa(listaArea, "Gestor"),
-      { tituloTooltip: (l) => `${l.label}: ${l.total} contrato(s)`, selecionado: filtroPessoaArea?.tipo === "gestor" ? filtroPessoaArea.nome : "" }
+    el("gestor").innerHTML = barraContagemHorizontalSVG(
+      agruparContratosPorPessoa(listaFiltrada, "Gestor"),
+      { tituloTooltip: (l) => `${l.label}: ${l.total} contrato(s)`, selecionado: filtroPessoa?.tipo === "gestor" ? filtroPessoa.nome : "" }
     );
-    document.getElementById("area-fiscal").innerHTML = barraContagemHorizontalSVG(
-      agruparContratosPorPessoa(listaArea, "Fiscal"),
-      { tituloTooltip: (l) => `${l.label}: ${l.total} contrato(s)`, selecionado: filtroPessoaArea?.tipo === "fiscal" ? filtroPessoaArea.nome : "" }
+    el("fiscal").innerHTML = barraContagemHorizontalSVG(
+      agruparContratosPorPessoa(listaFiltrada, "Fiscal"),
+      { tituloTooltip: (l) => `${l.label}: ${l.total} contrato(s)`, selecionado: filtroPessoa?.tipo === "fiscal" ? filtroPessoa.nome : "" }
     );
-    adicionarControlesGrafico(document.getElementById("area-analista"));
-    adicionarControlesGrafico(document.getElementById("area-gestor"));
-    adicionarControlesGrafico(document.getElementById("area-fiscal"));
+    adicionarControlesGrafico(el("analista"));
+    adicionarControlesGrafico(el("gestor"));
+    adicionarControlesGrafico(el("fiscal"));
 
-    function ligarClique(id, tipo) {
-      document.getElementById(id).addEventListener("click", (ev) => {
+    function ligarClique(sufixo, tipo) {
+      el(sufixo).addEventListener("click", (ev) => {
         const alvoClicado = ev.target.closest("[data-cat]");
         if (!alvoClicado) return;
         const nome = alvoClicado.dataset.cat;
-        filtroPessoaArea = filtroPessoaArea?.tipo === tipo && filtroPessoaArea.nome === nome ? null : { tipo, nome };
-        renderPessoas(listaArea);
+        filtroPessoa = filtroPessoa?.tipo === tipo && filtroPessoa.nome === nome ? null : { tipo, nome };
+        renderPessoas(listaFiltrada);
       });
     }
-    ligarClique("area-analista", "analista");
-    ligarClique("area-gestor", "gestor");
-    ligarClique("area-fiscal", "fiscal");
+    ligarClique("analista", "analista");
+    ligarClique("gestor", "gestor");
+    ligarClique("fiscal", "fiscal");
 
-    if (filtroPessoaArea) {
+    if (filtroPessoa) {
       const testesPorTipo = {
-        analista: (c) => (c.analista || "(sem analista)") === filtroPessoaArea.nome,
-        gestor: (c) => (c.pessoas || []).some((p) => p.papel === "Gestor" && p.nomePessoa === filtroPessoaArea.nome),
-        fiscal: (c) => (c.pessoas || []).some((p) => p.papel === "Fiscal" && p.nomePessoa === filtroPessoaArea.nome),
+        analista: (c) => (c.analista || "(sem analista)") === filtroPessoa.nome,
+        gestor: (c) => (c.pessoas || []).some((pe) => pe.papel === "Gestor" && pe.nomePessoa === filtroPessoa.nome),
+        fiscal: (c) => (c.pessoas || []).some((pe) => pe.papel === "Fiscal" && pe.nomePessoa === filtroPessoa.nome),
       };
-      const contratosDoFiltro = listaArea.filter(testesPorTipo[filtroPessoaArea.tipo]);
-      document.getElementById("area-pessoas-tabela").innerHTML = `
+      const contratosDoFiltro = listaFiltrada.filter(testesPorTipo[filtroPessoa.tipo]);
+      el("pessoas-tabela").innerHTML = `
         <div class="dash-chart-box">
-          <h4>Contratos — ${escapeHTML(filtroPessoaArea.tipo)}: ${escapeHTML(filtroPessoaArea.nome)}</h4>
-          <div class="tabela-rolavel" style="max-height:320px" id="area-pessoas-tabela-conteudo"></div>
+          <h4>Contratos — ${escapeHTML(filtroPessoa.tipo)}: ${escapeHTML(filtroPessoa.nome)}</h4>
+          <div class="tabela-rolavel" style="max-height:320px" id="${p}-pessoas-tabela-conteudo"></div>
         </div>`;
-      document.getElementById("area-pessoas-tabela-conteudo").innerHTML = tabelaContratosHTML(contratosDoFiltro);
-      ligarTooltipLinhas(document.getElementById("area-pessoas-tabela-conteudo"), porId);
+      el("pessoas-tabela-conteudo").innerHTML = tabelaContratosHTML(contratosDoFiltro);
+      ligarTooltipLinhas(el("pessoas-tabela-conteudo"), porId);
     } else {
-      document.getElementById("area-pessoas-tabela").innerHTML = "";
+      el("pessoas-tabela").innerHTML = "";
     }
   }
 
   function atualizar() {
-    if (!areaSelecionada) {
-      document.getElementById("area-perfil").hidden = true;
+    if (!selecionada) {
+      el("perfil").hidden = true;
       renderLanding();
       return;
     }
-    document.getElementById("area-landing").innerHTML = "";
-    document.getElementById("area-perfil").hidden = false;
-    const listaArea = lista.filter((c) => (c.unidadeGestora || "(sem unidade)") === areaSelecionada);
-    renderCabecalho(listaArea);
-    renderVisaoGeral(listaArea);
-    renderPrazos(listaArea);
-    renderFinanceiro(listaArea);
-    renderPessoas(listaArea);
+    el("landing").innerHTML = "";
+    el("perfil").hidden = false;
+    const listaFiltrada = lista.filter((c) => (cfg.campoAgrupador(c) || cfg.rotuloVazio) === selecionada);
+    renderCabecalho(listaFiltrada);
+    renderVisaoGeral(listaFiltrada);
+    renderPrazos(listaFiltrada);
+    renderFinanceiro(listaFiltrada);
+    renderPessoas(listaFiltrada);
   }
 
   atualizar();
 }
+function renderPorAreaContratos(lista) { renderPorDimensaoContratos(lista, configPorArea()); }
+function renderPorCategoriaContratos(lista) { renderPorDimensaoContratos(lista, configPorCategoria()); }
 
 async function carregarContratosPortal(portalSlug) {
   const painel = document.getElementById("tab-contratos");
@@ -6042,17 +6084,19 @@ async function carregarContratosPortal(portalSlug) {
       <button class="tab-btn" data-subtab-contratos="tatico">TÁTICO</button>
       <button class="tab-btn" data-subtab-contratos="operacional">OPERACIONAL</button>
       <button class="tab-btn" data-subtab-contratos="porarea">POR ÁREA GESTORA</button>
+      <button class="tab-btn" data-subtab-contratos="porcategoria">POR CATEGORIA</button>
       <button class="tab-btn" data-subtab-contratos="atualizados">ATUALIZADOS RECENTEMENTE</button>
     </div>
     <div class="tab-panel" id="contratos-sub-gerencial"></div>
     <div class="tab-panel" id="contratos-sub-tatico" hidden></div>
     <div class="tab-panel" id="contratos-sub-operacional" hidden></div>
     <div class="tab-panel" id="contratos-sub-porarea" hidden></div>
+    <div class="tab-panel" id="contratos-sub-porcategoria" hidden></div>
     <div class="tab-panel" id="contratos-sub-atualizados" hidden></div>
   `;
   renderAlertaVencimentoContratos(lista, new Map(lista.map((c) => [c.id, c])), decisoesRenovacao);
 
-  const SUBABAS_CONTRATOS = ["gerencial", "tatico", "operacional", "porarea", "atualizados"];
+  const SUBABAS_CONTRATOS = ["gerencial", "tatico", "operacional", "porarea", "porcategoria", "atualizados"];
   painel.querySelectorAll("[data-subtab-contratos]").forEach((btn) => {
     btn.addEventListener("click", () => {
       painel.querySelectorAll("[data-subtab-contratos]").forEach((b) => b.classList.remove("active"));
@@ -6066,6 +6110,7 @@ async function carregarContratosPortal(portalSlug) {
   renderTaticoContratos(lista);
   renderOperacionalContratos(lista, portalSlug);
   renderPorAreaContratos(lista);
+  renderPorCategoriaContratos(lista);
   renderAtualizadosRecentemente(lista, decisoesRenovacao);
 }
 
