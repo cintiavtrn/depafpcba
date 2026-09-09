@@ -3877,6 +3877,26 @@ function formatarMoedaBR(v) {
   if (v === null || v === undefined) return "—";
   return "R$ " + Number(v).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
+// Lê valor digitado no padrão brasileiro (vírgula decimal, ponto de milhar)
+// — bug reportado direto: "946.020,00" digitado num <input type=number>
+// (que só entende ponto como decimal, formato americano) virava 946.02,
+// quase mil vezes menor, sem nenhum aviso. "946.020,00" com vírgula → ponto
+// vira separador de milhar (remove) e vírgula vira decimal. Sem vírgula,
+// aceita tanto "150000.50" (ponto decimal, quem digitar no padrão técnico)
+// quanto "1.234.567" (só ponto de milhar, sem casa decimal) — só remove os
+// pontos quando tem mais de um (aí não tem como ser decimal).
+function parseValorBR(str) {
+  if (str === null || str === undefined) return null;
+  let s = String(str).trim();
+  if (!s) return null;
+  if (s.includes(",")) {
+    s = s.replace(/\./g, "").replace(",", ".");
+  } else if ((s.match(/\./g) || []).length > 1) {
+    s = s.replace(/\./g, "");
+  }
+  const n = parseFloat(s);
+  return Number.isNaN(n) ? null : n;
+}
 function formatarDataBR(iso) {
   if (!iso) return "—";
   return new Date(iso).toLocaleDateString("pt-BR", { timeZone: "UTC" });
@@ -5329,7 +5349,8 @@ function renderOperacionalContratos(lista, portalSlug) {
           </div>
           <div class="dash-filtro" style="flex:1;min-width:180px">
             <label>NOVO VALOR GLOBAL ATUAL (R$)</label>
-            <input type="number" id="renov-novo-valor" step="0.01" min="0" placeholder="Ex.: 95261.00" />
+            <input type="text" inputmode="decimal" id="renov-novo-valor" placeholder="Ex.: 946.020,00" />
+            <span class="font-mono" id="renov-novo-valor-preview" style="font-size:var(--fs-ui-xs);color:#8B93A3"></span>
           </div>
         </div>
       </div>
@@ -5357,13 +5378,31 @@ function renderOperacionalContratos(lista, portalSlug) {
     document.getElementById("renov-sei").value = dados.processoSeiRenovacao || "";
     document.getElementById("renov-data").value = dados.dataRenovacao ? dados.dataRenovacao.slice(0, 10) : "";
     document.getElementById("renov-nova-data-fim").value = dados.novaDataFim ? dados.novaDataFim.slice(0, 10) : "";
-    document.getElementById("renov-novo-valor").value = dados.novoValorGlobalAtual ?? "";
+    // Mostra formatado (padrão BR, igual o resto do painel inteiro) em vez
+    // do número cru — bug reportado direto: "946.020,00" estimado virou
+    // "946,02" reais sem nenhum aviso porque o campo era type=number (só
+    // entende ponto decimal, formato americano). Agora aceita texto livre
+    // e sempre mostra/entende no padrão que o resto do sistema já usa.
+    document.getElementById("renov-novo-valor").value = dados.novoValorGlobalAtual != null
+      ? dados.novoValorGlobalAtual.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+      : "";
     document.getElementById("renov-status").textContent = dados.atualizadoEm ? `Última atualização: ${formatarDataBR(dados.atualizadoEm)}` : "";
 
     // Nº do SEI e data da renovação só fazem sentido quando "Já Renovado" —
     // ficam escondidos nos outros 3 estados, pra não poluir o caso comum.
     const camposJaRenovado = document.getElementById("renov-campos-ja-renovado");
     const decisaoSelect = document.getElementById("renov-decisao");
+    // Preview ao vivo do que foi entendido — pra ela conferir ANTES de
+    // salvar, em vez de descobrir um valor errado só depois (foi assim que
+    // o 946,02 passou despercebido da primeira vez).
+    const campoNovoValor = document.getElementById("renov-novo-valor");
+    const previewNovoValor = document.getElementById("renov-novo-valor-preview");
+    function atualizarPreviewValor() {
+      const n = parseValorBR(campoNovoValor.value);
+      previewNovoValor.textContent = campoNovoValor.value.trim() === "" ? "" : (n === null ? "⚠ não entendi esse valor" : `= ${formatarMoedaBR(n)}`);
+    }
+    campoNovoValor.addEventListener("input", atualizarPreviewValor);
+    atualizarPreviewValor();
     function alternarCamposJaRenovado() {
       camposJaRenovado.hidden = decisaoSelect.value !== "Já Renovado";
     }
@@ -5389,7 +5428,7 @@ function renderOperacionalContratos(lista, portalSlug) {
             processoSeiRenovacao: decisaoAtual === "Já Renovado" ? (document.getElementById("renov-sei").value || null) : null,
             dataRenovacao: decisaoAtual === "Já Renovado" ? (document.getElementById("renov-data").value || null) : null,
             novaDataFim: decisaoAtual === "Já Renovado" ? (document.getElementById("renov-nova-data-fim").value || null) : null,
-            novoValorGlobalAtual: decisaoAtual === "Já Renovado" && document.getElementById("renov-novo-valor").value !== "" ? +document.getElementById("renov-novo-valor").value : null,
+            novoValorGlobalAtual: decisaoAtual === "Já Renovado" ? parseValorBR(document.getElementById("renov-novo-valor").value) : null,
           }),
         });
         // Reportado direto: "eu atualizei um contrato... e não tá saindo da
