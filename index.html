@@ -261,6 +261,16 @@ body{background:var(--paper);color:var(--carvao);font-family:'IBM Plex Sans',san
 .alerta-vencimento summary .conta{font-weight:400;opacity:.8}
 .alerta-vencimento .corpo{padding:0 16px 16px}
 
+/* Checklist de trâmites do Acompanhamento de Renovação */
+.renov-tramites{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:0}
+.renov-tramites li{padding:8px 4px;border-bottom:1px solid var(--paper-line);display:flex;align-items:flex-start;gap:8px}
+.renov-tramites li:last-child{border-bottom:none}
+.renov-tramites input[type="checkbox"]{margin-top:3px;flex:none;width:16px;height:16px;cursor:pointer}
+.renov-tramites input[type="checkbox"]:disabled{cursor:not-allowed}
+.renov-tramites label{cursor:pointer;flex:1;font-family:'IBM Plex Mono',monospace;font-size:var(--fs-ui-sm);line-height:1.4}
+.renov-tramites label.concluido{color:#8B93A3;text-decoration:line-through}
+.renov-tramite-data{display:block;opacity:.65;font-size:var(--fs-ui-xs);text-decoration:none}
+
 /* Rolagem DENTRO da tabela (como no Power BI) — o cabeçalho fica fixo e só o
    corpo rola, em vez da tabela empurrar a página inteira pra baixo quando
    tem muita linha. */
@@ -5175,7 +5185,7 @@ function renderTaticoContratos(lista) {
 }
 
 // ---------- Operacional: drill-down de um contrato (setor → contrato) ----------
-function renderOperacionalContratos(lista) {
+function renderOperacionalContratos(lista, portalSlug) {
   const alvo = document.getElementById("contratos-sub-operacional");
   const porId = new Map(lista.map((c) => [c.id, c]));
   const setores = [...new Set(lista.map((c) => c.unidadeGestora || "(sem unidade)"))].sort();
@@ -5212,9 +5222,114 @@ function renderOperacionalContratos(lista) {
         <div id="op-gauge" style="display:flex;justify-content:center"></div>
       </div>
     </div>
+    <div class="dash-chart-box" id="op-renovacao-box" style="margin-top:16px" hidden>
+      <h4>Acompanhamento de Renovação</h4>
+      <p class="dash-chart-hint">Registra se o contrato vai ser renovado e os trâmites já feitos — fica salvo pra qualquer um da equipe ver que já está sendo acompanhado.</p>
+      <div id="op-renovacao-conteudo"></div>
+    </div>
   `;
 
   ligarBuscaContratos(lista, porId, "op-busca", "op-busca-resultado");
+
+  // Acompanhamento de renovação — pedido direto: "quando o contrato tá
+  // perto de vencer, ter como marcar se vai renovar ou não... e saber que a
+  // pessoa tá acompanhando". Fica preso ao contrato selecionado aqui em
+  // Operacional (onde já mora todo o resto do panorama de UM contrato só).
+  async function renderRenovacao(selecionado) {
+    const box = document.getElementById("op-renovacao-box");
+    if (!selecionado) { box.hidden = true; return; }
+    box.hidden = false;
+    const contratoAlvo = selecionado.id;
+    const conteudo = document.getElementById("op-renovacao-conteudo");
+    conteudo.innerHTML = `<p class="tela-intro">Carregando acompanhamento...</p>`;
+    let dados;
+    try {
+      dados = await apiFetch(`/api/portais/${portalSlug}/contratos/${contratoAlvo}/renovacao`);
+    } catch (erro) {
+      conteudo.innerHTML = `<p class="tela-intro">Não consegui carregar o acompanhamento: ${escapeHTML(erro.message)}</p>`;
+      return;
+    }
+    // Contrato mudou enquanto isso carregava (cliques rápidos no seletor) —
+    // não pisa em cima do que já está na tela pro contrato novo.
+    if (contratoId !== contratoAlvo) return;
+
+    const existe = !!dados.criadoEm;
+    const concluidos = dados.tramites.filter((t) => t.concluido).length;
+    conteudo.innerHTML = `
+      <div class="dash-filtros" style="margin-bottom:12px">
+        <div class="dash-filtro" style="flex:1;min-width:180px">
+          <label>VAI RENOVAR?</label>
+          <select id="renov-decisao">
+            <option value="">— Ainda sem decisão —</option>
+            <option value="Sim">Sim</option>
+            <option value="Não">Não</option>
+            <option value="Em análise">Em análise</option>
+          </select>
+        </div>
+        <div class="dash-filtro" style="flex:1;min-width:180px">
+          <label>QUEM ESTÁ ACOMPANHANDO</label>
+          <input type="text" id="renov-responsavel" placeholder="Nome de quem está cuidando disso" />
+        </div>
+      </div>
+      <div class="dash-filtro" style="margin-bottom:10px">
+        <label>OBSERVAÇÃO</label>
+        <textarea id="renov-observacao" rows="2" placeholder="Qualquer detalhe que ajude quem olhar depois..."></textarea>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:18px">
+        <button type="button" class="dash-toggle-btn" id="renov-salvar">SALVAR</button>
+        <span class="font-mono" id="renov-status" style="font-size:var(--fs-ui-sm);color:#8B93A3"></span>
+      </div>
+      <h4 style="margin-bottom:4px">Trâmites${existe ? ` (${concluidos} de ${dados.tramites.length} concluídos)` : ""}</h4>
+      ${existe ? "" : `<p class="dash-chart-hint" style="margin:0 0 8px">Salve a decisão de renovação (mesmo em branco) pra poder marcar os trâmites.</p>`}
+      <ul class="renov-tramites">
+        ${dados.tramites.map((t) => `
+          <li>
+            <input type="checkbox" id="renov-tramite-${t.id || t.ordem}" data-tramite-id="${t.id || ""}" ${t.concluido ? "checked" : ""} ${existe ? "" : "disabled"} />
+            <label for="renov-tramite-${t.id || t.ordem}" class="${t.concluido ? "concluido" : ""}">${escapeHTML(t.nome)}${t.concluidoEm ? `<span class="renov-tramite-data">concluído em ${formatarDataBR(t.concluidoEm)}</span>` : ""}</label>
+          </li>`).join("")}
+      </ul>
+    `;
+    document.getElementById("renov-decisao").value = dados.decisao || "";
+    document.getElementById("renov-responsavel").value = dados.responsavel || "";
+    document.getElementById("renov-observacao").value = dados.observacao || "";
+    document.getElementById("renov-status").textContent = dados.atualizadoEm ? `Última atualização: ${formatarDataBR(dados.atualizadoEm)}` : "";
+
+    document.getElementById("renov-salvar").addEventListener("click", async () => {
+      const status = document.getElementById("renov-status");
+      status.textContent = "Salvando...";
+      try {
+        await apiFetch(`/api/portais/${portalSlug}/contratos/${contratoAlvo}/renovacao`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            decisao: document.getElementById("renov-decisao").value || null,
+            responsavel: document.getElementById("renov-responsavel").value || null,
+            observacao: document.getElementById("renov-observacao").value || null,
+          }),
+        });
+        renderRenovacao(selecionado);
+      } catch (erro) {
+        status.textContent = "";
+        toastErro("Não consegui salvar o acompanhamento: " + erro.message);
+      }
+    });
+
+    document.querySelectorAll("#op-renovacao-conteudo .renov-tramites input[type=checkbox]").forEach((chk) => {
+      chk.addEventListener("change", async () => {
+        try {
+          await apiFetch(`/api/portais/${portalSlug}/contratos/${contratoAlvo}/renovacao/tramites/${chk.dataset.tramiteId}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ concluido: chk.checked }),
+          });
+          renderRenovacao(selecionado);
+        } catch (erro) {
+          chk.checked = !chk.checked;
+          toastErro("Não consegui salvar o trâmite: " + erro.message);
+        }
+      });
+    });
+  }
 
   function contratosDoSetor() {
     return setor ? lista.filter((c) => (c.unidadeGestora || "(sem unidade)") === setor) : lista;
@@ -5258,6 +5373,8 @@ function renderOperacionalContratos(lista) {
 
     const selContrato = document.getElementById("op-select-contrato");
     selContrato.innerHTML = `<option value="">Todos</option>` + emContexto.map((c) => `<option value="${escapeAttr(c.id)}"${c.id === contratoId ? " selected" : ""}>${escapeHTML(c.numeroContrato)} — ${escapeHTML(c.empresa)}</option>`).join("");
+
+    renderRenovacao(selecionado);
   }
 
   document.getElementById("op-select-setor").addEventListener("change", (ev) => { setor = ev.target.value; contratoId = ""; atualizar(); });
@@ -5717,7 +5834,7 @@ async function carregarContratosPortal(portalSlug) {
 
   renderGerencialContratos(lista, resumo);
   renderTaticoContratos(lista);
-  renderOperacionalContratos(lista);
+  renderOperacionalContratos(lista, portalSlug);
   renderPorAreaContratos(lista);
 }
 
