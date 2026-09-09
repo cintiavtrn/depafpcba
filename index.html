@@ -5392,6 +5392,22 @@ function renderOperacionalContratos(lista, portalSlug) {
             novoValorGlobalAtual: decisaoAtual === "Já Renovado" && document.getElementById("renov-novo-valor").value !== "" ? +document.getElementById("renov-novo-valor").value : null,
           }),
         });
+        // Reportado direto: "eu atualizei um contrato... e não tá saindo da
+        // lista de contratos críticos". O acompanhamento salva certo, mas o
+        // contrato já vinha carregado (com o status de ANTES do save) tanto
+        // aqui quanto no alerta lá em cima — sem recarregar a página inteira,
+        // continuava mostrando o estado velho até alguém dar F5. Busca o
+        // contrato já reprocessado com a sobreposição nova e atualiza o
+        // MESMO objeto que está dentro de `lista` (Object.assign, não troca
+        // a referência) — como Gerencial/Tático/Por Área leem dessa mesma
+        // `lista` compartilhada, todos enxergam o dado novo na próxima vez
+        // que redesenharem, e o alerta é redesenhado JÁ AGORA, sem esperar.
+        try {
+          const contratoAtualizado = await apiFetch(`/api/portais/${portalSlug}/contratos/${contratoAlvo}`);
+          Object.assign(porId.get(contratoAlvo), contratoAtualizado);
+          const linhasDecisoes = await apiFetch(`/api/portais/${portalSlug}/contratos/renovacoes`);
+          renderAlertaVencimentoContratos(lista, porId, new Map(linhasDecisoes.map((r) => [r.contratoId, r])));
+        } catch { /* alerta só fica desatualizado até um F5 — não interrompe o save, que já funcionou */ }
         renderRenovacao(selecionado);
       } catch (erro) {
         status.textContent = "";
