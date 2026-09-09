@@ -4025,7 +4025,10 @@ function agruparPorQtdAditivos(lista) {
   }
   return [...mapa.entries()]
     .sort((a, b) => a[0] - b[0])
-    .map(([qtd, total]) => ({ label: `${qtd} aditivo${qtd === 1 ? "" : "s"}`, total }));
+    // `valor` carrega o número puro (0, 1, 2...) pra quem for filtrar por
+    // ele — `label` é só o texto pra tela, não dá pra "desfazer" o parse de
+    // "6 aditivos" com segurança se plural/singular mudar de regra um dia.
+    .map(([qtd, total]) => ({ label: `${qtd} aditivo${qtd === 1 ? "" : "s"}`, valor: qtd, total }));
 }
 
 function agruparTopContratosPorValor(lista, n = 10) {
@@ -4070,10 +4073,20 @@ function barraContagemHorizontalSVG(linhas, opcoes = {}) {
   const {
     maxRotulo = 24,
     formatarValor = (v) => v.toLocaleString("pt-BR"),
+    // Texto opcional escrito LOGO DEPOIS do valor formatado (ex.: "(25
+    // contratos)") — pedido direto: gráfico de valor (R$) sozinho obriga
+    // clicar pra saber a quantidade, e "as pessoas são preguiçosas e as
+    // reuniões são rápidas". Deixa a segunda informação já visível, sem
+    // precisar de outra função de formatação nem quebrar quem só passa
+    // formatarValor hoje.
+    rotuloExtra = null,
     tituloTooltip = (l) => `${l.label}: ${formatarValor(l.total)}`,
     selecionado = "",
   } = opcoes;
-  const padL = 170, padR = 44, padT = 6;
+  // Com rotuloExtra o texto depois da barra fica bem mais comprido (ex.:
+  // "R$ 37,9M (25 contratos)") — precisa de mais espaço reservado à direita
+  // pra não vazar pra fora do viewBox.
+  const padL = 170, padR = rotuloExtra ? 150 : 44, padT = 6;
   const larguraPlot = 250;
   const ALTURA_LINHA_TEXTO = 10, alturaBarra = 15;
   // Altura de linha FIXA não dava conta de rótulo comprido (nº do contrato +
@@ -4094,11 +4107,16 @@ function barraContagemHorizontalSVG(linhas, opcoes = {}) {
     const larg = maxTotal ? larguraPlot * (l.total / maxTotal) : 0;
     const dim = selecionado && selecionado !== l.label;
     const atributosContrato = l.id ? ` class="linha-contrato" data-contrato-id="${escapeAttr(l.id)}"` : "";
-    corpo += `<g data-cat="${escapeAttr(l.label)}"${atributosContrato} style="cursor:pointer" opacity="${dim ? 0.4 : 1}">`;
+    // Algumas categorias (Nº de Aditivos) precisam do valor NUMÉRICO puro pra
+    // filtrar, não do texto do rótulo ("6 aditivos") — data-valor carrega
+    // esse número quando a linha tem um.
+    const atributoValor = l.valor !== undefined ? ` data-valor="${escapeAttr(l.valor)}"` : "";
+    corpo += `<g data-cat="${escapeAttr(l.label)}"${atributoValor}${atributosContrato} style="cursor:pointer" opacity="${dim ? 0.4 : 1}">`;
     corpo += `<rect class="area-hit" x="0" y="${y.toFixed(1)}" width="${w}" height="${rowH}" fill="transparent" />`;
     corpo += textoSVG(l.label, padL - 8, y + rowH / 2, { maxChars: maxRotulo, anchor: "end", fontSize: 9, alturaLinha: ALTURA_LINHA_TEXTO, peso: selecionado === l.label ? 700 : 400 });
     corpo += `<rect x="${padL}" y="${yBarra.toFixed(1)}" width="${Math.max(larg, 1.5).toFixed(1)}" height="${alturaBarra}" fill="${corCategoria(i)}"><title>${escapeHTML(tituloTooltip(l))}</title></rect>`;
-    corpo += `<text x="${(padL + larg + 6).toFixed(1)}" y="${(yBarra + alturaBarra / 2 + 3.5).toFixed(1)}" font-family="monospace" font-size="9" font-weight="700" fill="var(--carvao)">${escapeHTML(formatarValor(l.total))}</text>`;
+    const textoValor = formatarValor(l.total) + (rotuloExtra ? ` ${rotuloExtra(l)}` : "");
+    corpo += `<text x="${(padL + larg + 6).toFixed(1)}" y="${(yBarra + alturaBarra / 2 + 3.5).toFixed(1)}" font-family="monospace" font-size="9" font-weight="700" fill="var(--carvao)">${escapeHTML(textoValor)}</text>`;
     corpo += `</g>`;
     y += rowH;
   });
@@ -4127,9 +4145,12 @@ function agruparValorPorCampo(lista, campoFn, rotuloVazio = "(não informado)") 
   for (const c of lista) {
     if (c.valorGlobalAtual == null) continue;
     const chave = campoFn(c) || rotuloVazio;
-    mapa.set(chave, (mapa.get(chave) || 0) + c.valorGlobalAtual);
+    if (!mapa.has(chave)) mapa.set(chave, { total: 0, qtd: 0 });
+    const g = mapa.get(chave);
+    g.total += c.valorGlobalAtual;
+    g.qtd += 1;
   }
-  return [...mapa.entries()].map(([label, total]) => ({ label, total })).sort((a, b) => b.total - a.total);
+  return [...mapa.entries()].map(([label, g]) => ({ label, total: g.total, qtd: g.qtd })).sort((a, b) => b.total - a.total);
 }
 
 // Gestor e Fiscal vêm da tabela relacional ContratoPessoa (um contrato pode
@@ -4497,7 +4518,7 @@ function abrirContratoNoOperacional(contratoId) {
   selContrato.value = contratoId;
   selContrato.dispatchEvent(new Event("change", { bubbles: true }));
   painel.querySelector('[data-subtab-contratos="operacional"]')?.click();
-  document.getElementById("contratos-sub-operacional")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  document.getElementById("contratos-sub-operacional")?.scrollIntoView?.({ behavior: "smooth", block: "start" });
 }
 
 function ligarTooltipLinhas(container, porId) {
@@ -4536,6 +4557,8 @@ function renderGerencialContratos(lista, resumo) {
   let filtroGestor = "";
   let filtroFiscal = "";
   let filtroStatusKpi = "";
+  let filtroAditivos = null; // número puro (0, 1, 2...) ou null — 0 é um filtro válido, não "vazio"
+  let filtroGarantia = false;
   let modoBarra = lerGraficoSalvo("cpg-gerencial-barra") || "proporcao";
 
   alvo.innerHTML = `
@@ -4598,7 +4621,7 @@ function renderGerencialContratos(lista, resumo) {
       </div>
       <div class="dash-chart-box">
         <h4>Distribuição de Contratos por Nº de Aditivos</h4>
-        <p class="dash-chart-hint">Quantos contratos têm 0, 1, 2... aditivos. Não é uma linha do tempo — pra isso precisaria da data de CADA aditivo, que a planilha ainda não traz.</p>
+        <p class="dash-chart-hint">Quantos contratos têm 0, 1, 2... aditivos. Não é uma linha do tempo — pra isso precisaria da data de CADA aditivo, que a planilha ainda não traz. Clique numa barra pra ver quais contratos são e o número do SEI de cada aditivo.</p>
         <div id="ger-aditivos"></div>
       </div>
     </div>
@@ -4647,37 +4670,75 @@ function renderGerencialContratos(lista, resumo) {
   // padrão vale agora pra tipo, analista, gestor e fiscal — pedido direto de
   // reunião: "ao clicar nos nomes, ver tudo que está sob responsabilidade
   // deles", não só a contagem.
+  // Clicar em QUALQUER coisa que filtra a página — cartão, gráfico, nome —
+  // volta a rolagem pro topo do Gerencial. Pedido direto: a pessoa clica no
+  // meio (ou no rodapé, bem lá embaixo) da página, o filtro isola tudo, mas
+  // os cartões recalculados e a tabela de resultado ficam lá em CIMA — sem
+  // isso, quem clicou no meio nem sabe que a filtragem "começa" ali.
+  function rolarParaTopoGerencial() {
+    // scrollIntoView não existe em todo ambiente (jsdom, por exemplo, nem
+    // implementa) — checagem defensiva pra um clique nunca quebrar por causa
+    // só da rolagem.
+    document.getElementById("contratos-sub-gerencial")?.scrollIntoView?.({ behavior: "smooth", block: "start" });
+  }
   function selecionarArea(area) {
     filtroArea = filtroArea === area ? "" : area;
     document.getElementById("ger-filtro-area").value = filtroArea;
     atualizar();
+    rolarParaTopoGerencial();
   }
   function selecionarTipo(tipo) {
     filtroTipo = filtroTipo === tipo ? "" : tipo;
     atualizar();
+    rolarParaTopoGerencial();
   }
   function selecionarAnalista(nome) {
     filtroAnalista = filtroAnalista === nome ? "" : nome;
     atualizar();
+    rolarParaTopoGerencial();
   }
   function selecionarGestor(nome) {
     filtroGestor = filtroGestor === nome ? "" : nome;
     atualizar();
+    rolarParaTopoGerencial();
   }
   function selecionarFiscal(nome) {
     filtroFiscal = filtroFiscal === nome ? "" : nome;
     atualizar();
+    rolarParaTopoGerencial();
   }
-  // Clique no cartão "Qtd Contratos Vencidos"/"A Vencer" é um filtro À PARTE
-  // dos de cima (não mexe em área/tipo/pessoa) — mas ENTRA na mesma tabela
-  // de resultado combinada lá embaixo.
+  // Nº de aditivos usa o VALOR numérico (data-valor), não o rótulo — "6" e
+  // "6 aditivos" têm que apontar pro mesmo filtro.
+  function selecionarAditivos(valor) {
+    filtroAditivos = filtroAditivos === valor ? null : valor;
+    atualizar();
+    rolarParaTopoGerencial();
+  }
+  function selecionarGarantia() {
+    filtroGarantia = !filtroGarantia;
+    atualizar();
+    rolarParaTopoGerencial();
+  }
+  // Clique no cartão "Qtd Contratos Vencidos"/"A Vencer"/"A Contratar" é um
+  // filtro À PARTE dos de cima (não mexe em área/tipo/pessoa) — mas ENTRA na
+  // mesma tabela de resultado combinada lá embaixo.
   function selecionarStatusKpi(status) {
     filtroStatusKpi = filtroStatusKpi === status ? "" : status;
     atualizar();
+    rolarParaTopoGerencial();
   }
   document.getElementById("ger-kpis").addEventListener("click", (ev) => {
     const card = ev.target.closest("[data-status]");
     if (card) selecionarStatusKpi(card.dataset.status);
+  });
+  // O rodapé (Qtd A Contratar, Contratos Garantia Exigida) fica lá embaixo
+  // da página — exatamente por isso esses dois cartões são os que mais
+  // precisavam virar clicáveis com o scroll-pro-topo.
+  document.getElementById("ger-rodape").addEventListener("click", (ev) => {
+    const cardStatus = ev.target.closest("[data-status]");
+    if (cardStatus) return selecionarStatusKpi(cardStatus.dataset.status);
+    const cardGarantia = ev.target.closest("[data-garantia]");
+    if (cardGarantia) return selecionarGarantia();
   });
   document.getElementById("ger-matriz").addEventListener("click", (ev) => {
     const tr = ev.target.closest("[data-cat]");
@@ -4711,6 +4772,10 @@ function renderGerencialContratos(lista, resumo) {
     const alvoClicado = ev.target.closest("[data-cat]");
     if (alvoClicado) selecionarFiscal(alvoClicado.dataset.cat);
   });
+  document.getElementById("ger-aditivos").addEventListener("click", (ev) => {
+    const alvoClicado = ev.target.closest("[data-valor]");
+    if (alvoClicado) selecionarAditivos(+alvoClicado.dataset.valor);
+  });
   document.getElementById("ger-matriz-baixar").addEventListener("click", () =>
     baixarTabelaComoImagem(document.getElementById("ger-matriz"), "cpg-contratos-detalhamento-area-gestora.png"));
 
@@ -4720,19 +4785,24 @@ function renderGerencialContratos(lista, resumo) {
       (!filtroTipo || (c.tipoObjeto || "(sem tipo)") === filtroTipo) &&
       (!filtroAnalista || (c.analista || "(sem analista)") === filtroAnalista) &&
       (!filtroGestor || (c.pessoas || []).some((p) => p.papel === "Gestor" && p.nomePessoa === filtroGestor)) &&
-      (!filtroFiscal || (c.pessoas || []).some((p) => p.papel === "Fiscal" && p.nomePessoa === filtroFiscal))
+      (!filtroFiscal || (c.pessoas || []).some((p) => p.papel === "Fiscal" && p.nomePessoa === filtroFiscal)) &&
+      (filtroAditivos === null || (c.qtdAditivos ?? 0) === filtroAditivos) &&
+      (!filtroGarantia || c.garantiaExigida === "Sim")
     );
 
     // Chips genéricos — um por filtro ativo, cada um sabe desligar a si
-    // mesmo. Cresceu de 2 pra 5 filtros possíveis (área, tipo, analista,
-    // gestor, fiscal) e repetir o bloco if/então 5 vezes ficaria ilegível;
-    // um array de {rotulo, limpar} escala sem repetição.
+    // mesmo. Cresceu de 2 pra 7 filtros possíveis (área, tipo, analista,
+    // gestor, fiscal, nº de aditivos, garantia) e repetir o bloco if/então 7
+    // vezes ficaria ilegível; um array de {rotulo, limpar} escala sem
+    // repetição.
     const chipsAtivos = [
       filtroArea && { rotulo: `área: ${filtroArea}`, limpar: () => selecionarArea(filtroArea) },
       filtroTipo && { rotulo: `tipo: ${filtroTipo}`, limpar: () => selecionarTipo(filtroTipo) },
       filtroAnalista && { rotulo: `analista: ${filtroAnalista}`, limpar: () => selecionarAnalista(filtroAnalista) },
       filtroGestor && { rotulo: `gestor: ${filtroGestor}`, limpar: () => selecionarGestor(filtroGestor) },
       filtroFiscal && { rotulo: `fiscal: ${filtroFiscal}`, limpar: () => selecionarFiscal(filtroFiscal) },
+      filtroAditivos !== null && { rotulo: `${filtroAditivos} aditivo${filtroAditivos === 1 ? "" : "s"}`, limpar: () => selecionarAditivos(filtroAditivos) },
+      filtroGarantia && { rotulo: `garantia exigida: Sim`, limpar: () => selecionarGarantia() },
     ].filter(Boolean);
     document.getElementById("ger-chip-filtro").innerHTML = chipsAtivos.length
       ? `<div class="filter-chips">${chipsAtivos.map((c, i) => `<span class="filter-chip">Isolando ${escapeHTML(c.rotulo)}<button type="button" data-chip-limpar="${i}" title="Remover este filtro">✕</button></span>`).join("")}</div>`
@@ -4766,14 +4836,19 @@ function renderGerencialContratos(lista, resumo) {
       </div>`;
 
     // Tabela combinada: aparece sempre que QUALQUER filtro de recorte estiver
-    // ativo (área, tipo, analista, gestor, fiscal — clicados direto no
-    // gráfico — ou o status Vencido/A Vencer, clicado no cartão). Pedido
-    // direto de reunião: "se eu clico e isolo, já quero ver os contratos",
-    // sem precisar mudar pra aba Operacional.
+    // ativo (área, tipo, analista, gestor, fiscal, nº de aditivos, garantia
+    // — clicados direto no gráfico — ou o status Vencido/A Vencer/A
+    // Contratar, clicado no cartão). Pedido direto de reunião: "se eu clico
+    // e isolo, já quero ver os contratos", sem precisar mudar pra aba
+    // Operacional.
     const partesTitulo = chipsAtivos.map((c) => c.rotulo);
-    if (filtroStatusKpi) partesTitulo.push(filtroStatusKpi === "Vencido" ? "vencidos" : "a vencer");
+    if (filtroStatusKpi) partesTitulo.push(filtroStatusKpi.toLowerCase());
     if (partesTitulo.length) {
       const contratosTabela = filtroStatusKpi ? filtrada.filter((c) => c.statusVigencia === filtroStatusKpi) : filtrada;
+      // Coluna extra só quando o filtro é justamente por Nº de Aditivos —
+      // é aí que a pergunta "qual é o número do SEI desse aditivo" faz
+      // sentido; nas outras tabelas seria uma coluna vazia poluindo à toa.
+      const colunaSei = filtroAditivos !== null;
       document.getElementById("ger-kpi-tabela").innerHTML = `
         <div class="dash-chart-box">
           <h4>Contratos — ${escapeHTML(partesTitulo.join(" · "))}</h4>
@@ -4782,10 +4857,10 @@ function renderGerencialContratos(lista, resumo) {
         </div>`;
       document.getElementById("ger-kpi-tabela-conteudo").innerHTML = contratosTabela.length
         ? `<table class="dash-tabela">
-            <thead><tr><th>Nº CONTRATO</th><th>ÁREA GESTORA</th><th>EMPRESA</th><th>DIAS PARA VENCER</th><th>CRITICIDADE</th></tr></thead>
+            <thead><tr><th>Nº CONTRATO</th><th>ÁREA GESTORA</th><th>EMPRESA</th><th>DIAS PARA VENCER</th><th>CRITICIDADE</th>${colunaSei ? "<th>SEI DOS ADITIVOS</th>" : ""}</tr></thead>
             <tbody>${contratosTabela.map((c) => `
               <tr class="linha-contrato" data-contrato-id="${escapeAttr(c.id)}">
-                <td>${escapeHTML(c.numeroContrato)}</td><td>${escapeHTML(c.unidadeGestora || "—")}</td><td>${escapeHTML(c.empresa)}</td><td class="num">${formatarDiasBR(c.diasParaVencer)}</td><td>${pillCriticidade(c.criticidade)}</td>
+                <td>${escapeHTML(c.numeroContrato)}</td><td>${escapeHTML(c.unidadeGestora || "—")}</td><td>${escapeHTML(c.empresa)}</td><td class="num">${formatarDiasBR(c.diasParaVencer)}</td><td>${pillCriticidade(c.criticidade)}</td>${colunaSei ? `<td>${(c.aditivos || []).map((a) => `${a.numeroAditivo}º: ${escapeHTML(a.processoSeiAditivo || "—")}`).join("<br>") || "—"}</td>` : ""}
               </tr>`).join("")}</tbody>
           </table>`
         : `<p class="tela-intro">Nenhum contrato nessa faixa.</p>`;
@@ -4804,12 +4879,22 @@ function renderGerencialContratos(lista, resumo) {
     });
     document.getElementById("ger-valor-area").innerHTML = barraContagemHorizontalSVG(
       agruparValorPorCampo(filtrada, (c) => c.unidadeGestora, "(sem unidade)"),
-      { formatarValor: (v) => "R$ " + formatarEixo(v), tituloTooltip: (l) => `${l.label}: ${formatarMoedaBR(l.total)}`, selecionado: filtroArea }
+      {
+        formatarValor: (v) => "R$ " + formatarEixo(v),
+        rotuloExtra: (l) => `(${l.qtd} contrato${l.qtd === 1 ? "" : "s"})`,
+        tituloTooltip: (l) => `${l.label}: ${formatarMoedaBR(l.total)} — ${l.qtd} contrato${l.qtd === 1 ? "" : "s"}`,
+        selecionado: filtroArea,
+      }
     );
     document.getElementById("ger-tipo").innerHTML = barraTipoObjetoSVG(agruparPorTipoObjeto(filtrada), filtroTipo);
     document.getElementById("ger-valor-tipo").innerHTML = barraContagemHorizontalSVG(
       agruparValorPorCampo(filtrada, (c) => c.tipoObjeto, "(sem tipo)"),
-      { formatarValor: (v) => "R$ " + formatarEixo(v), tituloTooltip: (l) => `${l.label}: ${formatarMoedaBR(l.total)}`, selecionado: filtroTipo }
+      {
+        formatarValor: (v) => "R$ " + formatarEixo(v),
+        rotuloExtra: (l) => `(${l.qtd} contrato${l.qtd === 1 ? "" : "s"})`,
+        tituloTooltip: (l) => `${l.label}: ${formatarMoedaBR(l.total)} — ${l.qtd} contrato${l.qtd === 1 ? "" : "s"}`,
+        selecionado: filtroTipo,
+      }
     );
     document.getElementById("ger-analista").innerHTML = barraContagemHorizontalSVG(
       agruparContagemPorCampo(filtrada, (c) => c.analista, "(sem analista)"),
@@ -4856,11 +4941,11 @@ function renderGerencialContratos(lista, resumo) {
     // com "isto é um extra que a gente achou que ajudava".
     document.getElementById("ger-rodape").innerHTML = `
       <div class="kpi-card" style="--kpi-cor:var(--crit-baixo)"><div class="kpi-label">% Contratos Baixo</div><div class="kpi-value">${pctBaixo.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}%</div></div>
-      <div class="kpi-card" style="--kpi-cor:var(--crit-neutro)"><div class="kpi-label">Qtd A Contratar</div><div class="kpi-value">${qtdAContratar.toLocaleString("pt-BR")}</div></div>
+      <div class="kpi-card kpi-clicavel" data-status="A Contratar" title="Clique pra ver quais são" style="--kpi-cor:var(--crit-neutro);cursor:pointer;${filtroStatusKpi === "A Contratar" ? "outline:2px solid var(--crit-neutro);outline-offset:-2px" : ""}"><div class="kpi-label">Qtd A Contratar</div><div class="kpi-value">${qtdAContratar.toLocaleString("pt-BR")}</div></div>
       <div class="kpi-card"><div class="kpi-label">Qtd Total de Aditivos</div><div class="kpi-value">${qtdTotalAditivos.toLocaleString("pt-BR")}</div></div>
       <div class="kpi-card"><div class="kpi-label">Média de Aditivos / Contrato</div><div class="kpi-value">${mediaAditivos.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}</div></div>
       <div class="kpi-card"><div class="kpi-label">% com Garantia Exigida</div><div class="kpi-value">${pctGarantia === null ? "—" : pctGarantia.toLocaleString("pt-BR", { maximumFractionDigits: 1 }) + "%"}</div></div>
-      <div class="kpi-card"><div class="kpi-label">Contratos Garantia Exigida</div><div class="kpi-value">${qtdGarantiaExigida.toLocaleString("pt-BR")}</div></div>`;
+      <div class="kpi-card kpi-clicavel" data-garantia="Sim" title="Clique pra ver quais são" style="cursor:pointer;${filtroGarantia ? "outline:2px solid var(--carvao);outline-offset:-2px" : ""}"><div class="kpi-label">Contratos Garantia Exigida</div><div class="kpi-value">${qtdGarantiaExigida.toLocaleString("pt-BR")}</div></div>`;
   }
 
   document.getElementById("ger-filtro-area").addEventListener("change", (ev) => { filtroArea = ev.target.value; atualizar(); });
