@@ -5445,8 +5445,15 @@ function renderOperacionalContratos(lista, portalSlug) {
           const contratoAtualizado = await apiFetch(`/api/portais/${portalSlug}/contratos/${contratoAlvo}`);
           Object.assign(porId.get(contratoAlvo), contratoAtualizado);
           const linhasDecisoes = await apiFetch(`/api/portais/${portalSlug}/contratos/renovacoes`);
-          renderAlertaVencimentoContratos(lista, porId, new Map(linhasDecisoes.map((r) => [r.contratoId, r])));
-        } catch { /* alerta só fica desatualizado até um F5 — não interrompe o save, que já funcionou */ }
+          const decisoesAtualizadas = new Map(linhasDecisoes.map((r) => [r.contratoId, r]));
+          renderAlertaVencimentoContratos(lista, porId, decisoesAtualizadas);
+          // "Atualizados Recentemente" — pedido direto: confirmar que ficou
+          // registrado que ELA mexeu naquele contrato, mesmo quando ele some
+          // do alerta (porque a nova data resolveu de verdade e ele deixou
+          // de ser urgente) — sem isso, o único jeito de conferir seria
+          // reabrir cada contrato um por um no Operacional.
+          renderAtualizadosRecentemente(lista, decisoesAtualizadas);
+        } catch { /* alerta/lista só ficam desatualizados até um F5 — não interrompe o save, que já funcionou */ }
         renderRenovacao(selecionado);
       } catch (erro) {
         status.textContent = "";
@@ -6035,15 +6042,17 @@ async function carregarContratosPortal(portalSlug) {
       <button class="tab-btn" data-subtab-contratos="tatico">TÁTICO</button>
       <button class="tab-btn" data-subtab-contratos="operacional">OPERACIONAL</button>
       <button class="tab-btn" data-subtab-contratos="porarea">POR ÁREA GESTORA</button>
+      <button class="tab-btn" data-subtab-contratos="atualizados">ATUALIZADOS RECENTEMENTE</button>
     </div>
     <div class="tab-panel" id="contratos-sub-gerencial"></div>
     <div class="tab-panel" id="contratos-sub-tatico" hidden></div>
     <div class="tab-panel" id="contratos-sub-operacional" hidden></div>
     <div class="tab-panel" id="contratos-sub-porarea" hidden></div>
+    <div class="tab-panel" id="contratos-sub-atualizados" hidden></div>
   `;
   renderAlertaVencimentoContratos(lista, new Map(lista.map((c) => [c.id, c])), decisoesRenovacao);
 
-  const SUBABAS_CONTRATOS = ["gerencial", "tatico", "operacional", "porarea"];
+  const SUBABAS_CONTRATOS = ["gerencial", "tatico", "operacional", "porarea", "atualizados"];
   painel.querySelectorAll("[data-subtab-contratos]").forEach((btn) => {
     btn.addEventListener("click", () => {
       painel.querySelectorAll("[data-subtab-contratos]").forEach((b) => b.classList.remove("active"));
@@ -6057,6 +6066,57 @@ async function carregarContratosPortal(portalSlug) {
   renderTaticoContratos(lista);
   renderOperacionalContratos(lista, portalSlug);
   renderPorAreaContratos(lista);
+  renderAtualizadosRecentemente(lista, decisoesRenovacao);
+}
+
+// "Atualizados Recentemente" — pedido direto: depois de marcar a renovação
+// de um contrato (Galtrans, Toccato...), ela queria um jeito de CONFIRMAR
+// que ficou registrado — sem precisar lembrar qual contrato mexeu ou torcer
+// pra ele ainda aparecer no alerta (que, se a nova data resolveu de
+// verdade, some de lá — não é mais "urgente" nenhum, mas ela ainda quer ver
+// que foi ela quem atualizou). Lista TODO contrato com QUALQUER
+// acompanhamento registrado, do mais recente pro mais antigo — não só
+// "Já Renovado", qualquer decisão ou trâmite marcado conta como "mexi
+// nisso".
+function renderAtualizadosRecentemente(lista, decisoesRenovacao) {
+  const alvo = document.getElementById("contratos-sub-atualizados");
+  if (!alvo) return;
+  const porId = new Map(lista.map((c) => [c.id, c]));
+  const linhas = [...decisoesRenovacao.values()]
+    .filter((a) => a.criadoEm && porId.has(a.contratoId))
+    .sort((a, b) => new Date(b.atualizadoEm) - new Date(a.atualizadoEm));
+
+  if (!linhas.length) {
+    alvo.innerHTML = `<p class="tela-intro">Nenhum contrato foi atualizado ainda — marque uma decisão de renovação em algum contrato (aba Operacional, seção "Acompanhamento de Renovação") pra ele aparecer aqui.</p>`;
+    return;
+  }
+
+  alvo.innerHTML = `
+    <div class="dash-chart-box">
+      <h4>Contratos com Acompanhamento de Renovação</h4>
+      <p class="dash-chart-hint">${linhas.length} contrato${linhas.length === 1 ? "" : "s"} com algo registrado — do mais recente pro mais antigo. Passe o mouse numa linha pra ver o detalhe rápido — clique pra abrir o panorama completo.</p>
+      <div class="tabela-rolavel" style="max-height:480px" id="atualizados-tabela"></div>
+    </div>`;
+
+  document.getElementById("atualizados-tabela").innerHTML = `
+    <table class="dash-tabela">
+      <thead><tr><th>Nº CONTRATO</th><th>ÁREA GESTORA</th><th>EMPRESA</th><th>DECISÃO</th><th>RESPONSÁVEL</th><th>TRÂMITES</th><th>ATUALIZADO EM</th></tr></thead>
+      <tbody>${linhas.map((a) => {
+        const c = porId.get(a.contratoId);
+        const concluidos = (a.tramites || []).filter((t) => t.concluido).length;
+        return `
+          <tr class="linha-contrato" data-contrato-id="${escapeAttr(c.id)}">
+            <td>${escapeHTML(c.numeroContrato)}${badgeRenovado(c)}</td>
+            <td>${escapeHTML(c.unidadeGestora || "—")}</td>
+            <td>${escapeHTML(c.empresa)}</td>
+            <td>${escapeHTML(a.decisao || "—")}</td>
+            <td>${escapeHTML(a.responsavel || "—")}</td>
+            <td class="num">${(a.tramites || []).length ? `${concluidos} de ${a.tramites.length}` : "—"}</td>
+            <td>${new Date(a.atualizadoEm).toLocaleString("pt-BR")}</td>
+          </tr>`;
+      }).join("")}</tbody>
+    </table>`;
+  ligarTooltipLinhas(document.getElementById("atualizados-tabela"), porId);
 }
 
 async function abrirTela(id) {
