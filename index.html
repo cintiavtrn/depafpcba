@@ -5592,21 +5592,49 @@ function renderResumoRapido(lista, resumo) {
     <div class="dash-chart-box" style="margin-bottom:16px">
       <h4>Resumo Rápido</h4>
       <div class="kpi-row">
-        <div class="kpi-card"><div class="kpi-label">Qtd Contratos</div><div class="kpi-value">${resumo.qtdContratos.toLocaleString("pt-BR")}</div></div>
-        <div class="kpi-card"><div class="kpi-label">Valor Atual Total</div><div class="kpi-value">R$ ${formatarEixo(resumo.valorGlobalAtualTotal)}</div><div class="kpi-valor-exato">${formatarMoedaBR(resumo.valorGlobalAtualTotal)}</div></div>
-        <div class="kpi-card" style="--kpi-cor:var(--crit-vencido)"><div class="kpi-label">Vencidos</div><div class="kpi-value">${resumo.qtdVencidos.toLocaleString("pt-BR")}</div></div>
-        <div class="kpi-card" style="--kpi-cor:var(--crit-alto)"><div class="kpi-label">A Vencer (≤90 dias)</div><div class="kpi-value">${resumo.qtdAVencer.toLocaleString("pt-BR")}</div></div>
+        <div class="kpi-card kpi-clicavel" data-resumo-ir="gerencial" title="Clique pra ver o detalhamento completo" style="cursor:pointer"><div class="kpi-label">Qtd Contratos</div><div class="kpi-value">${resumo.qtdContratos.toLocaleString("pt-BR")}</div></div>
+        <div class="kpi-card kpi-clicavel" data-resumo-ir="gerencial" title="Clique pra ver o detalhamento completo" style="cursor:pointer"><div class="kpi-label">Valor Atual Total</div><div class="kpi-value">R$ ${formatarEixo(resumo.valorGlobalAtualTotal)}</div><div class="kpi-valor-exato">${formatarMoedaBR(resumo.valorGlobalAtualTotal)}</div></div>
+        <div class="kpi-card kpi-clicavel" data-resumo-status="Vencido" title="Clique pra ver quais são" style="--kpi-cor:var(--crit-vencido);cursor:pointer"><div class="kpi-label">Vencidos</div><div class="kpi-value">${resumo.qtdVencidos.toLocaleString("pt-BR")}</div></div>
+        <div class="kpi-card kpi-clicavel" data-resumo-status="A Vencer" title="Clique pra ver quais são" style="--kpi-cor:var(--crit-alto);cursor:pointer"><div class="kpi-label">A Vencer (≤90 dias)</div><div class="kpi-value">${resumo.qtdAVencer.toLocaleString("pt-BR")}</div></div>
       </div>
-      <p class="dash-chart-hint" style="margin:14px 0 6px">Onde mais se gasta (top 3 áreas gestoras por valor):</p>
+      <p class="dash-chart-hint" style="margin:14px 0 6px">Onde mais se gasta (top 3 áreas gestoras por valor) — clique pra abrir o perfil completo da área:</p>
       <div class="kpi-row" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr))">
         ${top3Areas.map((a) => `
-          <div class="kpi-card">
+          <div class="kpi-card kpi-clicavel" data-resumo-area="${escapeAttr(a.label)}" title="Clique pra ver o perfil completo desta área" style="cursor:pointer">
             <div class="kpi-label">${escapeHTML(a.label)}</div>
             <div class="kpi-value" style="font-size:var(--fs-subtitulo)">R$ ${formatarEixo(a.total)}</div>
             <div class="kpi-valor-exato">${formatarMoedaBR(a.total)} · ${a.qtd} contrato${a.qtd === 1 ? "" : "s"}</div>
           </div>`).join("")}
       </div>
     </div>`;
+
+  // Pedido direto: "só faltou tornar isso clicável também como os outros
+  // que abre e dá pra ver detalhes, gráficos, divisões... aí só os cartões
+  // puros" — os cartões de status abrem o Gerencial já filtrado (mesmo
+  // mecanismo dos cartões "Qtd Contratos Vencidos"/"A Vencer" que já
+  // existem lá dentro); os de área abrem o perfil completo dela em "Por
+  // Área Gestora" (gráficos, divisões temáticas, tudo). Os dois primeiros
+  // (Qtd Contratos/Valor Atual) não têm um filtro óbvio pra isolar — levam
+  // pro Gerencial, onde o detalhamento inteiro já está.
+  alvo.addEventListener("click", (ev) => {
+    const cardIr = ev.target.closest("[data-resumo-ir]");
+    if (cardIr) {
+      document.querySelector('[data-subtab-contratos="gerencial"]')?.click();
+      return;
+    }
+    const cardStatus = ev.target.closest("[data-resumo-status]");
+    if (cardStatus) {
+      document.querySelector('[data-subtab-contratos="gerencial"]')?.click();
+      document.querySelector(`#ger-kpis [data-status="${CSS.escape(cardStatus.dataset.resumoStatus)}"]`)?.dispatchEvent(new Event("click", { bubbles: true }));
+      return;
+    }
+    const cardArea = ev.target.closest("[data-resumo-area]");
+    if (cardArea) {
+      document.querySelector('[data-subtab-contratos="porarea"]')?.click();
+      const sel = document.getElementById("area-select");
+      if (sel) { sel.value = cardArea.dataset.resumoArea; sel.dispatchEvent(new Event("change", { bubbles: true })); }
+    }
+  });
 }
 
 // Alerta de vencimento, logo ao abrir a página — pedido direto: hoje só dá
@@ -6129,7 +6157,6 @@ async function carregarContratosPortal(portalSlug) {
     <div class="tab-panel" id="contratos-sub-porcategoria" hidden></div>
     <div class="tab-panel" id="contratos-sub-atualizados" hidden></div>
   `;
-  renderResumoRapido(lista, resumo);
   renderAlertaVencimentoContratos(lista, new Map(lista.map((c) => [c.id, c])), decisoesRenovacao);
 
   const SUBABAS_CONTRATOS = ["gerencial", "tatico", "operacional", "porarea", "porcategoria", "atualizados"];
@@ -6148,6 +6175,12 @@ async function carregarContratosPortal(portalSlug) {
   renderPorAreaContratos(lista);
   renderPorCategoriaContratos(lista);
   renderAtualizadosRecentemente(lista, decisoesRenovacao);
+  // Depois de Gerencial/Por Área já existirem no DOM — os cliques do Resumo
+  // Rápido disparam eventos em cima dos elementos DELES (cartão de status,
+  // <select> de área), então eles precisam estar montados primeiro. A
+  // posição na tela não muda (o container já está lá em cima desde o
+  // template inicial); só QUANDO ele é preenchido é que muda.
+  renderResumoRapido(lista, resumo);
 }
 
 // "Atualizados Recentemente" — pedido direto: depois de marcar a renovação
