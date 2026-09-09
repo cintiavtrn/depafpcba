@@ -4083,10 +4083,16 @@ function barraContagemHorizontalSVG(linhas, opcoes = {}) {
     tituloTooltip = (l) => `${l.label}: ${formatarValor(l.total)}`,
     selecionado = "",
   } = opcoes;
-  // Com rotuloExtra o texto depois da barra fica bem mais comprido (ex.:
-  // "R$ 37,9M (25 contratos)") — precisa de mais espaço reservado à direita
-  // pra não vazar pra fora do viewBox.
-  const padL = 170, padR = rotuloExtra ? 150 : 44, padT = 6;
+  // padR reservava um número fixo de pixels (44, ou 150 com rotuloExtra) —
+  // verificação com dado real (área DGTI, "R$ 10,3M") mostrou que um valor
+  // fixo vaza: 8 caracteres em negrito mono já passam de 44px. Em vez de
+  // chutar outro número fixo, mede o texto mais largo que essa lista de
+  // linhas vai realmente desenhar (mesmo cálculo usado no gráfico por mês) e
+  // reserva exatamente isso + a folga de 6px entre a barra e o texto.
+  const padL = 170;
+  const maiorTextoValor = Math.max(0, ...linhas.map((l) => larguraTextoMonoAprox(formatarValor(l.total) + (rotuloExtra ? ` ${rotuloExtra(l)}` : ""), 9, true)));
+  const padR = Math.max(44, maiorTextoValor + 10);
+  const padT = 6;
   const larguraPlot = 250;
   const ALTURA_LINHA_TEXTO = 10, alturaBarra = 15;
   // Altura de linha FIXA não dava conta de rótulo comprido (nº do contrato +
@@ -4521,6 +4527,25 @@ function abrirContratoNoOperacional(contratoId) {
   document.getElementById("contratos-sub-operacional")?.scrollIntoView?.({ behavior: "smooth", block: "start" });
 }
 
+// Tabela de contratos compartilhada — mesma estrutura usada em toda tela do
+// CPG que precisa listar "quais contratos são estes" (Gerencial, e agora o
+// perfil por Área Gestora): número, área, empresa, dias pra vencer,
+// criticidade, e opcionalmente o número do SEI de cada aditivo (só faz
+// sentido quando o recorte é justamente "por Nº de Aditivos"). Devolve só o
+// HTML — quem chama ainda decide onde colocar e roda ligarTooltipLinhas()
+// depois de inserir no documento.
+function tabelaContratosHTML(lista, opcoes = {}) {
+  const { comSei = false } = opcoes;
+  if (!lista.length) return `<p class="tela-intro">Nenhum contrato nessa faixa.</p>`;
+  return `<table class="dash-tabela">
+      <thead><tr><th>Nº CONTRATO</th><th>ÁREA GESTORA</th><th>EMPRESA</th><th>DIAS PARA VENCER</th><th>CRITICIDADE</th>${comSei ? "<th>SEI DOS ADITIVOS</th>" : ""}</tr></thead>
+      <tbody>${lista.map((c) => `
+        <tr class="linha-contrato" data-contrato-id="${escapeAttr(c.id)}">
+          <td>${escapeHTML(c.numeroContrato)}</td><td>${escapeHTML(c.unidadeGestora || "—")}</td><td>${escapeHTML(c.empresa)}</td><td class="num">${formatarDiasBR(c.diasParaVencer)}</td><td>${pillCriticidade(c.criticidade)}</td>${comSei ? `<td>${(c.aditivos || []).map((a) => `${a.numeroAditivo}º: ${escapeHTML(a.processoSeiAditivo || "—")}`).join("<br>") || "—"}</td>` : ""}
+        </tr>`).join("")}</tbody>
+    </table>`;
+}
+
 function ligarTooltipLinhas(container, porId) {
   const tooltip = tooltipContratoEl();
   container.querySelectorAll(".linha-contrato").forEach((tr) => {
@@ -4855,15 +4880,7 @@ function renderGerencialContratos(lista, resumo) {
           <p class="dash-chart-hint">Passe o mouse numa linha pra ver o detalhe rápido — clique pra abrir o panorama completo do contrato.</p>
           <div id="ger-kpi-tabela-conteudo" class="tabela-rolavel" style="max-height:320px"></div>
         </div>`;
-      document.getElementById("ger-kpi-tabela-conteudo").innerHTML = contratosTabela.length
-        ? `<table class="dash-tabela">
-            <thead><tr><th>Nº CONTRATO</th><th>ÁREA GESTORA</th><th>EMPRESA</th><th>DIAS PARA VENCER</th><th>CRITICIDADE</th>${colunaSei ? "<th>SEI DOS ADITIVOS</th>" : ""}</tr></thead>
-            <tbody>${contratosTabela.map((c) => `
-              <tr class="linha-contrato" data-contrato-id="${escapeAttr(c.id)}">
-                <td>${escapeHTML(c.numeroContrato)}</td><td>${escapeHTML(c.unidadeGestora || "—")}</td><td>${escapeHTML(c.empresa)}</td><td class="num">${formatarDiasBR(c.diasParaVencer)}</td><td>${pillCriticidade(c.criticidade)}</td>${colunaSei ? `<td>${(c.aditivos || []).map((a) => `${a.numeroAditivo}º: ${escapeHTML(a.processoSeiAditivo || "—")}`).join("<br>") || "—"}</td>` : ""}
-              </tr>`).join("")}</tbody>
-          </table>`
-        : `<p class="tela-intro">Nenhum contrato nessa faixa.</p>`;
+      document.getElementById("ger-kpi-tabela-conteudo").innerHTML = tabelaContratosHTML(contratosTabela, { comSei: colunaSei });
       ligarTooltipLinhas(document.getElementById("ger-kpi-tabela-conteudo"), porId);
     } else {
       document.getElementById("ger-kpi-tabela").innerHTML = "";
@@ -5201,6 +5218,311 @@ function dicaLeituraContratosHTML() {
     </details>`;
 }
 
+// ---------- Por Área Gestora: "perfil" de uma área, à la SEI Municípios ----------
+// Mesmo princípio do SEI Municípios (seleciona um município, cai num perfil
+// com abas temáticas: Educação, Saúde...): aqui a "entidade" é a área
+// gestora, e as abas temáticas são Visão Geral / Prazos e Vencimentos /
+// Financeiro / Pessoas. Reaproveita quase toda função de gráfico que já
+// existe no Gerencial — a única diferença é que aqui elas sempre recebem a
+// lista JÁ FILTRADA pra uma área só, e a apresentação vira "perfil" em vez
+// de portfólio inteiro.
+function renderPorAreaContratos(lista) {
+  const alvo = document.getElementById("contratos-sub-porarea");
+  const porId = new Map(lista.map((c) => [c.id, c]));
+  const areasDisponiveis = [...new Set(lista.map((c) => c.unidadeGestora || "(sem unidade)"))].sort();
+  let areaSelecionada = "";
+  let filtroAditivosArea = null;
+  let filtroPessoaArea = null; // { tipo: "analista"|"gestor"|"fiscal", nome }
+  let modoMesArea = "colunas";
+
+  alvo.innerHTML = `
+    <div class="dash-filtros">
+      <div class="dash-filtro" style="flex:1;min-width:280px">
+        <label>SELECIONE A ÁREA GESTORA</label>
+        <select id="area-select"><option value="">— Escolha uma área —</option>${areasDisponiveis.map((a) => `<option value="${escapeAttr(a)}">${escapeHTML(a)}</option>`).join("")}</select>
+      </div>
+      <div class="dash-filtro" style="flex:1;min-width:280px">
+        <label>BUSCAR (Nº, EMPRESA, OBJETO, VALOR, DATA, ÁREA, ANALISTA, GESTOR, FISCAL...)</label>
+        <input type="text" id="area-busca" placeholder="Digite qualquer parte do que lembrar..." />
+      </div>
+    </div>
+    <div id="area-busca-resultado"></div>
+    <div id="area-landing"></div>
+    <div id="area-perfil" hidden>
+      <div class="dash-chart-box" id="area-cabecalho" style="margin-bottom:16px"></div>
+      <div class="tabs" style="margin-bottom:0">
+        <button class="tab-btn active" data-subtab-area="visao">VISÃO GERAL</button>
+        <button class="tab-btn" data-subtab-area="prazos">PRAZOS E VENCIMENTOS</button>
+        <button class="tab-btn" data-subtab-area="financeiro">FINANCEIRO</button>
+        <button class="tab-btn" data-subtab-area="pessoas">PESSOAS</button>
+      </div>
+      <div class="tab-panel" id="area-sub-visao"></div>
+      <div class="tab-panel" id="area-sub-prazos" hidden></div>
+      <div class="tab-panel" id="area-sub-financeiro" hidden></div>
+      <div class="tab-panel" id="area-sub-pessoas" hidden></div>
+    </div>
+  `;
+
+  ligarBuscaContratos(lista, porId, "area-busca", "area-busca-resultado");
+
+  const SUBABAS_AREA = ["visao", "prazos", "financeiro", "pessoas"];
+  alvo.querySelectorAll("[data-subtab-area]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      alvo.querySelectorAll("[data-subtab-area]").forEach((b) => b.classList.remove("active"));
+      btn.classList.add("active");
+      const nomeAba = btn.dataset.subtabArea;
+      SUBABAS_AREA.forEach((nome) => { document.getElementById(`area-sub-${nome}`).hidden = nomeAba !== nome; });
+    });
+  });
+
+  function selecionarArea(area) {
+    areaSelecionada = area;
+    document.getElementById("area-select").value = area;
+    filtroAditivosArea = null;
+    filtroPessoaArea = null;
+    atualizar();
+    alvo.scrollIntoView?.({ behavior: "smooth", block: "start" });
+  }
+  document.getElementById("area-select").addEventListener("change", (ev) => selecionarArea(ev.target.value));
+
+  // Landing (nenhuma área escolhida ainda): grade com TODAS as áreas de uma
+  // vez, qtd de contrato e valor — o equivalente ao mapa/lista de municípios
+  // do SEI antes de escolher um. Clicar num cartão também seleciona.
+  function renderLanding() {
+    const porArea = agruparPorAreaCriticidade(lista);
+    const valorPorArea = new Map(agruparValorPorCampo(lista, (c) => c.unidadeGestora, "(sem unidade)").map((l) => [l.label, l]));
+    document.getElementById("area-landing").innerHTML = `
+      <p class="dash-chart-hint">Escolha uma área gestora (no campo acima, ou clicando num cartão abaixo) pra ver o perfil completo dela — vencimentos, financeiro, pessoas.</p>
+      <div class="kpi-row" style="grid-template-columns:repeat(auto-fill,minmax(200px,1fr));margin-top:10px" id="area-cards"></div>
+    `;
+    document.getElementById("area-cards").innerHTML = porArea.map((l) => {
+      const v = valorPorArea.get(l.label);
+      const piorCrit = CRITICIDADE_VISUAL.find((cv) => l.porCrit[cv.label] > 0);
+      return `<div class="kpi-card" data-area-card="${escapeAttr(l.label)}" style="cursor:pointer;--kpi-cor:${piorCrit ? piorCrit.cor : "var(--carvao)"}">
+        <div class="kpi-label">${escapeHTML(l.label)}</div>
+        <div class="kpi-value" style="font-size:var(--fs-subtitulo)">${l.total} contrato${l.total === 1 ? "" : "s"}</div>
+        <div class="font-mono" style="font-size:var(--fs-ui-sm);color:#8B93A3">${v ? formatarMoedaBR(v.total) : "—"}</div>
+      </div>`;
+    }).join("");
+    document.getElementById("area-cards").querySelectorAll("[data-area-card]").forEach((card) => {
+      card.addEventListener("click", () => selecionarArea(card.dataset.areaCard));
+    });
+  }
+
+  function renderCabecalho(listaArea) {
+    const valorAtual = listaArea.reduce((a, c) => a + (c.valorGlobalAtual || 0), 0);
+    const qtdVencidos = listaArea.filter((c) => c.statusVigencia === "Vencido").length;
+    document.getElementById("area-cabecalho").innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px">
+        <div>
+          <h4 style="margin-bottom:2px">${escapeHTML(areaSelecionada)}</h4>
+          <p class="font-mono" style="font-size:var(--fs-ui-sm);color:#8B93A3">${listaArea.length} contrato(s) · ${formatarMoedaBR(valorAtual)} em valor atual${qtdVencidos ? ` · ${qtdVencidos} vencido(s)` : ""}</p>
+        </div>
+        <button type="button" class="dash-toggle-btn" id="area-trocar">← TROCAR DE ÁREA</button>
+      </div>`;
+    document.getElementById("area-trocar").addEventListener("click", () => selecionarArea(""));
+  }
+
+  function renderVisaoGeral(listaArea) {
+    const qtdVencidos = listaArea.filter((c) => c.statusVigencia === "Vencido").length;
+    const qtdAVencer = listaArea.filter((c) => c.statusVigencia === "A Vencer").length;
+    const qtdAContratar = listaArea.filter((c) => c.statusVigencia === "A Contratar").length;
+    const valorAtual = listaArea.reduce((a, c) => a + (c.valorGlobalAtual || 0), 0);
+    document.getElementById("area-sub-visao").innerHTML = `
+      <div class="kpi-row" style="margin-bottom:16px">
+        <div class="kpi-card"><div class="kpi-label">Qtd Contratos</div><div class="kpi-value">${listaArea.length.toLocaleString("pt-BR")}</div></div>
+        <div class="kpi-card" style="--kpi-cor:var(--crit-vencido)"><div class="kpi-label">Vencidos</div><div class="kpi-value">${qtdVencidos.toLocaleString("pt-BR")}</div></div>
+        <div class="kpi-card" style="--kpi-cor:var(--crit-alto)"><div class="kpi-label">A Vencer</div><div class="kpi-value">${qtdAVencer.toLocaleString("pt-BR")}</div></div>
+        <div class="kpi-card" style="--kpi-cor:var(--crit-neutro)"><div class="kpi-label">A Contratar</div><div class="kpi-value">${qtdAContratar.toLocaleString("pt-BR")}</div></div>
+        <div class="kpi-card"><div class="kpi-label">Valor Atual Total</div><div class="kpi-value">R$ ${formatarEixo(valorAtual)}</div></div>
+      </div>
+      <div class="dash-chart-box">
+        <h4>Detalhamento dos Contratos</h4>
+        <p class="dash-chart-hint">Passe o mouse numa linha pra ver o detalhe rápido — clique pra abrir o panorama completo do contrato.</p>
+        <div id="area-visao-tabela" class="tabela-rolavel" style="max-height:360px"></div>
+      </div>`;
+    document.getElementById("area-visao-tabela").innerHTML = tabelaContratosHTML(listaArea);
+    ligarTooltipLinhas(document.getElementById("area-visao-tabela"), porId);
+  }
+
+  function renderPrazos(listaArea) {
+    document.getElementById("area-sub-prazos").innerHTML = `
+      <div class="dash-chart-box">
+        <h4>Contratos por Vencimento e Criticidade</h4>
+        <div class="linha-troca-grafico"><div class="dash-toggle" id="area-mes-toggle">
+          <button class="dash-toggle-btn" data-modo="colunas" title="Compara o total de cada mês">COLUNAS</button>
+          <button class="dash-toggle-btn" data-modo="gantt" title="Mostra a vigência de cada contrato numa linha do tempo">GANTT</button>
+        </div></div>
+        <div id="area-grafico-mes"></div>
+      </div>`;
+    function desenharMes() {
+      const container = document.getElementById("area-grafico-mes");
+      if (modoMesArea === "gantt") {
+        container.innerHTML = ganttContratosSVG(listaArea).svg;
+        ligarTooltipLinhas(container, porId);
+      } else {
+        container.innerHTML = colunaCriticidadeEmpilhadaSVG(agruparPorMesCriticidade(listaArea));
+      }
+      adicionarControlesGrafico(container);
+      document.querySelectorAll("#area-mes-toggle [data-modo]").forEach((btn) => {
+        btn.classList.toggle("active", btn.dataset.modo === modoMesArea);
+      });
+    }
+    desenharMes();
+    document.getElementById("area-mes-toggle").addEventListener("click", (ev) => {
+      const btn = ev.target.closest("[data-modo]");
+      if (!btn || btn.dataset.modo === modoMesArea) return;
+      modoMesArea = btn.dataset.modo;
+      desenharMes();
+    });
+  }
+
+  function renderFinanceiro(listaArea) {
+    document.getElementById("area-sub-financeiro").innerHTML = `
+      <div class="dash-charts" style="grid-template-columns:1fr 1fr">
+        <div class="dash-chart-box">
+          <h4>Valor por Tipo de Objeto</h4>
+          <div id="area-valor-tipo"></div>
+        </div>
+        <div class="dash-chart-box">
+          <h4>Top 10 Maiores Contratos (Valor Atual)</h4>
+          <p class="dash-chart-hint">Passe o mouse numa barra pra ver o detalhe rápido — clique pra abrir o panorama completo.</p>
+          <div id="area-top-contratos"></div>
+        </div>
+      </div>
+      <div class="dash-charts" style="grid-template-columns:1fr">
+        <div class="dash-chart-box">
+          <h4>Distribuição por Nº de Aditivos</h4>
+          <p class="dash-chart-hint">Clique numa barra pra ver quais contratos são e o número do SEI de cada aditivo.</p>
+          <div id="area-aditivos"></div>
+        </div>
+      </div>
+      <div id="area-financeiro-tabela" style="margin-top:16px"></div>
+    `;
+    document.getElementById("area-valor-tipo").innerHTML = barraContagemHorizontalSVG(
+      agruparValorPorCampo(listaArea, (c) => c.tipoObjeto, "(sem tipo)"),
+      {
+        formatarValor: (v) => "R$ " + formatarEixo(v),
+        rotuloExtra: (l) => `(${l.qtd} contrato${l.qtd === 1 ? "" : "s"})`,
+        tituloTooltip: (l) => `${l.label}: ${formatarMoedaBR(l.total)} — ${l.qtd} contrato${l.qtd === 1 ? "" : "s"}`,
+      }
+    );
+    document.getElementById("area-top-contratos").innerHTML = barraContagemHorizontalSVG(
+      agruparTopContratosPorValor(listaArea, 10),
+      { formatarValor: (v) => "R$ " + formatarEixo(v), tituloTooltip: (l) => `${l.label}: ${formatarMoedaBR(l.total)}` }
+    );
+    ligarTooltipLinhas(document.getElementById("area-top-contratos"), porId);
+    document.getElementById("area-aditivos").innerHTML = barraContagemHorizontalSVG(
+      agruparPorQtdAditivos(listaArea),
+      {
+        tituloTooltip: (l) => `${l.label}: ${l.total} contrato(s)`,
+        selecionado: filtroAditivosArea !== null ? `${filtroAditivosArea} aditivo${filtroAditivosArea === 1 ? "" : "s"}` : "",
+      }
+    );
+    adicionarControlesGrafico(document.getElementById("area-valor-tipo"));
+    adicionarControlesGrafico(document.getElementById("area-top-contratos"));
+    adicionarControlesGrafico(document.getElementById("area-aditivos"));
+    document.getElementById("area-aditivos").addEventListener("click", (ev) => {
+      const alvoClicado = ev.target.closest("[data-valor]");
+      if (!alvoClicado) return;
+      const valor = +alvoClicado.dataset.valor;
+      filtroAditivosArea = filtroAditivosArea === valor ? null : valor;
+      renderFinanceiro(listaArea);
+    });
+
+    if (filtroAditivosArea !== null) {
+      const contratosDoFiltro = listaArea.filter((c) => (c.qtdAditivos ?? 0) === filtroAditivosArea);
+      document.getElementById("area-financeiro-tabela").innerHTML = `
+        <div class="dash-chart-box">
+          <h4>Contratos com ${filtroAditivosArea} aditivo${filtroAditivosArea === 1 ? "" : "s"}</h4>
+          <div class="tabela-rolavel" style="max-height:320px" id="area-financeiro-tabela-conteudo"></div>
+        </div>`;
+      document.getElementById("area-financeiro-tabela-conteudo").innerHTML = tabelaContratosHTML(contratosDoFiltro, { comSei: true });
+      ligarTooltipLinhas(document.getElementById("area-financeiro-tabela-conteudo"), porId);
+    } else {
+      document.getElementById("area-financeiro-tabela").innerHTML = "";
+    }
+  }
+
+  function renderPessoas(listaArea) {
+    document.getElementById("area-sub-pessoas").innerHTML = `
+      <div class="dash-charts" style="grid-template-columns:1fr 1fr">
+        <div class="dash-chart-box"><h4>Por Analista</h4><div id="area-analista"></div></div>
+        <div class="dash-chart-box"><h4>Por Gestor</h4><div id="area-gestor"></div></div>
+      </div>
+      <div class="dash-charts" style="grid-template-columns:1fr">
+        <div class="dash-chart-box"><h4>Por Fiscal</h4><div id="area-fiscal"></div></div>
+      </div>
+      <p class="dash-chart-hint">Clique num nome pra ver os contratos sob responsabilidade dele.</p>
+      <div id="area-pessoas-tabela"></div>
+    `;
+    document.getElementById("area-analista").innerHTML = barraContagemHorizontalSVG(
+      agruparContagemPorCampo(listaArea, (c) => c.analista, "(sem analista)"),
+      { tituloTooltip: (l) => `${l.label}: ${l.total} contrato(s)`, selecionado: filtroPessoaArea?.tipo === "analista" ? filtroPessoaArea.nome : "" }
+    );
+    document.getElementById("area-gestor").innerHTML = barraContagemHorizontalSVG(
+      agruparContratosPorPessoa(listaArea, "Gestor"),
+      { tituloTooltip: (l) => `${l.label}: ${l.total} contrato(s)`, selecionado: filtroPessoaArea?.tipo === "gestor" ? filtroPessoaArea.nome : "" }
+    );
+    document.getElementById("area-fiscal").innerHTML = barraContagemHorizontalSVG(
+      agruparContratosPorPessoa(listaArea, "Fiscal"),
+      { tituloTooltip: (l) => `${l.label}: ${l.total} contrato(s)`, selecionado: filtroPessoaArea?.tipo === "fiscal" ? filtroPessoaArea.nome : "" }
+    );
+    adicionarControlesGrafico(document.getElementById("area-analista"));
+    adicionarControlesGrafico(document.getElementById("area-gestor"));
+    adicionarControlesGrafico(document.getElementById("area-fiscal"));
+
+    function ligarClique(id, tipo) {
+      document.getElementById(id).addEventListener("click", (ev) => {
+        const alvoClicado = ev.target.closest("[data-cat]");
+        if (!alvoClicado) return;
+        const nome = alvoClicado.dataset.cat;
+        filtroPessoaArea = filtroPessoaArea?.tipo === tipo && filtroPessoaArea.nome === nome ? null : { tipo, nome };
+        renderPessoas(listaArea);
+      });
+    }
+    ligarClique("area-analista", "analista");
+    ligarClique("area-gestor", "gestor");
+    ligarClique("area-fiscal", "fiscal");
+
+    if (filtroPessoaArea) {
+      const testesPorTipo = {
+        analista: (c) => (c.analista || "(sem analista)") === filtroPessoaArea.nome,
+        gestor: (c) => (c.pessoas || []).some((p) => p.papel === "Gestor" && p.nomePessoa === filtroPessoaArea.nome),
+        fiscal: (c) => (c.pessoas || []).some((p) => p.papel === "Fiscal" && p.nomePessoa === filtroPessoaArea.nome),
+      };
+      const contratosDoFiltro = listaArea.filter(testesPorTipo[filtroPessoaArea.tipo]);
+      document.getElementById("area-pessoas-tabela").innerHTML = `
+        <div class="dash-chart-box">
+          <h4>Contratos — ${escapeHTML(filtroPessoaArea.tipo)}: ${escapeHTML(filtroPessoaArea.nome)}</h4>
+          <div class="tabela-rolavel" style="max-height:320px" id="area-pessoas-tabela-conteudo"></div>
+        </div>`;
+      document.getElementById("area-pessoas-tabela-conteudo").innerHTML = tabelaContratosHTML(contratosDoFiltro);
+      ligarTooltipLinhas(document.getElementById("area-pessoas-tabela-conteudo"), porId);
+    } else {
+      document.getElementById("area-pessoas-tabela").innerHTML = "";
+    }
+  }
+
+  function atualizar() {
+    if (!areaSelecionada) {
+      document.getElementById("area-perfil").hidden = true;
+      renderLanding();
+      return;
+    }
+    document.getElementById("area-landing").innerHTML = "";
+    document.getElementById("area-perfil").hidden = false;
+    const listaArea = lista.filter((c) => (c.unidadeGestora || "(sem unidade)") === areaSelecionada);
+    renderCabecalho(listaArea);
+    renderVisaoGeral(listaArea);
+    renderPrazos(listaArea);
+    renderFinanceiro(listaArea);
+    renderPessoas(listaArea);
+  }
+
+  atualizar();
+}
+
 async function carregarContratosPortal(portalSlug) {
   const painel = document.getElementById("tab-contratos");
   painel.innerHTML = `<p class="tela-intro">Carregando contratos...</p>`;
@@ -5216,22 +5538,26 @@ async function carregarContratosPortal(portalSlug) {
     return;
   }
 
-  // Mesma organização em 3 páginas do painel de Power BI (contratos-2026/
-  // painelgerencialcontratos.pbip) — Gerencial, Tático, Operacional — pra
-  // ficar o mais fiel possível ao modelo de referência.
+  // 3 páginas fiéis ao painel de Power BI de referência (contratos-2026/
+  // painelgerencialcontratos.pbip) — Gerencial, Tático, Operacional — mais
+  // uma 4ª, "Por Área Gestora": inspirada no SEI Municípios (escolhe uma
+  // área, cai num perfil com abas temáticas), pedido direto depois de ela
+  // usar aquele painel e comparar com este.
   painel.innerHTML = `
     ${dicaLeituraContratosHTML()}
     <div class="tabs" style="margin-bottom:0">
       <button class="tab-btn active" data-subtab-contratos="gerencial">GERENCIAL</button>
       <button class="tab-btn" data-subtab-contratos="tatico">TÁTICO</button>
       <button class="tab-btn" data-subtab-contratos="operacional">OPERACIONAL</button>
+      <button class="tab-btn" data-subtab-contratos="porarea">POR ÁREA GESTORA</button>
     </div>
     <div class="tab-panel" id="contratos-sub-gerencial"></div>
     <div class="tab-panel" id="contratos-sub-tatico" hidden></div>
     <div class="tab-panel" id="contratos-sub-operacional" hidden></div>
+    <div class="tab-panel" id="contratos-sub-porarea" hidden></div>
   `;
 
-  const SUBABAS_CONTRATOS = ["gerencial", "tatico", "operacional"];
+  const SUBABAS_CONTRATOS = ["gerencial", "tatico", "operacional", "porarea"];
   painel.querySelectorAll("[data-subtab-contratos]").forEach((btn) => {
     btn.addEventListener("click", () => {
       painel.querySelectorAll("[data-subtab-contratos]").forEach((b) => b.classList.remove("active"));
@@ -5244,6 +5570,7 @@ async function carregarContratosPortal(portalSlug) {
   renderGerencialContratos(lista, resumo);
   renderTaticoContratos(lista);
   renderOperacionalContratos(lista);
+  renderPorAreaContratos(lista);
 }
 
 async function abrirTela(id) {
