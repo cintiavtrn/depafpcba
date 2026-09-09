@@ -866,7 +866,13 @@ function simpleLineChartSVG(pontos, cor) {
   return `<svg viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg">${grade}${eixoY}<path d="${area}" fill="${corGlow(cor)}" stroke="none" /><path d="${linha}" fill="none" stroke="${cor}" stroke-width="2.2" stroke-linejoin="round" />${nodos}${labels}</svg>`;
 }
 
-function pieChartSVG(categorias, selectedLabel) {
+// opcoes.formatarValor: como escrever o valor na legenda/tooltip (default:
+// número puro — contagem). opcoes.formatarCentro: idem pro número grande no
+// miolo da rosca (default: o mesmo texto por extenso/abreviado de sempre).
+// opcoes.rotuloExtra: texto extra na legenda depois do valor (ex.: "(21
+// contratos)", quando o valor já é R$ e a quantidade some sem isso).
+function pieChartSVG(categorias, selectedLabel, opcoes = {}) {
+  const { formatarValor = (v) => v.toLocaleString("pt-BR"), formatarCentro = null, rotuloExtra = null } = opcoes;
   const cx = 100, cy = 100, rOut = 88, rIn = 48, total = categorias.reduce((a, c) => a + c.valor, 0) || 1;
   const toXY = (a, r) => { const rad = a * Math.PI / 180; return [cx + r * Math.cos(rad), cy + r * Math.sin(rad)]; };
   let ang = -90, fatias = "", rotulosFatia = "";
@@ -878,7 +884,8 @@ function pieChartSVG(categorias, selectedLabel) {
     const large = (a1 - a0) > 180 ? 1 : 0;
     const dim = selectedLabel && selectedLabel !== c.label;
     const d = `M ${x0o.toFixed(1)} ${y0o.toFixed(1)} A ${rOut} ${rOut} 0 ${large} 1 ${x1o.toFixed(1)} ${y1o.toFixed(1)} L ${x1i.toFixed(1)} ${y1i.toFixed(1)} A ${rIn} ${rIn} 0 ${large} 0 ${x0i.toFixed(1)} ${y0i.toFixed(1)} Z`;
-    fatias += `<path class="donut-fatia" data-cat="${escapeAttr(c.label)}" d="${d}" fill="${cor}" opacity="${dim ? 0.28 : 1}" style="cursor:pointer"><title>${escapeHTML(c.label)}: ${c.valor} (${(frac * 100).toFixed(1)}%)</title></path>`;
+    const tituloFatia = `${c.label}: ${formatarValor(c.valor)}${rotuloExtra ? ` ${rotuloExtra(c)}` : ""} (${(frac * 100).toFixed(1)}%)`;
+    fatias += `<path class="donut-fatia" data-cat="${escapeAttr(c.label)}" d="${d}" fill="${cor}" opacity="${dim ? 0.28 : 1}" style="cursor:pointer"><title>${escapeHTML(tituloFatia)}</title></path>`;
 
     // percentual escrito na própria fatia — só quando ela tem espaço real
     // pra caber o texto (fatia fina com número em cima fica ilegível);
@@ -891,17 +898,37 @@ function pieChartSVG(categorias, selectedLabel) {
   });
   const legenda = categorias.map((c, i) => {
     const pct = ((c.valor / total) * 100).toFixed(1);
-    return `<button class="donut-leg" data-cat="${escapeAttr(c.label)}" style="cursor:pointer"><span class="sw" style="background:${corCategoria(i)}"></span><span class="lg-nome">${escapeHTML(c.label)}</span><span class="lg-valor" style="font-variant-numeric:tabular-nums;color:var(--carvao);opacity:.8">${c.valor.toLocaleString("pt-BR")}</span><span class="lg-pct">${pct}%</span></button>`;
+    const valorTexto = formatarValor(c.valor) + (rotuloExtra ? ` ${rotuloExtra(c)}` : "");
+    return `<button class="donut-leg" data-cat="${escapeAttr(c.label)}" style="cursor:pointer"><span class="sw" style="background:${corCategoria(i)}"></span><span class="lg-nome">${escapeHTML(c.label)}</span><span class="lg-valor" style="font-variant-numeric:tabular-nums;color:var(--carvao);opacity:.8">${escapeHTML(valorTexto)}</span><span class="lg-pct">${pct}%</span></button>`;
   }).join("");
   // Número por extenso, encolhendo conforme cresce. Abreviar ("1k") só entra
   // quando nem o menor corpo cabe: no miolo da rosca esse é O número do
   // painel, e "1k" no lugar de "1.033" perde precisão justamente onde ela
   // mais importa. 9 dígitos ainda cabem em 13px dentro do furo.
   const totalPorExtenso = total.toLocaleString("pt-BR");
-  const totalTexto = totalPorExtenso.length <= 9 ? totalPorExtenso : formatarEixo(total);
+  const totalTexto = formatarCentro ? formatarCentro(total) : (totalPorExtenso.length <= 9 ? totalPorExtenso : formatarEixo(total));
   const totalFontSize = totalTexto.length <= 5 ? 22 : totalTexto.length <= 7 ? 17 : 13;
-  const totalMeio = `<text x="${cx}" y="${(cy - 3).toFixed(1)}" text-anchor="middle" font-family="'Space Grotesk',sans-serif" font-size="${totalFontSize}" font-weight="700" fill="var(--carvao)"><title>${total.toLocaleString("pt-BR")}</title>${totalTexto}</text><text x="${cx}" y="${(cy + 13).toFixed(1)}" text-anchor="middle" font-family="monospace" font-size="7.5" letter-spacing="1.5" fill="var(--carvao)" fill-opacity="0.6">TOTAL</text>`;
+  const totalMeio = `<text x="${cx}" y="${(cy - 3).toFixed(1)}" text-anchor="middle" font-family="'Space Grotesk',sans-serif" font-size="${totalFontSize}" font-weight="700" fill="var(--carvao)"><title>${escapeHTML(formatarValor(total))}</title>${escapeHTML(totalTexto)}</text><text x="${cx}" y="${(cy + 13).toFixed(1)}" text-anchor="middle" font-family="monospace" font-size="7.5" letter-spacing="1.5" fill="var(--carvao)" fill-opacity="0.6">TOTAL</text>`;
   return `<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">${fatias}${rotulosFatia}${totalMeio}</svg><div class="donut-legenda">${legenda}</div>`;
+}
+
+// Rosca pro "Valor por Tipo de Objeto" (e qualquer outro valor-por-campo) —
+// virou rosca a pedido direto: a barra horizontal ficava com muita linha
+// quando tinha bastante tipo de objeto diferente, e "quanto se gasta em X"
+// é fundamentalmente uma pergunta de PARTE-DO-TODO, o desenho que a rosca
+// já resolve melhor que barra. Recebe o mesmo formato de linha que a barra
+// (agruparValorPorCampo: {label, total, qtd}) pra trocar uma pela outra sem
+// preparar o dado de novo.
+function roscaValorPorCampoSVG(linhas, selecionado) {
+  return pieChartSVG(
+    linhas.map((l) => ({ label: l.label, valor: l.total, qtd: l.qtd })),
+    selecionado,
+    {
+      formatarValor: (v) => "R$ " + formatarEixo(v),
+      formatarCentro: (v) => "R$ " + formatarEixo(v),
+      rotuloExtra: (c) => `(${c.qtd} contrato${c.qtd === 1 ? "" : "s"})`,
+    }
+  );
 }
 
 function barRankingChartSVG(categorias, selectedLabel) {
@@ -4904,14 +4931,9 @@ function renderGerencialContratos(lista, resumo) {
       }
     );
     document.getElementById("ger-tipo").innerHTML = barraTipoObjetoSVG(agruparPorTipoObjeto(filtrada), filtroTipo);
-    document.getElementById("ger-valor-tipo").innerHTML = barraContagemHorizontalSVG(
+    document.getElementById("ger-valor-tipo").innerHTML = roscaValorPorCampoSVG(
       agruparValorPorCampo(filtrada, (c) => c.tipoObjeto, "(sem tipo)"),
-      {
-        formatarValor: (v) => "R$ " + formatarEixo(v),
-        rotuloExtra: (l) => `(${l.qtd} contrato${l.qtd === 1 ? "" : "s"})`,
-        tituloTooltip: (l) => `${l.label}: ${formatarMoedaBR(l.total)} — ${l.qtd} contrato${l.qtd === 1 ? "" : "s"}`,
-        selecionado: filtroTipo,
-      }
+      filtroTipo
     );
     document.getElementById("ger-analista").innerHTML = barraContagemHorizontalSVG(
       agruparContagemPorCampo(filtrada, (c) => c.analista, "(sem analista)"),
@@ -5233,6 +5255,7 @@ function renderPorAreaContratos(lista) {
   let areaSelecionada = "";
   let filtroAditivosArea = null;
   let filtroPessoaArea = null; // { tipo: "analista"|"gestor"|"fiscal", nome }
+  let filtroMesArea = "";
   let modoMesArea = "colunas";
 
   alvo.innerHTML = `
@@ -5280,6 +5303,7 @@ function renderPorAreaContratos(lista) {
     document.getElementById("area-select").value = area;
     filtroAditivosArea = null;
     filtroPessoaArea = null;
+    filtroMesArea = "";
     atualizar();
     alvo.scrollIntoView?.({ behavior: "smooth", block: "start" });
   }
@@ -5345,23 +5369,32 @@ function renderPorAreaContratos(lista) {
     ligarTooltipLinhas(document.getElementById("area-visao-tabela"), porId);
   }
 
+  // Antes só o Tático deixava clicar num mês do gráfico e ver os contratos
+  // daquele mês numa tabela — aqui (Por Área) o gráfico ficava só de
+  // enfeite, "só mês e ano", pedido direto de volta pra ser igual: clicável
+  // e reunindo informação, mesma lógica do resto do sistema.
   function renderPrazos(listaArea) {
     document.getElementById("area-sub-prazos").innerHTML = `
       <div class="dash-chart-box">
         <h4>Contratos por Vencimento e Criticidade</h4>
+        <p class="dash-chart-hint" id="area-mes-hint"></p>
         <div class="linha-troca-grafico"><div class="dash-toggle" id="area-mes-toggle">
           <button class="dash-toggle-btn" data-modo="colunas" title="Compara o total de cada mês">COLUNAS</button>
           <button class="dash-toggle-btn" data-modo="gantt" title="Mostra a vigência de cada contrato numa linha do tempo">GANTT</button>
         </div></div>
         <div id="area-grafico-mes"></div>
-      </div>`;
+      </div>
+      <div id="area-mes-chip"></div>
+      <div id="area-prazos-tabela" style="margin-top:16px"></div>`;
     function desenharMes() {
       const container = document.getElementById("area-grafico-mes");
       if (modoMesArea === "gantt") {
         container.innerHTML = ganttContratosSVG(listaArea).svg;
         ligarTooltipLinhas(container, porId);
+        document.getElementById("area-mes-hint").textContent = "Passe o mouse numa barra pra ver o detalhe rápido, clique pra abrir o panorama completo — a linha vertical marca a data de hoje.";
       } else {
-        container.innerHTML = colunaCriticidadeEmpilhadaSVG(agruparPorMesCriticidade(listaArea));
+        container.innerHTML = colunaCriticidadeEmpilhadaSVG(agruparPorMesCriticidade(listaArea), filtroMesArea);
+        document.getElementById("area-mes-hint").textContent = "Clique numa barra pra isolar só aquele mês de vencimento na tabela abaixo — clique de novo pra voltar a ver todos os meses.";
       }
       adicionarControlesGrafico(container);
       document.querySelectorAll("#area-mes-toggle [data-modo]").forEach((btn) => {
@@ -5375,6 +5408,32 @@ function renderPorAreaContratos(lista) {
       modoMesArea = btn.dataset.modo;
       desenharMes();
     });
+    document.getElementById("area-grafico-mes").addEventListener("click", (ev) => {
+      const alvoClicado = ev.target.closest("[data-mes]");
+      if (!alvoClicado) return;
+      filtroMesArea = filtroMesArea === alvoClicado.dataset.mes ? "" : alvoClicado.dataset.mes;
+      renderPrazos(listaArea);
+    });
+
+    document.getElementById("area-mes-chip").innerHTML = filtroMesArea
+      ? `<div class="filter-chips"><span class="filter-chip">Isolando mês: ${escapeHTML(filtroMesArea)}<button type="button" data-limpar-mes-area title="Voltar a ver todos os meses">✕</button></span></div>`
+      : "";
+    const btnLimparMesArea = document.querySelector("[data-limpar-mes-area]");
+    if (btnLimparMesArea) btnLimparMesArea.addEventListener("click", () => { filtroMesArea = ""; renderPrazos(listaArea); });
+
+    if (filtroMesArea) {
+      const contratosDoMes = listaArea.filter((c) => chaveAnoMes(c.dataFim) === filtroMesArea);
+      document.getElementById("area-prazos-tabela").innerHTML = `
+        <div class="dash-chart-box">
+          <h4>Contratos com vencimento em ${escapeHTML(filtroMesArea)}</h4>
+          <p class="dash-chart-hint">Passe o mouse numa linha pra ver o detalhe rápido — clique pra abrir o panorama completo do contrato.</p>
+          <div class="tabela-rolavel" style="max-height:320px" id="area-prazos-tabela-conteudo"></div>
+        </div>`;
+      document.getElementById("area-prazos-tabela-conteudo").innerHTML = tabelaContratosHTML(contratosDoMes);
+      ligarTooltipLinhas(document.getElementById("area-prazos-tabela-conteudo"), porId);
+    } else {
+      document.getElementById("area-prazos-tabela").innerHTML = "";
+    }
   }
 
   function renderFinanceiro(listaArea) {
@@ -5399,13 +5458,8 @@ function renderPorAreaContratos(lista) {
       </div>
       <div id="area-financeiro-tabela" style="margin-top:16px"></div>
     `;
-    document.getElementById("area-valor-tipo").innerHTML = barraContagemHorizontalSVG(
-      agruparValorPorCampo(listaArea, (c) => c.tipoObjeto, "(sem tipo)"),
-      {
-        formatarValor: (v) => "R$ " + formatarEixo(v),
-        rotuloExtra: (l) => `(${l.qtd} contrato${l.qtd === 1 ? "" : "s"})`,
-        tituloTooltip: (l) => `${l.label}: ${formatarMoedaBR(l.total)} — ${l.qtd} contrato${l.qtd === 1 ? "" : "s"}`,
-      }
+    document.getElementById("area-valor-tipo").innerHTML = roscaValorPorCampoSVG(
+      agruparValorPorCampo(listaArea, (c) => c.tipoObjeto, "(sem tipo)")
     );
     document.getElementById("area-top-contratos").innerHTML = barraContagemHorizontalSVG(
       agruparTopContratosPorValor(listaArea, 10),
