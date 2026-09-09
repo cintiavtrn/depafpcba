@@ -677,6 +677,33 @@ select:focus-visible,input:focus-visible{
 </footer>
 
 <script>
+// GitHub Pages serve este arquivo com Cache-Control: max-age=600 (10min) —
+// quem já tinha a aba aberta, ou só apertou F5 dentro dessa janela, nunca
+// via as atualizações mais recentes (relatado direto: "as mudanças não
+// estão aparecendo pros outros usuários, só o que já tava aparecendo").
+// document.lastModified é a data da página que ESTE navegador tem carregada
+// agora; um HEAD sem cache pro mesmo endereço traz a data do que está
+// publicado no servidor NESTE instante — se for mais nova, recarrega uma
+// vez sozinho. sessionStorage evita ficar recarregando em loop se, por
+// algum motivo, a comparação continuar dando "mais nova" depois de recarregar.
+(function verificarVersaoPainel() {
+  try {
+    if (sessionStorage.getItem("cpg-recarregou-versao-nova")) return;
+    fetch(location.href, { method: "HEAD", cache: "no-store" })
+      .then((r) => {
+        const doServidor = r.headers.get("Last-Modified");
+        if (!doServidor) return;
+        const dataServidor = new Date(doServidor).getTime();
+        const dataAtual = new Date(document.lastModified).getTime();
+        if (dataServidor > dataAtual + 1000) {
+          sessionStorage.setItem("cpg-recarregou-versao-nova", "1");
+          location.reload();
+        }
+      })
+      .catch(() => {});
+  } catch { /* navegador sem sessionStorage/fetch — segue sem checar */ }
+})();
+
 // =====================================================================
 // 1. ÍCONES E FUNÇÕES DE DESENHO (SVG)
 // =====================================================================
@@ -891,11 +918,26 @@ function pieChartSVG(categorias, selectedLabel, opcoes = {}) {
   categorias.forEach((c, i) => {
     const cor = corCategoria(i);
     const a0 = ang, frac = c.valor / total, a1 = ang + frac * 360; ang = a1;
-    const [x0o, y0o] = toXY(a0, rOut), [x1o, y1o] = toXY(a1, rOut);
-    const [x1i, y1i] = toXY(a1, rIn), [x0i, y0i] = toXY(a0, rIn);
-    const large = (a1 - a0) > 180 ? 1 : 0;
     const dim = selectedLabel && selectedLabel !== c.label;
-    const d = `M ${x0o.toFixed(1)} ${y0o.toFixed(1)} A ${rOut} ${rOut} 0 ${large} 1 ${x1o.toFixed(1)} ${y1o.toFixed(1)} L ${x1i.toFixed(1)} ${y1i.toFixed(1)} A ${rIn} ${rIn} 0 ${large} 0 ${x0i.toFixed(1)} ${y0i.toFixed(1)} Z`;
+    let d;
+    // Categoria sozinha (100% do total) quebrava o desenho: início e fim do
+    // arco caem no MESMO ponto (-90° e 270° são o mesmo lugar no círculo),
+    // e um arco de ponta a ponta idêntica não pinta nada — foi o que
+    // aconteceu com "Terceirizados" numa área com um tipo de objeto só (a
+    // legenda mostrava 100% mas o desenho ficava em branco). Círculo
+    // completo não dá pra desenhar com 1 arco só (ambíguo); a saída é
+    // sempre usada é partir em 2 meios-círculos.
+    if (frac >= 0.999) {
+      const aMeio = a0 + 180;
+      const [xoA, yoA] = toXY(a0, rOut), [xoB, yoB] = toXY(aMeio, rOut);
+      const [xiA, yiA] = toXY(a0, rIn), [xiB, yiB] = toXY(aMeio, rIn);
+      d = `M ${xoA.toFixed(1)} ${yoA.toFixed(1)} A ${rOut} ${rOut} 0 1 1 ${xoB.toFixed(1)} ${yoB.toFixed(1)} A ${rOut} ${rOut} 0 1 1 ${xoA.toFixed(1)} ${yoA.toFixed(1)} L ${xiA.toFixed(1)} ${yiA.toFixed(1)} A ${rIn} ${rIn} 0 1 0 ${xiB.toFixed(1)} ${yiB.toFixed(1)} A ${rIn} ${rIn} 0 1 0 ${xiA.toFixed(1)} ${yiA.toFixed(1)} Z`;
+    } else {
+      const [x0o, y0o] = toXY(a0, rOut), [x1o, y1o] = toXY(a1, rOut);
+      const [x1i, y1i] = toXY(a1, rIn), [x0i, y0i] = toXY(a0, rIn);
+      const large = (a1 - a0) > 180 ? 1 : 0;
+      d = `M ${x0o.toFixed(1)} ${y0o.toFixed(1)} A ${rOut} ${rOut} 0 ${large} 1 ${x1o.toFixed(1)} ${y1o.toFixed(1)} L ${x1i.toFixed(1)} ${y1i.toFixed(1)} A ${rIn} ${rIn} 0 ${large} 0 ${x0i.toFixed(1)} ${y0i.toFixed(1)} Z`;
+    }
     const tituloFatia = `${c.label}: ${formatarValor(c.valor)}${rotuloExtra ? ` ${rotuloExtra(c)}` : ""} (${(frac * 100).toFixed(1)}%)`;
     fatias += `<path class="donut-fatia" data-cat="${escapeAttr(c.label)}" d="${d}" fill="${cor}" opacity="${dim ? 0.28 : 1}" style="cursor:pointer"><title>${escapeHTML(tituloFatia)}</title></path>`;
 
