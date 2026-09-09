@@ -5264,11 +5264,22 @@ function renderOperacionalContratos(lista, portalSlug) {
             <option value="Sim">Sim</option>
             <option value="Não">Não</option>
             <option value="Em análise">Em análise</option>
+            <option value="Já Renovado">Já Renovado (visto no Diário Oficial, planilha ainda não atualizou)</option>
           </select>
         </div>
         <div class="dash-filtro" style="flex:1;min-width:180px">
           <label>QUEM ESTÁ ACOMPANHANDO</label>
           <input type="text" id="renov-responsavel" placeholder="Nome de quem está cuidando disso" />
+        </div>
+      </div>
+      <div class="dash-filtros" id="renov-campos-ja-renovado" style="margin-bottom:12px" hidden>
+        <div class="dash-filtro" style="flex:1;min-width:180px">
+          <label>Nº DO PROCESSO SEI DA RENOVAÇÃO</label>
+          <input type="text" id="renov-sei" placeholder="Ex.: 012.345.2026.0001-11" />
+        </div>
+        <div class="dash-filtro" style="flex:1;min-width:180px">
+          <label>DATA DA RENOVAÇÃO</label>
+          <input type="date" id="renov-data" />
         </div>
       </div>
       <div class="dash-filtro" style="margin-bottom:10px">
@@ -5292,19 +5303,38 @@ function renderOperacionalContratos(lista, portalSlug) {
     document.getElementById("renov-decisao").value = dados.decisao || "";
     document.getElementById("renov-responsavel").value = dados.responsavel || "";
     document.getElementById("renov-observacao").value = dados.observacao || "";
+    document.getElementById("renov-sei").value = dados.processoSeiRenovacao || "";
+    document.getElementById("renov-data").value = dados.dataRenovacao ? dados.dataRenovacao.slice(0, 10) : "";
     document.getElementById("renov-status").textContent = dados.atualizadoEm ? `Última atualização: ${formatarDataBR(dados.atualizadoEm)}` : "";
+
+    // Nº do SEI e data da renovação só fazem sentido quando "Já Renovado" —
+    // ficam escondidos nos outros 3 estados, pra não poluir o caso comum.
+    const camposJaRenovado = document.getElementById("renov-campos-ja-renovado");
+    const decisaoSelect = document.getElementById("renov-decisao");
+    function alternarCamposJaRenovado() {
+      camposJaRenovado.hidden = decisaoSelect.value !== "Já Renovado";
+    }
+    alternarCamposJaRenovado();
+    decisaoSelect.addEventListener("change", alternarCamposJaRenovado);
 
     document.getElementById("renov-salvar").addEventListener("click", async () => {
       const status = document.getElementById("renov-status");
       status.textContent = "Salvando...";
+      const decisaoAtual = decisaoSelect.value;
       try {
         await apiFetch(`/api/portais/${portalSlug}/contratos/${contratoAlvo}/renovacao`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            decisao: document.getElementById("renov-decisao").value || null,
+            decisao: decisaoAtual || null,
             responsavel: document.getElementById("renov-responsavel").value || null,
             observacao: document.getElementById("renov-observacao").value || null,
+            // Só manda SEI/data quando a decisão é "Já Renovado" — evita
+            // deixar um SEI de uma renovação "fantasma" salvo se alguém
+            // preencher o campo e depois mudar de ideia sobre a decisão
+            // antes de salvar.
+            processoSeiRenovacao: decisaoAtual === "Já Renovado" ? (document.getElementById("renov-sei").value || null) : null,
+            dataRenovacao: decisaoAtual === "Já Renovado" ? (document.getElementById("renov-data").value || null) : null,
           }),
         });
         renderRenovacao(selecionado);
@@ -5417,13 +5447,25 @@ function dicaLeituraContratosHTML() {
 // que vence em até 90 dias (mesmo corte de "A Vencer" já usado no resto do
 // sistema) e mostra JÁ ABERTO, sem exigir nenhum clique — só uma tabela
 // clicável de verdade (abre o panorama completo), igual ao resto do painel.
-function renderAlertaVencimentoContratos(lista, porId) {
+//
+// decisoesRenovacao: mapa contratoId -> {decisao, ...} (ver
+// listarDecisoesRenovacao no backend). Pedido direto: ela achou, olhando o
+// Diário Oficial, pelo menos 5 contratos já renovados de fato mas que a
+// planilha ainda mostra como vencido/a vencer — sem isso, o alerta ficaria
+// cobrando atenção pra algo que já foi resolvido. Só esse alerta muda de
+// comportamento; o resto do painel (KPIs do Gerencial, criticidade, etc.)
+// continua batendo com a planilha, de propósito — misturar as duas fontes
+// silenciosamente ali seria mudar um número "oficial" sem ela pedir.
+function renderAlertaVencimentoContratos(lista, porId, decisoesRenovacao = new Map()) {
   const alvo = document.getElementById("contratos-alerta");
   if (!alvo) return;
-  const vencidos = lista.filter((c) => c.statusVigencia === "Vencido");
-  const aVencer = lista.filter((c) => c.statusVigencia === "A Vencer");
+  const ehJaRenovado = (c) => decisoesRenovacao.get(c.id)?.decisao === "Já Renovado";
+
+  const vencidos = lista.filter((c) => c.statusVigencia === "Vencido" && !ehJaRenovado(c));
+  const aVencer = lista.filter((c) => c.statusVigencia === "A Vencer" && !ehJaRenovado(c));
+  const jaRenovados = lista.filter((c) => (c.statusVigencia === "Vencido" || c.statusVigencia === "A Vencer") && ehJaRenovado(c));
   const total = vencidos.length + aVencer.length;
-  if (!total) { alvo.innerHTML = ""; return; }
+  if (!total && !jaRenovados.length) { alvo.innerHTML = ""; return; }
 
   // cor do alerta segue a mesma lógica de criticidade de sempre: vermelho
   // (vencido) pesa mais que laranja (a vencer) — se tem os dois, o alerta
@@ -5437,16 +5479,37 @@ function renderAlertaVencimentoContratos(lista, porId) {
 
   const ordenados = [...vencidos, ...aVencer].sort((a, b) => (a.diasParaVencer ?? 1e9) - (b.diasParaVencer ?? 1e9));
 
-  alvo.innerHTML = `
-    <details class="alerta-vencimento" style="--alerta-cor:${cor};--alerta-cor-glow:${corGlowVar}" open>
-      <summary>⚠ ${total} contrato${total === 1 ? "" : "s"} merece${total === 1 ? "" : "m"} atenção <span class="conta">— ${escapeHTML(partes)}</span></summary>
-      <div class="corpo">
-        <p class="dash-chart-hint" style="margin:0 0 8px">Passe o mouse numa linha pra ver o detalhe rápido — clique pra abrir o panorama completo do contrato.</p>
-        <div class="tabela-rolavel" style="max-height:280px" id="contratos-alerta-tabela"></div>
-      </div>
-    </details>`;
-  document.getElementById("contratos-alerta-tabela").innerHTML = tabelaContratosHTML(ordenados);
-  ligarTooltipLinhas(document.getElementById("contratos-alerta-tabela"), porId);
+  const blocoUrgente = total
+    ? `<details class="alerta-vencimento" style="--alerta-cor:${cor};--alerta-cor-glow:${corGlowVar}" open>
+        <summary>⚠ ${total} contrato${total === 1 ? "" : "s"} merece${total === 1 ? "" : "m"} atenção <span class="conta">— ${escapeHTML(partes)}</span></summary>
+        <div class="corpo">
+          <p class="dash-chart-hint" style="margin:0 0 8px">Passe o mouse numa linha pra ver o detalhe rápido — clique pra abrir o panorama completo do contrato.</p>
+          <div class="tabela-rolavel" style="max-height:280px" id="contratos-alerta-tabela"></div>
+        </div>
+      </details>`
+    : "";
+  // Sub-bloco calmo (verde, fechado por padrão) — a informação continua
+  // visível pra quem quiser conferir, mas sem o tom de urgência que não
+  // cabe mais aqui: já foi resolvido, só falta a planilha alcançar.
+  const blocoJaRenovado = jaRenovados.length
+    ? `<details class="alerta-vencimento" style="--alerta-cor:var(--crit-baixo);--alerta-cor-glow:var(--crit-baixo-glow)">
+        <summary>✓ ${jaRenovados.length} contrato${jaRenovados.length === 1 ? "" : "s"} já renovado${jaRenovados.length === 1 ? "" : "s"} <span class="conta">— aguardando a planilha atualizar</span></summary>
+        <div class="corpo">
+          <p class="dash-chart-hint" style="margin:0 0 8px">A planilha-fonte ainda mostra estes como vencido/a vencer, mas já foram renovados de fato (marcado no Acompanhamento de Renovação, aba Operacional).</p>
+          <div class="tabela-rolavel" style="max-height:280px" id="contratos-alerta-renovado-tabela"></div>
+        </div>
+      </details>`
+    : "";
+
+  alvo.innerHTML = blocoUrgente + blocoJaRenovado;
+  if (total) {
+    document.getElementById("contratos-alerta-tabela").innerHTML = tabelaContratosHTML(ordenados);
+    ligarTooltipLinhas(document.getElementById("contratos-alerta-tabela"), porId);
+  }
+  if (jaRenovados.length) {
+    document.getElementById("contratos-alerta-renovado-tabela").innerHTML = tabelaContratosHTML(jaRenovados);
+    ligarTooltipLinhas(document.getElementById("contratos-alerta-renovado-tabela"), porId);
+  }
 }
 
 // ---------- Por Área Gestora: "perfil" de uma área, à la SEI Municípios ----------
@@ -5801,6 +5864,17 @@ async function carregarContratosPortal(portalSlug) {
     return;
   }
 
+  // Decisões de renovação (pra saber quem já foi "Já Renovado" e não deve
+  // mais aparecer como urgente no alerta) — busca À PARTE, com sua própria
+  // rede de proteção: se falhar por qualquer motivo, o alerta simplesmente
+  // trata todo mundo como a planilha diz (comportamento de antes), em vez
+  // de derrubar a aba inteira de Contratos por causa de um dado auxiliar.
+  let decisoesRenovacao = new Map();
+  try {
+    const linhasDecisoes = await apiFetch(`/api/portais/${portalSlug}/contratos/renovacoes`);
+    decisoesRenovacao = new Map(linhasDecisoes.map((r) => [r.contratoId, r]));
+  } catch { /* segue sem — ver comentário acima */ }
+
   // 3 páginas fiéis ao painel de Power BI de referência (contratos-2026/
   // painelgerencialcontratos.pbip) — Gerencial, Tático, Operacional — mais
   // uma 4ª, "Por Área Gestora": inspirada no SEI Municípios (escolhe uma
@@ -5820,7 +5894,7 @@ async function carregarContratosPortal(portalSlug) {
     <div class="tab-panel" id="contratos-sub-operacional" hidden></div>
     <div class="tab-panel" id="contratos-sub-porarea" hidden></div>
   `;
-  renderAlertaVencimentoContratos(lista, new Map(lista.map((c) => [c.id, c])));
+  renderAlertaVencimentoContratos(lista, new Map(lista.map((c) => [c.id, c])), decisoesRenovacao);
 
   const SUBABAS_CONTRATOS = ["gerencial", "tatico", "operacional", "porarea"];
   painel.querySelectorAll("[data-subtab-contratos]").forEach((btn) => {
