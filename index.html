@@ -249,6 +249,18 @@ body{background:var(--paper);color:var(--carvao);font-family:'IBM Plex Sans',san
 .dash-chart-box h4{font-family:'Space Grotesk',sans-serif;font-size:var(--fs-subtitulo);margin-bottom:12px}
 .dash-chart-box svg{width:100%;height:auto;display:block}
 
+/* Alerta de vencimento — pedido direto: "chegou ali no 90 dias o sistema
+   avisa", sem precisar abrir aba nem clicar em cartão. Aberto por padrão
+   (não é um <details> escondido) porque o pedido era JUSTAMENTE não
+   depender de mais um clique pra ver o que precisa de atenção. */
+.alerta-vencimento{border:2px solid var(--alerta-cor,var(--crit-alto));background:var(--alerta-cor-glow,var(--crit-alto-glow));margin-bottom:16px}
+.alerta-vencimento summary{cursor:pointer;padding:12px 16px;font-family:'IBM Plex Mono',monospace;font-size:var(--fs-ui);font-weight:700;color:var(--carvao);list-style:none;display:flex;align-items:center;gap:8px}
+.alerta-vencimento summary::-webkit-details-marker{display:none}
+.alerta-vencimento summary::before{content:"▸";transition:transform .15s ease}
+.alerta-vencimento[open] summary::before{transform:rotate(90deg)}
+.alerta-vencimento summary .conta{font-weight:400;opacity:.8}
+.alerta-vencimento .corpo{padding:0 16px 16px}
+
 /* Rolagem DENTRO da tabela (como no Power BI) — o cabeçalho fica fixo e só o
    corpo rola, em vez da tabela empurrar a página inteira pra baixo quando
    tem muita linha. */
@@ -5240,6 +5252,44 @@ function dicaLeituraContratosHTML() {
     </details>`;
 }
 
+// Alerta de vencimento, logo ao abrir a página — pedido direto: hoje só dá
+// pra saber que tem contrato vencido/a vencer clicando num cartão lá dentro
+// do Gerencial; isso exige a pessoa lembrar de ir olhar. Isola vencidos + o
+// que vence em até 90 dias (mesmo corte de "A Vencer" já usado no resto do
+// sistema) e mostra JÁ ABERTO, sem exigir nenhum clique — só uma tabela
+// clicável de verdade (abre o panorama completo), igual ao resto do painel.
+function renderAlertaVencimentoContratos(lista, porId) {
+  const alvo = document.getElementById("contratos-alerta");
+  if (!alvo) return;
+  const vencidos = lista.filter((c) => c.statusVigencia === "Vencido");
+  const aVencer = lista.filter((c) => c.statusVigencia === "A Vencer");
+  const total = vencidos.length + aVencer.length;
+  if (!total) { alvo.innerHTML = ""; return; }
+
+  // cor do alerta segue a mesma lógica de criticidade de sempre: vermelho
+  // (vencido) pesa mais que laranja (a vencer) — se tem os dois, o alerta
+  // inteiro fica vermelho, porque é a informação mais urgente das duas.
+  const cor = vencidos.length ? "var(--crit-vencido)" : "var(--crit-alto)";
+  const corGlowVar = vencidos.length ? "var(--crit-vencido-glow)" : "var(--crit-alto-glow)";
+  const partes = [
+    vencidos.length ? `${vencidos.length} vencido${vencidos.length === 1 ? "" : "s"}` : "",
+    aVencer.length ? `${aVencer.length} vencendo em até 90 dias` : "",
+  ].filter(Boolean).join(" · ");
+
+  const ordenados = [...vencidos, ...aVencer].sort((a, b) => (a.diasParaVencer ?? 1e9) - (b.diasParaVencer ?? 1e9));
+
+  alvo.innerHTML = `
+    <details class="alerta-vencimento" style="--alerta-cor:${cor};--alerta-cor-glow:${corGlowVar}" open>
+      <summary>⚠ ${total} contrato${total === 1 ? "" : "s"} merece${total === 1 ? "" : "m"} atenção <span class="conta">— ${escapeHTML(partes)}</span></summary>
+      <div class="corpo">
+        <p class="dash-chart-hint" style="margin:0 0 8px">Passe o mouse numa linha pra ver o detalhe rápido — clique pra abrir o panorama completo do contrato.</p>
+        <div class="tabela-rolavel" style="max-height:280px" id="contratos-alerta-tabela"></div>
+      </div>
+    </details>`;
+  document.getElementById("contratos-alerta-tabela").innerHTML = tabelaContratosHTML(ordenados);
+  ligarTooltipLinhas(document.getElementById("contratos-alerta-tabela"), porId);
+}
+
 // ---------- Por Área Gestora: "perfil" de uma área, à la SEI Municípios ----------
 // Mesmo princípio do SEI Municípios (seleciona um município, cai num perfil
 // com abas temáticas: Educação, Saúde...): aqui a "entidade" é a área
@@ -5598,6 +5648,7 @@ async function carregarContratosPortal(portalSlug) {
   // área, cai num perfil com abas temáticas), pedido direto depois de ela
   // usar aquele painel e comparar com este.
   painel.innerHTML = `
+    <div id="contratos-alerta"></div>
     ${dicaLeituraContratosHTML()}
     <div class="tabs" style="margin-bottom:0">
       <button class="tab-btn active" data-subtab-contratos="gerencial">GERENCIAL</button>
@@ -5610,6 +5661,7 @@ async function carregarContratosPortal(portalSlug) {
     <div class="tab-panel" id="contratos-sub-operacional" hidden></div>
     <div class="tab-panel" id="contratos-sub-porarea" hidden></div>
   `;
+  renderAlertaVencimentoContratos(lista, new Map(lista.map((c) => [c.id, c])));
 
   const SUBABAS_CONTRATOS = ["gerencial", "tatico", "operacional", "porarea"];
   painel.querySelectorAll("[data-subtab-contratos]").forEach((btn) => {
