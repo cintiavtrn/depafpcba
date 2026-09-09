@@ -4672,6 +4672,7 @@ function renderGerencialContratos(lista, resumo) {
   let filtroAnalista = "";
   let filtroGestor = "";
   let filtroFiscal = "";
+  let filtroFornecedor = "";
   let filtroStatusKpi = "";
   let filtroAditivos = null; // número puro (0, 1, 2...) ou null — 0 é um filtro válido, não "vazio"
   let filtroGarantia = false;
@@ -4823,6 +4824,14 @@ function renderGerencialContratos(lista, resumo) {
     atualizar();
     rolarParaTopoGerencial();
   }
+  // "Top 10 Maiores Fornecedores" ficava só de leitura — igual ao resto da
+  // página (analista, gestor, fiscal...), clicar num fornecedor isola os
+  // contratos DELE, não só mostra o valor.
+  function selecionarFornecedor(nome) {
+    filtroFornecedor = filtroFornecedor === nome ? "" : nome;
+    atualizar();
+    rolarParaTopoGerencial();
+  }
   // Nº de aditivos usa o VALOR numérico (data-valor), não o rótulo — "6" e
   // "6 aditivos" têm que apontar pro mesmo filtro.
   function selecionarAditivos(valor) {
@@ -4892,6 +4901,10 @@ function renderGerencialContratos(lista, resumo) {
     const alvoClicado = ev.target.closest("[data-valor]");
     if (alvoClicado) selecionarAditivos(+alvoClicado.dataset.valor);
   });
+  document.getElementById("ger-top-fornecedores").addEventListener("click", (ev) => {
+    const alvoClicado = ev.target.closest("[data-cat]");
+    if (alvoClicado) selecionarFornecedor(alvoClicado.dataset.cat);
+  });
   document.getElementById("ger-matriz-baixar").addEventListener("click", () =>
     baixarTabelaComoImagem(document.getElementById("ger-matriz"), "cpg-contratos-detalhamento-area-gestora.png"));
 
@@ -4902,21 +4915,23 @@ function renderGerencialContratos(lista, resumo) {
       (!filtroAnalista || (c.analista || "(sem analista)") === filtroAnalista) &&
       (!filtroGestor || (c.pessoas || []).some((p) => p.papel === "Gestor" && p.nomePessoa === filtroGestor)) &&
       (!filtroFiscal || (c.pessoas || []).some((p) => p.papel === "Fiscal" && p.nomePessoa === filtroFiscal)) &&
+      (!filtroFornecedor || (c.empresa || "(empresa não identificada)") === filtroFornecedor) &&
       (filtroAditivos === null || (c.qtdAditivos ?? 0) === filtroAditivos) &&
       (!filtroGarantia || c.garantiaExigida === "Sim")
     );
 
     // Chips genéricos — um por filtro ativo, cada um sabe desligar a si
-    // mesmo. Cresceu de 2 pra 7 filtros possíveis (área, tipo, analista,
-    // gestor, fiscal, nº de aditivos, garantia) e repetir o bloco if/então 7
-    // vezes ficaria ilegível; um array de {rotulo, limpar} escala sem
-    // repetição.
+    // mesmo. Cresceu de 2 pra 8 filtros possíveis (área, tipo, analista,
+    // gestor, fiscal, fornecedor, nº de aditivos, garantia) e repetir o
+    // bloco if/então 8 vezes ficaria ilegível; um array de {rotulo, limpar}
+    // escala sem repetição.
     const chipsAtivos = [
       filtroArea && { rotulo: `área: ${filtroArea}`, limpar: () => selecionarArea(filtroArea) },
       filtroTipo && { rotulo: `tipo: ${filtroTipo}`, limpar: () => selecionarTipo(filtroTipo) },
       filtroAnalista && { rotulo: `analista: ${filtroAnalista}`, limpar: () => selecionarAnalista(filtroAnalista) },
       filtroGestor && { rotulo: `gestor: ${filtroGestor}`, limpar: () => selecionarGestor(filtroGestor) },
       filtroFiscal && { rotulo: `fiscal: ${filtroFiscal}`, limpar: () => selecionarFiscal(filtroFiscal) },
+      filtroFornecedor && { rotulo: `fornecedor: ${filtroFornecedor}`, limpar: () => selecionarFornecedor(filtroFornecedor) },
       filtroAditivos !== null && { rotulo: `${filtroAditivos} aditivo${filtroAditivos === 1 ? "" : "s"}`, limpar: () => selecionarAditivos(filtroAditivos) },
       filtroGarantia && { rotulo: `garantia exigida: Sim`, limpar: () => selecionarGarantia() },
     ].filter(Boolean);
@@ -5025,6 +5040,7 @@ function renderGerencialContratos(lista, resumo) {
       {
         formatarValor: (v) => "R$ " + formatarEixo(v),
         tituloTooltip: (l) => `${l.label}: ${formatarMoedaBR(l.total)} (${l.qtd} contrato${l.qtd > 1 ? "s" : ""})`,
+        selecionado: filtroFornecedor,
       }
     );
     adicionarControlesGrafico(document.getElementById("ger-barra"));
@@ -5525,6 +5541,7 @@ function renderPorAreaContratos(lista) {
   const porId = new Map(lista.map((c) => [c.id, c]));
   const areasDisponiveis = [...new Set(lista.map((c) => c.unidadeGestora || "(sem unidade)"))].sort();
   let areaSelecionada = "";
+  let filtroTipoArea = "";
   let filtroAditivosArea = null;
   let filtroPessoaArea = null; // { tipo: "analista"|"gestor"|"fiscal", nome }
   let filtroMesArea = "";
@@ -5573,6 +5590,7 @@ function renderPorAreaContratos(lista) {
   function selecionarArea(area) {
     areaSelecionada = area;
     document.getElementById("area-select").value = area;
+    filtroTipoArea = "";
     filtroAditivosArea = null;
     filtroPessoaArea = null;
     filtroMesArea = "";
@@ -5730,16 +5748,28 @@ function renderPorAreaContratos(lista) {
       </div>
       <div id="area-financeiro-tabela" style="margin-top:16px"></div>
     `;
+    // Cross-filter à la BI: clicar numa fatia da rosca não só destaca ela —
+    // filtra TAMBÉM o Top 10 e o gráfico de aditivos pro tipo escolhido
+    // (igual clicar num aspecto já isola o resto da tela em Gerencial). A
+    // própria rosca de Valor por Tipo continua mostrando TODOS os tipos
+    // (só com o escolhido em destaque), senão não daria pra trocar de fatia
+    // depois de escolher uma.
+    const filtrada = listaArea.filter((c) =>
+      (!filtroTipoArea || (c.tipoObjeto || "(sem tipo)") === filtroTipoArea) &&
+      (filtroAditivosArea === null || (c.qtdAditivos ?? 0) === filtroAditivosArea)
+    );
+
     document.getElementById("area-valor-tipo").innerHTML = roscaValorPorCampoSVG(
-      agruparValorPorCampo(listaArea, (c) => c.tipoObjeto, "(sem tipo)")
+      agruparValorPorCampo(listaArea, (c) => c.tipoObjeto, "(sem tipo)"),
+      filtroTipoArea
     );
     document.getElementById("area-top-contratos").innerHTML = barraContagemHorizontalSVG(
-      agruparTopContratosPorValor(listaArea, 10),
+      agruparTopContratosPorValor(filtrada, 10),
       { formatarValor: (v) => "R$ " + formatarEixo(v), tituloTooltip: (l) => `${l.label}: ${formatarMoedaBR(l.total)}` }
     );
     ligarTooltipLinhas(document.getElementById("area-top-contratos"), porId);
     document.getElementById("area-aditivos").innerHTML = barraContagemHorizontalSVG(
-      agruparPorQtdAditivos(listaArea),
+      agruparPorQtdAditivos(filtrada),
       {
         tituloTooltip: (l) => `${l.label}: ${l.total} contrato(s)`,
         selecionado: filtroAditivosArea !== null ? `${filtroAditivosArea} aditivo${filtroAditivosArea === 1 ? "" : "s"}` : "",
@@ -5748,6 +5778,12 @@ function renderPorAreaContratos(lista) {
     adicionarControlesGrafico(document.getElementById("area-valor-tipo"));
     adicionarControlesGrafico(document.getElementById("area-top-contratos"));
     adicionarControlesGrafico(document.getElementById("area-aditivos"));
+    document.getElementById("area-valor-tipo").addEventListener("click", (ev) => {
+      const alvoClicado = ev.target.closest("[data-cat]");
+      if (!alvoClicado) return;
+      filtroTipoArea = filtroTipoArea === alvoClicado.dataset.cat ? "" : alvoClicado.dataset.cat;
+      renderFinanceiro(listaArea);
+    });
     document.getElementById("area-aditivos").addEventListener("click", (ev) => {
       const alvoClicado = ev.target.closest("[data-valor]");
       if (!alvoClicado) return;
@@ -5756,14 +5792,23 @@ function renderPorAreaContratos(lista) {
       renderFinanceiro(listaArea);
     });
 
-    if (filtroAditivosArea !== null) {
-      const contratosDoFiltro = listaArea.filter((c) => (c.qtdAditivos ?? 0) === filtroAditivosArea);
+    // Chip(s) do que está isolado — mesmo padrão do Gerencial: cada filtro
+    // ativo sabe se desligar sozinho.
+    const chipsFinanceiro = [
+      filtroTipoArea && { rotulo: `tipo: ${filtroTipoArea}`, limpar: () => { filtroTipoArea = ""; renderFinanceiro(listaArea); } },
+      filtroAditivosArea !== null && { rotulo: `${filtroAditivosArea} aditivo${filtroAditivosArea === 1 ? "" : "s"}`, limpar: () => { filtroAditivosArea = null; renderFinanceiro(listaArea); } },
+    ].filter(Boolean);
+    if (chipsFinanceiro.length) {
       document.getElementById("area-financeiro-tabela").innerHTML = `
+        <div class="filter-chips">${chipsFinanceiro.map((c, i) => `<span class="filter-chip">Isolando ${escapeHTML(c.rotulo)}<button type="button" data-chip-financeiro="${i}" title="Remover este filtro">✕</button></span>`).join("")}</div>
         <div class="dash-chart-box">
-          <h4>Contratos com ${filtroAditivosArea} aditivo${filtroAditivosArea === 1 ? "" : "s"}</h4>
+          <h4>Contratos — ${escapeHTML(chipsFinanceiro.map((c) => c.rotulo).join(" · "))}</h4>
           <div class="tabela-rolavel" style="max-height:320px" id="area-financeiro-tabela-conteudo"></div>
         </div>`;
-      document.getElementById("area-financeiro-tabela-conteudo").innerHTML = tabelaContratosHTML(contratosDoFiltro, { comSei: true });
+      document.querySelectorAll("[data-chip-financeiro]").forEach((btn) => {
+        btn.addEventListener("click", () => chipsFinanceiro[+btn.dataset.chipFinanceiro].limpar());
+      });
+      document.getElementById("area-financeiro-tabela-conteudo").innerHTML = tabelaContratosHTML(filtrada, { comSei: filtroAditivosArea !== null });
       ligarTooltipLinhas(document.getElementById("area-financeiro-tabela-conteudo"), porId);
     } else {
       document.getElementById("area-financeiro-tabela").innerHTML = "";
