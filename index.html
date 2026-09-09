@@ -271,6 +271,7 @@ body{background:var(--paper);color:var(--carvao);font-family:'IBM Plex Sans',san
 .renov-tramites label.concluido{color:#8B93A3;text-decoration:line-through}
 .renov-tramite-data{display:block;opacity:.65;font-size:var(--fs-ui-xs);text-decoration:none}
 .renov-badge{font-family:'IBM Plex Mono',monospace;font-size:var(--fs-ui-xs);color:var(--crit-baixo);margin-top:3px;cursor:help}
+.badge-renovado{cursor:help;font-size:0.85em}
 
 /* Rolagem DENTRO da tabela (como no Power BI) — o cabeçalho fica fixo e só o
    corpo rola, em vez da tabela empurrar a página inteira pra baixo quando
@@ -3858,6 +3859,20 @@ function pillCriticidade(rotulo) {
   return `<span class="pill-criticidade ${classe}">${escapeHTML(rotulo)}</span>`;
 }
 
+// Selo de "renovado manualmente" — pedido direto: "tem algum jeito de dizer
+// que foi marcado lá no sistema?" — antes só aparecia dentro do panorama do
+// Operacional, quando alguém já tinha ido conferir aquele contrato
+// específico. Junto de tabelaContratosHTML() (usada em toda tabela de
+// contrato do sistema: Gerencial, Tático, alerta, Por Área) e nas duas
+// outras tabelas que têm markup próprio (busca, Detalhamento do Tático),
+// fica visível em QUALQUER lista onde o contrato aparecer, não só quando a
+// pessoa clica pra abrir ele.
+function badgeRenovado(c) {
+  return c.renovadoManualmente
+    ? ` <span class="badge-renovado" title="Atualizado manualmente — renovação já registrada no sistema (a planilha ainda não foi reimportada)">🔄</span>`
+    : "";
+}
+
 function formatarMoedaBR(v) {
   if (v === null || v === undefined) return "—";
   return "R$ " + Number(v).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -4055,7 +4070,13 @@ function heatmapAreaCriticidadeSVG(linhasArea) {
   const MAX_ROTULO = 20;
   const padL = 150, padT = 26;
   const colW = 60, rowH = 24;
-  const w = padL + presentes.length * colW + 8;
+  // Legenda de rodapé é uma frase fixa — com poucas áreas/colunas (isolando
+  // uma área só, por exemplo) a grade em si fica bem mais estreita que essa
+  // frase precisa, e o texto vazava pra fora do viewBox (reportado com
+  // print: cortado na borda da tela). viewBox nunca fica mais estreito do
+  // que a legenda precisa.
+  const TEXTO_RODAPE = "cor = criticidade · intensidade = volume de contratos na célula";
+  const w = Math.max(padL + presentes.length * colW + 8, padL + larguraTextoMonoAprox(TEXTO_RODAPE, 8) + 8);
   const h = padT + linhasArea.length * rowH + 18;
   const maxCelula = maxSeguro(linhasArea.flatMap((l) => presentes.map((cv) => l.porCrit[cv.label] || 0)));
 
@@ -4084,7 +4105,7 @@ function heatmapAreaCriticidadeSVG(linhasArea) {
   });
 
   const yRodape = padT + linhasArea.length * rowH + 13;
-  const rodape = `<text x="${padL}" y="${yRodape.toFixed(1)}" font-family="monospace" font-size="8" fill="var(--carvao)" fill-opacity="0.6">cor = criticidade · intensidade = volume de contratos na célula</text>`;
+  const rodape = `<text x="${padL}" y="${yRodape.toFixed(1)}" font-family="monospace" font-size="8" fill="var(--carvao)" fill-opacity="0.6">${TEXTO_RODAPE}</text>`;
 
   return `<svg viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg">${cabecalho}${corpo}${rodape}</svg>`;
 }
@@ -4309,7 +4330,7 @@ function ligarBuscaContratos(lista, porId, idInput, idResultado) {
           <thead><tr><th>Nº CONTRATO</th><th>ÁREA GESTORA</th><th>EMPRESA</th><th>OBJETO</th></tr></thead>
           <tbody>${encontrados.map((c) => `
             <tr class="linha-contrato" data-contrato-id="${escapeAttr(c.id)}">
-              <td>${escapeHTML(c.numeroContrato)}</td><td>${escapeHTML(c.unidadeGestora || "—")}</td><td>${escapeHTML(c.empresa)}</td><td>${escapeHTML(c.objeto || "—")}</td>
+              <td>${escapeHTML(c.numeroContrato)}${badgeRenovado(c)}</td><td>${escapeHTML(c.unidadeGestora || "—")}</td><td>${escapeHTML(c.empresa)}</td><td>${escapeHTML(c.objeto || "—")}</td>
             </tr>`).join("")}</tbody>
         </table></div>` : ""}
       </div>`;
@@ -4633,7 +4654,7 @@ function tabelaContratosHTML(lista, opcoes = {}) {
       <thead><tr><th>Nº CONTRATO</th><th>ÁREA GESTORA</th><th>EMPRESA</th><th>DIAS PARA VENCER</th><th>CRITICIDADE</th>${comSei ? "<th>SEI DOS ADITIVOS</th>" : ""}</tr></thead>
       <tbody>${lista.map((c) => `
         <tr class="linha-contrato" data-contrato-id="${escapeAttr(c.id)}">
-          <td>${escapeHTML(c.numeroContrato)}</td><td>${escapeHTML(c.unidadeGestora || "—")}</td><td>${escapeHTML(c.empresa)}</td><td class="num">${formatarDiasBR(c.diasParaVencer)}</td><td>${pillCriticidade(c.criticidade)}</td>${comSei ? `<td>${(c.aditivos || []).map((a) => `${a.numeroAditivo}º: ${escapeHTML(a.processoSeiAditivo || "—")}`).join("<br>") || "—"}</td>` : ""}
+          <td>${escapeHTML(c.numeroContrato)}${badgeRenovado(c)}</td><td>${escapeHTML(c.unidadeGestora || "—")}</td><td>${escapeHTML(c.empresa)}</td><td class="num">${formatarDiasBR(c.diasParaVencer)}</td><td>${pillCriticidade(c.criticidade)}</td>${comSei ? `<td>${(c.aditivos || []).map((a) => `${a.numeroAditivo}º: ${escapeHTML(a.processoSeiAditivo || "—")}`).join("<br>") || "—"}</td>` : ""}
         </tr>`).join("")}</tbody>
     </table>`;
 }
@@ -5176,7 +5197,7 @@ function renderTaticoContratos(lista) {
           <thead><tr><th>Nº CONTRATO</th><th>ÁREA GESTORA</th><th>EMPRESA</th><th>OBJETO</th></tr></thead>
           <tbody>${filtrada.map((c) => `
             <tr class="linha-contrato" data-contrato-id="${escapeAttr(c.id)}">
-              <td>${escapeHTML(c.numeroContrato)}</td><td>${escapeHTML(c.unidadeGestora || "—")}</td><td>${escapeHTML(c.empresa)}</td><td>${escapeHTML(c.objeto || "—")}</td>
+              <td>${escapeHTML(c.numeroContrato)}${badgeRenovado(c)}</td><td>${escapeHTML(c.unidadeGestora || "—")}</td><td>${escapeHTML(c.empresa)}</td><td>${escapeHTML(c.objeto || "—")}</td>
             </tr>`).join("")}</tbody>
         </table>`
       : `<p class="tela-intro">Nenhum contrato nessa faixa.</p>`;
