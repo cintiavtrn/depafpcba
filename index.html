@@ -5333,6 +5333,7 @@ function renderTaticoContratos(lista) {
       </div>
     </div>
     <div id="tat-busca-resultado"></div>
+    <div class="kpi-row" style="margin-bottom:16px" id="tat-resumo"></div>
     <h4 style="font-family:'Space Grotesk',sans-serif;font-size:var(--fs-subtitulo);margin-bottom:8px">Controle de Prazos</h4>
     <div class="dash-toggle" id="tat-toggle-criticidade" style="margin-bottom:18px;flex-wrap:wrap">
       <button class="dash-toggle-btn active" data-crit="">SELECIONAR TUDO</button>
@@ -5423,6 +5424,23 @@ function renderTaticoContratos(lista) {
     document.querySelectorAll("#tat-toggle-criticidade [data-crit]").forEach((btn) => {
       btn.classList.toggle("active", btn.dataset.crit ? filtrosCriticidade.has(btn.dataset.crit) : filtrosCriticidade.size === 0);
     });
+
+    // Pedido direto, comparando com o SEI de novo: "adiciona no tático e
+    // operacional cartões de resumo também" — o tema natural do Tático já
+    // É criticidade (é o que "Controle de Prazos" mede), então o resumo
+    // aqui é literalmente a contagem de cada faixa que o toggle abaixo
+    // filtra — clicar no cartão dispara o MESMO clique que clicar no botão
+    // do toggle (mesmo mecanismo, dois lugares pra chegar nele).
+    const contagemCrit = (l) => lista.filter((c) => c.criticidade === l).length;
+    document.getElementById("tat-resumo").innerHTML = ["Vencido", "Crítico (≤30 dias)", "Alto (31–60 dias)", "Médio (61–90 dias)"].map((l) => {
+      const cv = CRITICIDADE_VISUAL.find((x) => x.label === l);
+      return `<div class="kpi-card kpi-clicavel" data-resumo-crit="${escapeAttr(l)}" title="Clique pra isolar essa faixa" style="--kpi-cor:${cv.cor};cursor:pointer;${filtrosCriticidade.has(l) ? `outline:2px solid ${cv.cor};outline-offset:-2px` : ""}"><div class="kpi-cabeca">${kpiIcone("relogio")}<div class="kpi-label">${escapeHTML(l)}</div></div><div class="kpi-value">${contagemCrit(l).toLocaleString("pt-BR")}</div></div>`;
+    }).join("");
+    document.getElementById("tat-resumo").querySelectorAll("[data-resumo-crit]").forEach((card) => {
+      card.addEventListener("click", () => {
+        document.querySelector(`#tat-toggle-criticidade [data-crit="${CSS.escape(card.dataset.resumoCrit)}"]`)?.dispatchEvent(new Event("click", { bubbles: true }));
+      });
+    });
   }
 
   document.getElementById("tat-tabela-baixar").addEventListener("click", () =>
@@ -5465,6 +5483,7 @@ function renderOperacionalContratos(lista, portalSlug) {
       </div>
     </div>
     <div id="op-busca-resultado"></div>
+    <div class="kpi-row" style="margin-bottom:16px" id="op-resumo"></div>
     <div id="op-campos-selecionados" style="margin-bottom:16px"></div>
     <div id="op-kpis" style="margin-bottom:16px"></div>
     <div class="dash-charts" style="grid-template-columns:1.3fr 1fr">
@@ -5685,6 +5704,28 @@ function renderOperacionalContratos(lista, portalSlug) {
     const selecionado = contratoId ? porId.get(contratoId) : null;
     const valorAtualTotal = emContexto.reduce((a, c) => a + (c.valorGlobalAtual || 0), 0);
     const qtdAditivosTotal = emContexto.reduce((a, c) => a + (c.qtdAditivos || 0), 0);
+
+    // Pedido direto: "adiciona no tático e operacional cartões de resumo
+    // também" — aqui o resumo é o "antes de mergulhar em UM contrato só":
+    // sempre visível, mesmo com um contrato já selecionado (é a mesma
+    // foto que o Resumo Rápido já dá, só que respeitando o setor
+    // escolhido aqui). Sem um "isolar" próprio nesta tela (Operacional é
+    // só um contrato por vez) — clicar leva pro Gerencial já filtrado,
+    // mesmo mecanismo do Resumo Rápido.
+    const qtdVencidosOp = emContexto.filter((c) => c.statusVigencia === "Vencido").length;
+    const qtdAVencerOp = emContexto.filter((c) => c.statusVigencia === "A Vencer").length;
+    const qtdAContratarOp = emContexto.filter((c) => c.statusVigencia === "A Contratar").length;
+    document.getElementById("op-resumo").innerHTML = `
+      <div class="kpi-card kpi-clicavel" data-resumo-op="Todos" title="Clique pra ver a lista completa" style="cursor:pointer"><div class="kpi-cabeca">${kpiIcone("competencia_normas")}<div class="kpi-label">Qtd Contratos</div></div><div class="kpi-value">${emContexto.length.toLocaleString("pt-BR")}</div></div>
+      <div class="kpi-card kpi-clicavel" data-resumo-op="Vencido" title="Clique pra ver quais são" style="--kpi-cor:var(--crit-vencido);cursor:pointer"><div class="kpi-cabeca">${kpiIcone("relogio")}<div class="kpi-label">Vencidos</div></div><div class="kpi-value">${qtdVencidosOp.toLocaleString("pt-BR")}</div></div>
+      <div class="kpi-card kpi-clicavel" data-resumo-op="A Vencer" title="Clique pra ver quais são" style="--kpi-cor:var(--crit-alto);cursor:pointer"><div class="kpi-cabeca">${kpiIcone("relogio")}<div class="kpi-label">A Vencer</div></div><div class="kpi-value">${qtdAVencerOp.toLocaleString("pt-BR")}</div></div>
+      <div class="kpi-card kpi-clicavel" data-resumo-op="A Contratar" title="Clique pra ver quais são" style="--kpi-cor:var(--crit-neutro);cursor:pointer"><div class="kpi-cabeca">${kpiIcone("calendario")}<div class="kpi-label">A Contratar</div></div><div class="kpi-value">${qtdAContratarOp.toLocaleString("pt-BR")}</div></div>`;
+    document.getElementById("op-resumo").querySelectorAll("[data-resumo-op]").forEach((card) => {
+      card.addEventListener("click", () => {
+        document.querySelector('[data-subtab-contratos="gerencial"]')?.click();
+        document.querySelector(`#ger-kpis [data-status="${CSS.escape(card.dataset.resumoOp)}"]`)?.dispatchEvent(new Event("click", { bubbles: true }));
+      });
+    });
 
     // Pedido direto: quando "Já Renovado" veio com data/valor novos, o
     // painel inteiro já usa esses valores (ver enriquecer(), backend) — mas
@@ -6056,6 +6097,16 @@ function renderPorDimensaoContratos(lista, cfg) {
     });
   });
 
+  // Scroll + realce temporário — pra cartões que não têm um "subconjunto"
+  // óbvio pra isolar, mas ainda merecem um destino real (mesmo mecanismo
+  // já usado em Gerencial).
+  function rolarEDestacarPD(idElemento) {
+    const caixa = document.getElementById(idElemento)?.closest(".dash-chart-box");
+    caixa?.scrollIntoView?.({ behavior: "smooth", block: "center" });
+    caixa?.classList.add("destaque-temporario");
+    setTimeout(() => caixa?.classList.remove("destaque-temporario"), 1400);
+  }
+
   function selecionar(valor) {
     selecionada = valor;
     el("select").value = valor;
@@ -6185,7 +6236,7 @@ function renderPorDimensaoContratos(lista, cfg) {
         <div class="kpi-card" style="--kpi-cor:var(--crit-vencido)"><div class="kpi-cabeca">${kpiIcone("relogio")}<div class="kpi-label">Vencidos</div></div><div class="kpi-value">${vencidosPrazo.toLocaleString("pt-BR")}</div></div>
         <div class="kpi-card" style="--kpi-cor:var(--crit-critico)"><div class="kpi-cabeca">${kpiIcone("relogio")}<div class="kpi-label">Vence em até 30 dias</div></div><div class="kpi-value">${em30.toLocaleString("pt-BR")}</div></div>
         <div class="kpi-card" style="--kpi-cor:var(--crit-medio)"><div class="kpi-cabeca">${kpiIcone("relogio")}<div class="kpi-label">Vence em 31–90 dias</div></div><div class="kpi-value">${em90.toLocaleString("pt-BR")}</div></div>
-        <div class="kpi-card"><div class="kpi-cabeca">${kpiIcone("relogio")}<div class="kpi-label">Próximo a Vencer</div></div><div class="kpi-value" style="font-size:var(--fs-subtitulo)">${proximoVencer ? escapeHTML(proximoVencer.numeroContrato) : "—"}</div><div class="kpi-valor-exato">${proximoVencer ? `em ${proximoVencer.diasParaVencer} dia${proximoVencer.diasParaVencer === 1 ? "" : "s"}` : "nenhum contrato com data de vigência futura"}</div></div>
+        <div class="kpi-card${proximoVencer ? " linha-contrato" : ""}"${proximoVencer ? ` data-contrato-id="${escapeAttr(proximoVencer.id)}" style="cursor:pointer" title="Passe o mouse pra ver o detalhe rápido — clique pra abrir o panorama completo"` : ""}><div class="kpi-cabeca">${kpiIcone("relogio")}<div class="kpi-label">Próximo a Vencer</div></div><div class="kpi-value" style="font-size:var(--fs-subtitulo)">${proximoVencer ? escapeHTML(proximoVencer.numeroContrato) : "—"}</div><div class="kpi-valor-exato">${proximoVencer ? `em ${proximoVencer.diasParaVencer} dia${proximoVencer.diasParaVencer === 1 ? "" : "s"}` : "nenhum contrato com data de vigência futura"}</div></div>
       </div>
       <div class="dash-chart-box">
         <h4>Contratos por Vencimento e Criticidade</h4>
@@ -6198,6 +6249,12 @@ function renderPorDimensaoContratos(lista, cfg) {
       </div>
       <div id="${p}-mes-chip"></div>
       <div id="${p}-prazos-tabela" style="margin-top:16px"></div>`;
+    // Pedido direto: "cai naquela coisa deles não lembrarem por número,
+    // empresa..." — o cartão "Próximo a Vencer" referencia UM contrato só;
+    // reaproveita o MESMO tooltip-ao-passar-o-mouse (empresa, objeto,
+    // valor...) e o clique-abre-panorama que toda tabela de contrato já
+    // usa, em vez de deixar só o número do contrato pra decorar.
+    ligarTooltipLinhas(el("sub-prazos"), porId);
     function desenharMes() {
       const container = el("grafico-mes");
       if (modoMes === "gantt") {
@@ -6266,8 +6323,8 @@ function renderPorDimensaoContratos(lista, cfg) {
       <div class="kpi-row" style="margin-bottom:16px">
         <div class="kpi-card"><div class="kpi-cabeca">${kpiIcone("moeda")}<div class="kpi-label">Valor Atual Total</div></div><div class="kpi-value">R$ ${formatarEixo(valorAtualFin)}</div><div class="kpi-valor-exato">${formatarMoedaBR(valorAtualFin)}</div></div>
         <div class="kpi-card"><div class="kpi-cabeca">${kpiIcone("moeda")}<div class="kpi-label">Ticket Médio</div></div><div class="kpi-value">R$ ${formatarEixo(ticketMedio)}</div><div class="kpi-valor-exato">${formatarMoedaBR(ticketMedio)}</div></div>
-        <div class="kpi-card"><div class="kpi-cabeca">${kpiIcone("moeda")}<div class="kpi-label">Maior Contrato</div></div><div class="kpi-value" style="font-size:var(--fs-subtitulo)">${maiorContrato ? escapeHTML(maiorContrato.numeroContrato) : "—"}</div><div class="kpi-valor-exato">${maiorContrato ? formatarMoedaBR(maiorContrato.valorGlobalAtual) : "—"}</div></div>
-        <div class="kpi-card"><div class="kpi-cabeca">${kpiIcone("aditivo")}<div class="kpi-label">Qtd Total de Aditivos</div></div><div class="kpi-value">${totalAditivosFin.toLocaleString("pt-BR")}</div></div>
+        <div class="kpi-card${maiorContrato ? " linha-contrato" : ""}"${maiorContrato ? ` data-contrato-id="${escapeAttr(maiorContrato.id)}" style="cursor:pointer" title="Passe o mouse pra ver o detalhe rápido — clique pra abrir o panorama completo"` : ""}><div class="kpi-cabeca">${kpiIcone("moeda")}<div class="kpi-label">Maior Contrato</div></div><div class="kpi-value" style="font-size:var(--fs-subtitulo)">${maiorContrato ? escapeHTML(maiorContrato.numeroContrato) : "—"}</div><div class="kpi-valor-exato">${maiorContrato ? formatarMoedaBR(maiorContrato.valorGlobalAtual) : "—"}</div></div>
+        <div class="kpi-card kpi-clicavel" data-acao-fin="aditivos" title="Clique pra ver a distribuição" style="cursor:pointer"><div class="kpi-cabeca">${kpiIcone("aditivo")}<div class="kpi-label">Qtd Total de Aditivos</div></div><div class="kpi-value">${totalAditivosFin.toLocaleString("pt-BR")}</div></div>
       </div>
       <div class="dash-charts" style="grid-template-columns:1fr 1fr">
         <div class="dash-chart-box">
@@ -6295,6 +6352,10 @@ function renderPorDimensaoContratos(lista, cfg) {
       </div>
       <div id="${p}-financeiro-tabela" style="margin-top:16px"></div>
     `;
+    // Mesmo raciocínio do "Próximo a Vencer": "Maior Contrato" também é UM
+    // contrato só — tooltip ao passar o mouse (empresa, objeto...) e
+    // clique abre o panorama, em vez de só mostrar o número dele.
+    ligarTooltipLinhas(el("sub-financeiro"), porId);
     // Cross-filter à la BI: clicar numa fatia da rosca não só destaca ela —
     // filtra TAMBÉM o Top 10 e o gráfico de aditivos pro valor escolhido da
     // dimensão complementar (igual clicar num aspecto já isola o resto da
@@ -6345,6 +6406,8 @@ function renderPorDimensaoContratos(lista, cfg) {
       filtroAditivos = filtroAditivos === valor ? null : valor;
       renderFinanceiro(listaFiltrada);
     });
+    const acaoAditivosFin = el("sub-financeiro").querySelector('[data-acao-fin="aditivos"]');
+    if (acaoAditivosFin) acaoAditivosFin.addEventListener("click", () => rolarEDestacarPD(`${p}-aditivos`));
 
     // Chip(s) do que está isolado — mesmo padrão do Gerencial: cada filtro
     // ativo sabe se desligar sozinho.
@@ -6376,10 +6439,10 @@ function renderPorDimensaoContratos(lista, cfg) {
     const semResponsavel = listaFiltrada.filter((c) => !c.analista && !(c.pessoas || []).length).length;
     el("sub-pessoas").innerHTML = `
       <div class="kpi-row" style="margin-bottom:16px">
-        <div class="kpi-card"><div class="kpi-cabeca">${kpiIcone("pessoa")}<div class="kpi-label">Analistas</div></div><div class="kpi-value">${qtdAnalistas.toLocaleString("pt-BR")}</div></div>
-        <div class="kpi-card"><div class="kpi-cabeca">${kpiIcone("pessoa")}<div class="kpi-label">Gestores</div></div><div class="kpi-value">${qtdGestores.toLocaleString("pt-BR")}</div></div>
-        <div class="kpi-card"><div class="kpi-cabeca">${kpiIcone("pessoa")}<div class="kpi-label">Fiscais</div></div><div class="kpi-value">${qtdFiscais.toLocaleString("pt-BR")}</div></div>
-        <div class="kpi-card"${semResponsavel ? ' style="--kpi-cor:var(--crit-alto)"' : ""}><div class="kpi-cabeca">${kpiIcone("alerta")}<div class="kpi-label">Sem Responsável Cadastrado</div></div><div class="kpi-value">${semResponsavel.toLocaleString("pt-BR")}</div></div>
+        <div class="kpi-card kpi-clicavel" data-acao-pes="analista" title="Clique pra ver a distribuição" style="cursor:pointer"><div class="kpi-cabeca">${kpiIcone("pessoa")}<div class="kpi-label">Analistas</div></div><div class="kpi-value">${qtdAnalistas.toLocaleString("pt-BR")}</div></div>
+        <div class="kpi-card kpi-clicavel" data-acao-pes="gestor" title="Clique pra ver a distribuição" style="cursor:pointer"><div class="kpi-cabeca">${kpiIcone("pessoa")}<div class="kpi-label">Gestores</div></div><div class="kpi-value">${qtdGestores.toLocaleString("pt-BR")}</div></div>
+        <div class="kpi-card kpi-clicavel" data-acao-pes="fiscal" title="Clique pra ver a distribuição" style="cursor:pointer"><div class="kpi-cabeca">${kpiIcone("pessoa")}<div class="kpi-label">Fiscais</div></div><div class="kpi-value">${qtdFiscais.toLocaleString("pt-BR")}</div></div>
+        <div class="kpi-card kpi-clicavel" data-sem-responsavel title="Clique pra ver quais são" style="${semResponsavel ? "--kpi-cor:var(--crit-alto);" : ""}cursor:pointer${filtroPessoa?.tipo === "sem-responsavel" ? ";outline:2px solid var(--crit-alto);outline-offset:-2px" : ""}"><div class="kpi-cabeca">${kpiIcone("alerta")}<div class="kpi-label">Sem Responsável Cadastrado</div></div><div class="kpi-value">${semResponsavel.toLocaleString("pt-BR")}</div></div>
       </div>
       <div class="dash-charts" style="grid-template-columns:1fr 1fr">
         <div class="dash-chart-box"><h4>Por Analista</h4><div id="${p}-analista"></div></div>
@@ -6420,16 +6483,37 @@ function renderPorDimensaoContratos(lista, cfg) {
     ligarClique("gestor", "gestor");
     ligarClique("fiscal", "fiscal");
 
+    // Analistas/Gestores/Fiscais não têm um "subconjunto" próprio no
+    // cartão (são contagem de gente única) — clicar rola até o gráfico
+    // correspondente, onde aí sim dá pra escolher um nome.
+    el("sub-pessoas").querySelectorAll("[data-acao-pes]").forEach((card) => {
+      card.addEventListener("click", () => rolarEDestacarPD(`${p}-${card.dataset.acaoPes}`));
+    });
+    // "Sem Responsável Cadastrado" é o mais valioso dos 4 — achar o buraco
+    // no dado é exatamente o "achar informações perdidas" que já motivou
+    // outras partes do sistema.
+    const cardSemResponsavel = el("sub-pessoas").querySelector("[data-sem-responsavel]");
+    if (cardSemResponsavel) {
+      cardSemResponsavel.addEventListener("click", () => {
+        filtroPessoa = filtroPessoa?.tipo === "sem-responsavel" ? null : { tipo: "sem-responsavel", nome: null };
+        renderPessoas(listaFiltrada);
+      });
+    }
+
     if (filtroPessoa) {
       const testesPorTipo = {
         analista: (c) => (c.analista || "(sem analista)") === filtroPessoa.nome,
         gestor: (c) => (c.pessoas || []).some((pe) => pe.papel === "Gestor" && pe.nomePessoa === filtroPessoa.nome),
         fiscal: (c) => (c.pessoas || []).some((pe) => pe.papel === "Fiscal" && pe.nomePessoa === filtroPessoa.nome),
+        "sem-responsavel": (c) => !c.analista && !(c.pessoas || []).length,
       };
       const contratosDoFiltro = listaFiltrada.filter(testesPorTipo[filtroPessoa.tipo]);
+      const tituloFiltroPessoa = filtroPessoa.tipo === "sem-responsavel"
+        ? "sem responsável cadastrado (nem analista, nem gestor, nem fiscal)"
+        : `${escapeHTML(filtroPessoa.tipo)}: ${escapeHTML(filtroPessoa.nome)}`;
       el("pessoas-tabela").innerHTML = `
         <div class="dash-chart-box">
-          <h4>Contratos — ${escapeHTML(filtroPessoa.tipo)}: ${escapeHTML(filtroPessoa.nome)}</h4>
+          <h4>Contratos — ${tituloFiltroPessoa}</h4>
           <div class="tabela-rolavel" style="max-height:320px" id="${p}-pessoas-tabela-conteudo"></div>
         </div>`;
       el("pessoas-tabela-conteudo").innerHTML = tabelaContratosHTML(contratosDoFiltro);
