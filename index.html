@@ -3996,41 +3996,18 @@ function badgeEntidadeHTML(nome) {
   return kpiIcone(icone, cor);
 }
 
-// Pedido direto: "eu acho que vc deveria olhar a natureza dos contratos
-// relacionados... objeto... pra montar uma identidade visual mesmo...
-// ainda to achando que tem nada a ver". Área gestora é sigla/nome interno
-// (DGTI, CORE/SAER, DEPAF...) — bater padrão de palavra no NOME dela quase
-// nunca acha nada com sentido. O que tem sentido é o que ela CONTRATA: a
-// categoria (tipo de objeto) mais frequente entre os contratos daquela
-// área já é uma palavra "de verdade" (Transporte, Imóveis, TIC...) que O
-// MESMO sistema de padrões já reconhece bem. Ícone = a natureza
-// predominante do que a área contrata; cor = hash do NOME da área (pra
-// duas áreas com a mesma natureza — ex. duas dominadas por Transporte —
-// ainda saírem visualmente diferentes uma da outra, não idênticas).
-function categoriaDominante(nomeArea, lista) {
-  const porTipo = new Map();
-  lista.forEach((c) => {
-    if ((c.unidadeGestora || "(sem unidade)") !== nomeArea) return;
-    const tipo = c.tipoObjeto || "(sem tipo)";
-    const atual = porTipo.get(tipo) || { qtd: 0, valor: 0 };
-    atual.qtd += 1;
-    atual.valor += c.valorGlobalAtual || 0;
-    porTipo.set(tipo, atual);
-  });
-  let tipoDominante = "";
-  let melhor = null;
-  porTipo.forEach((v, k) => {
-    if (!melhor || v.qtd > melhor.qtd || (v.qtd === melhor.qtd && v.valor > melhor.valor)) { melhor = v; tipoDominante = k; }
-  });
-  return tipoDominante;
-}
-function entidadeIconeCorArea(nomeArea, lista) {
-  const tipoDominante = categoriaDominante(nomeArea, lista);
-  if (!tipoDominante) return entidadeIconeCor(nomeArea); // área sem contrato nenhum (não deveria acontecer, mas não quebra)
-  const bucket = BUCKETS_ENTIDADE.find((b) => b.padrao.test(tipoDominante));
-  const hArea = hashTexto(nomeArea);
-  const icone = bucket ? bucket.icone : ICONES_ENTIDADE_RESERVA[hashTexto(tipoDominante) % ICONES_ENTIDADE_RESERVA.length];
-  return { icone, cor: CORES_ENTIDADE[hArea % CORES_ENTIDADE.length] };
+// Pedido direto, depois de testar a ideia de ícone por natureza do
+// contrato (computador pro DGTI, avião pro CORE/SAER etc.): "ainda dá
+// confusão esses ícones aí... que tal colocar área gestora só com os
+// prédios de cores diferentes?" — simplificado de volta: TODA área
+// gestora usa o mesmo ícone (prédio, a própria metáfora de "unidade
+// organizacional" que a aba "Por Área Gestora" já usa), só a cor muda
+// por área (hash do nome, mesmo esquema de sempre — determinístico, não
+// muda de um lugar pro outro). Categoria (tipo de objeto) continua com o
+// ícone pela natureza do próprio nome dela — só área gestora simplificou.
+function entidadeIconeCorArea(nomeArea, _lista) {
+  const hArea = hashTexto(nomeArea || "");
+  return { icone: "predio", cor: CORES_ENTIDADE[hArea % CORES_ENTIDADE.length] };
 }
 function badgeEntidadeAreaHTML(nomeArea, lista) {
   const { icone, cor } = entidadeIconeCorArea(nomeArea, lista);
