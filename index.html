@@ -3996,6 +3996,47 @@ function badgeEntidadeHTML(nome) {
   return kpiIcone(icone, cor);
 }
 
+// Pedido direto: "eu acho que vc deveria olhar a natureza dos contratos
+// relacionados... objeto... pra montar uma identidade visual mesmo...
+// ainda to achando que tem nada a ver". Área gestora é sigla/nome interno
+// (DGTI, CORE/SAER, DEPAF...) — bater padrão de palavra no NOME dela quase
+// nunca acha nada com sentido. O que tem sentido é o que ela CONTRATA: a
+// categoria (tipo de objeto) mais frequente entre os contratos daquela
+// área já é uma palavra "de verdade" (Transporte, Imóveis, TIC...) que O
+// MESMO sistema de padrões já reconhece bem. Ícone = a natureza
+// predominante do que a área contrata; cor = hash do NOME da área (pra
+// duas áreas com a mesma natureza — ex. duas dominadas por Transporte —
+// ainda saírem visualmente diferentes uma da outra, não idênticas).
+function categoriaDominante(nomeArea, lista) {
+  const porTipo = new Map();
+  lista.forEach((c) => {
+    if ((c.unidadeGestora || "(sem unidade)") !== nomeArea) return;
+    const tipo = c.tipoObjeto || "(sem tipo)";
+    const atual = porTipo.get(tipo) || { qtd: 0, valor: 0 };
+    atual.qtd += 1;
+    atual.valor += c.valorGlobalAtual || 0;
+    porTipo.set(tipo, atual);
+  });
+  let tipoDominante = "";
+  let melhor = null;
+  porTipo.forEach((v, k) => {
+    if (!melhor || v.qtd > melhor.qtd || (v.qtd === melhor.qtd && v.valor > melhor.valor)) { melhor = v; tipoDominante = k; }
+  });
+  return tipoDominante;
+}
+function entidadeIconeCorArea(nomeArea, lista) {
+  const tipoDominante = categoriaDominante(nomeArea, lista);
+  if (!tipoDominante) return entidadeIconeCor(nomeArea); // área sem contrato nenhum (não deveria acontecer, mas não quebra)
+  const bucket = BUCKETS_ENTIDADE.find((b) => b.padrao.test(tipoDominante));
+  const hArea = hashTexto(nomeArea);
+  const icone = bucket ? bucket.icone : ICONES_ENTIDADE_RESERVA[hashTexto(tipoDominante) % ICONES_ENTIDADE_RESERVA.length];
+  return { icone, cor: CORES_ENTIDADE[hArea % CORES_ENTIDADE.length] };
+}
+function badgeEntidadeAreaHTML(nomeArea, lista) {
+  const { icone, cor } = entidadeIconeCorArea(nomeArea, lista);
+  return kpiIcone(icone, cor);
+}
+
 function formatarMoedaBR(v) {
   if (v === null || v === undefined) return "—";
   return "R$ " + Number(v).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -5808,7 +5849,7 @@ function renderResumoRapido(lista, resumo) {
       <div class="kpi-row" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr))">
         ${top3.map((a) => `
           <div class="kpi-card kpi-clicavel" ${atributoRanking}="${escapeAttr(a.label)}" title="Clique pra ver o perfil completo" style="cursor:pointer">
-            <div class="kpi-cabeca">${badgeEntidadeHTML(a.label)}<div class="kpi-label">${escapeHTML(a.label)}</div></div>
+            <div class="kpi-cabeca">${modoRanking === "area" ? badgeEntidadeAreaHTML(a.label, lista) : badgeEntidadeHTML(a.label)}<div class="kpi-label">${escapeHTML(a.label)}</div></div>
             <div class="kpi-value" style="font-size:var(--fs-subtitulo)">R$ ${formatarEixo(a.total)}</div>
             <div class="kpi-valor-exato">${formatarMoedaBR(a.total)} · ${a.qtd} contrato${a.qtd === 1 ? "" : "s"}</div>
           </div>`).join("")}
@@ -6069,7 +6110,7 @@ function renderPorDimensaoContratos(lista, cfg) {
       const v = valorPorGrupo.get(l.label);
       const piorCrit = CRITICIDADE_VISUAL.find((cv) => l.porCrit[cv.label] > 0);
       return `<div class="kpi-card" data-${p}-card="${escapeAttr(l.label)}" style="cursor:pointer;--kpi-cor:${piorCrit ? piorCrit.cor : "var(--carvao)"}">
-        <div class="kpi-cabeca">${badgeEntidadeHTML(l.label)}<div class="kpi-label">${escapeHTML(l.label)}</div></div>
+        <div class="kpi-cabeca">${p === "area" ? badgeEntidadeAreaHTML(l.label, lista) : badgeEntidadeHTML(l.label)}<div class="kpi-label">${escapeHTML(l.label)}</div></div>
         <div class="kpi-value" style="font-size:var(--fs-subtitulo)">${l.total} contrato${l.total === 1 ? "" : "s"}</div>
         <div class="font-mono" style="font-size:var(--fs-ui-sm);color:#8B93A3">${v ? formatarMoedaBR(v.total) : "—"}</div>
       </div>`;
@@ -6096,7 +6137,7 @@ function renderPorDimensaoContratos(lista, cfg) {
     el("cabecalho").innerHTML = `
       <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px">
         <div style="display:flex;align-items:center;gap:12px">
-          ${badgeEntidadeHTML(selecionada)}
+          ${p === "area" ? badgeEntidadeAreaHTML(selecionada, lista) : badgeEntidadeHTML(selecionada)}
           <div>
             <h4 style="margin-bottom:2px">${escapeHTML(selecionada)}</h4>
             <p class="font-mono" style="font-size:var(--fs-ui-sm);color:#8B93A3">${listaFiltrada.length} contrato(s) · ${formatarMoedaBR(valorAtual)} em valor atual${qtdVencidos ? ` · ${qtdVencidos} vencido(s)` : ""}</p>
