@@ -245,17 +245,27 @@ body{background:var(--paper);color:var(--carvao);font-family:'IBM Plex Sans',san
 .equipe{font-family:'IBM Plex Mono',monospace;font-size:var(--fs-ui-sm);color:#9AA3B2;margin-top:14px;border-top:1px solid var(--paper-line);padding-top:10px}
 .equipe span{display:block}
 
-.tabs{display:flex;gap:2px;margin-bottom:0;border-bottom:3px solid var(--carvao)}
+/* Pedido direto, comparando com o SEI: "os quadrados de gerencial, tático,
+   operacional... quadradão e sem ícone" — mesmo tratamento do kpi-card:
+   ganham ícone e um respiro maior entre elas (gap real em vez de coladas),
+   sem abandonar a metáfora de aba de pasta (ainda encostam no conteúdo). */
+.tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:0;border-bottom:3px solid var(--carvao)}
 .tab-btn{
   font-family:'IBM Plex Mono',monospace;font-size:var(--fs-ui);letter-spacing:0.05em;
   background:var(--paper-line);color:var(--carvao);border:2px solid var(--carvao);border-bottom:none;
-  padding:10px 18px;cursor:pointer;position:relative;top:3px;
+  padding:10px 16px;cursor:pointer;position:relative;top:3px;
+  display:inline-flex;align-items:center;gap:8px;
 }
+.tab-btn svg{width:15px;height:15px;flex:none}
 .tab-btn.active{	background:var(--surface);top:0;padding-bottom:13px;font-weight:600}
 .tab-panel{padding-top:26px}
 .tab-panel[hidden]{display:none}
 
-.dash-filtros{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:24px;background:var(--surface);border:2px solid var(--carvao);padding:14px 16px;box-sizing:border-box;max-width:100%}
+/* Pedido direto: "os slicer de seleção... a forma de exibição das seções
+   onde aparece os gráficos e tabelas" — mesmo raciocínio do kpi-card: sai
+   a costura fina de 2px (fundo carvão vazando), entra borda e canto
+   próprios, mais leves. */
+.dash-filtros{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:24px;background:var(--surface);border:1.5px solid var(--paper-line);border-radius:var(--radius-md);padding:14px 16px;box-sizing:border-box;max-width:100%}
 .dash-filtros *{box-sizing:border-box}
 .dash-filtros select,.dash-filtros input[type="text"],.dash-filtros input[type="number"]{max-width:100%}
 .dash-filtro{min-width:0;max-width:100%}
@@ -263,12 +273,12 @@ body{background:var(--paper);color:var(--carvao);font-family:'IBM Plex Sans',san
 .dash-filtro{display:flex;flex-direction:column;gap:4px}
 .dash-filtro label{font-family:'IBM Plex Mono',monospace;font-size:var(--fs-ui-sm);letter-spacing:0.08em;color:#9AA3B2}
 .dash-filtro select{
-  font-family:'IBM Plex Mono',monospace;font-size:var(--fs-ui);padding:6px 8px;border:2px solid var(--carvao);background:var(--paper);color:var(--carvao);
+  font-family:'IBM Plex Mono',monospace;font-size:var(--fs-ui);padding:7px 10px;border:1.5px solid var(--paper-line);background:var(--paper);color:var(--carvao);border-radius:var(--radius-sm);
 }
 
-.dash-charts{display:grid;grid-template-columns:1fr 1.05fr;gap:2px;background:var(--carvao);border:2px solid var(--carvao);margin-bottom:2px}
+.dash-charts{display:grid;grid-template-columns:1fr 1.05fr;gap:14px;margin-bottom:14px}
 @media (max-width:760px){.dash-charts{grid-template-columns:1fr}}
-.dash-chart-box{	background:var(--surface);padding:18px}
+.dash-chart-box{	background:var(--surface);padding:18px;border:1.5px solid var(--paper-line);border-radius:var(--radius-md)}
 .dash-chart-box h4{font-family:'Space Grotesk',sans-serif;font-size:var(--fs-subtitulo);margin-bottom:12px}
 .dash-chart-box svg{width:100%;height:auto;display:block}
 
@@ -299,10 +309,10 @@ body{background:var(--paper);color:var(--carvao);font-family:'IBM Plex Sans',san
 /* Rolagem DENTRO da tabela (como no Power BI) — o cabeçalho fica fixo e só o
    corpo rola, em vez da tabela empurrar a página inteira pra baixo quando
    tem muita linha. */
-.tabela-rolavel{max-height:360px;overflow-y:auto;border:2px solid var(--carvao)}
+.tabela-rolavel{max-height:360px;overflow-y:auto;overflow-x:auto;border:1.5px solid var(--paper-line);border-radius:var(--radius-md)}
 .tabela-rolavel .dash-tabela{border:none}
 .tabela-rolavel thead th{position:sticky;top:0;z-index:1}
-.dash-tabela{width:100%;border-collapse:collapse;	background:var(--surface);border:2px solid var(--carvao)}
+.dash-tabela{width:100%;border-collapse:collapse;	background:var(--surface);border:1.5px solid var(--paper-line)}
 .dash-tabela th,.dash-tabela td{border:1px solid var(--paper-line);padding:8px 10px;font-size:var(--fs-corpo);text-align:left}
 .dash-tabela th{font-family:'IBM Plex Mono',monospace;font-size:var(--fs-ui-sm);letter-spacing:0.06em;background:var(--paper);color:#9AA3B2}
 .dash-tabela td.num{font-family:'IBM Plex Mono',monospace;text-align:right}
@@ -541,7 +551,7 @@ select:focus-visible,input:focus-visible{
   outline:2px solid var(--tinta);outline-offset:2px;
 }
 
-.tab-btn{border-radius:var(--radius-sm) var(--radius-sm) 0 0}
+.tab-btn{border-radius:var(--radius-md) var(--radius-md) 0 0}
 .tab-btn.active{box-shadow:0 -6px 16px -10px rgba(34,211,238,.4)}
 
 .dash-toggle{border-radius:var(--radius-sm);overflow:hidden;box-shadow:var(--shadow-xs)}
@@ -744,6 +754,7 @@ select:focus-visible,input:focus-visible{
 // =====================================================================
 const ICONS = {
   aditivo: "<svg viewBox=\"0 0 64 64\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"3\" stroke-linecap=\"square\" stroke-linejoin=\"miter\" xmlns=\"http://www.w3.org/2000/svg\">\n  <rect x=\"10\" y=\"8\" width=\"30\" height=\"40\" />\n  <line x1=\"16\" y1=\"18\" x2=\"34\" y2=\"18\" />\n  <line x1=\"16\" y1=\"26\" x2=\"34\" y2=\"26\" />\n  <circle cx=\"44\" cy=\"42\" r=\"12\" />\n  <line x1=\"44\" y1=\"36\" x2=\"44\" y2=\"48\" />\n  <line x1=\"38\" y1=\"42\" x2=\"50\" y2=\"42\" />\n</svg>",
+  atualizar: "<svg viewBox=\"0 0 64 64\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"3\" stroke-linecap=\"square\" stroke-linejoin=\"miter\" xmlns=\"http://www.w3.org/2000/svg\">\n  <path d=\"M 12 32 A 20 20 0 1 1 18 46\" />\n  <polyline points=\"8,34 12,46 24,42\" />\n</svg>",
   calendario: "<svg viewBox=\"0 0 64 64\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"3\" stroke-linecap=\"square\" stroke-linejoin=\"miter\" xmlns=\"http://www.w3.org/2000/svg\">\n  <rect x=\"8\" y=\"14\" width=\"48\" height=\"42\" />\n  <line x1=\"8\" y1=\"26\" x2=\"56\" y2=\"26\" />\n  <line x1=\"20\" y1=\"8\" x2=\"20\" y2=\"20\" />\n  <line x1=\"44\" y1=\"8\" x2=\"44\" y2=\"20\" />\n</svg>",
   categoria_tag: "<svg viewBox=\"0 0 64 64\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"3\" stroke-linecap=\"square\" stroke-linejoin=\"miter\" xmlns=\"http://www.w3.org/2000/svg\">\n  <polygon points=\"8,32 32,8 56,8 56,32 32,56\" />\n  <circle cx=\"44\" cy=\"20\" r=\"3\" fill=\"currentColor\" stroke=\"none\" />\n</svg>",
   brasao_pcba: "<svg viewBox=\"0 0 120 140\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linejoin=\"miter\" stroke-linecap=\"square\" xmlns=\"http://www.w3.org/2000/svg\">\n  <g>\n    <polygon points=\"60,6 64,18 76,18 66,25 70,37 60,30 50,37 54,25 44,18 56,18\" />\n  </g>\n  <g>\n    <path d=\"M 22 46 L 22 42 L 30 42 L 30 46 L 38 46 L 38 42 L 46 42 L 46 46 L 54 46 L 54 42 L 66 42 L 66 46 L 74 46 L 74 42 L 82 42 L 82 46 L 90 46 L 90 42 L 98 42 L 98 46 L 98 96 L 60 118 L 22 96 Z\" />\n    <path d=\"M 28 52 L 28 48 L 34 48 L 34 52 L 40 52 L 40 48 L 46 48 L 46 52 L 54 52 L 54 48 L 66 48 L 66 52 L 74 52 L 74 48 L 80 48 L 80 52 L 86 52 L 86 48 L 92 48 L 92 52 L 92 93 L 60 112 L 28 93 Z\" />\n  </g>\n  <g>\n    <line x1=\"60\" y1=\"58\" x2=\"60\" y2=\"104\" />\n    <line x1=\"48\" y1=\"72\" x2=\"72\" y2=\"72\" />\n    <line x1=\"48\" y1=\"80\" x2=\"72\" y2=\"80\" />\n    <line x1=\"48\" y1=\"72\" x2=\"48\" y2=\"80\" />\n    <line x1=\"72\" y1=\"72\" x2=\"72\" y2=\"80\" />\n  </g>\n  <g>\n    <path d=\"M 42 100 L 42 96 L 45 96 L 45 100 L 48 100 L 48 96 L 51 96 L 51 100 L 51 108 L 42 108 Z\" />\n    <rect x=\"45\" y=\"102\" width=\"3\" height=\"6\" />\n    <path d=\"M 69 100 L 69 96 L 72 96 L 72 100 L 75 100 L 75 96 L 78 96 L 78 100 L 78 108 L 69 108 Z\" />\n    <rect x=\"72\" y=\"102\" width=\"3\" height=\"6\" />\n  </g>\n  <g stroke-width=\"1.5\">\n    <path d=\"M 22 96 L 12 108 L 18 118 L 30 122 L 44 126 L 60 128\" />\n    <line x1=\"16\" y1=\"110\" x2=\"22\" y2=\"106\" />\n    <line x1=\"22\" y1=\"118\" x2=\"28\" y2=\"114\" />\n    <line x1=\"30\" y1=\"122\" x2=\"34\" y2=\"116\" />\n    <line x1=\"40\" y1=\"124\" x2=\"44\" y2=\"118\" />\n    <line x1=\"50\" y1=\"126\" x2=\"54\" y2=\"120\" />\n    <path d=\"M 98 96 L 108 108 L 102 118 L 90 122 L 76 126 L 60 128\" />\n    <line x1=\"104\" y1=\"110\" x2=\"98\" y2=\"106\" />\n    <line x1=\"98\" y1=\"118\" x2=\"92\" y2=\"114\" />\n    <line x1=\"90\" y1=\"122\" x2=\"86\" y2=\"116\" />\n    <line x1=\"80\" y1=\"124\" x2=\"76\" y2=\"118\" />\n    <line x1=\"70\" y1=\"126\" x2=\"66\" y2=\"120\" />\n    <polygon points=\"54,128 66,128 63,134 57,134\" />\n  </g>\n</svg>",
@@ -758,8 +769,11 @@ const ICONS = {
   competencia_tombamento: "<svg viewBox=\"0 0 64 64\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"3\" stroke-linecap=\"square\" stroke-linejoin=\"miter\" xmlns=\"http://www.w3.org/2000/svg\">\n  <g>\n    <polygon points=\"10,18 54,18 54,46 10,46\" />\n    <circle cx=\"16\" cy=\"22\" r=\"1.5\" fill=\"currentColor\" stroke=\"none\" />\n    <circle cx=\"48\" cy=\"22\" r=\"1.5\" fill=\"currentColor\" stroke=\"none\" />\n    <circle cx=\"16\" cy=\"42\" r=\"1.5\" fill=\"currentColor\" stroke=\"none\" />\n    <circle cx=\"48\" cy=\"42\" r=\"1.5\" fill=\"currentColor\" stroke=\"none\" />\n    <line x1=\"18\" y1=\"28\" x2=\"46\" y2=\"28\" />\n    <text x=\"32\" y=\"40\" text-anchor=\"middle\" font-family=\"monospace\" font-size=\"9\" fill=\"currentColor\" stroke=\"none\" letter-spacing=\"1\">N\u00b0</text>\n  </g>\n</svg>",
   cota_horizontal: "<svg viewBox=\"0 0 240 28\" width=\"240\" height=\"28\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.25\" xmlns=\"http://www.w3.org/2000/svg\">\n  <line x1=\"4\" y1=\"18\" x2=\"236\" y2=\"18\" />\n  <line x1=\"4\" y1=\"10\" x2=\"4\" y2=\"26\" />\n  <line x1=\"236\" y1=\"10\" x2=\"236\" y2=\"26\" />\n  <polygon points=\"10,18 4,15 4,21\" fill=\"currentColor\" stroke=\"none\" />\n  <polygon points=\"230,18 236,15 236,21\" fill=\"currentColor\" stroke=\"none\" />\n  <rect x=\"94\" y=\"4\" width=\"52\" height=\"12\" fill=\"var(--paper, #ffffff)\" stroke=\"none\" />\n  <text x=\"120\" y=\"14\" text-anchor=\"middle\" font-family=\"monospace\" font-size=\"10\" fill=\"currentColor\" stroke=\"none\" letter-spacing=\"1\">64,00</text>\n</svg>",
   distintivo_pcba: "<svg viewBox=\"0 0 140 170\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linejoin=\"miter\" stroke-linecap=\"square\" xmlns=\"http://www.w3.org/2000/svg\">\n  <defs>\n    <g id=\"brasao-pcba-mark\">\n      <g>\n        <polygon points=\"60,6 64,18 76,18 66,25 70,37 60,30 50,37 54,25 44,18 56,18\" />\n      </g>\n      <g>\n        <path d=\"M 22 46 L 22 42 L 30 42 L 30 46 L 38 46 L 38 42 L 46 42 L 46 46 L 54 46 L 54 42 L 66 42 L 66 46 L 74 46 L 74 42 L 82 42 L 82 46 L 90 46 L 90 42 L 98 42 L 98 46 L 98 96 L 60 118 L 22 96 Z\" />\n        <path d=\"M 28 52 L 28 48 L 34 48 L 34 52 L 40 52 L 40 48 L 46 48 L 46 52 L 54 52 L 54 48 L 66 48 L 66 52 L 74 52 L 74 48 L 80 48 L 80 52 L 86 52 L 86 48 L 92 48 L 92 52 L 92 93 L 60 112 L 28 93 Z\" />\n      </g>\n      <g>\n        <line x1=\"60\" y1=\"58\" x2=\"60\" y2=\"104\" />\n        <line x1=\"48\" y1=\"72\" x2=\"72\" y2=\"72\" />\n        <line x1=\"48\" y1=\"80\" x2=\"72\" y2=\"80\" />\n        <line x1=\"48\" y1=\"72\" x2=\"48\" y2=\"80\" />\n        <line x1=\"72\" y1=\"72\" x2=\"72\" y2=\"80\" />\n      </g>\n      <g>\n        <path d=\"M 42 100 L 42 96 L 45 96 L 45 100 L 48 100 L 48 96 L 51 96 L 51 100 L 51 108 L 42 108 Z\" />\n        <rect x=\"45\" y=\"102\" width=\"3\" height=\"6\" />\n        <path d=\"M 69 100 L 69 96 L 72 96 L 72 100 L 75 100 L 75 96 L 78 96 L 78 100 L 78 108 L 69 108 Z\" />\n        <rect x=\"72\" y=\"102\" width=\"3\" height=\"6\" />\n      </g>\n      <g stroke-width=\"1.5\">\n        <path d=\"M 22 96 L 12 108 L 18 118 L 30 122 L 44 126 L 60 128\" />\n        <line x1=\"16\" y1=\"110\" x2=\"22\" y2=\"106\" />\n        <line x1=\"22\" y1=\"118\" x2=\"28\" y2=\"114\" />\n        <line x1=\"30\" y1=\"122\" x2=\"34\" y2=\"116\" />\n        <line x1=\"40\" y1=\"124\" x2=\"44\" y2=\"118\" />\n        <line x1=\"50\" y1=\"126\" x2=\"54\" y2=\"120\" />\n        <path d=\"M 98 96 L 108 108 L 102 118 L 90 122 L 76 126 L 60 128\" />\n        <line x1=\"104\" y1=\"110\" x2=\"98\" y2=\"106\" />\n        <line x1=\"98\" y1=\"118\" x2=\"92\" y2=\"114\" />\n        <line x1=\"90\" y1=\"122\" x2=\"86\" y2=\"116\" />\n        <line x1=\"80\" y1=\"124\" x2=\"76\" y2=\"118\" />\n        <line x1=\"70\" y1=\"126\" x2=\"66\" y2=\"120\" />\n        <polygon points=\"54,128 66,128 63,134 57,134\" />\n      </g>\n    </g>\n  </defs>\n\n  \n  <path d=\"M 20 22 L 120 22 L 130 40 L 130 118 L 70 162 L 10 118 L 10 40 Z\" />\n  \n  <path d=\"M 26 30 L 114 30 L 122 44 L 122 114 L 70 154 L 18 114 L 18 44 Z\" />\n\n  \n  <g>\n    <polygon points=\"18,36 122,36 128,44 122,52 18,52 24,44\" />\n    <polygon points=\"10,40 18,36 24,44 18,52 10,48\" />\n    <polygon points=\"130,40 122,36 116,44 122,52 130,48\" />\n    <text x=\"70\" y=\"47\" text-anchor=\"middle\" font-family=\"monospace\" font-weight=\"700\" font-size=\"9\" letter-spacing=\"2\" fill=\"currentColor\" stroke=\"none\">POL\u00cdCIA</text>\n  </g>\n\n  \n  <use href=\"#brasao-pcba-mark\" transform=\"translate(35 54) scale(0.42)\" />\n\n  \n  <g>\n    <polygon points=\"26,130 114,130 120,138 114,146 26,146 32,138\" />\n    <text x=\"70\" y=\"141\" text-anchor=\"middle\" font-family=\"monospace\" font-weight=\"700\" font-size=\"9\" letter-spacing=\"3\" fill=\"currentColor\" stroke=\"none\">CIVIL \u00b7 BA</text>\n  </g>\n</svg>",
+  engrenagem: "<svg viewBox=\"0 0 64 64\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"3\" stroke-linecap=\"square\" stroke-linejoin=\"miter\" xmlns=\"http://www.w3.org/2000/svg\">\n  <circle cx=\"32\" cy=\"32\" r=\"10\" />\n  <line x1=\"32\" y1=\"6\" x2=\"32\" y2=\"16\" />\n  <line x1=\"32\" y1=\"48\" x2=\"32\" y2=\"58\" />\n  <line x1=\"6\" y1=\"32\" x2=\"16\" y2=\"32\" />\n  <line x1=\"48\" y1=\"32\" x2=\"58\" y2=\"32\" />\n  <line x1=\"13\" y1=\"13\" x2=\"20\" y2=\"20\" />\n  <line x1=\"44\" y1=\"44\" x2=\"51\" y2=\"51\" />\n  <line x1=\"51\" y1=\"13\" x2=\"44\" y2=\"20\" />\n  <line x1=\"20\" y1=\"44\" x2=\"13\" y2=\"51\" />\n</svg>",
   escudo: "<svg viewBox=\"0 0 64 64\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"3\" stroke-linecap=\"square\" stroke-linejoin=\"miter\" xmlns=\"http://www.w3.org/2000/svg\">\n  <polygon points=\"32,6 54,14 54,32 32,58 10,32 10,14\" />\n  <polyline points=\"21,32 28,40 44,22\" />\n</svg>",
+  mira: "<svg viewBox=\"0 0 64 64\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"3\" stroke-linecap=\"square\" stroke-linejoin=\"miter\" xmlns=\"http://www.w3.org/2000/svg\">\n  <circle cx=\"32\" cy=\"32\" r=\"22\" />\n  <circle cx=\"32\" cy=\"32\" r=\"9\" />\n  <line x1=\"32\" y1=\"2\" x2=\"32\" y2=\"14\" />\n  <line x1=\"32\" y1=\"50\" x2=\"32\" y2=\"62\" />\n  <line x1=\"2\" y1=\"32\" x2=\"14\" y2=\"32\" />\n  <line x1=\"50\" y1=\"32\" x2=\"62\" y2=\"32\" />\n</svg>",
   moeda: "<svg viewBox=\"0 0 64 64\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"3\" stroke-linecap=\"square\" stroke-linejoin=\"miter\" xmlns=\"http://www.w3.org/2000/svg\">\n  <g>\n    <circle cx=\"32\" cy=\"32\" r=\"22\" />\n    <line x1=\"54\" y1=\"32\" x2=\"60\" y2=\"32\" />\n    <line x1=\"48\" y1=\"48\" x2=\"52\" y2=\"52\" />\n    <line x1=\"32\" y1=\"54\" x2=\"32\" y2=\"60\" />\n    <line x1=\"16\" y1=\"48\" x2=\"12\" y2=\"52\" />\n    <line x1=\"10\" y1=\"32\" x2=\"4\" y2=\"32\" />\n    <line x1=\"16\" y1=\"16\" x2=\"12\" y2=\"12\" />\n    <line x1=\"32\" y1=\"10\" x2=\"32\" y2=\"4\" />\n    <line x1=\"48\" y1=\"16\" x2=\"52\" y2=\"12\" />\n    <line x1=\"32\" y1=\"24\" x2=\"32\" y2=\"40\" />\n    <line x1=\"24\" y1=\"32\" x2=\"40\" y2=\"32\" />\n  </g>\n</svg>",
+  painel_dashboard: "<svg viewBox=\"0 0 64 64\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"3\" stroke-linecap=\"square\" stroke-linejoin=\"miter\" xmlns=\"http://www.w3.org/2000/svg\">\n  <rect x=\"6\" y=\"6\" width=\"24\" height=\"24\" />\n  <rect x=\"34\" y=\"6\" width=\"24\" height=\"24\" />\n  <rect x=\"6\" y=\"34\" width=\"24\" height=\"24\" />\n  <rect x=\"34\" y=\"34\" width=\"24\" height=\"24\" />\n</svg>",
   predio: "<svg viewBox=\"0 0 64 64\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"3\" stroke-linecap=\"square\" stroke-linejoin=\"miter\" xmlns=\"http://www.w3.org/2000/svg\">\n  <g>\n    <rect x=\"14\" y=\"8\" width=\"36\" height=\"48\" />\n    <line x1=\"8\" y1=\"56\" x2=\"56\" y2=\"56\" />\n    <rect x=\"20\" y=\"16\" width=\"6\" height=\"6\" />\n    <rect x=\"32\" y=\"16\" width=\"6\" height=\"6\" />\n    <rect x=\"20\" y=\"28\" width=\"6\" height=\"6\" />\n    <rect x=\"32\" y=\"28\" width=\"6\" height=\"6\" />\n    <rect x=\"20\" y=\"40\" width=\"6\" height=\"6\" />\n    <rect x=\"32\" y=\"40\" width=\"6\" height=\"6\" />\n  </g>\n</svg>",
   projeto_investigacao: "<svg viewBox=\"0 0 64 64\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"3\" stroke-linecap=\"square\" stroke-linejoin=\"miter\" xmlns=\"http://www.w3.org/2000/svg\">\n  <g>\n    <rect x=\"8\" y=\"8\" width=\"48\" height=\"48\" />\n    <rect x=\"24\" y=\"26\" width=\"16\" height=\"12\" />\n    <rect x=\"14\" y=\"14\" width=\"6\" height=\"6\" />\n    <rect x=\"44\" y=\"14\" width=\"6\" height=\"6\" />\n    <rect x=\"14\" y=\"44\" width=\"6\" height=\"6\" />\n    <rect x=\"44\" y=\"44\" width=\"6\" height=\"6\" />\n  </g>\n</svg>",
   projeto_rede: "<svg viewBox=\"0 0 64 64\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"3\" stroke-linecap=\"square\" stroke-linejoin=\"miter\" xmlns=\"http://www.w3.org/2000/svg\">\n  <g>\n    <rect x=\"6\" y=\"10\" width=\"14\" height=\"14\" />\n    <rect x=\"44\" y=\"10\" width=\"14\" height=\"14\" />\n    <rect x=\"25\" y=\"40\" width=\"14\" height=\"14\" />\n    <line x1=\"20\" y1=\"17\" x2=\"44\" y2=\"17\" />\n    <line x1=\"13\" y1=\"24\" x2=\"30\" y2=\"40\" />\n    <line x1=\"51\" y1=\"24\" x2=\"34\" y2=\"40\" />\n  </g>\n</svg>",
@@ -3902,10 +3916,45 @@ function badgeRenovado(c) {
 }
 
 // Ícone redondo de cabeçalho de KPI, à la SEI Municípios (círculo colorido +
-// ícone) — usa a MESMA cor de acento (--kpi-cor) que já pinta a borda de
-// cima do cartão, sem precisar declarar a cor duas vezes.
-function kpiIcone(chaveIcone) {
-  return `<div class="kpi-icone">${ICONS[chaveIcone]}</div>`;
+// ícone) — por padrão usa a MESMA cor de acento (--kpi-cor) que já pinta a
+// borda de cima do cartão, sem precisar declarar a cor duas vezes; `cor`
+// (opcional) sobrescreve isso só no ícone, sem mexer na borda do cartão —
+// usado pelo badge de entidade (área/categoria), que pinta o ícone com uma
+// cor própria sem perder a cor de criticidade que a borda já mostra.
+function kpiIcone(chaveIcone, cor) {
+  return `<div class="kpi-icone"${cor ? ` style="--kpi-cor:${cor}"` : ""}>${ICONS[chaveIcone]}</div>`;
+}
+
+// Pedido direto: "cria ícones para cada área gestora e cada categoria... e
+// deixar padrão pra onde ela aparecer... se é um ícone de prédio azul o
+// DGTI ele aparece assim no por área gestora mas também aparece assim no
+// resumo... não muda". Em vez de uma tabela escrita à mão (a lista de áreas/
+// categorias muda toda vez que a planilha traz uma nova), o ícone e a cor
+// saem de um hash do próprio nome — determinístico, então "DGTI" sempre cai
+// no mesmo ícone/cor em QUALQUER lugar do sistema, sem precisar cadastrar
+// nada, e continua funcionando pra área/categoria nova que a planilha trouxer.
+function hashTexto(str) {
+  let h = 0;
+  for (let i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) >>> 0;
+  return h;
+}
+const ICONES_ENTIDADE = [
+  "predio", "categoria_tag", "viatura", "competencia_frota", "competencia_normas",
+  "competencia_cofre", "competencia_balanca", "competencia_folha_pagamento",
+  "competencia_orcamento", "competencia_portaria", "escudo", "engrenagem", "mira",
+  "painel_dashboard", "aditivo", "calendario", "moeda", "projeto_rede", "projeto_sac",
+  "projeto_investigacao",
+];
+const CORES_ENTIDADE = ["var(--tinta)", "var(--mostarda)", "var(--terracota)", "var(--oliva)", "var(--dourado)", "var(--vinho)"];
+function entidadeIconeCor(nome) {
+  const h = hashTexto(nome || "");
+  return { icone: ICONES_ENTIDADE[h % ICONES_ENTIDADE.length], cor: CORES_ENTIDADE[h % CORES_ENTIDADE.length] };
+}
+// Atalho pro caso mais comum: ícone+cor de uma entidade, já dentro do
+// kpi-cabeca.
+function badgeEntidadeHTML(nome) {
+  const { icone, cor } = entidadeIconeCor(nome);
+  return kpiIcone(icone, cor);
 }
 
 function formatarMoedaBR(v) {
@@ -5626,7 +5675,6 @@ function renderResumoRapido(lista, resumo) {
 
   function corpoHTML() {
     const top3 = modoRanking === "area" ? top3Areas : top3Categorias;
-    const iconeRanking = modoRanking === "area" ? "predio" : "categoria_tag";
     const atributoRanking = modoRanking === "area" ? "data-resumo-area" : "data-resumo-categoria";
     const rotuloPlural = modoRanking === "area" ? "áreas gestoras" : "categorias";
     return `
@@ -5659,7 +5707,7 @@ function renderResumoRapido(lista, resumo) {
       <div class="kpi-row" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr))">
         ${top3.map((a) => `
           <div class="kpi-card kpi-clicavel" ${atributoRanking}="${escapeAttr(a.label)}" title="Clique pra ver o perfil completo" style="cursor:pointer">
-            <div class="kpi-cabeca">${kpiIcone(iconeRanking)}<div class="kpi-label">${escapeHTML(a.label)}</div></div>
+            <div class="kpi-cabeca">${badgeEntidadeHTML(a.label)}<div class="kpi-label">${escapeHTML(a.label)}</div></div>
             <div class="kpi-value" style="font-size:var(--fs-subtitulo)">R$ ${formatarEixo(a.total)}</div>
             <div class="kpi-valor-exato">${formatarMoedaBR(a.total)} · ${a.qtd} contrato${a.qtd === 1 ? "" : "s"}</div>
           </div>`).join("")}
@@ -5807,7 +5855,6 @@ function configPorArea() {
     opcaoPadrao: "— Escolha uma área —",
     labelBusca: "ÁREA",
     labelTrocar: "← TROCAR DE ÁREA",
-    icone: "predio",
     dicaLanding: "Escolha uma área gestora (no campo acima, ou clicando num cartão abaixo) pra ver o perfil completo dela — vencimentos, financeiro, pessoas.",
     complementar: { campoFn: (c) => c.tipoObjeto, rotuloVazio: "(sem tipo)", titulo: "Valor por Tipo de Objeto", prefixoAlvo: "categoria", tituloAba: "Por Categoria" },
   };
@@ -5821,7 +5868,6 @@ function configPorCategoria() {
     opcaoPadrao: "— Escolha uma categoria —",
     labelBusca: "CATEGORIA",
     labelTrocar: "← TROCAR DE CATEGORIA",
-    icone: "categoria_tag",
     dicaLanding: "Escolha uma categoria (no campo acima, ou clicando num cartão abaixo) pra ver o perfil completo dela — vencimentos, financeiro, pessoas.",
     complementar: { campoFn: (c) => c.unidadeGestora, rotuloVazio: "(sem unidade)", titulo: "Valor por Área Gestora", prefixoAlvo: "area", tituloAba: "Por Área Gestora" },
   };
@@ -5913,7 +5959,7 @@ function renderPorDimensaoContratos(lista, cfg) {
       const v = valorPorGrupo.get(l.label);
       const piorCrit = CRITICIDADE_VISUAL.find((cv) => l.porCrit[cv.label] > 0);
       return `<div class="kpi-card" data-${p}-card="${escapeAttr(l.label)}" style="cursor:pointer;--kpi-cor:${piorCrit ? piorCrit.cor : "var(--carvao)"}">
-        <div class="kpi-cabeca">${kpiIcone(cfg.icone)}<div class="kpi-label">${escapeHTML(l.label)}</div></div>
+        <div class="kpi-cabeca">${badgeEntidadeHTML(l.label)}<div class="kpi-label">${escapeHTML(l.label)}</div></div>
         <div class="kpi-value" style="font-size:var(--fs-subtitulo)">${l.total} contrato${l.total === 1 ? "" : "s"}</div>
         <div class="font-mono" style="font-size:var(--fs-ui-sm);color:#8B93A3">${v ? formatarMoedaBR(v.total) : "—"}</div>
       </div>`;
@@ -5939,9 +5985,12 @@ function renderPorDimensaoContratos(lista, cfg) {
     const qtdVencidos = listaFiltrada.filter((c) => c.statusVigencia === "Vencido").length;
     el("cabecalho").innerHTML = `
       <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px">
-        <div>
-          <h4 style="margin-bottom:2px">${escapeHTML(selecionada)}</h4>
-          <p class="font-mono" style="font-size:var(--fs-ui-sm);color:#8B93A3">${listaFiltrada.length} contrato(s) · ${formatarMoedaBR(valorAtual)} em valor atual${qtdVencidos ? ` · ${qtdVencidos} vencido(s)` : ""}</p>
+        <div style="display:flex;align-items:center;gap:12px">
+          ${badgeEntidadeHTML(selecionada)}
+          <div>
+            <h4 style="margin-bottom:2px">${escapeHTML(selecionada)}</h4>
+            <p class="font-mono" style="font-size:var(--fs-ui-sm);color:#8B93A3">${listaFiltrada.length} contrato(s) · ${formatarMoedaBR(valorAtual)} em valor atual${qtdVencidos ? ` · ${qtdVencidos} vencido(s)` : ""}</p>
+          </div>
         </div>
         <button type="button" class="dash-toggle-btn" id="${p}-trocar">${cfg.labelTrocar}</button>
       </div>`;
@@ -6263,12 +6312,12 @@ async function carregarContratosPortal(portalSlug) {
     <div id="contratos-alerta"></div>
     ${dicaLeituraContratosHTML()}
     <div class="tabs" style="margin-bottom:0">
-      <button class="tab-btn active" data-subtab-contratos="gerencial">GERENCIAL</button>
-      <button class="tab-btn" data-subtab-contratos="tatico">TÁTICO</button>
-      <button class="tab-btn" data-subtab-contratos="operacional">OPERACIONAL</button>
-      <button class="tab-btn" data-subtab-contratos="porarea">POR ÁREA GESTORA</button>
-      <button class="tab-btn" data-subtab-contratos="porcategoria">POR CATEGORIA</button>
-      <button class="tab-btn" data-subtab-contratos="atualizados">ATUALIZADOS RECENTEMENTE</button>
+      <button class="tab-btn active" data-subtab-contratos="gerencial">${ICONS.painel_dashboard}GERENCIAL</button>
+      <button class="tab-btn" data-subtab-contratos="tatico">${ICONS.mira}TÁTICO</button>
+      <button class="tab-btn" data-subtab-contratos="operacional">${ICONS.engrenagem}OPERACIONAL</button>
+      <button class="tab-btn" data-subtab-contratos="porarea">${ICONS.predio}POR ÁREA GESTORA</button>
+      <button class="tab-btn" data-subtab-contratos="porcategoria">${ICONS.categoria_tag}POR CATEGORIA</button>
+      <button class="tab-btn" data-subtab-contratos="atualizados">${ICONS.atualizar}ATUALIZADOS RECENTEMENTE</button>
     </div>
     <div class="tab-panel" id="contratos-sub-gerencial"></div>
     <div class="tab-panel" id="contratos-sub-tatico" hidden></div>
