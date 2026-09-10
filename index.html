@@ -278,7 +278,10 @@ body{background:var(--paper);color:var(--carvao);font-family:'IBM Plex Sans',san
 
 .dash-charts{display:grid;grid-template-columns:1fr 1.05fr;gap:14px;margin-bottom:14px}
 @media (max-width:760px){.dash-charts{grid-template-columns:1fr}}
-.dash-chart-box{	background:var(--surface);padding:18px;border:1.5px solid var(--paper-line);border-radius:var(--radius-md)}
+.dash-chart-box{	background:var(--surface);padding:18px;border:1.5px solid var(--paper-line);border-radius:var(--radius-md);transition:border-color .3s ease,box-shadow .3s ease}
+/* Pisca de leve quando um cartão "leva até aqui" em vez de filtrar algo —
+   avisa que a rolagem parou no lugar certo, sem precisar de mais texto. */
+.destaque-temporario{border-color:var(--tinta);box-shadow:0 0 0 3px var(--tinta-glow)}
 .dash-chart-box h4{font-family:'Space Grotesk',sans-serif;font-size:var(--fs-subtitulo);margin-bottom:12px}
 .dash-chart-box svg{width:100%;height:auto;display:block}
 
@@ -755,7 +758,9 @@ select:focus-visible,input:focus-visible{
 const ICONS = {
   aditivo: "<svg viewBox=\"0 0 64 64\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"3\" stroke-linecap=\"square\" stroke-linejoin=\"miter\" xmlns=\"http://www.w3.org/2000/svg\">\n  <rect x=\"10\" y=\"8\" width=\"30\" height=\"40\" />\n  <line x1=\"16\" y1=\"18\" x2=\"34\" y2=\"18\" />\n  <line x1=\"16\" y1=\"26\" x2=\"34\" y2=\"26\" />\n  <circle cx=\"44\" cy=\"42\" r=\"12\" />\n  <line x1=\"44\" y1=\"36\" x2=\"44\" y2=\"48\" />\n  <line x1=\"38\" y1=\"42\" x2=\"50\" y2=\"42\" />\n</svg>",
   atualizar: "<svg viewBox=\"0 0 64 64\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"3\" stroke-linecap=\"square\" stroke-linejoin=\"miter\" xmlns=\"http://www.w3.org/2000/svg\">\n  <path d=\"M 12 32 A 20 20 0 1 1 18 46\" />\n  <polyline points=\"8,34 12,46 24,42\" />\n</svg>",
+  aviao: "<svg viewBox=\"0 0 64 64\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"3\" stroke-linecap=\"square\" stroke-linejoin=\"miter\" xmlns=\"http://www.w3.org/2000/svg\">\n  <polygon points=\"32,6 38,26 58,34 58,40 38,36 34,54 44,58 44,62 32,58 20,62 20,58 30,54 26,36 6,40 6,34 26,26\" />\n</svg>",
   calendario: "<svg viewBox=\"0 0 64 64\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"3\" stroke-linecap=\"square\" stroke-linejoin=\"miter\" xmlns=\"http://www.w3.org/2000/svg\">\n  <rect x=\"8\" y=\"14\" width=\"48\" height=\"42\" />\n  <line x1=\"8\" y1=\"26\" x2=\"56\" y2=\"26\" />\n  <line x1=\"20\" y1=\"8\" x2=\"20\" y2=\"20\" />\n  <line x1=\"44\" y1=\"8\" x2=\"44\" y2=\"20\" />\n</svg>",
+  caixa: "<svg viewBox=\"0 0 64 64\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"3\" stroke-linecap=\"square\" stroke-linejoin=\"miter\" xmlns=\"http://www.w3.org/2000/svg\">\n  <rect x=\"10\" y=\"14\" width=\"44\" height=\"40\" />\n  <line x1=\"32\" y1=\"14\" x2=\"32\" y2=\"54\" />\n  <line x1=\"10\" y1=\"14\" x2=\"32\" y2=\"26\" />\n  <line x1=\"54\" y1=\"14\" x2=\"32\" y2=\"26\" />\n</svg>",
   categoria_tag: "<svg viewBox=\"0 0 64 64\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"3\" stroke-linecap=\"square\" stroke-linejoin=\"miter\" xmlns=\"http://www.w3.org/2000/svg\">\n  <polygon points=\"8,32 32,8 56,8 56,32 32,56\" />\n  <circle cx=\"44\" cy=\"20\" r=\"3\" fill=\"currentColor\" stroke=\"none\" />\n</svg>",
   brasao_pcba: "<svg viewBox=\"0 0 120 140\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linejoin=\"miter\" stroke-linecap=\"square\" xmlns=\"http://www.w3.org/2000/svg\">\n  <g>\n    <polygon points=\"60,6 64,18 76,18 66,25 70,37 60,30 50,37 54,25 44,18 56,18\" />\n  </g>\n  <g>\n    <path d=\"M 22 46 L 22 42 L 30 42 L 30 46 L 38 46 L 38 42 L 46 42 L 46 46 L 54 46 L 54 42 L 66 42 L 66 46 L 74 46 L 74 42 L 82 42 L 82 46 L 90 46 L 90 42 L 98 42 L 98 46 L 98 96 L 60 118 L 22 96 Z\" />\n    <path d=\"M 28 52 L 28 48 L 34 48 L 34 52 L 40 52 L 40 48 L 46 48 L 46 52 L 54 52 L 54 48 L 66 48 L 66 52 L 74 52 L 74 48 L 80 48 L 80 52 L 86 52 L 86 48 L 92 48 L 92 52 L 92 93 L 60 112 L 28 93 Z\" />\n  </g>\n  <g>\n    <line x1=\"60\" y1=\"58\" x2=\"60\" y2=\"104\" />\n    <line x1=\"48\" y1=\"72\" x2=\"72\" y2=\"72\" />\n    <line x1=\"48\" y1=\"80\" x2=\"72\" y2=\"80\" />\n    <line x1=\"48\" y1=\"72\" x2=\"48\" y2=\"80\" />\n    <line x1=\"72\" y1=\"72\" x2=\"72\" y2=\"80\" />\n  </g>\n  <g>\n    <path d=\"M 42 100 L 42 96 L 45 96 L 45 100 L 48 100 L 48 96 L 51 96 L 51 100 L 51 108 L 42 108 Z\" />\n    <rect x=\"45\" y=\"102\" width=\"3\" height=\"6\" />\n    <path d=\"M 69 100 L 69 96 L 72 96 L 72 100 L 75 100 L 75 96 L 78 96 L 78 100 L 78 108 L 69 108 Z\" />\n    <rect x=\"72\" y=\"102\" width=\"3\" height=\"6\" />\n  </g>\n  <g stroke-width=\"1.5\">\n    <path d=\"M 22 96 L 12 108 L 18 118 L 30 122 L 44 126 L 60 128\" />\n    <line x1=\"16\" y1=\"110\" x2=\"22\" y2=\"106\" />\n    <line x1=\"22\" y1=\"118\" x2=\"28\" y2=\"114\" />\n    <line x1=\"30\" y1=\"122\" x2=\"34\" y2=\"116\" />\n    <line x1=\"40\" y1=\"124\" x2=\"44\" y2=\"118\" />\n    <line x1=\"50\" y1=\"126\" x2=\"54\" y2=\"120\" />\n    <path d=\"M 98 96 L 108 108 L 102 118 L 90 122 L 76 126 L 60 128\" />\n    <line x1=\"104\" y1=\"110\" x2=\"98\" y2=\"106\" />\n    <line x1=\"98\" y1=\"118\" x2=\"92\" y2=\"114\" />\n    <line x1=\"90\" y1=\"122\" x2=\"86\" y2=\"116\" />\n    <line x1=\"80\" y1=\"124\" x2=\"76\" y2=\"118\" />\n    <line x1=\"70\" y1=\"126\" x2=\"66\" y2=\"120\" />\n    <polygon points=\"54,128 66,128 63,134 57,134\" />\n  </g>\n</svg>",
   competencia_balanca: "<svg viewBox=\"0 0 64 64\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"3\" stroke-linecap=\"square\" stroke-linejoin=\"miter\" xmlns=\"http://www.w3.org/2000/svg\">\n  <g>\n    <line x1=\"32\" y1=\"10\" x2=\"32\" y2=\"52\" />\n    <line x1=\"20\" y1=\"52\" x2=\"44\" y2=\"52\" />\n    <line x1=\"10\" y1=\"18\" x2=\"54\" y2=\"18\" />\n    <polygon points=\"10,18 4,32 16,32\" />\n    <polygon points=\"54,18 48,32 60,32\" />\n    <circle cx=\"32\" cy=\"10\" r=\"2\" fill=\"currentColor\" stroke=\"none\" />\n  </g>\n</svg>",
@@ -767,18 +772,22 @@ const ICONS = {
   competencia_orcamento: "<svg viewBox=\"0 0 64 64\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"3\" stroke-linecap=\"square\" stroke-linejoin=\"miter\" xmlns=\"http://www.w3.org/2000/svg\">\n  <g>\n    <rect x=\"6\" y=\"24\" width=\"52\" height=\"16\" />\n    <line x1=\"12\" y1=\"24\" x2=\"12\" y2=\"34\" />\n    <line x1=\"20\" y1=\"24\" x2=\"20\" y2=\"30\" />\n    <line x1=\"28\" y1=\"24\" x2=\"28\" y2=\"34\" />\n    <line x1=\"36\" y1=\"24\" x2=\"36\" y2=\"30\" />\n    <line x1=\"44\" y1=\"24\" x2=\"44\" y2=\"34\" />\n    <line x1=\"52\" y1=\"24\" x2=\"52\" y2=\"30\" />\n  </g>\n</svg>",
   competencia_portaria: "<svg viewBox=\"0 0 64 64\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"3\" stroke-linecap=\"square\" stroke-linejoin=\"miter\" xmlns=\"http://www.w3.org/2000/svg\">\n  <g>\n    <line x1=\"8\" y1=\"52\" x2=\"24\" y2=\"52\" />\n    <line x1=\"40\" y1=\"52\" x2=\"56\" y2=\"52\" />\n    <line x1=\"24\" y1=\"52\" x2=\"24\" y2=\"16\" />\n    <path d=\"M 24 16 A 36 36 0 0 1 40 52\" />\n    <circle cx=\"38\" cy=\"48\" r=\"1.5\" fill=\"currentColor\" stroke=\"none\" />\n  </g>\n</svg>",
   competencia_tombamento: "<svg viewBox=\"0 0 64 64\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"3\" stroke-linecap=\"square\" stroke-linejoin=\"miter\" xmlns=\"http://www.w3.org/2000/svg\">\n  <g>\n    <polygon points=\"10,18 54,18 54,46 10,46\" />\n    <circle cx=\"16\" cy=\"22\" r=\"1.5\" fill=\"currentColor\" stroke=\"none\" />\n    <circle cx=\"48\" cy=\"22\" r=\"1.5\" fill=\"currentColor\" stroke=\"none\" />\n    <circle cx=\"16\" cy=\"42\" r=\"1.5\" fill=\"currentColor\" stroke=\"none\" />\n    <circle cx=\"48\" cy=\"42\" r=\"1.5\" fill=\"currentColor\" stroke=\"none\" />\n    <line x1=\"18\" y1=\"28\" x2=\"46\" y2=\"28\" />\n    <text x=\"32\" y=\"40\" text-anchor=\"middle\" font-family=\"monospace\" font-size=\"9\" fill=\"currentColor\" stroke=\"none\" letter-spacing=\"1\">N\u00b0</text>\n  </g>\n</svg>",
+  computador: "<svg viewBox=\"0 0 64 64\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"3\" stroke-linecap=\"square\" stroke-linejoin=\"miter\" xmlns=\"http://www.w3.org/2000/svg\">\n  <rect x=\"8\" y=\"10\" width=\"48\" height=\"32\" />\n  <line x1=\"24\" y1=\"50\" x2=\"40\" y2=\"50\" />\n  <line x1=\"32\" y1=\"42\" x2=\"32\" y2=\"50\" />\n  <line x1=\"16\" y1=\"20\" x2=\"48\" y2=\"20\" />\n  <line x1=\"16\" y1=\"28\" x2=\"36\" y2=\"28\" />\n</svg>",
   cota_horizontal: "<svg viewBox=\"0 0 240 28\" width=\"240\" height=\"28\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.25\" xmlns=\"http://www.w3.org/2000/svg\">\n  <line x1=\"4\" y1=\"18\" x2=\"236\" y2=\"18\" />\n  <line x1=\"4\" y1=\"10\" x2=\"4\" y2=\"26\" />\n  <line x1=\"236\" y1=\"10\" x2=\"236\" y2=\"26\" />\n  <polygon points=\"10,18 4,15 4,21\" fill=\"currentColor\" stroke=\"none\" />\n  <polygon points=\"230,18 236,15 236,21\" fill=\"currentColor\" stroke=\"none\" />\n  <rect x=\"94\" y=\"4\" width=\"52\" height=\"12\" fill=\"var(--paper, #ffffff)\" stroke=\"none\" />\n  <text x=\"120\" y=\"14\" text-anchor=\"middle\" font-family=\"monospace\" font-size=\"10\" fill=\"currentColor\" stroke=\"none\" letter-spacing=\"1\">64,00</text>\n</svg>",
   distintivo_pcba: "<svg viewBox=\"0 0 140 170\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linejoin=\"miter\" stroke-linecap=\"square\" xmlns=\"http://www.w3.org/2000/svg\">\n  <defs>\n    <g id=\"brasao-pcba-mark\">\n      <g>\n        <polygon points=\"60,6 64,18 76,18 66,25 70,37 60,30 50,37 54,25 44,18 56,18\" />\n      </g>\n      <g>\n        <path d=\"M 22 46 L 22 42 L 30 42 L 30 46 L 38 46 L 38 42 L 46 42 L 46 46 L 54 46 L 54 42 L 66 42 L 66 46 L 74 46 L 74 42 L 82 42 L 82 46 L 90 46 L 90 42 L 98 42 L 98 46 L 98 96 L 60 118 L 22 96 Z\" />\n        <path d=\"M 28 52 L 28 48 L 34 48 L 34 52 L 40 52 L 40 48 L 46 48 L 46 52 L 54 52 L 54 48 L 66 48 L 66 52 L 74 52 L 74 48 L 80 48 L 80 52 L 86 52 L 86 48 L 92 48 L 92 52 L 92 93 L 60 112 L 28 93 Z\" />\n      </g>\n      <g>\n        <line x1=\"60\" y1=\"58\" x2=\"60\" y2=\"104\" />\n        <line x1=\"48\" y1=\"72\" x2=\"72\" y2=\"72\" />\n        <line x1=\"48\" y1=\"80\" x2=\"72\" y2=\"80\" />\n        <line x1=\"48\" y1=\"72\" x2=\"48\" y2=\"80\" />\n        <line x1=\"72\" y1=\"72\" x2=\"72\" y2=\"80\" />\n      </g>\n      <g>\n        <path d=\"M 42 100 L 42 96 L 45 96 L 45 100 L 48 100 L 48 96 L 51 96 L 51 100 L 51 108 L 42 108 Z\" />\n        <rect x=\"45\" y=\"102\" width=\"3\" height=\"6\" />\n        <path d=\"M 69 100 L 69 96 L 72 96 L 72 100 L 75 100 L 75 96 L 78 96 L 78 100 L 78 108 L 69 108 Z\" />\n        <rect x=\"72\" y=\"102\" width=\"3\" height=\"6\" />\n      </g>\n      <g stroke-width=\"1.5\">\n        <path d=\"M 22 96 L 12 108 L 18 118 L 30 122 L 44 126 L 60 128\" />\n        <line x1=\"16\" y1=\"110\" x2=\"22\" y2=\"106\" />\n        <line x1=\"22\" y1=\"118\" x2=\"28\" y2=\"114\" />\n        <line x1=\"30\" y1=\"122\" x2=\"34\" y2=\"116\" />\n        <line x1=\"40\" y1=\"124\" x2=\"44\" y2=\"118\" />\n        <line x1=\"50\" y1=\"126\" x2=\"54\" y2=\"120\" />\n        <path d=\"M 98 96 L 108 108 L 102 118 L 90 122 L 76 126 L 60 128\" />\n        <line x1=\"104\" y1=\"110\" x2=\"98\" y2=\"106\" />\n        <line x1=\"98\" y1=\"118\" x2=\"92\" y2=\"114\" />\n        <line x1=\"90\" y1=\"122\" x2=\"86\" y2=\"116\" />\n        <line x1=\"80\" y1=\"124\" x2=\"76\" y2=\"118\" />\n        <line x1=\"70\" y1=\"126\" x2=\"66\" y2=\"120\" />\n        <polygon points=\"54,128 66,128 63,134 57,134\" />\n      </g>\n    </g>\n  </defs>\n\n  \n  <path d=\"M 20 22 L 120 22 L 130 40 L 130 118 L 70 162 L 10 118 L 10 40 Z\" />\n  \n  <path d=\"M 26 30 L 114 30 L 122 44 L 122 114 L 70 154 L 18 114 L 18 44 Z\" />\n\n  \n  <g>\n    <polygon points=\"18,36 122,36 128,44 122,52 18,52 24,44\" />\n    <polygon points=\"10,40 18,36 24,44 18,52 10,48\" />\n    <polygon points=\"130,40 122,36 116,44 122,52 130,48\" />\n    <text x=\"70\" y=\"47\" text-anchor=\"middle\" font-family=\"monospace\" font-weight=\"700\" font-size=\"9\" letter-spacing=\"2\" fill=\"currentColor\" stroke=\"none\">POL\u00cdCIA</text>\n  </g>\n\n  \n  <use href=\"#brasao-pcba-mark\" transform=\"translate(35 54) scale(0.42)\" />\n\n  \n  <g>\n    <polygon points=\"26,130 114,130 120,138 114,146 26,146 32,138\" />\n    <text x=\"70\" y=\"141\" text-anchor=\"middle\" font-family=\"monospace\" font-weight=\"700\" font-size=\"9\" letter-spacing=\"3\" fill=\"currentColor\" stroke=\"none\">CIVIL \u00b7 BA</text>\n  </g>\n</svg>",
   engrenagem: "<svg viewBox=\"0 0 64 64\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"3\" stroke-linecap=\"square\" stroke-linejoin=\"miter\" xmlns=\"http://www.w3.org/2000/svg\">\n  <circle cx=\"32\" cy=\"32\" r=\"10\" />\n  <line x1=\"32\" y1=\"6\" x2=\"32\" y2=\"16\" />\n  <line x1=\"32\" y1=\"48\" x2=\"32\" y2=\"58\" />\n  <line x1=\"6\" y1=\"32\" x2=\"16\" y2=\"32\" />\n  <line x1=\"48\" y1=\"32\" x2=\"58\" y2=\"32\" />\n  <line x1=\"13\" y1=\"13\" x2=\"20\" y2=\"20\" />\n  <line x1=\"44\" y1=\"44\" x2=\"51\" y2=\"51\" />\n  <line x1=\"51\" y1=\"13\" x2=\"44\" y2=\"20\" />\n  <line x1=\"20\" y1=\"44\" x2=\"13\" y2=\"51\" />\n</svg>",
   escudo: "<svg viewBox=\"0 0 64 64\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"3\" stroke-linecap=\"square\" stroke-linejoin=\"miter\" xmlns=\"http://www.w3.org/2000/svg\">\n  <polygon points=\"32,6 54,14 54,32 32,58 10,32 10,14\" />\n  <polyline points=\"21,32 28,40 44,22\" />\n</svg>",
   mira: "<svg viewBox=\"0 0 64 64\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"3\" stroke-linecap=\"square\" stroke-linejoin=\"miter\" xmlns=\"http://www.w3.org/2000/svg\">\n  <circle cx=\"32\" cy=\"32\" r=\"22\" />\n  <circle cx=\"32\" cy=\"32\" r=\"9\" />\n  <line x1=\"32\" y1=\"2\" x2=\"32\" y2=\"14\" />\n  <line x1=\"32\" y1=\"50\" x2=\"32\" y2=\"62\" />\n  <line x1=\"2\" y1=\"32\" x2=\"14\" y2=\"32\" />\n  <line x1=\"50\" y1=\"32\" x2=\"62\" y2=\"32\" />\n</svg>",
+  impressora: "<svg viewBox=\"0 0 64 64\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"3\" stroke-linecap=\"square\" stroke-linejoin=\"miter\" xmlns=\"http://www.w3.org/2000/svg\">\n  <rect x=\"14\" y=\"22\" width=\"36\" height=\"20\" />\n  <rect x=\"20\" y=\"8\" width=\"24\" height=\"14\" />\n  <rect x=\"20\" y=\"42\" width=\"24\" height=\"14\" />\n  <line x1=\"20\" y1=\"32\" x2=\"28\" y2=\"32\" />\n</svg>",
   moeda: "<svg viewBox=\"0 0 64 64\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"3\" stroke-linecap=\"square\" stroke-linejoin=\"miter\" xmlns=\"http://www.w3.org/2000/svg\">\n  <g>\n    <circle cx=\"32\" cy=\"32\" r=\"22\" />\n    <line x1=\"54\" y1=\"32\" x2=\"60\" y2=\"32\" />\n    <line x1=\"48\" y1=\"48\" x2=\"52\" y2=\"52\" />\n    <line x1=\"32\" y1=\"54\" x2=\"32\" y2=\"60\" />\n    <line x1=\"16\" y1=\"48\" x2=\"12\" y2=\"52\" />\n    <line x1=\"10\" y1=\"32\" x2=\"4\" y2=\"32\" />\n    <line x1=\"16\" y1=\"16\" x2=\"12\" y2=\"12\" />\n    <line x1=\"32\" y1=\"10\" x2=\"32\" y2=\"4\" />\n    <line x1=\"48\" y1=\"16\" x2=\"52\" y2=\"12\" />\n    <line x1=\"32\" y1=\"24\" x2=\"32\" y2=\"40\" />\n    <line x1=\"24\" y1=\"32\" x2=\"40\" y2=\"32\" />\n  </g>\n</svg>",
+  obras: "<svg viewBox=\"0 0 64 64\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"3\" stroke-linecap=\"square\" stroke-linejoin=\"miter\" xmlns=\"http://www.w3.org/2000/svg\">\n  <path d=\"M 10 44 A 22 20 0 0 1 54 44 Z\" />\n  <line x1=\"6\" y1=\"44\" x2=\"58\" y2=\"44\" />\n  <rect x=\"28\" y=\"20\" width=\"8\" height=\"8\" />\n</svg>",
   painel_dashboard: "<svg viewBox=\"0 0 64 64\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"3\" stroke-linecap=\"square\" stroke-linejoin=\"miter\" xmlns=\"http://www.w3.org/2000/svg\">\n  <rect x=\"6\" y=\"6\" width=\"24\" height=\"24\" />\n  <rect x=\"34\" y=\"6\" width=\"24\" height=\"24\" />\n  <rect x=\"6\" y=\"34\" width=\"24\" height=\"24\" />\n  <rect x=\"34\" y=\"34\" width=\"24\" height=\"24\" />\n</svg>",
   predio: "<svg viewBox=\"0 0 64 64\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"3\" stroke-linecap=\"square\" stroke-linejoin=\"miter\" xmlns=\"http://www.w3.org/2000/svg\">\n  <g>\n    <rect x=\"14\" y=\"8\" width=\"36\" height=\"48\" />\n    <line x1=\"8\" y1=\"56\" x2=\"56\" y2=\"56\" />\n    <rect x=\"20\" y=\"16\" width=\"6\" height=\"6\" />\n    <rect x=\"32\" y=\"16\" width=\"6\" height=\"6\" />\n    <rect x=\"20\" y=\"28\" width=\"6\" height=\"6\" />\n    <rect x=\"32\" y=\"28\" width=\"6\" height=\"6\" />\n    <rect x=\"20\" y=\"40\" width=\"6\" height=\"6\" />\n    <rect x=\"32\" y=\"40\" width=\"6\" height=\"6\" />\n  </g>\n</svg>",
   projeto_investigacao: "<svg viewBox=\"0 0 64 64\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"3\" stroke-linecap=\"square\" stroke-linejoin=\"miter\" xmlns=\"http://www.w3.org/2000/svg\">\n  <g>\n    <rect x=\"8\" y=\"8\" width=\"48\" height=\"48\" />\n    <rect x=\"24\" y=\"26\" width=\"16\" height=\"12\" />\n    <rect x=\"14\" y=\"14\" width=\"6\" height=\"6\" />\n    <rect x=\"44\" y=\"14\" width=\"6\" height=\"6\" />\n    <rect x=\"14\" y=\"44\" width=\"6\" height=\"6\" />\n    <rect x=\"44\" y=\"44\" width=\"6\" height=\"6\" />\n  </g>\n</svg>",
   projeto_rede: "<svg viewBox=\"0 0 64 64\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"3\" stroke-linecap=\"square\" stroke-linejoin=\"miter\" xmlns=\"http://www.w3.org/2000/svg\">\n  <g>\n    <rect x=\"6\" y=\"10\" width=\"14\" height=\"14\" />\n    <rect x=\"44\" y=\"10\" width=\"14\" height=\"14\" />\n    <rect x=\"25\" y=\"40\" width=\"14\" height=\"14\" />\n    <line x1=\"20\" y1=\"17\" x2=\"44\" y2=\"17\" />\n    <line x1=\"13\" y1=\"24\" x2=\"30\" y2=\"40\" />\n    <line x1=\"51\" y1=\"24\" x2=\"34\" y2=\"40\" />\n  </g>\n</svg>",
   projeto_sac: "<svg viewBox=\"0 0 64 64\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"3\" stroke-linecap=\"square\" stroke-linejoin=\"miter\" xmlns=\"http://www.w3.org/2000/svg\">\n  <g>\n    <rect x=\"8\" y=\"22\" width=\"20\" height=\"10\" />\n    <rect x=\"36\" y=\"22\" width=\"20\" height=\"10\" />\n    <line x1=\"8\" y1=\"42\" x2=\"56\" y2=\"42\" />\n    <line x1=\"8\" y1=\"46\" x2=\"56\" y2=\"46\" />\n    <circle cx=\"32\" cy=\"52\" r=\"3\" />\n  </g>\n</svg>",
   relogio: "<svg viewBox=\"0 0 64 64\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"3\" stroke-linecap=\"square\" stroke-linejoin=\"miter\" xmlns=\"http://www.w3.org/2000/svg\">\n  <circle cx=\"32\" cy=\"36\" r=\"22\" />\n  <line x1=\"32\" y1=\"36\" x2=\"32\" y2=\"20\" />\n  <line x1=\"32\" y1=\"36\" x2=\"43\" y2=\"36\" />\n  <line x1=\"22\" y1=\"6\" x2=\"30\" y2=\"6\" />\n  <line x1=\"34\" y1=\"6\" x2=\"42\" y2=\"6\" />\n</svg>",
+  saude: "<svg viewBox=\"0 0 64 64\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"3\" stroke-linecap=\"square\" stroke-linejoin=\"miter\" xmlns=\"http://www.w3.org/2000/svg\">\n  <rect x=\"26\" y=\"8\" width=\"12\" height=\"48\" />\n  <rect x=\"8\" y=\"26\" width=\"48\" height=\"12\" />\n</svg>",
   selo: "<svg viewBox=\"0 0 120 120\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"square\" stroke-linejoin=\"miter\" xmlns=\"http://www.w3.org/2000/svg\">\n  <polygon points=\"35,10 85,10 110,35 110,85 85,110 35,110 10,85 10,35\" />\n  <polygon points=\"40,18 80,18 102,40 102,80 80,102 40,102 18,80 18,40\" />\n  <text x=\"60\" y=\"56\" text-anchor=\"middle\" font-family=\"monospace\" font-size=\"16\" letter-spacing=\"2\" fill=\"currentColor\" stroke=\"none\" font-weight=\"700\">DEPAF</text>\n  <line x1=\"28\" y1=\"64\" x2=\"92\" y2=\"64\" />\n  <text x=\"60\" y=\"80\" text-anchor=\"middle\" font-family=\"monospace\" font-size=\"8\" letter-spacing=\"3\" fill=\"currentColor\" stroke=\"none\">PROTOCOLO</text>\n</svg>",
   viatura: "<svg viewBox=\"0 0 64 64\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"3\" stroke-linecap=\"square\" stroke-linejoin=\"miter\" xmlns=\"http://www.w3.org/2000/svg\">\n  <g>\n    <polygon points=\"8,50 8,42 16,42 20,34 44,34 48,42 56,42 56,50\" />\n    <line x1=\"8\" y1=\"50\" x2=\"56\" y2=\"50\" />\n    <line x1=\"20\" y1=\"38\" x2=\"44\" y2=\"38\" />\n    <line x1=\"32\" y1=\"34\" x2=\"32\" y2=\"42\" />\n    <rect x=\"27\" y=\"28\" width=\"10\" height=\"5\" />\n    <circle cx=\"18\" cy=\"50\" r=\"5\" />\n    <circle cx=\"46\" cy=\"50\" r=\"5\" />\n  </g>\n</svg>",
 };
@@ -3926,29 +3935,59 @@ function kpiIcone(chaveIcone, cor) {
 }
 
 // Pedido direto: "cria ícones para cada área gestora e cada categoria... e
-// deixar padrão pra onde ela aparecer... se é um ícone de prédio azul o
-// DGTI ele aparece assim no por área gestora mas também aparece assim no
-// resumo... não muda". Em vez de uma tabela escrita à mão (a lista de áreas/
-// categorias muda toda vez que a planilha traz uma nova), o ícone e a cor
-// saem de um hash do próprio nome — determinístico, então "DGTI" sempre cai
-// no mesmo ícone/cor em QUALQUER lugar do sistema, sem precisar cadastrar
-// nada, e continua funcionando pra área/categoria nova que a planilha trouxer.
+// deixar padrão pra onde ela aparecer... não muda". Em vez de uma tabela
+// escrita à mão (a lista de áreas/categorias muda toda vez que a planilha
+// traz uma nova), o ícone e a cor saem de um hash do próprio nome —
+// determinístico, então "DGTI" sempre cai no mesmo ícone/cor em QUALQUER
+// lugar do sistema, sem precisar cadastrar nada, e continua funcionando pra
+// área/categoria nova que a planilha trouxer.
+//
+// 2ª volta, pedido direto de novo: "porque DGTI é uma engrenagem? porque
+// saer é calendário? ... porque obra é esse que é o mesmo do gerencial?" —
+// o hash cru caía às vezes num ícone que ou não tinha nada a ver, ou pior,
+// já tinha um significado FIXO em outro canto do sistema (engrenagem =
+// aba Operacional, mira = aba Tático, o ícone de "A Contratar" virando o
+// ícone de uma área é confuso mesmo sendo "só" coincidência de hash). Duas
+// correções: (1) só ícones sem outro significado fixo entram no hash de
+// reserva; (2) antes do hash, tenta bater um padrão de palavra conhecido
+// no nome (TIC/DGTI vira computador, "aéreo" vira avião, "obra" vira
+// capacete, etc.) — cobre os casos mais comuns com sentido de verdade, sem
+// virar uma tabela fixa que quebra pra nome novo (o que não bate cai no
+// hash igual antes).
 function hashTexto(str) {
   let h = 0;
   for (let i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) >>> 0;
   return h;
 }
-const ICONES_ENTIDADE = [
+const BUCKETS_ENTIDADE = [
+  { padrao: /\bTIC\b|DGTI|TECNOLOG|SISTEMA|INFORM[ÁA]TIC/i, icone: "computador" },
+  { padrao: /A[ÉE]RE[OA]|AVIA[ÇC][ÃA]O/i, icone: "aviao" },
+  { padrao: /OBRA|ENGENHARIA|CONSTRU|REFORMA/i, icone: "obras" },
+  { padrao: /ODONTOL|SA[ÚU]DE|M[ÉE]DIC|HOSPITAL/i, icone: "saude" },
+  { padrao: /GR[ÁA]FIC|IMPRESS|POSTAGEM|CORREIO/i, icone: "impressora" },
+  { padrao: /MATERIAL|AQUISI[ÇC][ÃA]O|SUPRIMENTO|PRODUTO|B[ÉE]LIC|SEMOVENTE/i, icone: "caixa" },
+  { padrao: /IM[ÓO]VE|PATRIM[ÔO]NIO|TOMBAMENTO/i, icone: "predio" },
+  { padrao: /TRANSPORT|FROTA|VE[ÍI]CUL/i, icone: "viatura" },
+  { padrao: /SEGURO|GARANTIA/i, icone: "escudo" },
+  { padrao: /TERCEIRIZAD|AUXILIAR|PESSOAL|\bFOLHA\b/i, icone: "competencia_folha_pagamento" },
+];
+// Reserva pra quando nenhum padrão bate — todos neutros, nenhum já usado
+// com outro significado fixo em outro lugar do sistema (nada de
+// engrenagem/mira/painel/atualizar/relógio/calendário/moeda/aditivo, que
+// já "são" Operacional/Tático/Gerencial/Atualizados/Vencido/A Contratar/
+// Valor/Aditivos em outro canto da tela).
+const ICONES_ENTIDADE_RESERVA = [
   "predio", "categoria_tag", "viatura", "competencia_frota", "competencia_normas",
   "competencia_cofre", "competencia_balanca", "competencia_folha_pagamento",
-  "competencia_orcamento", "competencia_portaria", "escudo", "engrenagem", "mira",
-  "painel_dashboard", "aditivo", "calendario", "moeda", "projeto_rede", "projeto_sac",
-  "projeto_investigacao",
+  "competencia_orcamento", "competencia_portaria", "projeto_rede", "projeto_sac",
+  "projeto_investigacao", "computador", "aviao", "obras", "saude", "impressora", "caixa",
 ];
 const CORES_ENTIDADE = ["var(--tinta)", "var(--mostarda)", "var(--terracota)", "var(--oliva)", "var(--dourado)", "var(--vinho)"];
 function entidadeIconeCor(nome) {
   const h = hashTexto(nome || "");
-  return { icone: ICONES_ENTIDADE[h % ICONES_ENTIDADE.length], cor: CORES_ENTIDADE[h % CORES_ENTIDADE.length] };
+  const bucket = BUCKETS_ENTIDADE.find((b) => b.padrao.test(nome || ""));
+  const icone = bucket ? bucket.icone : ICONES_ENTIDADE_RESERVA[h % ICONES_ENTIDADE_RESERVA.length];
+  return { icone, cor: CORES_ENTIDADE[h % CORES_ENTIDADE.length] };
 }
 // Atalho pro caso mais comum: ícone+cor de uma entidade, já dentro do
 // kpi-cabeca.
@@ -4805,6 +4844,7 @@ function renderGerencialContratos(lista, resumo) {
   let filtroStatusKpi = "";
   let filtroAditivos = null; // número puro (0, 1, 2...) ou null — 0 é um filtro válido, não "vazio"
   let filtroGarantia = false;
+  let filtroCriticidadeBaixo = false;
   let modoBarra = lerGraficoSalvo("cpg-gerencial-barra") || "proporcao";
 
   alvo.innerHTML = `
@@ -4973,6 +5013,29 @@ function renderGerencialContratos(lista, resumo) {
     atualizar();
     rolarParaTopoGerencial();
   }
+  // Pedido direto: "os cartões... poderiam também direcionar como os
+  // outros... isso se aplica não só pros cartões do resumo, mas pros
+  // outros que não têm direcionamento ainda" — "% Contratos Baixo" ficava
+  // solto no rodapé sem levar a lugar nenhum; agora isola o mesmo jeito
+  // que "Contratos Garantia Exigida" já isolava.
+  function selecionarCriticidadeBaixo() {
+    filtroCriticidadeBaixo = !filtroCriticidadeBaixo;
+    atualizar();
+    rolarParaTopoGerencial();
+  }
+  // Scroll + realce temporário — pra cartões que não têm um "subconjunto"
+  // óbvio pra isolar, mas ainda merecem um destino real em vez de ficarem
+  // sem clique nenhum (ex.: "Valor Global Atual Total" leva até o Top 10,
+  // "Qtd Total de Aditivos"/"Média de Aditivos" levam até a distribuição).
+  function rolarEDestacar(idElemento) {
+    // scrollIntoView não existe em todo ambiente (jsdom, por exemplo, nem
+    // implementa) — checagem defensiva pra um clique nunca quebrar só por
+    // causa da rolagem.
+    const caixa = document.getElementById(idElemento)?.closest(".dash-chart-box");
+    caixa?.scrollIntoView?.({ behavior: "smooth", block: "center" });
+    caixa?.classList.add("destaque-temporario");
+    setTimeout(() => caixa?.classList.remove("destaque-temporario"), 1400);
+  }
   // Clique no cartão "Qtd Contratos Vencidos"/"A Vencer"/"A Contratar" é um
   // filtro À PARTE dos de cima (não mexe em área/tipo/pessoa) — mas ENTRA na
   // mesma tabela de resultado combinada lá embaixo.
@@ -4983,7 +5046,12 @@ function renderGerencialContratos(lista, resumo) {
   }
   document.getElementById("ger-kpis").addEventListener("click", (ev) => {
     const card = ev.target.closest("[data-status]");
-    if (card) selecionarStatusKpi(card.dataset.status);
+    if (card) return selecionarStatusKpi(card.dataset.status);
+    // "Valor Global Atual Total" não isola nada (não tem um "subconjunto"
+    // óbvio pra filtrar) — clicar leva direto pro gráfico que já responde
+    // "quais são os maiores", em vez de ficar sem destino nenhum.
+    const acao = ev.target.closest("[data-acao]");
+    if (acao?.dataset.acao === "top-contratos") rolarEDestacar("ger-top-contratos");
   });
   // O rodapé (Qtd A Contratar, Contratos Garantia Exigida) fica lá embaixo
   // da página — exatamente por isso esses dois cartões são os que mais
@@ -4993,6 +5061,10 @@ function renderGerencialContratos(lista, resumo) {
     if (cardStatus) return selecionarStatusKpi(cardStatus.dataset.status);
     const cardGarantia = ev.target.closest("[data-garantia]");
     if (cardGarantia) return selecionarGarantia();
+    const cardCriticidade = ev.target.closest("[data-criticidade]");
+    if (cardCriticidade) return selecionarCriticidadeBaixo();
+    const acaoRodape = ev.target.closest("[data-acao]");
+    if (acaoRodape?.dataset.acao === "aditivos") rolarEDestacar("ger-aditivos");
   });
   document.getElementById("ger-matriz").addEventListener("click", (ev) => {
     const tr = ev.target.closest("[data-cat]");
@@ -5046,7 +5118,8 @@ function renderGerencialContratos(lista, resumo) {
       (!filtroFiscal || (c.pessoas || []).some((p) => p.papel === "Fiscal" && p.nomePessoa === filtroFiscal)) &&
       (!filtroFornecedor || (c.empresa || "(empresa não identificada)") === filtroFornecedor) &&
       (filtroAditivos === null || (c.qtdAditivos ?? 0) === filtroAditivos) &&
-      (!filtroGarantia || c.garantiaExigida === "Sim")
+      (!filtroGarantia || c.garantiaExigida === "Sim") &&
+      (!filtroCriticidadeBaixo || c.criticidade === "Baixo (>90 dias)")
     );
 
     // Chips genéricos — um por filtro ativo, cada um sabe desligar a si
@@ -5063,6 +5136,7 @@ function renderGerencialContratos(lista, resumo) {
       filtroFornecedor && { rotulo: `fornecedor: ${filtroFornecedor}`, limpar: () => selecionarFornecedor(filtroFornecedor) },
       filtroAditivos !== null && { rotulo: `${filtroAditivos} aditivo${filtroAditivos === 1 ? "" : "s"}`, limpar: () => selecionarAditivos(filtroAditivos) },
       filtroGarantia && { rotulo: `garantia exigida: Sim`, limpar: () => selecionarGarantia() },
+      filtroCriticidadeBaixo && { rotulo: `criticidade: Baixo (>90 dias)`, limpar: () => selecionarCriticidadeBaixo() },
     ].filter(Boolean);
     document.getElementById("ger-chip-filtro").innerHTML = chipsAtivos.length
       ? `<div class="filter-chips">${chipsAtivos.map((c, i) => `<span class="filter-chip">Isolando ${escapeHTML(c.rotulo)}<button type="button" data-chip-limpar="${i}" title="Remover este filtro">✕</button></span>`).join("")}</div>`
@@ -5086,13 +5160,29 @@ function renderGerencialContratos(lista, resumo) {
     const qtdGarantiaExigida = comGarantiaSim.length;
     const porArea = agruparPorAreaCriticidade(filtrada);
 
+    // Pedido direto: "os cartões de quantidade de contrato e valor atual
+    // poderiam também direcionar como os outros... no de contrato mostrar
+    // mesmo aquela tabela dos contratos totais e o de valor atual mostrar
+    // em comparar com o inicial". Qtd Contratos agora reaproveita a MESMA
+    // tabela combinada que Vencidos/A Vencer/A Contratar já abrem (só que
+    // sem filtrar por status nenhum — mostra tudo). Valor Global Atual
+    // ganha o comparativo direto (Δ vs Inicial, sempre visível, sem
+    // precisar clicar — reaproveita o .kpi-delta que já existia no CSS
+    // mas não era usado aqui) e, ao clicar, rola até o "Top 10 Maiores
+    // Contratos", o destino mais natural pra "quero ver os valores".
+    const deltaValor = valorInicial ? ((valorAtual - valorInicial) / valorInicial) * 100 : null;
+    const deltaClasse = deltaValor === null ? "flat" : deltaValor > 0.05 ? "up" : deltaValor < -0.05 ? "down" : "flat";
+    const deltaSeta = deltaClasse === "up" ? "▲" : deltaClasse === "down" ? "▼" : "●";
+    const deltaTexto = deltaValor === null
+      ? "sem valor inicial pra comparar"
+      : `${deltaSeta} ${Math.abs(deltaValor).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}% vs inicial (${formatarMoedaBR(valorAtual - valorInicial)})`;
     document.getElementById("ger-kpis").innerHTML = `
       <div class="kpi-row">
-        <div class="kpi-card"><div class="kpi-cabeca">${kpiIcone("competencia_normas")}<div class="kpi-label">Qtd Contratos</div></div><div class="kpi-value">${filtrada.length.toLocaleString("pt-BR")}</div></div>
+        <div class="kpi-card kpi-clicavel" data-status="Todos" title="Clique pra ver a lista completa" style="cursor:pointer;${filtroStatusKpi === "Todos" ? "outline:2px solid var(--carvao);outline-offset:-2px" : ""}"><div class="kpi-cabeca">${kpiIcone("competencia_normas")}<div class="kpi-label">Qtd Contratos</div></div><div class="kpi-value">${filtrada.length.toLocaleString("pt-BR")}</div></div>
         <div class="kpi-card kpi-clicavel" data-status="Vencido" title="Clique pra ver quais são" style="--kpi-cor:var(--crit-vencido);cursor:pointer;${filtroStatusKpi === "Vencido" ? "outline:2px solid var(--crit-vencido);outline-offset:-2px" : ""}"><div class="kpi-cabeca">${kpiIcone("relogio")}<div class="kpi-label">Qtd Contratos Vencidos</div></div><div class="kpi-value">${qtdVencidos.toLocaleString("pt-BR")}</div></div>
         <div class="kpi-card kpi-clicavel" data-status="A Vencer" title="Clique pra ver quais são" style="--kpi-cor:var(--crit-alto);cursor:pointer;${filtroStatusKpi === "A Vencer" ? "outline:2px solid var(--crit-alto);outline-offset:-2px" : ""}"><div class="kpi-cabeca">${kpiIcone("relogio")}<div class="kpi-label">Qtd Contratos A Vencer</div></div><div class="kpi-value">${qtdAVencer.toLocaleString("pt-BR")}</div></div>
         <div class="kpi-card"><div class="kpi-cabeca">${kpiIcone("moeda")}<div class="kpi-label">Valor Global Inicial Total</div></div><div class="kpi-value">R$ ${formatarEixo(valorInicial)}</div><div class="kpi-valor-exato">${formatarMoedaBR(valorInicial)}</div></div>
-        <div class="kpi-card"><div class="kpi-cabeca">${kpiIcone("moeda")}<div class="kpi-label">Valor Global Atual Total</div></div><div class="kpi-value">R$ ${formatarEixo(valorAtual)}</div><div class="kpi-valor-exato">${formatarMoedaBR(valorAtual)}</div></div>
+        <div class="kpi-card kpi-clicavel" data-acao="top-contratos" title="Clique pra ver os maiores contratos" style="cursor:pointer"><div class="kpi-cabeca">${kpiIcone("moeda")}<div class="kpi-label">Valor Global Atual Total</div></div><div class="kpi-value">R$ ${formatarEixo(valorAtual)}</div><div class="kpi-valor-exato">${formatarMoedaBR(valorAtual)}</div><div class="kpi-delta ${deltaClasse}">${deltaTexto}</div></div>
       </div>`;
 
     // Tabela combinada: aparece sempre que QUALQUER filtro de recorte estiver
@@ -5102,9 +5192,10 @@ function renderGerencialContratos(lista, resumo) {
     // e isolo, já quero ver os contratos", sem precisar mudar pra aba
     // Operacional.
     const partesTitulo = chipsAtivos.map((c) => c.rotulo);
-    if (filtroStatusKpi) partesTitulo.push(filtroStatusKpi.toLowerCase());
+    if (filtroStatusKpi === "Todos") partesTitulo.push("todos os contratos");
+    else if (filtroStatusKpi) partesTitulo.push(filtroStatusKpi.toLowerCase());
     if (partesTitulo.length) {
-      const contratosTabela = filtroStatusKpi ? filtrada.filter((c) => c.statusVigencia === filtroStatusKpi) : filtrada;
+      const contratosTabela = filtroStatusKpi && filtroStatusKpi !== "Todos" ? filtrada.filter((c) => c.statusVigencia === filtroStatusKpi) : filtrada;
       // Coluna extra só quando o filtro é justamente por Nº de Aditivos —
       // é aí que a pergunta "qual é o número do SEI desse aditivo" faz
       // sentido; nas outras tabelas seria uma coluna vazia poluindo à toa.
@@ -5188,11 +5279,11 @@ function renderGerencialContratos(lista, resumo) {
     // fiéis ao original, pra não confundir "isto é o modelo de referência"
     // com "isto é um extra que a gente achou que ajudava".
     document.getElementById("ger-rodape").innerHTML = `
-      <div class="kpi-card" style="--kpi-cor:var(--crit-baixo)"><div class="kpi-cabeca">${kpiIcone("relogio")}<div class="kpi-label">% Contratos Baixo</div></div><div class="kpi-value">${pctBaixo.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}%</div></div>
+      <div class="kpi-card kpi-clicavel" data-criticidade="Baixo" title="Clique pra ver quais são" style="--kpi-cor:var(--crit-baixo);cursor:pointer;${filtroCriticidadeBaixo ? "outline:2px solid var(--crit-baixo);outline-offset:-2px" : ""}"><div class="kpi-cabeca">${kpiIcone("relogio")}<div class="kpi-label">% Contratos Baixo</div></div><div class="kpi-value">${pctBaixo.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}%</div></div>
       <div class="kpi-card kpi-clicavel" data-status="A Contratar" title="Clique pra ver quais são" style="--kpi-cor:var(--crit-neutro);cursor:pointer;${filtroStatusKpi === "A Contratar" ? "outline:2px solid var(--crit-neutro);outline-offset:-2px" : ""}"><div class="kpi-cabeca">${kpiIcone("calendario")}<div class="kpi-label">Qtd A Contratar</div></div><div class="kpi-value">${qtdAContratar.toLocaleString("pt-BR")}</div></div>
-      <div class="kpi-card"><div class="kpi-cabeca">${kpiIcone("aditivo")}<div class="kpi-label">Qtd Total de Aditivos</div></div><div class="kpi-value">${qtdTotalAditivos.toLocaleString("pt-BR")}</div></div>
-      <div class="kpi-card"><div class="kpi-cabeca">${kpiIcone("aditivo")}<div class="kpi-label">Média de Aditivos / Contrato</div></div><div class="kpi-value">${mediaAditivos.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}</div></div>
-      <div class="kpi-card"><div class="kpi-cabeca">${kpiIcone("escudo")}<div class="kpi-label">% com Garantia Exigida</div></div><div class="kpi-value">${pctGarantia === null ? "—" : pctGarantia.toLocaleString("pt-BR", { maximumFractionDigits: 1 }) + "%"}</div></div>
+      <div class="kpi-card kpi-clicavel" data-acao="aditivos" title="Clique pra ver a distribuição" style="cursor:pointer"><div class="kpi-cabeca">${kpiIcone("aditivo")}<div class="kpi-label">Qtd Total de Aditivos</div></div><div class="kpi-value">${qtdTotalAditivos.toLocaleString("pt-BR")}</div></div>
+      <div class="kpi-card kpi-clicavel" data-acao="aditivos" title="Clique pra ver a distribuição" style="cursor:pointer"><div class="kpi-cabeca">${kpiIcone("aditivo")}<div class="kpi-label">Média de Aditivos / Contrato</div></div><div class="kpi-value">${mediaAditivos.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}</div></div>
+      <div class="kpi-card kpi-clicavel" data-garantia="Sim" title="Clique pra ver quais são" style="cursor:pointer;${filtroGarantia ? "outline:2px solid var(--carvao);outline-offset:-2px" : ""}"><div class="kpi-cabeca">${kpiIcone("escudo")}<div class="kpi-label">% com Garantia Exigida</div></div><div class="kpi-value">${pctGarantia === null ? "—" : pctGarantia.toLocaleString("pt-BR", { maximumFractionDigits: 1 }) + "%"}</div></div>
       <div class="kpi-card kpi-clicavel" data-garantia="Sim" title="Clique pra ver quais são" style="cursor:pointer;${filtroGarantia ? "outline:2px solid var(--carvao);outline-offset:-2px" : ""}"><div class="kpi-cabeca">${kpiIcone("escudo")}<div class="kpi-label">Contratos Garantia Exigida</div></div><div class="kpi-value">${qtdGarantiaExigida.toLocaleString("pt-BR")}</div></div>`;
   }
 
@@ -5677,16 +5768,26 @@ function renderResumoRapido(lista, resumo) {
     const top3 = modoRanking === "area" ? top3Areas : top3Categorias;
     const atributoRanking = modoRanking === "area" ? "data-resumo-area" : "data-resumo-categoria";
     const rotuloPlural = modoRanking === "area" ? "áreas gestoras" : "categorias";
+    // Pedido direto: "os cartões de quantidade de contrato e valor atual
+    // poderiam também direcionar como os outros... no de contrato mostrar
+    // aquela tabela dos contratos totais e o de valor atual mostrar em
+    // comparar com o inicial" — mesmo comparativo e mesmo destino que já
+    // foram construídos dentro do Gerencial; aqui só dispara o clique de
+    // lá por fora (mesmo mecanismo dos outros cartões desta seção).
+    const deltaResumo = resumo.valorGlobalInicialTotal ? ((resumo.valorGlobalAtualTotal - resumo.valorGlobalInicialTotal) / resumo.valorGlobalInicialTotal) * 100 : null;
+    const deltaResumoClasse = deltaResumo === null ? "flat" : deltaResumo > 0.05 ? "up" : deltaResumo < -0.05 ? "down" : "flat";
+    const deltaResumoTexto = deltaResumo === null ? "sem valor inicial pra comparar" : `${deltaResumoClasse === "up" ? "▲" : deltaResumoClasse === "down" ? "▼" : "●"} ${Math.abs(deltaResumo).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}% vs inicial`;
     return `
       <div class="kpi-row">
-        <div class="kpi-card kpi-clicavel" data-resumo-ir="gerencial" title="Clique pra ver o detalhamento completo" style="cursor:pointer">
+        <div class="kpi-card kpi-clicavel" data-resumo-ir="gerencial-todos" title="Clique pra ver a lista completa" style="cursor:pointer">
           <div class="kpi-cabeca">${kpiIcone("competencia_normas")}<div class="kpi-label">Qtd Contratos <span class="kpi-info" title="Todos os contratos cadastrados no sistema, em qualquer situação de vigência.">ⓘ</span></div></div>
           <div class="kpi-value">${resumo.qtdContratos.toLocaleString("pt-BR")}</div>
         </div>
-        <div class="kpi-card kpi-clicavel" data-resumo-ir="gerencial" title="Clique pra ver o detalhamento completo" style="cursor:pointer">
+        <div class="kpi-card kpi-clicavel" data-resumo-ir="gerencial-valor" title="Clique pra ver os maiores contratos" style="cursor:pointer">
           <div class="kpi-cabeca">${kpiIcone("moeda")}<div class="kpi-label">Valor Atual Total <span class="kpi-info" title="Soma do Valor Global Atual de todos os contratos — já considerando as renovações marcadas manualmente, mesmo antes da planilha ser reimportada.">ⓘ</span></div></div>
           <div class="kpi-value">R$ ${formatarEixo(resumo.valorGlobalAtualTotal)}</div>
           <div class="kpi-valor-exato">${formatarMoedaBR(resumo.valorGlobalAtualTotal)}</div>
+          <div class="kpi-delta ${deltaResumoClasse}">${deltaResumoTexto}</div>
         </div>
         <div class="kpi-card kpi-clicavel" data-resumo-status="Vencido" title="Clique pra ver quais são" style="--kpi-cor:var(--crit-vencido);cursor:pointer">
           <div class="kpi-cabeca">${kpiIcone("relogio")}<div class="kpi-label">Vencidos <span class="kpi-info" title="A data de vigência já passou e o contrato ainda não foi renovado/atualizado.">ⓘ</span></div></div>
@@ -5731,14 +5832,21 @@ function renderResumoRapido(lista, resumo) {
   // mecanismo dos cartões "Qtd Contratos Vencidos"/"A Vencer" que já
   // existem lá dentro); os de área/categoria abrem o perfil completo dela
   // em "Por Área Gestora"/"Por Categoria" (gráficos, divisões temáticas,
-  // tudo). Os dois primeiros (Qtd Contratos/Valor Atual) não têm um filtro
-  // óbvio pra isolar — levam pro Gerencial, onde o detalhamento inteiro já
-  // está. O listener fica no container (não se refaz a cada desenhar()),
-  // então continua funcionando depois de trocar o toggle.
+  // tudo). Qtd Contratos abre a lista completa (mesmo cartão "Qtd
+  // Contratos" clicável que existe dentro do Gerencial); Valor Atual rola
+  // até o Top 10 Maiores Contratos lá dentro (mesmo cartão "Valor Global
+  // Atual Total" clicável de lá). O listener fica no container (não se
+  // refaz a cada desenhar()), então continua funcionando depois de trocar
+  // o toggle.
   alvo.addEventListener("click", (ev) => {
     const cardIr = ev.target.closest("[data-resumo-ir]");
     if (cardIr) {
       document.querySelector('[data-subtab-contratos="gerencial"]')?.click();
+      if (cardIr.dataset.resumoIr === "gerencial-todos") {
+        document.querySelector('#ger-kpis [data-status="Todos"]')?.dispatchEvent(new Event("click", { bubbles: true }));
+      } else if (cardIr.dataset.resumoIr === "gerencial-valor") {
+        document.querySelector('#ger-kpis [data-acao="top-contratos"]')?.dispatchEvent(new Event("click", { bubbles: true }));
+      }
       return;
     }
     const cardStatus = ev.target.closest("[data-resumo-status]");
@@ -5886,6 +5994,7 @@ function renderPorDimensaoContratos(lista, cfg) {
   let filtroPessoa = null; // { tipo: "analista"|"gestor"|"fiscal", nome }
   let filtroMes = "";
   let modoMes = "colunas";
+  let filtroStatusVisao = ""; // "Vencido" | "A Vencer" | "A Contratar" | "" — cartões da Visão Geral
 
   alvo.innerHTML = `
     <div class="dash-filtros">
@@ -5935,6 +6044,7 @@ function renderPorDimensaoContratos(lista, cfg) {
     filtroAditivos = null;
     filtroPessoa = null;
     filtroMes = "";
+    filtroStatusVisao = "";
     atualizar();
     alvo.scrollIntoView?.({ behavior: "smooth", block: "start" });
   }
@@ -6002,21 +6112,36 @@ function renderPorDimensaoContratos(lista, cfg) {
     const qtdAVencer = listaFiltrada.filter((c) => c.statusVigencia === "A Vencer").length;
     const qtdAContratar = listaFiltrada.filter((c) => c.statusVigencia === "A Contratar").length;
     const valorAtual = listaFiltrada.reduce((a, c) => a + (c.valorGlobalAtual || 0), 0);
+    // Pedido direto: "isso se aplica não só pros cartões do resumo, mas
+    // pros outros que não têm direcionamento ainda... a tendência é que
+    // tentem clicar em tudo" — Vencidos/A Vencer/A Contratar aqui não
+    // isolavam nada; agora filtram a MESMA tabela que já aparece embaixo,
+    // igual ao cartão equivalente do Gerencial.
+    const tabelaAlvo = filtroStatusVisao ? listaFiltrada.filter((c) => c.statusVigencia === filtroStatusVisao) : listaFiltrada;
     el("sub-visao").innerHTML = `
       <div class="kpi-row" style="margin-bottom:16px">
         <div class="kpi-card"><div class="kpi-cabeca">${kpiIcone("competencia_normas")}<div class="kpi-label">Qtd Contratos</div></div><div class="kpi-value">${listaFiltrada.length.toLocaleString("pt-BR")}</div></div>
-        <div class="kpi-card" style="--kpi-cor:var(--crit-vencido)"><div class="kpi-cabeca">${kpiIcone("relogio")}<div class="kpi-label">Vencidos</div></div><div class="kpi-value">${qtdVencidos.toLocaleString("pt-BR")}</div></div>
-        <div class="kpi-card" style="--kpi-cor:var(--crit-alto)"><div class="kpi-cabeca">${kpiIcone("relogio")}<div class="kpi-label">A Vencer</div></div><div class="kpi-value">${qtdAVencer.toLocaleString("pt-BR")}</div></div>
-        <div class="kpi-card" style="--kpi-cor:var(--crit-neutro)"><div class="kpi-cabeca">${kpiIcone("calendario")}<div class="kpi-label">A Contratar</div></div><div class="kpi-value">${qtdAContratar.toLocaleString("pt-BR")}</div></div>
+        <div class="kpi-card kpi-clicavel" data-status-visao="Vencido" title="Clique pra isolar" style="--kpi-cor:var(--crit-vencido);cursor:pointer;${filtroStatusVisao === "Vencido" ? "outline:2px solid var(--crit-vencido);outline-offset:-2px" : ""}"><div class="kpi-cabeca">${kpiIcone("relogio")}<div class="kpi-label">Vencidos</div></div><div class="kpi-value">${qtdVencidos.toLocaleString("pt-BR")}</div></div>
+        <div class="kpi-card kpi-clicavel" data-status-visao="A Vencer" title="Clique pra isolar" style="--kpi-cor:var(--crit-alto);cursor:pointer;${filtroStatusVisao === "A Vencer" ? "outline:2px solid var(--crit-alto);outline-offset:-2px" : ""}"><div class="kpi-cabeca">${kpiIcone("relogio")}<div class="kpi-label">A Vencer</div></div><div class="kpi-value">${qtdAVencer.toLocaleString("pt-BR")}</div></div>
+        <div class="kpi-card kpi-clicavel" data-status-visao="A Contratar" title="Clique pra isolar" style="--kpi-cor:var(--crit-neutro);cursor:pointer;${filtroStatusVisao === "A Contratar" ? "outline:2px solid var(--crit-neutro);outline-offset:-2px" : ""}"><div class="kpi-cabeca">${kpiIcone("calendario")}<div class="kpi-label">A Contratar</div></div><div class="kpi-value">${qtdAContratar.toLocaleString("pt-BR")}</div></div>
         <div class="kpi-card"><div class="kpi-cabeca">${kpiIcone("moeda")}<div class="kpi-label">Valor Atual Total</div></div><div class="kpi-value">R$ ${formatarEixo(valorAtual)}</div><div class="kpi-valor-exato">${formatarMoedaBR(valorAtual)}</div></div>
       </div>
+      ${filtroStatusVisao ? `<div class="filter-chips"><span class="filter-chip">Isolando status: ${escapeHTML(filtroStatusVisao)}<button type="button" data-limpar-status-visao title="Voltar a ver todos">✕</button></span></div>` : ""}
       <div class="dash-chart-box">
-        <h4>Detalhamento dos Contratos</h4>
+        <h4>Detalhamento dos Contratos${filtroStatusVisao ? ` — ${escapeHTML(filtroStatusVisao)}` : ""}</h4>
         <p class="dash-chart-hint">Passe o mouse numa linha pra ver o detalhe rápido — clique pra abrir o panorama completo do contrato.</p>
         <div id="${p}-visao-tabela" class="tabela-rolavel" style="max-height:360px"></div>
       </div>`;
-    el("visao-tabela").innerHTML = tabelaContratosHTML(listaFiltrada);
+    el("visao-tabela").innerHTML = tabelaContratosHTML(tabelaAlvo);
     ligarTooltipLinhas(el("visao-tabela"), porId);
+    el("sub-visao").querySelectorAll("[data-status-visao]").forEach((card) => {
+      card.addEventListener("click", () => {
+        filtroStatusVisao = filtroStatusVisao === card.dataset.statusVisao ? "" : card.dataset.statusVisao;
+        renderVisaoGeral(listaFiltrada);
+      });
+    });
+    const btnLimparStatusVisao = el("sub-visao").querySelector("[data-limpar-status-visao]");
+    if (btnLimparStatusVisao) btnLimparStatusVisao.addEventListener("click", () => { filtroStatusVisao = ""; renderVisaoGeral(listaFiltrada); });
   }
 
   // Clicável e reunindo informação, mesma lógica do resto do sistema: clicar
