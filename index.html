@@ -5730,7 +5730,7 @@ function configPorArea() {
     labelBusca: "ÁREA",
     labelTrocar: "← TROCAR DE ÁREA",
     dicaLanding: "Escolha uma área gestora (no campo acima, ou clicando num cartão abaixo) pra ver o perfil completo dela — vencimentos, financeiro, pessoas.",
-    complementar: { campoFn: (c) => c.tipoObjeto, rotuloVazio: "(sem tipo)", titulo: "Valor por Tipo de Objeto" },
+    complementar: { campoFn: (c) => c.tipoObjeto, rotuloVazio: "(sem tipo)", titulo: "Valor por Tipo de Objeto", prefixoAlvo: "categoria", tituloAba: "Por Categoria" },
   };
 }
 function configPorCategoria() {
@@ -5743,7 +5743,7 @@ function configPorCategoria() {
     labelBusca: "CATEGORIA",
     labelTrocar: "← TROCAR DE CATEGORIA",
     dicaLanding: "Escolha uma categoria (no campo acima, ou clicando num cartão abaixo) pra ver o perfil completo dela — vencimentos, financeiro, pessoas.",
-    complementar: { campoFn: (c) => c.unidadeGestora, rotuloVazio: "(sem unidade)", titulo: "Valor por Área Gestora" },
+    complementar: { campoFn: (c) => c.unidadeGestora, rotuloVazio: "(sem unidade)", titulo: "Valor por Área Gestora", prefixoAlvo: "area", tituloAba: "Por Área Gestora" },
   };
 }
 
@@ -5821,6 +5821,11 @@ function renderPorDimensaoContratos(lista, cfg) {
     el("landing").innerHTML = `
       <p class="dash-chart-hint">${cfg.dicaLanding}</p>
       <div class="kpi-row" style="grid-template-columns:repeat(auto-fill,minmax(200px,1fr));margin-top:10px" id="${p}-cards"></div>
+      <div class="dash-chart-box" style="margin-top:16px">
+        <h4>${escapeHTML(cfg.complementar.titulo)} (visão geral, todas as ${cfg.labelBusca.toLowerCase()}s)</h4>
+        <p class="dash-chart-hint">Antes de escolher uma ${cfg.labelBusca.toLowerCase()}: como o total já se divide do outro lado. Clique numa fatia pra abrir o perfil completo dela em "${escapeHTML(cfg.complementar.tituloAba)}".</p>
+        <div id="${p}-landing-complementar"></div>
+      </div>
     `;
     el("cards").innerHTML = porGrupo.map((l) => {
       const v = valorPorGrupo.get(l.label);
@@ -5833,6 +5838,17 @@ function renderPorDimensaoContratos(lista, cfg) {
     }).join("");
     el("cards").querySelectorAll(`[data-${p}-card]`).forEach((card) => {
       card.addEventListener("click", () => selecionar(card.dataset[`${p}Card`]));
+    });
+    el("landing-complementar").innerHTML = roscaValorPorCampoSVG(
+      agruparValorPorCampo(lista, cfg.complementar.campoFn, cfg.complementar.rotuloVazio)
+    );
+    adicionarControlesGrafico(el("landing-complementar"));
+    el("landing-complementar").addEventListener("click", (ev) => {
+      const alvoClicado = ev.target.closest("[data-cat]");
+      if (!alvoClicado) return;
+      document.querySelector(`[data-subtab-contratos="por${cfg.complementar.prefixoAlvo}"]`)?.click();
+      const sel = document.getElementById(`${cfg.complementar.prefixoAlvo}-select`);
+      if (sel) { sel.value = alvoClicado.dataset.cat; sel.dispatchEvent(new Event("change", { bubbles: true })); }
     });
   }
 
