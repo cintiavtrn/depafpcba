@@ -6056,6 +6056,7 @@ function renderPorDimensaoContratos(lista, cfg) {
   let filtroMes = "";
   let modoMes = "colunas";
   let filtroStatusVisao = ""; // "Vencido" | "A Vencer" | "A Contratar" | "" — cartões da Visão Geral
+  let filtroUrgenciaPrazo = ""; // "Vencido" | "30" | "90" | "" — cartões da Visão Geral de Prazos e Vencimentos
 
   alvo.innerHTML = `
     <div class="dash-filtros">
@@ -6116,6 +6117,7 @@ function renderPorDimensaoContratos(lista, cfg) {
     filtroPessoa = null;
     filtroMes = "";
     filtroStatusVisao = "";
+    filtroUrgenciaPrazo = "";
     atualizar();
     alvo.scrollIntoView?.({ behavior: "smooth", block: "start" });
   }
@@ -6233,9 +6235,9 @@ function renderPorDimensaoContratos(lista, cfg) {
       .sort((a, b) => a.diasParaVencer - b.diasParaVencer)[0];
     el("sub-prazos").innerHTML = `
       <div class="kpi-row" style="margin-bottom:16px">
-        <div class="kpi-card" style="--kpi-cor:var(--crit-vencido)"><div class="kpi-cabeca">${kpiIcone("relogio")}<div class="kpi-label">Vencidos</div></div><div class="kpi-value">${vencidosPrazo.toLocaleString("pt-BR")}</div></div>
-        <div class="kpi-card" style="--kpi-cor:var(--crit-critico)"><div class="kpi-cabeca">${kpiIcone("relogio")}<div class="kpi-label">Vence em até 30 dias</div></div><div class="kpi-value">${em30.toLocaleString("pt-BR")}</div></div>
-        <div class="kpi-card" style="--kpi-cor:var(--crit-medio)"><div class="kpi-cabeca">${kpiIcone("relogio")}<div class="kpi-label">Vence em 31–90 dias</div></div><div class="kpi-value">${em90.toLocaleString("pt-BR")}</div></div>
+        <div class="kpi-card kpi-clicavel" data-urgencia="Vencido" title="Clique pra ver quais são" style="--kpi-cor:var(--crit-vencido);cursor:pointer;${filtroUrgenciaPrazo === "Vencido" ? "outline:2px solid var(--crit-vencido);outline-offset:-2px" : ""}"><div class="kpi-cabeca">${kpiIcone("relogio")}<div class="kpi-label">Vencidos</div></div><div class="kpi-value">${vencidosPrazo.toLocaleString("pt-BR")}</div></div>
+        <div class="kpi-card kpi-clicavel" data-urgencia="30" title="Clique pra ver quais são" style="--kpi-cor:var(--crit-critico);cursor:pointer;${filtroUrgenciaPrazo === "30" ? "outline:2px solid var(--crit-critico);outline-offset:-2px" : ""}"><div class="kpi-cabeca">${kpiIcone("relogio")}<div class="kpi-label">Vence em até 30 dias</div></div><div class="kpi-value">${em30.toLocaleString("pt-BR")}</div></div>
+        <div class="kpi-card kpi-clicavel" data-urgencia="90" title="Clique pra ver quais são" style="--kpi-cor:var(--crit-medio);cursor:pointer;${filtroUrgenciaPrazo === "90" ? "outline:2px solid var(--crit-medio);outline-offset:-2px" : ""}"><div class="kpi-cabeca">${kpiIcone("relogio")}<div class="kpi-label">Vence em 31–90 dias</div></div><div class="kpi-value">${em90.toLocaleString("pt-BR")}</div></div>
         <div class="kpi-card${proximoVencer ? " linha-contrato" : ""}"${proximoVencer ? ` data-contrato-id="${escapeAttr(proximoVencer.id)}" style="cursor:pointer" title="Passe o mouse pra ver o detalhe rápido — clique pra abrir o panorama completo"` : ""}><div class="kpi-cabeca">${kpiIcone("relogio")}<div class="kpi-label">Próximo a Vencer</div></div><div class="kpi-value" style="font-size:var(--fs-subtitulo)">${proximoVencer ? escapeHTML(proximoVencer.numeroContrato) : "—"}</div><div class="kpi-valor-exato">${proximoVencer ? `em ${proximoVencer.diasParaVencer} dia${proximoVencer.diasParaVencer === 1 ? "" : "s"}` : "nenhum contrato com data de vigência futura"}</div></div>
       </div>
       <div class="dash-chart-box">
@@ -6255,6 +6257,20 @@ function renderPorDimensaoContratos(lista, cfg) {
     // valor...) e o clique-abre-panorama que toda tabela de contrato já
     // usa, em vez de deixar só o número do contrato pra decorar.
     ligarTooltipLinhas(el("sub-prazos"), porId);
+    // Bug reportado direto: "indo por área gestora clicando em 'vence em
+    // 31-90 dias', não redireciona com os cliques, assim como 30... então
+    // é um problema que nem todos os cartões tão indo" — esses 3 cartões
+    // (Vencidos/≤30/31-90) tinham ficado só informativos quando o resumo
+    // desta aba foi criado; agora isolam a tabela abaixo, mesmo lugar que
+    // "clicar num mês" já usa (os dois se excluem: escolher um zera o
+    // outro, pra não competir pela mesma tabela).
+    el("sub-prazos").querySelectorAll("[data-urgencia]").forEach((card) => {
+      card.addEventListener("click", () => {
+        filtroUrgenciaPrazo = filtroUrgenciaPrazo === card.dataset.urgencia ? "" : card.dataset.urgencia;
+        filtroMes = "";
+        renderPrazos(listaFiltrada);
+      });
+    });
     function desenharMes() {
       const container = el("grafico-mes");
       if (modoMes === "gantt") {
@@ -6281,6 +6297,7 @@ function renderPorDimensaoContratos(lista, cfg) {
       const alvoClicado = ev.target.closest("[data-mes]");
       if (!alvoClicado) return;
       filtroMes = filtroMes === alvoClicado.dataset.mes ? "" : alvoClicado.dataset.mes;
+      filtroUrgenciaPrazo = "";
       renderPrazos(listaFiltrada);
     });
 
@@ -6290,7 +6307,26 @@ function renderPorDimensaoContratos(lista, cfg) {
     const btnLimparMes = alvo.querySelector(`[data-limpar-mes-${p}]`);
     if (btnLimparMes) btnLimparMes.addEventListener("click", () => { filtroMes = ""; renderPrazos(listaFiltrada); });
 
-    if (filtroMes) {
+    const ROTULO_URGENCIA = { Vencido: "vencidos", "30": "vence em até 30 dias", "90": "vence em 31–90 dias" };
+    const TESTE_URGENCIA = {
+      Vencido: (c) => c.statusVigencia === "Vencido",
+      "30": (c) => c.diasParaVencer !== null && c.diasParaVencer >= 0 && c.diasParaVencer <= 30,
+      "90": (c) => c.diasParaVencer !== null && c.diasParaVencer > 30 && c.diasParaVencer <= 90,
+    };
+    if (filtroUrgenciaPrazo) {
+      const contratosDaFaixa = listaFiltrada.filter(TESTE_URGENCIA[filtroUrgenciaPrazo]);
+      el("prazos-tabela").innerHTML = `
+        <div class="filter-chips"><span class="filter-chip">Isolando ${escapeHTML(ROTULO_URGENCIA[filtroUrgenciaPrazo])}<button type="button" data-limpar-urgencia-${p} title="Voltar a ver todos">✕</button></span></div>
+        <div class="dash-chart-box">
+          <h4>Contratos — ${escapeHTML(ROTULO_URGENCIA[filtroUrgenciaPrazo])}</h4>
+          <p class="dash-chart-hint">Passe o mouse numa linha pra ver o detalhe rápido — clique pra abrir o panorama completo do contrato.</p>
+          <div class="tabela-rolavel" style="max-height:320px" id="${p}-prazos-tabela-conteudo"></div>
+        </div>`;
+      el("prazos-tabela-conteudo").innerHTML = tabelaContratosHTML(contratosDaFaixa);
+      ligarTooltipLinhas(el("prazos-tabela-conteudo"), porId);
+      const btnLimparUrgencia = alvo.querySelector(`[data-limpar-urgencia-${p}]`);
+      if (btnLimparUrgencia) btnLimparUrgencia.addEventListener("click", () => { filtroUrgenciaPrazo = ""; renderPrazos(listaFiltrada); });
+    } else if (filtroMes) {
       const contratosDoMes = listaFiltrada.filter((c) => chaveAnoMes(c.dataFim) === filtroMes);
       el("prazos-tabela").innerHTML = `
         <div class="dash-chart-box">
