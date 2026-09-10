@@ -743,6 +743,8 @@ select:focus-visible,input:focus-visible{
 // 1. ÍCONES E FUNÇÕES DE DESENHO (SVG)
 // =====================================================================
 const ICONS = {
+  aditivo: "<svg viewBox=\"0 0 64 64\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"3\" stroke-linecap=\"square\" stroke-linejoin=\"miter\" xmlns=\"http://www.w3.org/2000/svg\">\n  <rect x=\"10\" y=\"8\" width=\"30\" height=\"40\" />\n  <line x1=\"16\" y1=\"18\" x2=\"34\" y2=\"18\" />\n  <line x1=\"16\" y1=\"26\" x2=\"34\" y2=\"26\" />\n  <circle cx=\"44\" cy=\"42\" r=\"12\" />\n  <line x1=\"44\" y1=\"36\" x2=\"44\" y2=\"48\" />\n  <line x1=\"38\" y1=\"42\" x2=\"50\" y2=\"42\" />\n</svg>",
+  calendario: "<svg viewBox=\"0 0 64 64\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"3\" stroke-linecap=\"square\" stroke-linejoin=\"miter\" xmlns=\"http://www.w3.org/2000/svg\">\n  <rect x=\"8\" y=\"14\" width=\"48\" height=\"42\" />\n  <line x1=\"8\" y1=\"26\" x2=\"56\" y2=\"26\" />\n  <line x1=\"20\" y1=\"8\" x2=\"20\" y2=\"20\" />\n  <line x1=\"44\" y1=\"8\" x2=\"44\" y2=\"20\" />\n</svg>",
   categoria_tag: "<svg viewBox=\"0 0 64 64\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"3\" stroke-linecap=\"square\" stroke-linejoin=\"miter\" xmlns=\"http://www.w3.org/2000/svg\">\n  <polygon points=\"8,32 32,8 56,8 56,32 32,56\" />\n  <circle cx=\"44\" cy=\"20\" r=\"3\" fill=\"currentColor\" stroke=\"none\" />\n</svg>",
   brasao_pcba: "<svg viewBox=\"0 0 120 140\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linejoin=\"miter\" stroke-linecap=\"square\" xmlns=\"http://www.w3.org/2000/svg\">\n  <g>\n    <polygon points=\"60,6 64,18 76,18 66,25 70,37 60,30 50,37 54,25 44,18 56,18\" />\n  </g>\n  <g>\n    <path d=\"M 22 46 L 22 42 L 30 42 L 30 46 L 38 46 L 38 42 L 46 42 L 46 46 L 54 46 L 54 42 L 66 42 L 66 46 L 74 46 L 74 42 L 82 42 L 82 46 L 90 46 L 90 42 L 98 42 L 98 46 L 98 96 L 60 118 L 22 96 Z\" />\n    <path d=\"M 28 52 L 28 48 L 34 48 L 34 52 L 40 52 L 40 48 L 46 48 L 46 52 L 54 52 L 54 48 L 66 48 L 66 52 L 74 52 L 74 48 L 80 48 L 80 52 L 86 52 L 86 48 L 92 48 L 92 52 L 92 93 L 60 112 L 28 93 Z\" />\n  </g>\n  <g>\n    <line x1=\"60\" y1=\"58\" x2=\"60\" y2=\"104\" />\n    <line x1=\"48\" y1=\"72\" x2=\"72\" y2=\"72\" />\n    <line x1=\"48\" y1=\"80\" x2=\"72\" y2=\"80\" />\n    <line x1=\"48\" y1=\"72\" x2=\"48\" y2=\"80\" />\n    <line x1=\"72\" y1=\"72\" x2=\"72\" y2=\"80\" />\n  </g>\n  <g>\n    <path d=\"M 42 100 L 42 96 L 45 96 L 45 100 L 48 100 L 48 96 L 51 96 L 51 100 L 51 108 L 42 108 Z\" />\n    <rect x=\"45\" y=\"102\" width=\"3\" height=\"6\" />\n    <path d=\"M 69 100 L 69 96 L 72 96 L 72 100 L 75 100 L 75 96 L 78 96 L 78 100 L 78 108 L 69 108 Z\" />\n    <rect x=\"72\" y=\"102\" width=\"3\" height=\"6\" />\n  </g>\n  <g stroke-width=\"1.5\">\n    <path d=\"M 22 96 L 12 108 L 18 118 L 30 122 L 44 126 L 60 128\" />\n    <line x1=\"16\" y1=\"110\" x2=\"22\" y2=\"106\" />\n    <line x1=\"22\" y1=\"118\" x2=\"28\" y2=\"114\" />\n    <line x1=\"30\" y1=\"122\" x2=\"34\" y2=\"116\" />\n    <line x1=\"40\" y1=\"124\" x2=\"44\" y2=\"118\" />\n    <line x1=\"50\" y1=\"126\" x2=\"54\" y2=\"120\" />\n    <path d=\"M 98 96 L 108 108 L 102 118 L 90 122 L 76 126 L 60 128\" />\n    <line x1=\"104\" y1=\"110\" x2=\"98\" y2=\"106\" />\n    <line x1=\"98\" y1=\"118\" x2=\"92\" y2=\"114\" />\n    <line x1=\"90\" y1=\"122\" x2=\"86\" y2=\"116\" />\n    <line x1=\"80\" y1=\"124\" x2=\"76\" y2=\"118\" />\n    <line x1=\"70\" y1=\"126\" x2=\"66\" y2=\"120\" />\n    <polygon points=\"54,128 66,128 63,134 57,134\" />\n  </g>\n</svg>",
   competencia_balanca: "<svg viewBox=\"0 0 64 64\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"3\" stroke-linecap=\"square\" stroke-linejoin=\"miter\" xmlns=\"http://www.w3.org/2000/svg\">\n  <g>\n    <line x1=\"32\" y1=\"10\" x2=\"32\" y2=\"52\" />\n    <line x1=\"20\" y1=\"52\" x2=\"44\" y2=\"52\" />\n    <line x1=\"10\" y1=\"18\" x2=\"54\" y2=\"18\" />\n    <polygon points=\"10,18 4,32 16,32\" />\n    <polygon points=\"54,18 48,32 60,32\" />\n    <circle cx=\"32\" cy=\"10\" r=\"2\" fill=\"currentColor\" stroke=\"none\" />\n  </g>\n</svg>",
@@ -756,6 +758,7 @@ const ICONS = {
   competencia_tombamento: "<svg viewBox=\"0 0 64 64\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"3\" stroke-linecap=\"square\" stroke-linejoin=\"miter\" xmlns=\"http://www.w3.org/2000/svg\">\n  <g>\n    <polygon points=\"10,18 54,18 54,46 10,46\" />\n    <circle cx=\"16\" cy=\"22\" r=\"1.5\" fill=\"currentColor\" stroke=\"none\" />\n    <circle cx=\"48\" cy=\"22\" r=\"1.5\" fill=\"currentColor\" stroke=\"none\" />\n    <circle cx=\"16\" cy=\"42\" r=\"1.5\" fill=\"currentColor\" stroke=\"none\" />\n    <circle cx=\"48\" cy=\"42\" r=\"1.5\" fill=\"currentColor\" stroke=\"none\" />\n    <line x1=\"18\" y1=\"28\" x2=\"46\" y2=\"28\" />\n    <text x=\"32\" y=\"40\" text-anchor=\"middle\" font-family=\"monospace\" font-size=\"9\" fill=\"currentColor\" stroke=\"none\" letter-spacing=\"1\">N\u00b0</text>\n  </g>\n</svg>",
   cota_horizontal: "<svg viewBox=\"0 0 240 28\" width=\"240\" height=\"28\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.25\" xmlns=\"http://www.w3.org/2000/svg\">\n  <line x1=\"4\" y1=\"18\" x2=\"236\" y2=\"18\" />\n  <line x1=\"4\" y1=\"10\" x2=\"4\" y2=\"26\" />\n  <line x1=\"236\" y1=\"10\" x2=\"236\" y2=\"26\" />\n  <polygon points=\"10,18 4,15 4,21\" fill=\"currentColor\" stroke=\"none\" />\n  <polygon points=\"230,18 236,15 236,21\" fill=\"currentColor\" stroke=\"none\" />\n  <rect x=\"94\" y=\"4\" width=\"52\" height=\"12\" fill=\"var(--paper, #ffffff)\" stroke=\"none\" />\n  <text x=\"120\" y=\"14\" text-anchor=\"middle\" font-family=\"monospace\" font-size=\"10\" fill=\"currentColor\" stroke=\"none\" letter-spacing=\"1\">64,00</text>\n</svg>",
   distintivo_pcba: "<svg viewBox=\"0 0 140 170\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linejoin=\"miter\" stroke-linecap=\"square\" xmlns=\"http://www.w3.org/2000/svg\">\n  <defs>\n    <g id=\"brasao-pcba-mark\">\n      <g>\n        <polygon points=\"60,6 64,18 76,18 66,25 70,37 60,30 50,37 54,25 44,18 56,18\" />\n      </g>\n      <g>\n        <path d=\"M 22 46 L 22 42 L 30 42 L 30 46 L 38 46 L 38 42 L 46 42 L 46 46 L 54 46 L 54 42 L 66 42 L 66 46 L 74 46 L 74 42 L 82 42 L 82 46 L 90 46 L 90 42 L 98 42 L 98 46 L 98 96 L 60 118 L 22 96 Z\" />\n        <path d=\"M 28 52 L 28 48 L 34 48 L 34 52 L 40 52 L 40 48 L 46 48 L 46 52 L 54 52 L 54 48 L 66 48 L 66 52 L 74 52 L 74 48 L 80 48 L 80 52 L 86 52 L 86 48 L 92 48 L 92 52 L 92 93 L 60 112 L 28 93 Z\" />\n      </g>\n      <g>\n        <line x1=\"60\" y1=\"58\" x2=\"60\" y2=\"104\" />\n        <line x1=\"48\" y1=\"72\" x2=\"72\" y2=\"72\" />\n        <line x1=\"48\" y1=\"80\" x2=\"72\" y2=\"80\" />\n        <line x1=\"48\" y1=\"72\" x2=\"48\" y2=\"80\" />\n        <line x1=\"72\" y1=\"72\" x2=\"72\" y2=\"80\" />\n      </g>\n      <g>\n        <path d=\"M 42 100 L 42 96 L 45 96 L 45 100 L 48 100 L 48 96 L 51 96 L 51 100 L 51 108 L 42 108 Z\" />\n        <rect x=\"45\" y=\"102\" width=\"3\" height=\"6\" />\n        <path d=\"M 69 100 L 69 96 L 72 96 L 72 100 L 75 100 L 75 96 L 78 96 L 78 100 L 78 108 L 69 108 Z\" />\n        <rect x=\"72\" y=\"102\" width=\"3\" height=\"6\" />\n      </g>\n      <g stroke-width=\"1.5\">\n        <path d=\"M 22 96 L 12 108 L 18 118 L 30 122 L 44 126 L 60 128\" />\n        <line x1=\"16\" y1=\"110\" x2=\"22\" y2=\"106\" />\n        <line x1=\"22\" y1=\"118\" x2=\"28\" y2=\"114\" />\n        <line x1=\"30\" y1=\"122\" x2=\"34\" y2=\"116\" />\n        <line x1=\"40\" y1=\"124\" x2=\"44\" y2=\"118\" />\n        <line x1=\"50\" y1=\"126\" x2=\"54\" y2=\"120\" />\n        <path d=\"M 98 96 L 108 108 L 102 118 L 90 122 L 76 126 L 60 128\" />\n        <line x1=\"104\" y1=\"110\" x2=\"98\" y2=\"106\" />\n        <line x1=\"98\" y1=\"118\" x2=\"92\" y2=\"114\" />\n        <line x1=\"90\" y1=\"122\" x2=\"86\" y2=\"116\" />\n        <line x1=\"80\" y1=\"124\" x2=\"76\" y2=\"118\" />\n        <line x1=\"70\" y1=\"126\" x2=\"66\" y2=\"120\" />\n        <polygon points=\"54,128 66,128 63,134 57,134\" />\n      </g>\n    </g>\n  </defs>\n\n  \n  <path d=\"M 20 22 L 120 22 L 130 40 L 130 118 L 70 162 L 10 118 L 10 40 Z\" />\n  \n  <path d=\"M 26 30 L 114 30 L 122 44 L 122 114 L 70 154 L 18 114 L 18 44 Z\" />\n\n  \n  <g>\n    <polygon points=\"18,36 122,36 128,44 122,52 18,52 24,44\" />\n    <polygon points=\"10,40 18,36 24,44 18,52 10,48\" />\n    <polygon points=\"130,40 122,36 116,44 122,52 130,48\" />\n    <text x=\"70\" y=\"47\" text-anchor=\"middle\" font-family=\"monospace\" font-weight=\"700\" font-size=\"9\" letter-spacing=\"2\" fill=\"currentColor\" stroke=\"none\">POL\u00cdCIA</text>\n  </g>\n\n  \n  <use href=\"#brasao-pcba-mark\" transform=\"translate(35 54) scale(0.42)\" />\n\n  \n  <g>\n    <polygon points=\"26,130 114,130 120,138 114,146 26,146 32,138\" />\n    <text x=\"70\" y=\"141\" text-anchor=\"middle\" font-family=\"monospace\" font-weight=\"700\" font-size=\"9\" letter-spacing=\"3\" fill=\"currentColor\" stroke=\"none\">CIVIL \u00b7 BA</text>\n  </g>\n</svg>",
+  escudo: "<svg viewBox=\"0 0 64 64\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"3\" stroke-linecap=\"square\" stroke-linejoin=\"miter\" xmlns=\"http://www.w3.org/2000/svg\">\n  <polygon points=\"32,6 54,14 54,32 32,58 10,32 10,14\" />\n  <polyline points=\"21,32 28,40 44,22\" />\n</svg>",
   moeda: "<svg viewBox=\"0 0 64 64\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"3\" stroke-linecap=\"square\" stroke-linejoin=\"miter\" xmlns=\"http://www.w3.org/2000/svg\">\n  <g>\n    <circle cx=\"32\" cy=\"32\" r=\"22\" />\n    <line x1=\"54\" y1=\"32\" x2=\"60\" y2=\"32\" />\n    <line x1=\"48\" y1=\"48\" x2=\"52\" y2=\"52\" />\n    <line x1=\"32\" y1=\"54\" x2=\"32\" y2=\"60\" />\n    <line x1=\"16\" y1=\"48\" x2=\"12\" y2=\"52\" />\n    <line x1=\"10\" y1=\"32\" x2=\"4\" y2=\"32\" />\n    <line x1=\"16\" y1=\"16\" x2=\"12\" y2=\"12\" />\n    <line x1=\"32\" y1=\"10\" x2=\"32\" y2=\"4\" />\n    <line x1=\"48\" y1=\"16\" x2=\"52\" y2=\"12\" />\n    <line x1=\"32\" y1=\"24\" x2=\"32\" y2=\"40\" />\n    <line x1=\"24\" y1=\"32\" x2=\"40\" y2=\"32\" />\n  </g>\n</svg>",
   predio: "<svg viewBox=\"0 0 64 64\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"3\" stroke-linecap=\"square\" stroke-linejoin=\"miter\" xmlns=\"http://www.w3.org/2000/svg\">\n  <g>\n    <rect x=\"14\" y=\"8\" width=\"36\" height=\"48\" />\n    <line x1=\"8\" y1=\"56\" x2=\"56\" y2=\"56\" />\n    <rect x=\"20\" y=\"16\" width=\"6\" height=\"6\" />\n    <rect x=\"32\" y=\"16\" width=\"6\" height=\"6\" />\n    <rect x=\"20\" y=\"28\" width=\"6\" height=\"6\" />\n    <rect x=\"32\" y=\"28\" width=\"6\" height=\"6\" />\n    <rect x=\"20\" y=\"40\" width=\"6\" height=\"6\" />\n    <rect x=\"32\" y=\"40\" width=\"6\" height=\"6\" />\n  </g>\n</svg>",
   projeto_investigacao: "<svg viewBox=\"0 0 64 64\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"3\" stroke-linecap=\"square\" stroke-linejoin=\"miter\" xmlns=\"http://www.w3.org/2000/svg\">\n  <g>\n    <rect x=\"8\" y=\"8\" width=\"48\" height=\"48\" />\n    <rect x=\"24\" y=\"26\" width=\"16\" height=\"12\" />\n    <rect x=\"14\" y=\"14\" width=\"6\" height=\"6\" />\n    <rect x=\"44\" y=\"14\" width=\"6\" height=\"6\" />\n    <rect x=\"14\" y=\"44\" width=\"6\" height=\"6\" />\n    <rect x=\"44\" y=\"44\" width=\"6\" height=\"6\" />\n  </g>\n</svg>",
@@ -5036,11 +5039,11 @@ function renderGerencialContratos(lista, resumo) {
 
     document.getElementById("ger-kpis").innerHTML = `
       <div class="kpi-row">
-        <div class="kpi-card"><div class="kpi-label">Qtd Contratos</div><div class="kpi-value">${filtrada.length.toLocaleString("pt-BR")}</div></div>
-        <div class="kpi-card kpi-clicavel" data-status="Vencido" title="Clique pra ver quais são" style="--kpi-cor:var(--crit-vencido);cursor:pointer;${filtroStatusKpi === "Vencido" ? "outline:2px solid var(--crit-vencido);outline-offset:-2px" : ""}"><div class="kpi-label">Qtd Contratos Vencidos</div><div class="kpi-value">${qtdVencidos.toLocaleString("pt-BR")}</div></div>
-        <div class="kpi-card kpi-clicavel" data-status="A Vencer" title="Clique pra ver quais são" style="--kpi-cor:var(--crit-alto);cursor:pointer;${filtroStatusKpi === "A Vencer" ? "outline:2px solid var(--crit-alto);outline-offset:-2px" : ""}"><div class="kpi-label">Qtd Contratos A Vencer</div><div class="kpi-value">${qtdAVencer.toLocaleString("pt-BR")}</div></div>
-        <div class="kpi-card"><div class="kpi-label">Valor Global Inicial Total</div><div class="kpi-value">R$ ${formatarEixo(valorInicial)}</div><div class="kpi-valor-exato">${formatarMoedaBR(valorInicial)}</div></div>
-        <div class="kpi-card"><div class="kpi-label">Valor Global Atual Total</div><div class="kpi-value">R$ ${formatarEixo(valorAtual)}</div><div class="kpi-valor-exato">${formatarMoedaBR(valorAtual)}</div></div>
+        <div class="kpi-card"><div class="kpi-cabeca">${kpiIcone("competencia_normas")}<div class="kpi-label">Qtd Contratos</div></div><div class="kpi-value">${filtrada.length.toLocaleString("pt-BR")}</div></div>
+        <div class="kpi-card kpi-clicavel" data-status="Vencido" title="Clique pra ver quais são" style="--kpi-cor:var(--crit-vencido);cursor:pointer;${filtroStatusKpi === "Vencido" ? "outline:2px solid var(--crit-vencido);outline-offset:-2px" : ""}"><div class="kpi-cabeca">${kpiIcone("relogio")}<div class="kpi-label">Qtd Contratos Vencidos</div></div><div class="kpi-value">${qtdVencidos.toLocaleString("pt-BR")}</div></div>
+        <div class="kpi-card kpi-clicavel" data-status="A Vencer" title="Clique pra ver quais são" style="--kpi-cor:var(--crit-alto);cursor:pointer;${filtroStatusKpi === "A Vencer" ? "outline:2px solid var(--crit-alto);outline-offset:-2px" : ""}"><div class="kpi-cabeca">${kpiIcone("relogio")}<div class="kpi-label">Qtd Contratos A Vencer</div></div><div class="kpi-value">${qtdAVencer.toLocaleString("pt-BR")}</div></div>
+        <div class="kpi-card"><div class="kpi-cabeca">${kpiIcone("moeda")}<div class="kpi-label">Valor Global Inicial Total</div></div><div class="kpi-value">R$ ${formatarEixo(valorInicial)}</div><div class="kpi-valor-exato">${formatarMoedaBR(valorInicial)}</div></div>
+        <div class="kpi-card"><div class="kpi-cabeca">${kpiIcone("moeda")}<div class="kpi-label">Valor Global Atual Total</div></div><div class="kpi-value">R$ ${formatarEixo(valorAtual)}</div><div class="kpi-valor-exato">${formatarMoedaBR(valorAtual)}</div></div>
       </div>`;
 
     // Tabela combinada: aparece sempre que QUALQUER filtro de recorte estiver
@@ -5136,12 +5139,12 @@ function renderGerencialContratos(lista, resumo) {
     // fiéis ao original, pra não confundir "isto é o modelo de referência"
     // com "isto é um extra que a gente achou que ajudava".
     document.getElementById("ger-rodape").innerHTML = `
-      <div class="kpi-card" style="--kpi-cor:var(--crit-baixo)"><div class="kpi-label">% Contratos Baixo</div><div class="kpi-value">${pctBaixo.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}%</div></div>
-      <div class="kpi-card kpi-clicavel" data-status="A Contratar" title="Clique pra ver quais são" style="--kpi-cor:var(--crit-neutro);cursor:pointer;${filtroStatusKpi === "A Contratar" ? "outline:2px solid var(--crit-neutro);outline-offset:-2px" : ""}"><div class="kpi-label">Qtd A Contratar</div><div class="kpi-value">${qtdAContratar.toLocaleString("pt-BR")}</div></div>
-      <div class="kpi-card"><div class="kpi-label">Qtd Total de Aditivos</div><div class="kpi-value">${qtdTotalAditivos.toLocaleString("pt-BR")}</div></div>
-      <div class="kpi-card"><div class="kpi-label">Média de Aditivos / Contrato</div><div class="kpi-value">${mediaAditivos.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}</div></div>
-      <div class="kpi-card"><div class="kpi-label">% com Garantia Exigida</div><div class="kpi-value">${pctGarantia === null ? "—" : pctGarantia.toLocaleString("pt-BR", { maximumFractionDigits: 1 }) + "%"}</div></div>
-      <div class="kpi-card kpi-clicavel" data-garantia="Sim" title="Clique pra ver quais são" style="cursor:pointer;${filtroGarantia ? "outline:2px solid var(--carvao);outline-offset:-2px" : ""}"><div class="kpi-label">Contratos Garantia Exigida</div><div class="kpi-value">${qtdGarantiaExigida.toLocaleString("pt-BR")}</div></div>`;
+      <div class="kpi-card" style="--kpi-cor:var(--crit-baixo)"><div class="kpi-cabeca">${kpiIcone("relogio")}<div class="kpi-label">% Contratos Baixo</div></div><div class="kpi-value">${pctBaixo.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}%</div></div>
+      <div class="kpi-card kpi-clicavel" data-status="A Contratar" title="Clique pra ver quais são" style="--kpi-cor:var(--crit-neutro);cursor:pointer;${filtroStatusKpi === "A Contratar" ? "outline:2px solid var(--crit-neutro);outline-offset:-2px" : ""}"><div class="kpi-cabeca">${kpiIcone("calendario")}<div class="kpi-label">Qtd A Contratar</div></div><div class="kpi-value">${qtdAContratar.toLocaleString("pt-BR")}</div></div>
+      <div class="kpi-card"><div class="kpi-cabeca">${kpiIcone("aditivo")}<div class="kpi-label">Qtd Total de Aditivos</div></div><div class="kpi-value">${qtdTotalAditivos.toLocaleString("pt-BR")}</div></div>
+      <div class="kpi-card"><div class="kpi-cabeca">${kpiIcone("aditivo")}<div class="kpi-label">Média de Aditivos / Contrato</div></div><div class="kpi-value">${mediaAditivos.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}</div></div>
+      <div class="kpi-card"><div class="kpi-cabeca">${kpiIcone("escudo")}<div class="kpi-label">% com Garantia Exigida</div></div><div class="kpi-value">${pctGarantia === null ? "—" : pctGarantia.toLocaleString("pt-BR", { maximumFractionDigits: 1 }) + "%"}</div></div>
+      <div class="kpi-card kpi-clicavel" data-garantia="Sim" title="Clique pra ver quais são" style="cursor:pointer;${filtroGarantia ? "outline:2px solid var(--carvao);outline-offset:-2px" : ""}"><div class="kpi-cabeca">${kpiIcone("escudo")}<div class="kpi-label">Contratos Garantia Exigida</div></div><div class="kpi-value">${qtdGarantiaExigida.toLocaleString("pt-BR")}</div></div>`;
   }
 
   document.getElementById("ger-filtro-area").addEventListener("change", (ev) => { filtroArea = ev.target.value; atualizar(); });
@@ -5545,10 +5548,10 @@ function renderOperacionalContratos(lista, portalSlug) {
 
     document.getElementById("op-kpis").innerHTML = `
       <div class="kpi-row">
-        <div class="kpi-card"><div class="kpi-label">Valor Global Atual Total${selecionado && selecionado.valorGlobalAtual !== selecionado.valorGlobalAtualPlanilha ? " 🔄" : ""}</div><div class="kpi-value">R$ ${formatarEixo(selecionado ? (selecionado.valorGlobalAtual || 0) : valorAtualTotal)}</div><div class="kpi-valor-exato">${formatarMoedaBR(selecionado ? (selecionado.valorGlobalAtual || 0) : valorAtualTotal)}</div></div>
-        <div class="kpi-card"><div class="kpi-label">Valor Executado Total</div><div class="kpi-value">—</div></div>
-        <div class="kpi-card"><div class="kpi-label">Saldo Disponível Total</div><div class="kpi-value">—</div></div>
-        <div class="kpi-card"><div class="kpi-label">Qtd Total de Aditivos</div><div class="kpi-value">${(selecionado ? selecionado.qtdAditivos : qtdAditivosTotal).toLocaleString("pt-BR")}</div></div>
+        <div class="kpi-card"><div class="kpi-cabeca">${kpiIcone("moeda")}<div class="kpi-label">Valor Global Atual Total${selecionado && selecionado.valorGlobalAtual !== selecionado.valorGlobalAtualPlanilha ? " 🔄" : ""}</div></div><div class="kpi-value">R$ ${formatarEixo(selecionado ? (selecionado.valorGlobalAtual || 0) : valorAtualTotal)}</div><div class="kpi-valor-exato">${formatarMoedaBR(selecionado ? (selecionado.valorGlobalAtual || 0) : valorAtualTotal)}</div></div>
+        <div class="kpi-card"><div class="kpi-cabeca">${kpiIcone("moeda")}<div class="kpi-label">Valor Executado Total</div></div><div class="kpi-value">—</div></div>
+        <div class="kpi-card"><div class="kpi-cabeca">${kpiIcone("moeda")}<div class="kpi-label">Saldo Disponível Total</div></div><div class="kpi-value">—</div></div>
+        <div class="kpi-card"><div class="kpi-cabeca">${kpiIcone("aditivo")}<div class="kpi-label">Qtd Total de Aditivos</div></div><div class="kpi-value">${(selecionado ? selecionado.qtdAditivos : qtdAditivosTotal).toLocaleString("pt-BR")}</div></div>
       </div>`;
 
     const pessoas = selecionado
@@ -5804,6 +5807,7 @@ function configPorArea() {
     opcaoPadrao: "— Escolha uma área —",
     labelBusca: "ÁREA",
     labelTrocar: "← TROCAR DE ÁREA",
+    icone: "predio",
     dicaLanding: "Escolha uma área gestora (no campo acima, ou clicando num cartão abaixo) pra ver o perfil completo dela — vencimentos, financeiro, pessoas.",
     complementar: { campoFn: (c) => c.tipoObjeto, rotuloVazio: "(sem tipo)", titulo: "Valor por Tipo de Objeto", prefixoAlvo: "categoria", tituloAba: "Por Categoria" },
   };
@@ -5817,6 +5821,7 @@ function configPorCategoria() {
     opcaoPadrao: "— Escolha uma categoria —",
     labelBusca: "CATEGORIA",
     labelTrocar: "← TROCAR DE CATEGORIA",
+    icone: "categoria_tag",
     dicaLanding: "Escolha uma categoria (no campo acima, ou clicando num cartão abaixo) pra ver o perfil completo dela — vencimentos, financeiro, pessoas.",
     complementar: { campoFn: (c) => c.unidadeGestora, rotuloVazio: "(sem unidade)", titulo: "Valor por Área Gestora", prefixoAlvo: "area", tituloAba: "Por Área Gestora" },
   };
@@ -5830,6 +5835,7 @@ function renderPorDimensaoContratos(lista, cfg) {
   const valoresDisponiveis = [...new Set(lista.map((c) => cfg.campoAgrupador(c) || cfg.rotuloVazio))].sort();
   let selecionada = "";
   let filtroComplementar = "";
+  let modoComplementar = "padrao"; // "padrao" (dimensão complementar de cfg) | "analista"
   let filtroAditivos = null;
   let filtroPessoa = null; // { tipo: "analista"|"gestor"|"fiscal", nome }
   let filtroMes = "";
@@ -5879,6 +5885,7 @@ function renderPorDimensaoContratos(lista, cfg) {
     selecionada = valor;
     el("select").value = valor;
     filtroComplementar = "";
+    modoComplementar = "padrao";
     filtroAditivos = null;
     filtroPessoa = null;
     filtroMes = "";
@@ -5906,7 +5913,7 @@ function renderPorDimensaoContratos(lista, cfg) {
       const v = valorPorGrupo.get(l.label);
       const piorCrit = CRITICIDADE_VISUAL.find((cv) => l.porCrit[cv.label] > 0);
       return `<div class="kpi-card" data-${p}-card="${escapeAttr(l.label)}" style="cursor:pointer;--kpi-cor:${piorCrit ? piorCrit.cor : "var(--carvao)"}">
-        <div class="kpi-label">${escapeHTML(l.label)}</div>
+        <div class="kpi-cabeca">${kpiIcone(cfg.icone)}<div class="kpi-label">${escapeHTML(l.label)}</div></div>
         <div class="kpi-value" style="font-size:var(--fs-subtitulo)">${l.total} contrato${l.total === 1 ? "" : "s"}</div>
         <div class="font-mono" style="font-size:var(--fs-ui-sm);color:#8B93A3">${v ? formatarMoedaBR(v.total) : "—"}</div>
       </div>`;
@@ -5948,11 +5955,11 @@ function renderPorDimensaoContratos(lista, cfg) {
     const valorAtual = listaFiltrada.reduce((a, c) => a + (c.valorGlobalAtual || 0), 0);
     el("sub-visao").innerHTML = `
       <div class="kpi-row" style="margin-bottom:16px">
-        <div class="kpi-card"><div class="kpi-label">Qtd Contratos</div><div class="kpi-value">${listaFiltrada.length.toLocaleString("pt-BR")}</div></div>
-        <div class="kpi-card" style="--kpi-cor:var(--crit-vencido)"><div class="kpi-label">Vencidos</div><div class="kpi-value">${qtdVencidos.toLocaleString("pt-BR")}</div></div>
-        <div class="kpi-card" style="--kpi-cor:var(--crit-alto)"><div class="kpi-label">A Vencer</div><div class="kpi-value">${qtdAVencer.toLocaleString("pt-BR")}</div></div>
-        <div class="kpi-card" style="--kpi-cor:var(--crit-neutro)"><div class="kpi-label">A Contratar</div><div class="kpi-value">${qtdAContratar.toLocaleString("pt-BR")}</div></div>
-        <div class="kpi-card"><div class="kpi-label">Valor Atual Total</div><div class="kpi-value">R$ ${formatarEixo(valorAtual)}</div><div class="kpi-valor-exato">${formatarMoedaBR(valorAtual)}</div></div>
+        <div class="kpi-card"><div class="kpi-cabeca">${kpiIcone("competencia_normas")}<div class="kpi-label">Qtd Contratos</div></div><div class="kpi-value">${listaFiltrada.length.toLocaleString("pt-BR")}</div></div>
+        <div class="kpi-card" style="--kpi-cor:var(--crit-vencido)"><div class="kpi-cabeca">${kpiIcone("relogio")}<div class="kpi-label">Vencidos</div></div><div class="kpi-value">${qtdVencidos.toLocaleString("pt-BR")}</div></div>
+        <div class="kpi-card" style="--kpi-cor:var(--crit-alto)"><div class="kpi-cabeca">${kpiIcone("relogio")}<div class="kpi-label">A Vencer</div></div><div class="kpi-value">${qtdAVencer.toLocaleString("pt-BR")}</div></div>
+        <div class="kpi-card" style="--kpi-cor:var(--crit-neutro)"><div class="kpi-cabeca">${kpiIcone("calendario")}<div class="kpi-label">A Contratar</div></div><div class="kpi-value">${qtdAContratar.toLocaleString("pt-BR")}</div></div>
+        <div class="kpi-card"><div class="kpi-cabeca">${kpiIcone("moeda")}<div class="kpi-label">Valor Atual Total</div></div><div class="kpi-value">R$ ${formatarEixo(valorAtual)}</div><div class="kpi-valor-exato">${formatarMoedaBR(valorAtual)}</div></div>
       </div>
       <div class="dash-chart-box">
         <h4>Detalhamento dos Contratos</h4>
@@ -6028,11 +6035,26 @@ function renderPorDimensaoContratos(lista, cfg) {
     }
   }
 
+  // Pedido direto, olhando o toggle Dengue/Zika/Chikungunya do SEI Municípios
+  // sobre o mesmo gráfico: "aplicar esse mesmo toggle onde mais der" — a
+  // rosca da dimensão complementar ganha um segundo modo (Analista), sem
+  // perder a dimensão que já existia (Tipo de Objeto/Área Gestora,
+  // dependendo da página). Mesmo dash-toggle de sempre, mesmo mecanismo.
   function renderFinanceiro(listaFiltrada) {
+    const dimensaoAtiva = modoComplementar === "analista"
+      ? { campoFn: (c) => c.analista, rotuloVazio: "(sem analista)", titulo: "Valor por Analista" }
+      : cfg.complementar;
+    const rotuloModoPadrao = cfg.complementar.titulo.replace(/^Valor por /, "").toUpperCase();
     el("sub-financeiro").innerHTML = `
       <div class="dash-charts" style="grid-template-columns:1fr 1fr">
         <div class="dash-chart-box">
-          <h4>${escapeHTML(cfg.complementar.titulo)}</h4>
+          <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:12px">
+            <h4 style="margin-bottom:0">${escapeHTML(dimensaoAtiva.titulo)}</h4>
+            <div class="dash-toggle" id="${p}-fin-toggle">
+              <button class="dash-toggle-btn${modoComplementar === "padrao" ? " active" : ""}" data-modo="padrao">${escapeHTML(rotuloModoPadrao)}</button>
+              <button class="dash-toggle-btn${modoComplementar === "analista" ? " active" : ""}" data-modo="analista">ANALISTA</button>
+            </div>
+          </div>
           <div id="${p}-complementar"></div>
         </div>
         <div class="dash-chart-box">
@@ -6057,12 +6079,12 @@ function renderPorDimensaoContratos(lista, cfg) {
     // valores (só com o escolhido em destaque), senão não daria pra trocar
     // de fatia depois de escolher uma.
     const filtrada = listaFiltrada.filter((c) =>
-      (!filtroComplementar || (cfg.complementar.campoFn(c) || cfg.complementar.rotuloVazio) === filtroComplementar) &&
+      (!filtroComplementar || (dimensaoAtiva.campoFn(c) || dimensaoAtiva.rotuloVazio) === filtroComplementar) &&
       (filtroAditivos === null || (c.qtdAditivos ?? 0) === filtroAditivos)
     );
 
     el("complementar").innerHTML = roscaValorPorCampoSVG(
-      agruparValorPorCampo(listaFiltrada, cfg.complementar.campoFn, cfg.complementar.rotuloVazio),
+      agruparValorPorCampo(listaFiltrada, dimensaoAtiva.campoFn, dimensaoAtiva.rotuloVazio),
       filtroComplementar
     );
     el("top-contratos").innerHTML = barraContagemHorizontalSVG(
@@ -6086,6 +6108,13 @@ function renderPorDimensaoContratos(lista, cfg) {
       filtroComplementar = filtroComplementar === alvoClicado.dataset.cat ? "" : alvoClicado.dataset.cat;
       renderFinanceiro(listaFiltrada);
     });
+    el("fin-toggle").addEventListener("click", (ev) => {
+      const btn = ev.target.closest("[data-modo]");
+      if (!btn || btn.dataset.modo === modoComplementar) return;
+      modoComplementar = btn.dataset.modo;
+      filtroComplementar = ""; // troca de dimensão zera o filtro da dimensão anterior (senão fica comparando maçã com laranja)
+      renderFinanceiro(listaFiltrada);
+    });
     el("aditivos").addEventListener("click", (ev) => {
       const alvoClicado = ev.target.closest("[data-valor]");
       if (!alvoClicado) return;
@@ -6097,7 +6126,7 @@ function renderPorDimensaoContratos(lista, cfg) {
     // Chip(s) do que está isolado — mesmo padrão do Gerencial: cada filtro
     // ativo sabe se desligar sozinho.
     const chipsFinanceiro = [
-      filtroComplementar && { rotulo: `${cfg.complementar.titulo.replace(/^Valor por /, "").toLowerCase()}: ${filtroComplementar}`, limpar: () => { filtroComplementar = ""; renderFinanceiro(listaFiltrada); } },
+      filtroComplementar && { rotulo: `${dimensaoAtiva.titulo.replace(/^Valor por /, "").toLowerCase()}: ${filtroComplementar}`, limpar: () => { filtroComplementar = ""; renderFinanceiro(listaFiltrada); } },
       filtroAditivos !== null && { rotulo: `${filtroAditivos} aditivo${filtroAditivos === 1 ? "" : "s"}`, limpar: () => { filtroAditivos = null; renderFinanceiro(listaFiltrada); } },
     ].filter(Boolean);
     if (chipsFinanceiro.length) {
