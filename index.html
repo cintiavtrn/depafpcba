@@ -174,10 +174,27 @@ body{background:var(--paper);color:var(--carvao);font-family:'IBM Plex Sans',san
 .tag-pendente{border:1.5px dashed #33415C;color:#8B93A3;background:none}
 
 /* ---------- dashboard ---------- */
-.kpi-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:2px;background:var(--carvao);border:2px solid var(--carvao);margin-bottom:16px}
-.kpi-card{	background:var(--surface);padding:16px 18px}
-.kpi-label{font-family:'IBM Plex Mono',monospace;font-size:var(--fs-ui-sm);letter-spacing:.08em;color:#9AA3B2;text-transform:uppercase}
+/* Pedido direto, comparando com o SEI Municípios: "eu acho os nossos
+   cartões bem pouco amigáveis". O grid de costura em 2px (fundo carvão
+   vazando pelas bordas) lia como grade de dossiê — técnico, mas frio pra
+   quem só quer bater o olho numa reunião. Trocado por cartões separados
+   de verdade (gap real, borda e sombra própria, canto arredondado) —
+   mantendo a paleta e a tipografia de sempre, só menos "documento
+   oficial" e mais fácil de escanear rápido. */
+.kpi-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;margin-bottom:16px}
+.kpi-card{	background:var(--surface);padding:16px 18px;border:1.5px solid var(--paper-line)}
+.kpi-label{font-family:'IBM Plex Mono',monospace;font-size:var(--fs-ui-sm);letter-spacing:.08em;color:#9AA3B2;text-transform:uppercase;display:inline-flex;align-items:center;gap:5px}
 .kpi-value{font-family:'Space Grotesk',sans-serif;font-size:var(--fs-display);line-height:1;margin-top:6px;font-variant-numeric:tabular-nums}
+/* Ícone redondo (à la SEI) + cabeçalho do cartão — só entra quando o
+   cartão explicitamente monta um .kpi-cabeca; cartão sem ele continua
+   igual, sem buraco nenhum no layout. */
+.kpi-cabeca{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.kpi-icone{width:28px;height:28px;flex:none;border-radius:50%;display:flex;align-items:center;justify-content:center;background:color-mix(in srgb, var(--kpi-cor,var(--carvao)) 18%, var(--surface));color:var(--kpi-cor,var(--carvao))}
+.kpi-icone svg{width:15px;height:15px}
+/* ⓘ explicando o que o número inclui — pedido junto: "achar informações
+   perdidas" também é entender o que está sendo contado sem perguntar. */
+.kpi-info{cursor:help;font-size:0.95em;opacity:.6;text-transform:none;letter-spacing:0}
+.kpi-info:hover{opacity:1}
 /* Valor exato por baixo do valor arredondado do KPI — pedido direto:
    "isso pode ser ruim pra uma diretoria financeira que precisa trabalhar
    com coisas exatas". O arredondado (R$ 37,9M) é só pra escanear rápido;
@@ -200,7 +217,7 @@ body{background:var(--paper);color:var(--carvao);font-family:'IBM Plex Sans',san
 .tela-head{position:relative}
 .dash-chart-box svg rect,.dash-chart-box svg path,.dash-chart-box svg circle{transition:opacity .25s ease,stroke-width .2s ease}
 .dash-chart-box svg .barra:hover,.dash-chart-box svg .donut-fatia:hover{opacity:.82}
-.kpi-card{border-top:3px solid var(--kpi-cor,var(--carvao))}
+.kpi-card{border-top:3px solid var(--kpi-cor,var(--carvao));border-radius:var(--radius-md)}
 .kpi-value{position:relative}
 .dash-chart-box h4{position:relative;padding-left:12px}
 .dash-chart-box h4::before{content:"";position:absolute;left:0;top:2px;bottom:2px;width:4px;background:var(--tela-color,var(--carvao))}
@@ -538,7 +555,7 @@ select:focus-visible,input:focus-visible{
 .dado,.kpi-card,.projeto-card,.dash-chart-box,.dash-tabela,.direcao-card,.dash-filtros{
   box-shadow:var(--shadow-sm);position:relative;
 }
-.kpi-card{border-radius:0 var(--radius-sm) 0 0;transition:transform .18s var(--ease-spring),box-shadow .18s ease}
+.kpi-card{transition:transform .18s var(--ease-spring),box-shadow .18s ease}
 .kpi-card:hover{transform:translateY(-2px);box-shadow:var(--shadow-md)}
 .dash-chart-box,.projeto-card{transition:box-shadow .2s ease}
 .dash-chart-box:hover,.projeto-card:hover{box-shadow:var(--shadow-md)}
@@ -726,6 +743,7 @@ select:focus-visible,input:focus-visible{
 // 1. ÍCONES E FUNÇÕES DE DESENHO (SVG)
 // =====================================================================
 const ICONS = {
+  categoria_tag: "<svg viewBox=\"0 0 64 64\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"3\" stroke-linecap=\"square\" stroke-linejoin=\"miter\" xmlns=\"http://www.w3.org/2000/svg\">\n  <polygon points=\"8,32 32,8 56,8 56,32 32,56\" />\n  <circle cx=\"44\" cy=\"20\" r=\"3\" fill=\"currentColor\" stroke=\"none\" />\n</svg>",
   brasao_pcba: "<svg viewBox=\"0 0 120 140\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linejoin=\"miter\" stroke-linecap=\"square\" xmlns=\"http://www.w3.org/2000/svg\">\n  <g>\n    <polygon points=\"60,6 64,18 76,18 66,25 70,37 60,30 50,37 54,25 44,18 56,18\" />\n  </g>\n  <g>\n    <path d=\"M 22 46 L 22 42 L 30 42 L 30 46 L 38 46 L 38 42 L 46 42 L 46 46 L 54 46 L 54 42 L 66 42 L 66 46 L 74 46 L 74 42 L 82 42 L 82 46 L 90 46 L 90 42 L 98 42 L 98 46 L 98 96 L 60 118 L 22 96 Z\" />\n    <path d=\"M 28 52 L 28 48 L 34 48 L 34 52 L 40 52 L 40 48 L 46 48 L 46 52 L 54 52 L 54 48 L 66 48 L 66 52 L 74 52 L 74 48 L 80 48 L 80 52 L 86 52 L 86 48 L 92 48 L 92 52 L 92 93 L 60 112 L 28 93 Z\" />\n  </g>\n  <g>\n    <line x1=\"60\" y1=\"58\" x2=\"60\" y2=\"104\" />\n    <line x1=\"48\" y1=\"72\" x2=\"72\" y2=\"72\" />\n    <line x1=\"48\" y1=\"80\" x2=\"72\" y2=\"80\" />\n    <line x1=\"48\" y1=\"72\" x2=\"48\" y2=\"80\" />\n    <line x1=\"72\" y1=\"72\" x2=\"72\" y2=\"80\" />\n  </g>\n  <g>\n    <path d=\"M 42 100 L 42 96 L 45 96 L 45 100 L 48 100 L 48 96 L 51 96 L 51 100 L 51 108 L 42 108 Z\" />\n    <rect x=\"45\" y=\"102\" width=\"3\" height=\"6\" />\n    <path d=\"M 69 100 L 69 96 L 72 96 L 72 100 L 75 100 L 75 96 L 78 96 L 78 100 L 78 108 L 69 108 Z\" />\n    <rect x=\"72\" y=\"102\" width=\"3\" height=\"6\" />\n  </g>\n  <g stroke-width=\"1.5\">\n    <path d=\"M 22 96 L 12 108 L 18 118 L 30 122 L 44 126 L 60 128\" />\n    <line x1=\"16\" y1=\"110\" x2=\"22\" y2=\"106\" />\n    <line x1=\"22\" y1=\"118\" x2=\"28\" y2=\"114\" />\n    <line x1=\"30\" y1=\"122\" x2=\"34\" y2=\"116\" />\n    <line x1=\"40\" y1=\"124\" x2=\"44\" y2=\"118\" />\n    <line x1=\"50\" y1=\"126\" x2=\"54\" y2=\"120\" />\n    <path d=\"M 98 96 L 108 108 L 102 118 L 90 122 L 76 126 L 60 128\" />\n    <line x1=\"104\" y1=\"110\" x2=\"98\" y2=\"106\" />\n    <line x1=\"98\" y1=\"118\" x2=\"92\" y2=\"114\" />\n    <line x1=\"90\" y1=\"122\" x2=\"86\" y2=\"116\" />\n    <line x1=\"80\" y1=\"124\" x2=\"76\" y2=\"118\" />\n    <line x1=\"70\" y1=\"126\" x2=\"66\" y2=\"120\" />\n    <polygon points=\"54,128 66,128 63,134 57,134\" />\n  </g>\n</svg>",
   competencia_balanca: "<svg viewBox=\"0 0 64 64\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"3\" stroke-linecap=\"square\" stroke-linejoin=\"miter\" xmlns=\"http://www.w3.org/2000/svg\">\n  <g>\n    <line x1=\"32\" y1=\"10\" x2=\"32\" y2=\"52\" />\n    <line x1=\"20\" y1=\"52\" x2=\"44\" y2=\"52\" />\n    <line x1=\"10\" y1=\"18\" x2=\"54\" y2=\"18\" />\n    <polygon points=\"10,18 4,32 16,32\" />\n    <polygon points=\"54,18 48,32 60,32\" />\n    <circle cx=\"32\" cy=\"10\" r=\"2\" fill=\"currentColor\" stroke=\"none\" />\n  </g>\n</svg>",
   competencia_cofre: "<svg viewBox=\"0 0 64 64\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"3\" stroke-linecap=\"square\" stroke-linejoin=\"miter\" xmlns=\"http://www.w3.org/2000/svg\">\n  <g>\n    <rect x=\"8\" y=\"12\" width=\"48\" height=\"40\" />\n    <rect x=\"14\" y=\"18\" width=\"36\" height=\"28\" />\n    <rect x=\"26\" y=\"26\" width=\"12\" height=\"12\" />\n    <line x1=\"32\" y1=\"26\" x2=\"32\" y2=\"20\" />\n    <line x1=\"32\" y1=\"38\" x2=\"32\" y2=\"44\" />\n    <line x1=\"8\" y1=\"52\" x2=\"12\" y2=\"56\" />\n    <line x1=\"56\" y1=\"52\" x2=\"52\" y2=\"56\" />\n  </g>\n</svg>",
@@ -743,6 +761,7 @@ const ICONS = {
   projeto_investigacao: "<svg viewBox=\"0 0 64 64\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"3\" stroke-linecap=\"square\" stroke-linejoin=\"miter\" xmlns=\"http://www.w3.org/2000/svg\">\n  <g>\n    <rect x=\"8\" y=\"8\" width=\"48\" height=\"48\" />\n    <rect x=\"24\" y=\"26\" width=\"16\" height=\"12\" />\n    <rect x=\"14\" y=\"14\" width=\"6\" height=\"6\" />\n    <rect x=\"44\" y=\"14\" width=\"6\" height=\"6\" />\n    <rect x=\"14\" y=\"44\" width=\"6\" height=\"6\" />\n    <rect x=\"44\" y=\"44\" width=\"6\" height=\"6\" />\n  </g>\n</svg>",
   projeto_rede: "<svg viewBox=\"0 0 64 64\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"3\" stroke-linecap=\"square\" stroke-linejoin=\"miter\" xmlns=\"http://www.w3.org/2000/svg\">\n  <g>\n    <rect x=\"6\" y=\"10\" width=\"14\" height=\"14\" />\n    <rect x=\"44\" y=\"10\" width=\"14\" height=\"14\" />\n    <rect x=\"25\" y=\"40\" width=\"14\" height=\"14\" />\n    <line x1=\"20\" y1=\"17\" x2=\"44\" y2=\"17\" />\n    <line x1=\"13\" y1=\"24\" x2=\"30\" y2=\"40\" />\n    <line x1=\"51\" y1=\"24\" x2=\"34\" y2=\"40\" />\n  </g>\n</svg>",
   projeto_sac: "<svg viewBox=\"0 0 64 64\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"3\" stroke-linecap=\"square\" stroke-linejoin=\"miter\" xmlns=\"http://www.w3.org/2000/svg\">\n  <g>\n    <rect x=\"8\" y=\"22\" width=\"20\" height=\"10\" />\n    <rect x=\"36\" y=\"22\" width=\"20\" height=\"10\" />\n    <line x1=\"8\" y1=\"42\" x2=\"56\" y2=\"42\" />\n    <line x1=\"8\" y1=\"46\" x2=\"56\" y2=\"46\" />\n    <circle cx=\"32\" cy=\"52\" r=\"3\" />\n  </g>\n</svg>",
+  relogio: "<svg viewBox=\"0 0 64 64\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"3\" stroke-linecap=\"square\" stroke-linejoin=\"miter\" xmlns=\"http://www.w3.org/2000/svg\">\n  <circle cx=\"32\" cy=\"36\" r=\"22\" />\n  <line x1=\"32\" y1=\"36\" x2=\"32\" y2=\"20\" />\n  <line x1=\"32\" y1=\"36\" x2=\"43\" y2=\"36\" />\n  <line x1=\"22\" y1=\"6\" x2=\"30\" y2=\"6\" />\n  <line x1=\"34\" y1=\"6\" x2=\"42\" y2=\"6\" />\n</svg>",
   selo: "<svg viewBox=\"0 0 120 120\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"square\" stroke-linejoin=\"miter\" xmlns=\"http://www.w3.org/2000/svg\">\n  <polygon points=\"35,10 85,10 110,35 110,85 85,110 35,110 10,85 10,35\" />\n  <polygon points=\"40,18 80,18 102,40 102,80 80,102 40,102 18,80 18,40\" />\n  <text x=\"60\" y=\"56\" text-anchor=\"middle\" font-family=\"monospace\" font-size=\"16\" letter-spacing=\"2\" fill=\"currentColor\" stroke=\"none\" font-weight=\"700\">DEPAF</text>\n  <line x1=\"28\" y1=\"64\" x2=\"92\" y2=\"64\" />\n  <text x=\"60\" y=\"80\" text-anchor=\"middle\" font-family=\"monospace\" font-size=\"8\" letter-spacing=\"3\" fill=\"currentColor\" stroke=\"none\">PROTOCOLO</text>\n</svg>",
   viatura: "<svg viewBox=\"0 0 64 64\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"3\" stroke-linecap=\"square\" stroke-linejoin=\"miter\" xmlns=\"http://www.w3.org/2000/svg\">\n  <g>\n    <polygon points=\"8,50 8,42 16,42 20,34 44,34 48,42 56,42 56,50\" />\n    <line x1=\"8\" y1=\"50\" x2=\"56\" y2=\"50\" />\n    <line x1=\"20\" y1=\"38\" x2=\"44\" y2=\"38\" />\n    <line x1=\"32\" y1=\"34\" x2=\"32\" y2=\"42\" />\n    <rect x=\"27\" y=\"28\" width=\"10\" height=\"5\" />\n    <circle cx=\"18\" cy=\"50\" r=\"5\" />\n    <circle cx=\"46\" cy=\"50\" r=\"5\" />\n  </g>\n</svg>",
 };
@@ -3879,6 +3898,13 @@ function badgeRenovado(c) {
     : "";
 }
 
+// Ícone redondo de cabeçalho de KPI, à la SEI Municípios (círculo colorido +
+// ícone) — usa a MESMA cor de acento (--kpi-cor) que já pinta a borda de
+// cima do cartão, sem precisar declarar a cor duas vezes.
+function kpiIcone(chaveIcone) {
+  return `<div class="kpi-icone">${ICONS[chaveIcone]}</div>`;
+}
+
 function formatarMoedaBR(v) {
   if (v === null || v === undefined) return "—";
   return "R$ " + Number(v).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -5587,35 +5613,77 @@ function renderResumoRapido(lista, resumo) {
   const alvo = document.getElementById("contratos-resumo-rapido");
   if (!alvo) return;
   const top3Areas = agruparValorPorCampo(lista, (c) => c.unidadeGestora, "(sem unidade)").slice(0, 3);
+  const top3Categorias = agruparValorPorCampo(lista, (c) => c.tipoObjeto, "(sem tipo)").slice(0, 3);
+  // Pedido direto, olhando o SEI Municípios (as abas Dengue/Zika/
+  // Chikungunya sobre o MESMO gráfico): "onde mais se gasta" também podia
+  // trocar de classificação sem sair do Resumo Rápido — reaproveita o
+  // mesmo dash-toggle que já existe pra COLUNAS/GANTT em Prazos, só que
+  // aqui a classificação é a dimensão do ranking (Área ↔ Categoria).
+  let modoRanking = "area";
 
-  alvo.innerHTML = `
-    <div class="dash-chart-box" style="margin-bottom:16px">
-      <h4>Resumo Rápido</h4>
+  function corpoHTML() {
+    const top3 = modoRanking === "area" ? top3Areas : top3Categorias;
+    const iconeRanking = modoRanking === "area" ? "predio" : "categoria_tag";
+    const atributoRanking = modoRanking === "area" ? "data-resumo-area" : "data-resumo-categoria";
+    const rotuloPlural = modoRanking === "area" ? "áreas gestoras" : "categorias";
+    return `
       <div class="kpi-row">
-        <div class="kpi-card kpi-clicavel" data-resumo-ir="gerencial" title="Clique pra ver o detalhamento completo" style="cursor:pointer"><div class="kpi-label">Qtd Contratos</div><div class="kpi-value">${resumo.qtdContratos.toLocaleString("pt-BR")}</div></div>
-        <div class="kpi-card kpi-clicavel" data-resumo-ir="gerencial" title="Clique pra ver o detalhamento completo" style="cursor:pointer"><div class="kpi-label">Valor Atual Total</div><div class="kpi-value">R$ ${formatarEixo(resumo.valorGlobalAtualTotal)}</div><div class="kpi-valor-exato">${formatarMoedaBR(resumo.valorGlobalAtualTotal)}</div></div>
-        <div class="kpi-card kpi-clicavel" data-resumo-status="Vencido" title="Clique pra ver quais são" style="--kpi-cor:var(--crit-vencido);cursor:pointer"><div class="kpi-label">Vencidos</div><div class="kpi-value">${resumo.qtdVencidos.toLocaleString("pt-BR")}</div></div>
-        <div class="kpi-card kpi-clicavel" data-resumo-status="A Vencer" title="Clique pra ver quais são" style="--kpi-cor:var(--crit-alto);cursor:pointer"><div class="kpi-label">A Vencer (≤90 dias)</div><div class="kpi-value">${resumo.qtdAVencer.toLocaleString("pt-BR")}</div></div>
+        <div class="kpi-card kpi-clicavel" data-resumo-ir="gerencial" title="Clique pra ver o detalhamento completo" style="cursor:pointer">
+          <div class="kpi-cabeca">${kpiIcone("competencia_normas")}<div class="kpi-label">Qtd Contratos <span class="kpi-info" title="Todos os contratos cadastrados no sistema, em qualquer situação de vigência.">ⓘ</span></div></div>
+          <div class="kpi-value">${resumo.qtdContratos.toLocaleString("pt-BR")}</div>
+        </div>
+        <div class="kpi-card kpi-clicavel" data-resumo-ir="gerencial" title="Clique pra ver o detalhamento completo" style="cursor:pointer">
+          <div class="kpi-cabeca">${kpiIcone("moeda")}<div class="kpi-label">Valor Atual Total <span class="kpi-info" title="Soma do Valor Global Atual de todos os contratos — já considerando as renovações marcadas manualmente, mesmo antes da planilha ser reimportada.">ⓘ</span></div></div>
+          <div class="kpi-value">R$ ${formatarEixo(resumo.valorGlobalAtualTotal)}</div>
+          <div class="kpi-valor-exato">${formatarMoedaBR(resumo.valorGlobalAtualTotal)}</div>
+        </div>
+        <div class="kpi-card kpi-clicavel" data-resumo-status="Vencido" title="Clique pra ver quais são" style="--kpi-cor:var(--crit-vencido);cursor:pointer">
+          <div class="kpi-cabeca">${kpiIcone("relogio")}<div class="kpi-label">Vencidos <span class="kpi-info" title="A data de vigência já passou e o contrato ainda não foi renovado/atualizado.">ⓘ</span></div></div>
+          <div class="kpi-value">${resumo.qtdVencidos.toLocaleString("pt-BR")}</div>
+        </div>
+        <div class="kpi-card kpi-clicavel" data-resumo-status="A Vencer" title="Clique pra ver quais são" style="--kpi-cor:var(--crit-alto);cursor:pointer">
+          <div class="kpi-cabeca">${kpiIcone("relogio")}<div class="kpi-label">A Vencer <span class="kpi-info" title="Vencem em até 90 dias a partir de hoje.">ⓘ</span></div></div>
+          <div class="kpi-value">${resumo.qtdAVencer.toLocaleString("pt-BR")}</div>
+        </div>
       </div>
-      <p class="dash-chart-hint" style="margin:14px 0 6px">Onde mais se gasta (top 3 áreas gestoras por valor) — clique pra abrir o perfil completo da área:</p>
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin:14px 0 6px">
+        <p class="dash-chart-hint" style="margin:0">Onde mais se gasta (top 3 ${rotuloPlural} por valor) — clique pra abrir o perfil completo:</p>
+        <div class="dash-toggle" id="resumo-ranking-toggle">
+          <button class="dash-toggle-btn${modoRanking === "area" ? " active" : ""}" data-modo="area" title="Quebrar por área gestora">ÁREA GESTORA</button>
+          <button class="dash-toggle-btn${modoRanking === "categoria" ? " active" : ""}" data-modo="categoria" title="Quebrar por categoria (tipo de objeto)">CATEGORIA</button>
+        </div>
+      </div>
       <div class="kpi-row" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr))">
-        ${top3Areas.map((a) => `
-          <div class="kpi-card kpi-clicavel" data-resumo-area="${escapeAttr(a.label)}" title="Clique pra ver o perfil completo desta área" style="cursor:pointer">
-            <div class="kpi-label">${escapeHTML(a.label)}</div>
+        ${top3.map((a) => `
+          <div class="kpi-card kpi-clicavel" ${atributoRanking}="${escapeAttr(a.label)}" title="Clique pra ver o perfil completo" style="cursor:pointer">
+            <div class="kpi-cabeca">${kpiIcone(iconeRanking)}<div class="kpi-label">${escapeHTML(a.label)}</div></div>
             <div class="kpi-value" style="font-size:var(--fs-subtitulo)">R$ ${formatarEixo(a.total)}</div>
             <div class="kpi-valor-exato">${formatarMoedaBR(a.total)} · ${a.qtd} contrato${a.qtd === 1 ? "" : "s"}</div>
           </div>`).join("")}
-      </div>
-    </div>`;
+      </div>`;
+  }
+
+  function desenhar() {
+    alvo.innerHTML = `<div class="dash-chart-box" style="margin-bottom:16px"><h4>Resumo Rápido</h4>${corpoHTML()}</div>`;
+    alvo.querySelector("#resumo-ranking-toggle").addEventListener("click", (ev) => {
+      const btn = ev.target.closest("[data-modo]");
+      if (!btn || btn.dataset.modo === modoRanking) return;
+      modoRanking = btn.dataset.modo;
+      desenhar();
+    });
+  }
+  desenhar();
 
   // Pedido direto: "só faltou tornar isso clicável também como os outros
   // que abre e dá pra ver detalhes, gráficos, divisões... aí só os cartões
   // puros" — os cartões de status abrem o Gerencial já filtrado (mesmo
   // mecanismo dos cartões "Qtd Contratos Vencidos"/"A Vencer" que já
-  // existem lá dentro); os de área abrem o perfil completo dela em "Por
-  // Área Gestora" (gráficos, divisões temáticas, tudo). Os dois primeiros
-  // (Qtd Contratos/Valor Atual) não têm um filtro óbvio pra isolar — levam
-  // pro Gerencial, onde o detalhamento inteiro já está.
+  // existem lá dentro); os de área/categoria abrem o perfil completo dela
+  // em "Por Área Gestora"/"Por Categoria" (gráficos, divisões temáticas,
+  // tudo). Os dois primeiros (Qtd Contratos/Valor Atual) não têm um filtro
+  // óbvio pra isolar — levam pro Gerencial, onde o detalhamento inteiro já
+  // está. O listener fica no container (não se refaz a cada desenhar()),
+  // então continua funcionando depois de trocar o toggle.
   alvo.addEventListener("click", (ev) => {
     const cardIr = ev.target.closest("[data-resumo-ir]");
     if (cardIr) {
@@ -5633,6 +5701,13 @@ function renderResumoRapido(lista, resumo) {
       document.querySelector('[data-subtab-contratos="porarea"]')?.click();
       const sel = document.getElementById("area-select");
       if (sel) { sel.value = cardArea.dataset.resumoArea; sel.dispatchEvent(new Event("change", { bubbles: true })); }
+      return;
+    }
+    const cardCategoria = ev.target.closest("[data-resumo-categoria]");
+    if (cardCategoria) {
+      document.querySelector('[data-subtab-contratos="porcategoria"]')?.click();
+      const sel = document.getElementById("categoria-select");
+      if (sel) { sel.value = cardCategoria.dataset.resumoCategoria; sel.dispatchEvent(new Event("change", { bubbles: true })); }
     }
   });
 }
