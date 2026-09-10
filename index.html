@@ -780,7 +780,9 @@ const ICONS = {
   mira: "<svg viewBox=\"0 0 64 64\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"3\" stroke-linecap=\"square\" stroke-linejoin=\"miter\" xmlns=\"http://www.w3.org/2000/svg\">\n  <circle cx=\"32\" cy=\"32\" r=\"22\" />\n  <circle cx=\"32\" cy=\"32\" r=\"9\" />\n  <line x1=\"32\" y1=\"2\" x2=\"32\" y2=\"14\" />\n  <line x1=\"32\" y1=\"50\" x2=\"32\" y2=\"62\" />\n  <line x1=\"2\" y1=\"32\" x2=\"14\" y2=\"32\" />\n  <line x1=\"50\" y1=\"32\" x2=\"62\" y2=\"32\" />\n</svg>",
   impressora: "<svg viewBox=\"0 0 64 64\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"3\" stroke-linecap=\"square\" stroke-linejoin=\"miter\" xmlns=\"http://www.w3.org/2000/svg\">\n  <rect x=\"14\" y=\"22\" width=\"36\" height=\"20\" />\n  <rect x=\"20\" y=\"8\" width=\"24\" height=\"14\" />\n  <rect x=\"20\" y=\"42\" width=\"24\" height=\"14\" />\n  <line x1=\"20\" y1=\"32\" x2=\"28\" y2=\"32\" />\n</svg>",
   moeda: "<svg viewBox=\"0 0 64 64\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"3\" stroke-linecap=\"square\" stroke-linejoin=\"miter\" xmlns=\"http://www.w3.org/2000/svg\">\n  <g>\n    <circle cx=\"32\" cy=\"32\" r=\"22\" />\n    <line x1=\"54\" y1=\"32\" x2=\"60\" y2=\"32\" />\n    <line x1=\"48\" y1=\"48\" x2=\"52\" y2=\"52\" />\n    <line x1=\"32\" y1=\"54\" x2=\"32\" y2=\"60\" />\n    <line x1=\"16\" y1=\"48\" x2=\"12\" y2=\"52\" />\n    <line x1=\"10\" y1=\"32\" x2=\"4\" y2=\"32\" />\n    <line x1=\"16\" y1=\"16\" x2=\"12\" y2=\"12\" />\n    <line x1=\"32\" y1=\"10\" x2=\"32\" y2=\"4\" />\n    <line x1=\"48\" y1=\"16\" x2=\"52\" y2=\"12\" />\n    <line x1=\"32\" y1=\"24\" x2=\"32\" y2=\"40\" />\n    <line x1=\"24\" y1=\"32\" x2=\"40\" y2=\"32\" />\n  </g>\n</svg>",
+  alerta: "<svg viewBox=\"0 0 64 64\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"3\" stroke-linecap=\"square\" stroke-linejoin=\"miter\" xmlns=\"http://www.w3.org/2000/svg\">\n  <polygon points=\"32,8 58,54 6,54\" />\n  <line x1=\"32\" y1=\"24\" x2=\"32\" y2=\"38\" />\n  <circle cx=\"32\" cy=\"46\" r=\"1.5\" fill=\"currentColor\" stroke=\"none\" />\n</svg>",
   obras: "<svg viewBox=\"0 0 64 64\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"3\" stroke-linecap=\"square\" stroke-linejoin=\"miter\" xmlns=\"http://www.w3.org/2000/svg\">\n  <path d=\"M 10 44 A 22 20 0 0 1 54 44 Z\" />\n  <line x1=\"6\" y1=\"44\" x2=\"58\" y2=\"44\" />\n  <rect x=\"28\" y=\"20\" width=\"8\" height=\"8\" />\n</svg>",
+  pessoa: "<svg viewBox=\"0 0 64 64\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"3\" stroke-linecap=\"square\" stroke-linejoin=\"miter\" xmlns=\"http://www.w3.org/2000/svg\">\n  <circle cx=\"32\" cy=\"18\" r=\"10\" />\n  <path d=\"M 12 56 A 20 20 0 0 1 52 56\" />\n</svg>",
   painel_dashboard: "<svg viewBox=\"0 0 64 64\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"3\" stroke-linecap=\"square\" stroke-linejoin=\"miter\" xmlns=\"http://www.w3.org/2000/svg\">\n  <rect x=\"6\" y=\"6\" width=\"24\" height=\"24\" />\n  <rect x=\"34\" y=\"6\" width=\"24\" height=\"24\" />\n  <rect x=\"6\" y=\"34\" width=\"24\" height=\"24\" />\n  <rect x=\"34\" y=\"34\" width=\"24\" height=\"24\" />\n</svg>",
   predio: "<svg viewBox=\"0 0 64 64\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"3\" stroke-linecap=\"square\" stroke-linejoin=\"miter\" xmlns=\"http://www.w3.org/2000/svg\">\n  <g>\n    <rect x=\"14\" y=\"8\" width=\"36\" height=\"48\" />\n    <line x1=\"8\" y1=\"56\" x2=\"56\" y2=\"56\" />\n    <rect x=\"20\" y=\"16\" width=\"6\" height=\"6\" />\n    <rect x=\"32\" y=\"16\" width=\"6\" height=\"6\" />\n    <rect x=\"20\" y=\"28\" width=\"6\" height=\"6\" />\n    <rect x=\"32\" y=\"28\" width=\"6\" height=\"6\" />\n    <rect x=\"20\" y=\"40\" width=\"6\" height=\"6\" />\n    <rect x=\"32\" y=\"40\" width=\"6\" height=\"6\" />\n  </g>\n</svg>",
   projeto_investigacao: "<svg viewBox=\"0 0 64 64\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"3\" stroke-linecap=\"square\" stroke-linejoin=\"miter\" xmlns=\"http://www.w3.org/2000/svg\">\n  <g>\n    <rect x=\"8\" y=\"8\" width=\"48\" height=\"48\" />\n    <rect x=\"24\" y=\"26\" width=\"16\" height=\"12\" />\n    <rect x=\"14\" y=\"14\" width=\"6\" height=\"6\" />\n    <rect x=\"44\" y=\"14\" width=\"6\" height=\"6\" />\n    <rect x=\"14\" y=\"44\" width=\"6\" height=\"6\" />\n    <rect x=\"44\" y=\"44\" width=\"6\" height=\"6\" />\n  </g>\n</svg>",
@@ -6164,8 +6166,27 @@ function renderPorDimensaoContratos(lista, cfg) {
 
   // Clicável e reunindo informação, mesma lógica do resto do sistema: clicar
   // num mês isola aquele mês na tabela abaixo.
+  // Pedido direto, comparando com o SEI Municípios: "lá no SEI, além da
+  // Visão Geral, as outras abas (Educação, Saúde, Vulnerabilidade...)
+  // também têm cartão de resumo lá no topo — o nosso só tem na Visão
+  // Geral". Cada sub-aba temática (Prazos, Financeiro, Pessoas) ganhou o
+  // resumo próprio DELA — não repete os cartões da Visão Geral, mostra o
+  // que só faz sentido perguntar ali dentro (igual o SEI: "Educação" não
+  // repete população, mostra taxa de matrícula).
   function renderPrazos(listaFiltrada) {
+    const vencidosPrazo = listaFiltrada.filter((c) => c.statusVigencia === "Vencido").length;
+    const em30 = listaFiltrada.filter((c) => c.diasParaVencer !== null && c.diasParaVencer >= 0 && c.diasParaVencer <= 30).length;
+    const em90 = listaFiltrada.filter((c) => c.diasParaVencer !== null && c.diasParaVencer > 30 && c.diasParaVencer <= 90).length;
+    const proximoVencer = listaFiltrada
+      .filter((c) => c.diasParaVencer !== null && c.diasParaVencer >= 0)
+      .sort((a, b) => a.diasParaVencer - b.diasParaVencer)[0];
     el("sub-prazos").innerHTML = `
+      <div class="kpi-row" style="margin-bottom:16px">
+        <div class="kpi-card" style="--kpi-cor:var(--crit-vencido)"><div class="kpi-cabeca">${kpiIcone("relogio")}<div class="kpi-label">Vencidos</div></div><div class="kpi-value">${vencidosPrazo.toLocaleString("pt-BR")}</div></div>
+        <div class="kpi-card" style="--kpi-cor:var(--crit-critico)"><div class="kpi-cabeca">${kpiIcone("relogio")}<div class="kpi-label">Vence em até 30 dias</div></div><div class="kpi-value">${em30.toLocaleString("pt-BR")}</div></div>
+        <div class="kpi-card" style="--kpi-cor:var(--crit-medio)"><div class="kpi-cabeca">${kpiIcone("relogio")}<div class="kpi-label">Vence em 31–90 dias</div></div><div class="kpi-value">${em90.toLocaleString("pt-BR")}</div></div>
+        <div class="kpi-card"><div class="kpi-cabeca">${kpiIcone("relogio")}<div class="kpi-label">Próximo a Vencer</div></div><div class="kpi-value" style="font-size:var(--fs-subtitulo)">${proximoVencer ? escapeHTML(proximoVencer.numeroContrato) : "—"}</div><div class="kpi-valor-exato">${proximoVencer ? `em ${proximoVencer.diasParaVencer} dia${proximoVencer.diasParaVencer === 1 ? "" : "s"}` : "nenhum contrato com data de vigência futura"}</div></div>
+      </div>
       <div class="dash-chart-box">
         <h4>Contratos por Vencimento e Criticidade</h4>
         <p class="dash-chart-hint" id="${p}-mes-hint"></p>
@@ -6237,7 +6258,17 @@ function renderPorDimensaoContratos(lista, cfg) {
       ? { campoFn: (c) => c.analista, rotuloVazio: "(sem analista)", titulo: "Valor por Analista" }
       : cfg.complementar;
     const rotuloModoPadrao = cfg.complementar.titulo.replace(/^Valor por /, "").toUpperCase();
+    const valorAtualFin = listaFiltrada.reduce((a, c) => a + (c.valorGlobalAtual || 0), 0);
+    const ticketMedio = listaFiltrada.length ? valorAtualFin / listaFiltrada.length : 0;
+    const maiorContrato = listaFiltrada.reduce((max, c) => ((c.valorGlobalAtual || 0) > (max?.valorGlobalAtual || 0) ? c : max), null);
+    const totalAditivosFin = listaFiltrada.reduce((a, c) => a + (c.qtdAditivos || 0), 0);
     el("sub-financeiro").innerHTML = `
+      <div class="kpi-row" style="margin-bottom:16px">
+        <div class="kpi-card"><div class="kpi-cabeca">${kpiIcone("moeda")}<div class="kpi-label">Valor Atual Total</div></div><div class="kpi-value">R$ ${formatarEixo(valorAtualFin)}</div><div class="kpi-valor-exato">${formatarMoedaBR(valorAtualFin)}</div></div>
+        <div class="kpi-card"><div class="kpi-cabeca">${kpiIcone("moeda")}<div class="kpi-label">Ticket Médio</div></div><div class="kpi-value">R$ ${formatarEixo(ticketMedio)}</div><div class="kpi-valor-exato">${formatarMoedaBR(ticketMedio)}</div></div>
+        <div class="kpi-card"><div class="kpi-cabeca">${kpiIcone("moeda")}<div class="kpi-label">Maior Contrato</div></div><div class="kpi-value" style="font-size:var(--fs-subtitulo)">${maiorContrato ? escapeHTML(maiorContrato.numeroContrato) : "—"}</div><div class="kpi-valor-exato">${maiorContrato ? formatarMoedaBR(maiorContrato.valorGlobalAtual) : "—"}</div></div>
+        <div class="kpi-card"><div class="kpi-cabeca">${kpiIcone("aditivo")}<div class="kpi-label">Qtd Total de Aditivos</div></div><div class="kpi-value">${totalAditivosFin.toLocaleString("pt-BR")}</div></div>
+      </div>
       <div class="dash-charts" style="grid-template-columns:1fr 1fr">
         <div class="dash-chart-box">
           <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:12px">
@@ -6339,7 +6370,17 @@ function renderPorDimensaoContratos(lista, cfg) {
   }
 
   function renderPessoas(listaFiltrada) {
+    const qtdAnalistas = new Set(listaFiltrada.map((c) => c.analista).filter(Boolean)).size;
+    const qtdGestores = new Set(listaFiltrada.flatMap((c) => (c.pessoas || []).filter((pe) => pe.papel === "Gestor").map((pe) => pe.nomePessoa))).size;
+    const qtdFiscais = new Set(listaFiltrada.flatMap((c) => (c.pessoas || []).filter((pe) => pe.papel === "Fiscal").map((pe) => pe.nomePessoa))).size;
+    const semResponsavel = listaFiltrada.filter((c) => !c.analista && !(c.pessoas || []).length).length;
     el("sub-pessoas").innerHTML = `
+      <div class="kpi-row" style="margin-bottom:16px">
+        <div class="kpi-card"><div class="kpi-cabeca">${kpiIcone("pessoa")}<div class="kpi-label">Analistas</div></div><div class="kpi-value">${qtdAnalistas.toLocaleString("pt-BR")}</div></div>
+        <div class="kpi-card"><div class="kpi-cabeca">${kpiIcone("pessoa")}<div class="kpi-label">Gestores</div></div><div class="kpi-value">${qtdGestores.toLocaleString("pt-BR")}</div></div>
+        <div class="kpi-card"><div class="kpi-cabeca">${kpiIcone("pessoa")}<div class="kpi-label">Fiscais</div></div><div class="kpi-value">${qtdFiscais.toLocaleString("pt-BR")}</div></div>
+        <div class="kpi-card"${semResponsavel ? ' style="--kpi-cor:var(--crit-alto)"' : ""}><div class="kpi-cabeca">${kpiIcone("alerta")}<div class="kpi-label">Sem Responsável Cadastrado</div></div><div class="kpi-value">${semResponsavel.toLocaleString("pt-BR")}</div></div>
+      </div>
       <div class="dash-charts" style="grid-template-columns:1fr 1fr">
         <div class="dash-chart-box"><h4>Por Analista</h4><div id="${p}-analista"></div></div>
         <div class="dash-chart-box"><h4>Por Gestor</h4><div id="${p}-gestor"></div></div>
