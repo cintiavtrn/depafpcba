@@ -275,6 +275,16 @@ body{background:var(--paper);color:var(--carvao);font-family:'IBM Plex Sans',san
 .dash-filtro select{
   font-family:'IBM Plex Mono',monospace;font-size:var(--fs-ui);padding:7px 10px;border:1.5px solid var(--paper-line);background:var(--paper);color:var(--carvao);border-radius:var(--radius-sm);
 }
+/* Pedido direto: "esse branco ficou muito feio porque não conversa com o
+   resto do design" — o campo de busca (BUSCAR Nº, EMPRESA...) tinha
+   ficado com o branco padrão do navegador, único elemento claro numa tela
+   inteira escura. Mesmo tratamento do <select> ao lado dele. */
+.dash-filtro input[type="text"],.dash-filtro input[type="date"]{
+  font-family:'IBM Plex Mono',monospace;font-size:var(--fs-ui);padding:7px 10px;border:1.5px solid var(--paper-line);background:var(--paper);color:var(--carvao);border-radius:var(--radius-sm);
+  color-scheme:dark;
+}
+.dash-filtro input[type="text"]::placeholder{color:#6E7A90}
+.dash-filtro input[type="text"]:hover,.dash-filtro input[type="text"]:focus,.dash-filtro input[type="date"]:hover,.dash-filtro input[type="date"]:focus{border-color:var(--tinta)}
 
 .dash-charts{display:grid;grid-template-columns:1fr 1.05fr;gap:14px;margin-bottom:14px}
 @media (max-width:760px){.dash-charts{grid-template-columns:1fr}}
@@ -4464,6 +4474,18 @@ function agruparContratosPorPessoa(lista, papel) {
 // único por contrato com TODOS os campos plausíveis de busca, já em
 // minúsculo, uma vez só (não a cada tecla digitada) — quem chama guarda o
 // resultado e só filtra a lista pronta.
+// Pedido direto: "a pesquisa não permite ou cruza palavra gravada quase
+// igual... se eu colocar lélia sem acento não acha... a pessoa ali
+// digitando mais rápido pode esquecer dessas grafias". Remove o acento
+// (NFD separa a letra do sinal diacrítico do sinal em si; os diacríticos
+// caem no bloco Unicode 0300-036F) tanto de quem já está indexado quanto
+// do que a pessoa digita — "lelia", "Lélia" e "LÉLIA" caem todos no
+// mesmo lugar.
+function normalizarBusca(s) {
+  var de = String.fromCharCode(768), ate = String.fromCharCode(879);
+  var removerDiacriticos = new RegExp("[" + de + "-" + ate + "]", "g");
+  return String(s || "").normalize("NFD").replace(removerDiacriticos, "").toLowerCase();
+}
 function indiceBuscaContrato(c) {
   const campos = [
     c.numeroContrato, c.empresa, c.objeto, c.processo, c.analista, c.tipoObjeto,
@@ -4472,7 +4494,7 @@ function indiceBuscaContrato(c) {
     formatarDataBR(c.dataInicio), formatarDataBR(c.dataFim),
     ...(c.pessoas || []).map((p) => p.nomePessoa),
   ];
-  return campos.filter(Boolean).join(" ␟").toLowerCase();
+  return normalizarBusca(campos.filter(Boolean).join(" ␟"));
 }
 
 // Liga uma caixa de busca a uma tabela de resultado — reaproveitado nas 3
@@ -4485,7 +4507,7 @@ function ligarBuscaContratos(lista, porId, idInput, idResultado) {
   const input = document.getElementById(idInput);
   const resultado = document.getElementById(idResultado);
   input.addEventListener("input", () => {
-    const termo = input.value.trim().toLowerCase();
+    const termo = normalizarBusca(input.value.trim());
     if (!termo) { resultado.innerHTML = ""; return; }
     const encontrados = indexado.filter((x) => x.indice.includes(termo)).map((x) => x.c);
     resultado.innerHTML = `
@@ -5309,6 +5331,28 @@ function renderGerencialContratos(lista, resumo) {
 
   document.getElementById("ger-filtro-area").addEventListener("change", (ev) => { filtroArea = ev.target.value; atualizar(); });
   atualizar();
+
+  // Pedido direto: "se eu isolo aí uma área aí depois ela fica marcada e
+  // não volta ao normal... um desatento pode esquecer de desmarcar... eu
+  // já vi em alguns serviços que em casos assim volta pro geral, em
+  // determinado ponto" — o "determinado ponto" é sair da aba: chamado de
+  // fora (carregarContratosPortal) quando a pessoa troca pra outra
+  // subaba, zera TODOS os filtros e a busca desta tela, sem recriar o
+  // HTML (os campos continuam sendo os MESMOS elementos — só o valor e o
+  // que está isolado voltam ao padrão).
+  return {
+    resetar() {
+      filtroArea = ""; filtroTipo = ""; filtroAnalista = ""; filtroGestor = ""; filtroFiscal = "";
+      filtroFornecedor = ""; filtroAditivos = null; filtroGarantia = false; filtroCriticidadeBaixo = false;
+      filtroStatusKpi = "";
+      document.getElementById("ger-filtro-area").value = "";
+      const buscaInput = document.getElementById("ger-busca");
+      if (buscaInput) buscaInput.value = "";
+      const buscaResultado = document.getElementById("ger-busca-resultado");
+      if (buscaResultado) buscaResultado.innerHTML = "";
+      atualizar();
+    },
+  };
 }
 
 // ---------- Tático: controle de prazos + evolução mensal + tabela ----------
@@ -5456,6 +5500,19 @@ function renderTaticoContratos(lista) {
   });
 
   atualizar();
+
+  // Volta pro geral ao trocar de aba (mesmo raciocínio do Gerencial).
+  return {
+    resetar() {
+      filtroTipo = ""; filtroMes = ""; filtrosCriticidade.clear();
+      document.getElementById("tat-filtro-tipo").value = "";
+      const buscaInput = document.getElementById("tat-busca");
+      if (buscaInput) buscaInput.value = "";
+      const buscaResultado = document.getElementById("tat-busca-resultado");
+      if (buscaResultado) buscaResultado.innerHTML = "";
+      atualizar();
+    },
+  };
 }
 
 // ---------- Operacional: drill-down de um contrato (setor → contrato) ----------
@@ -5777,6 +5834,20 @@ function renderOperacionalContratos(lista, portalSlug) {
     baixarTabelaComoImagem(document.getElementById("op-gestor-fiscal"), "cpg-contratos-gestor-fiscal.png"));
 
   atualizar();
+
+  // Volta pro geral ao trocar de aba (mesmo raciocínio do Gerencial) —
+  // aqui "geral" é ninguém selecionado, setor "Todos".
+  return {
+    resetar() {
+      setor = ""; contratoId = "";
+      document.getElementById("op-select-setor").value = "";
+      const buscaInput = document.getElementById("op-busca");
+      if (buscaInput) buscaInput.value = "";
+      const buscaResultado = document.getElementById("op-busca-resultado");
+      if (buscaResultado) buscaResultado.innerHTML = "";
+      atualizar();
+    },
+  };
 }
 
 // Painel só de leitura (fica fechado, quem quiser abre) pra quem não olha
@@ -6576,9 +6647,22 @@ function renderPorDimensaoContratos(lista, cfg) {
   }
 
   atualizar();
+
+  // Volta pro geral ao trocar de aba (mesmo raciocínio do Gerencial) —
+  // selecionar("") já é exatamente "sem área/categoria nenhuma escolhida,
+  // landing" (mesmo caminho do botão "← TROCAR"), só falta limpar a busca.
+  return {
+    resetar() {
+      selecionar("");
+      const buscaInput = el("busca");
+      if (buscaInput) buscaInput.value = "";
+      const buscaResultado = el("busca-resultado");
+      if (buscaResultado) buscaResultado.innerHTML = "";
+    },
+  };
 }
-function renderPorAreaContratos(lista) { renderPorDimensaoContratos(lista, configPorArea()); }
-function renderPorCategoriaContratos(lista) { renderPorDimensaoContratos(lista, configPorCategoria()); }
+function renderPorAreaContratos(lista) { return renderPorDimensaoContratos(lista, configPorArea()); }
+function renderPorCategoriaContratos(lista) { return renderPorDimensaoContratos(lista, configPorCategoria()); }
 
 async function carregarContratosPortal(portalSlug) {
   const painel = document.getElementById("tab-contratos");
@@ -6633,21 +6717,43 @@ async function carregarContratosPortal(portalSlug) {
   renderAlertaVencimentoContratos(lista, new Map(lista.map((c) => [c.id, c])), decisoesRenovacao);
 
   const SUBABAS_CONTRATOS = ["gerencial", "tatico", "operacional", "porarea", "porcategoria", "atualizados"];
+
+  const gerencialHandle = renderGerencialContratos(lista, resumo);
+  const taticoHandle = renderTaticoContratos(lista);
+  const operacionalHandle = renderOperacionalContratos(lista, portalSlug);
+  const porAreaHandle = renderPorAreaContratos(lista);
+  const porCategoriaHandle = renderPorCategoriaContratos(lista);
+  renderAtualizadosRecentemente(lista, decisoesRenovacao);
+
+  // Pedido direto: "se eu isolo aí uma área aí depois ela fica marcada e
+  // não volta ao normal... um desatento pode esquecer de desmarcar... eu
+  // já vi em alguns serviços que em casos assim volta pro geral, em
+  // determinado ponto" — o "determinado ponto" aqui é sair da aba: cada
+  // aba de contratos guarda o filtro que ela tinha enquanto você está NELA,
+  // mas ao trocar pra outra, a que você deixou volta pro estado inicial
+  // (sem filtro nenhum, sem busca) — pra quando alguém voltar nela depois
+  // (ela mesma ou outra pessoa da equipe), começar limpa, sem herdar um
+  // recorte que ninguém mais lembra que existia. Cada aba expõe seu
+  // próprio resetar() (zera as variáveis de filtro e redesenha) — sem
+  // recriar o HTML inteiro, os campos continuam sendo os MESMOS elementos.
+  const RESETAR_SUBABA_CONTRATOS = {
+    gerencial: () => gerencialHandle?.resetar(),
+    tatico: () => taticoHandle?.resetar(),
+    operacional: () => operacionalHandle?.resetar(),
+    porarea: () => porAreaHandle?.resetar(),
+    porcategoria: () => porCategoriaHandle?.resetar(),
+  };
+  let subabaContratosAtiva = "gerencial";
   painel.querySelectorAll("[data-subtab-contratos]").forEach((btn) => {
     btn.addEventListener("click", () => {
+      const alvo = btn.dataset.subtabContratos;
+      if (alvo !== subabaContratosAtiva) RESETAR_SUBABA_CONTRATOS[subabaContratosAtiva]?.();
+      subabaContratosAtiva = alvo;
       painel.querySelectorAll("[data-subtab-contratos]").forEach((b) => b.classList.remove("active"));
       btn.classList.add("active");
-      const alvo = btn.dataset.subtabContratos;
       SUBABAS_CONTRATOS.forEach((nome) => { painel.querySelector(`#contratos-sub-${nome}`).hidden = alvo !== nome; });
     });
   });
-
-  renderGerencialContratos(lista, resumo);
-  renderTaticoContratos(lista);
-  renderOperacionalContratos(lista, portalSlug);
-  renderPorAreaContratos(lista);
-  renderPorCategoriaContratos(lista);
-  renderAtualizadosRecentemente(lista, decisoesRenovacao);
   // Depois de Gerencial/Por Área já existirem no DOM — os cliques do Resumo
   // Rápido disparam eventos em cima dos elementos DELES (cartão de status,
   // <select> de área), então eles precisam estar montados primeiro. A
