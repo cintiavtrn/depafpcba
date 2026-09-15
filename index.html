@@ -5200,6 +5200,10 @@ function renderGerencialContratos(lista, resumo) {
     const comGarantiaSim = comGarantiaInformada.filter((c) => c.garantiaExigida === "Sim");
     const pctGarantia = comGarantiaInformada.length ? (comGarantiaSim.length / comGarantiaInformada.length) * 100 : null;
     const qtdGarantiaExigida = comGarantiaSim.length;
+    // Hoje só a DEPIN preenche "unidades" (COORPIN) — em qualquer outra
+    // área o card mostra 0, sem quebrar nada, até outra área também passar
+    // a ter esse detalhe.
+    const qtdUnidadesBeneficiadas = new Set(filtrada.flatMap((c) => (c.unidades || []).map((u) => u.nomeUnidade))).size;
     const porArea = agruparPorAreaCriticidade(filtrada);
 
     // Pedido direto: "os cartões de quantidade de contrato e valor atual
@@ -5326,7 +5330,8 @@ function renderGerencialContratos(lista, resumo) {
       <div class="kpi-card kpi-clicavel" data-acao="aditivos" title="Clique pra ver a distribuição" style="cursor:pointer"><div class="kpi-cabeca">${kpiIcone("aditivo")}<div class="kpi-label">Qtd Total de Aditivos</div></div><div class="kpi-value">${qtdTotalAditivos.toLocaleString("pt-BR")}</div></div>
       <div class="kpi-card kpi-clicavel" data-acao="aditivos" title="Clique pra ver a distribuição" style="cursor:pointer"><div class="kpi-cabeca">${kpiIcone("aditivo")}<div class="kpi-label">Média de Aditivos / Contrato</div></div><div class="kpi-value">${mediaAditivos.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}</div></div>
       <div class="kpi-card kpi-clicavel" data-garantia="Sim" title="Clique pra ver quais são" style="cursor:pointer;${filtroGarantia ? "outline:2px solid var(--carvao);outline-offset:-2px" : ""}"><div class="kpi-cabeca">${kpiIcone("escudo")}<div class="kpi-label">% com Garantia Exigida</div></div><div class="kpi-value">${pctGarantia === null ? "—" : pctGarantia.toLocaleString("pt-BR", { maximumFractionDigits: 1 }) + "%"}</div></div>
-      <div class="kpi-card kpi-clicavel" data-garantia="Sim" title="Clique pra ver quais são" style="cursor:pointer;${filtroGarantia ? "outline:2px solid var(--carvao);outline-offset:-2px" : ""}"><div class="kpi-cabeca">${kpiIcone("escudo")}<div class="kpi-label">Contratos Garantia Exigida</div></div><div class="kpi-value">${qtdGarantiaExigida.toLocaleString("pt-BR")}</div></div>`;
+      <div class="kpi-card kpi-clicavel" data-garantia="Sim" title="Clique pra ver quais são" style="cursor:pointer;${filtroGarantia ? "outline:2px solid var(--carvao);outline-offset:-2px" : ""}"><div class="kpi-cabeca">${kpiIcone("escudo")}<div class="kpi-label">Contratos Garantia Exigida</div></div><div class="kpi-value">${qtdGarantiaExigida.toLocaleString("pt-BR")}</div></div>
+      <div class="kpi-card" title="Quantas COORPIN/unidades regionais distintas os contratos aqui exibidos atendem — hoje só contratos da DEPIN têm essa informação"><div class="kpi-cabeca">${kpiIcone("predio")}<div class="kpi-label">Unidades Beneficiadas</div></div><div class="kpi-value">${qtdUnidadesBeneficiadas ? qtdUnidadesBeneficiadas.toLocaleString("pt-BR") : "—"}</div></div>`;
   }
 
   document.getElementById("ger-filtro-area").addEventListener("change", (ev) => { filtroArea = ev.target.value; atualizar(); });
@@ -6128,6 +6133,14 @@ function renderPorDimensaoContratos(lista, cfg) {
   let modoMes = "colunas";
   let filtroStatusVisao = ""; // "Vencido" | "A Vencer" | "A Contratar" | "" — cartões da Visão Geral
   let filtroUrgenciaPrazo = ""; // "Vencido" | "30" | "90" | "" — cartões da Visão Geral de Prazos e Vencimentos
+  // Pedido direto: "tem uma segunda classificação que é a de dirpin que
+  // acho interessante manter pra termos como opção de filtro também" — só
+  // aparece quando a área/categoria selecionada tem contrato com unidade
+  // (hoje, só CONTRATOS/DEPIN). Os dois se combinam (E, não OU) — escolher
+  // uma DIRPIN não esvazia a COORPIN escolhida antes, a não ser que a
+  // COORPIN escolhida não pertença mais a essa DIRPIN.
+  let filtroDirpin = "";
+  let filtroCoorpin = "";
 
   alvo.innerHTML = `
     <div class="dash-filtros">
@@ -6144,6 +6157,7 @@ function renderPorDimensaoContratos(lista, cfg) {
     <div id="${p}-landing"></div>
     <div id="${p}-perfil" hidden>
       <div class="dash-chart-box" id="${p}-cabecalho" style="margin-bottom:16px"></div>
+      <div id="${p}-filtro-unidade" style="margin-bottom:16px"></div>
       <div class="tabs" style="margin-bottom:0">
         <button class="tab-btn active" data-subtab-${p}="visao">VISÃO GERAL</button>
         <button class="tab-btn" data-subtab-${p}="prazos">PRAZOS E VENCIMENTOS</button>
@@ -6189,6 +6203,8 @@ function renderPorDimensaoContratos(lista, cfg) {
     filtroMes = "";
     filtroStatusVisao = "";
     filtroUrgenciaPrazo = "";
+    filtroDirpin = "";
+    filtroCoorpin = "";
     atualizar();
     alvo.scrollIntoView?.({ behavior: "smooth", block: "start" });
   }
@@ -6232,6 +6248,41 @@ function renderPorDimensaoContratos(lista, cfg) {
       const sel = document.getElementById(`${cfg.complementar.prefixoAlvo}-select`);
       if (sel) { sel.value = alvoClicado.dataset.cat; sel.dispatchEvent(new Event("change", { bubbles: true })); }
     });
+  }
+
+  // Só desenha o filtro quando a área/categoria selecionada tem alguma
+  // unidade regional atrelada (hoje, só CONTRATOS/DEPIN) — nas outras, o
+  // container fica vazio, sem selects inúteis sempre em "Todos".
+  function renderFiltroUnidade(listaFiltrada) {
+    const container = el("filtro-unidade");
+    const todasUnidades = listaFiltrada.flatMap((c) => c.unidades || []);
+    if (!todasUnidades.length) { container.innerHTML = ""; return; }
+    const dirpinsDisponiveis = [...new Set(todasUnidades.map((u) => u.dirpin).filter(Boolean))].sort();
+    const coorpinsDisponiveis = [...new Set(
+      todasUnidades.filter((u) => !filtroDirpin || u.dirpin === filtroDirpin).map((u) => u.nomeUnidade)
+    )].sort((a, b) => (parseInt(a, 10) || 0) - (parseInt(b, 10) || 0));
+    container.innerHTML = `
+      <div class="dash-filtros">
+        <div class="dash-filtro">
+          <label>DIRPIN</label>
+          <select id="${p}-filtro-dirpin"><option value="">Todas</option>${dirpinsDisponiveis.map((d) => `<option value="${escapeAttr(d)}"${d === filtroDirpin ? " selected" : ""}>${escapeHTML(d)}</option>`).join("")}</select>
+        </div>
+        <div class="dash-filtro">
+          <label>COORPIN / UNIDADE REGIONAL</label>
+          <select id="${p}-filtro-coorpin"><option value="">Todas</option>${coorpinsDisponiveis.map((c) => `<option value="${escapeAttr(c)}"${c === filtroCoorpin ? " selected" : ""}>${escapeHTML(c)}</option>`).join("")}</select>
+        </div>
+      </div>`;
+    el("filtro-dirpin").addEventListener("change", (ev) => {
+      filtroDirpin = ev.target.value;
+      // Se a COORPIN escolhida não pertence mais à DIRPIN nova, esvazia —
+      // evita ficar com um filtro combinado que não bate contrato nenhum.
+      if (filtroDirpin && filtroCoorpin) {
+        const aindaValida = todasUnidades.some((u) => u.nomeUnidade === filtroCoorpin && u.dirpin === filtroDirpin);
+        if (!aindaValida) filtroCoorpin = "";
+      }
+      atualizar();
+    });
+    el("filtro-coorpin").addEventListener("change", (ev) => { filtroCoorpin = ev.target.value; atualizar(); });
   }
 
   function renderCabecalho(listaFiltrada) {
@@ -6638,7 +6689,11 @@ function renderPorDimensaoContratos(lista, cfg) {
     }
     el("landing").innerHTML = "";
     el("perfil").hidden = false;
-    const listaFiltrada = lista.filter((c) => (cfg.campoAgrupador(c) || cfg.rotuloVazio) === selecionada);
+    const listaArea = lista.filter((c) => (cfg.campoAgrupador(c) || cfg.rotuloVazio) === selecionada);
+    renderFiltroUnidade(listaArea);
+    let listaFiltrada = listaArea;
+    if (filtroDirpin) listaFiltrada = listaFiltrada.filter((c) => (c.unidades || []).some((u) => u.dirpin === filtroDirpin));
+    if (filtroCoorpin) listaFiltrada = listaFiltrada.filter((c) => (c.unidades || []).some((u) => u.nomeUnidade === filtroCoorpin));
     renderCabecalho(listaFiltrada);
     renderVisaoGeral(listaFiltrada);
     renderPrazos(listaFiltrada);
