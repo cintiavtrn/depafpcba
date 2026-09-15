@@ -6326,6 +6326,69 @@ function mapaCoorpinSVG(linhas, opcoes = {}) {
   </svg>`;
 }
 
+// Pedido direto: "tem esse mapa que é Bahia, aí a gente vê Salvador e vê
+// todos esses, mas um outro mapa que é só Salvador dentro dele... clicando
+// na própria bolha Salvador... e aí você coloca a distribuição da forma
+// que dá, já que não temos as unidades atingidas como fins em Salvador,
+// por hora. Mas é bom já deixar isso quase pronto pra verem a utilidade e
+// aplicação." Não temos bairro/endereço de cada contrato em Salvador (só
+// o mapa de pontos por COORPIN tem coordenada real) — "a forma que dá" é
+// espalhar uma bolinha por contrato num arranjo em espiral (Vogel/
+// girassol: ângulo áureo a cada passo, raio cresce com a raiz do índice —
+// mesma ideia por trás de como sementes de girassol se distribuem sem se
+// sobrepor), cor por área gestora (a única dimensão que JÁ temos pra
+// qualquer contrato, com ou sem unidade). Não é geografia de verdade
+// dentro de Salvador — é organização visual, deixado bem explícito no
+// texto ao lado — mas já mostra a ideia funcionando: filtra, tem
+// legenda, clica e abre o contrato.
+function mapaSalvadorSVG(contratos, opcoes = {}) {
+  const { destacarId = null } = opcoes;
+  const W = 320, H = 320, cx = W / 2, cy = H / 2, R = 128;
+  const n = contratos.length;
+  const raioPonto = n > 80 ? 3 : n > 40 ? 3.8 : n > 15 ? 4.6 : 6;
+  const ANGULO_OURO = 2.399963; // ~137,5°, em radianos
+  let pontos = "";
+  contratos.forEach((c, i) => {
+    const r = n > 1 ? R * Math.sqrt(i / (n - 1)) : 0;
+    const theta = i * ANGULO_OURO;
+    const x = cx + r * Math.cos(theta);
+    const y = cy + r * Math.sin(theta);
+    const { cor } = entidadeIconeCorArea(c.unidadeGestora || "(sem unidade gestora)", contratos);
+    const destacado = destacarId && c.id === destacarId;
+    pontos += `<circle class="linha-contrato" data-contrato-id="${escapeAttr(c.id)}" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${raioPonto}" fill="${cor}" stroke="var(--paper)" stroke-width="${destacado ? 1.6 : 0.6}" style="cursor:pointer"><title>${escapeHTML(c.numeroContrato)} — ${escapeHTML(c.empresa)} (${escapeHTML(c.unidadeGestora || "—")})</title></circle>`;
+  });
+  return `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="max-width:340px;width:100%;height:auto;display:block;margin:0 auto">
+    <circle cx="${cx}" cy="${cy}" r="${R + 16}" fill="var(--paper-line)" stroke="var(--carvao)" stroke-width="1.5" stroke-dasharray="5,4"></circle>
+    <text x="${cx}" y="22" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="11" font-weight="700" fill="var(--carvao)" letter-spacing="1">SALVADOR</text>
+    ${pontos}
+  </svg>`;
+}
+
+// Legenda do mapaSalvadorSVG — cor por área gestora (mesmo esquema hash de
+// sempre, badgeEntidadeAreaHTML/entidadeIconeCorArea), ordenada da maior
+// pra menor quantidade. Não tenta ser exaustiva: mostra todas as que
+// aparecem na seleção atual, que tende a ser pequena (poucas dezenas de
+// contratos no máximo).
+function legendaAreaGestoraHTML(contratos) {
+  const porArea = new Map(); // nomeArea -> qtd
+  for (const c of contratos) {
+    const nome = c.unidadeGestora || "(sem unidade gestora)";
+    porArea.set(nome, (porArea.get(nome) || 0) + 1);
+  }
+  const linhas = [...porArea.entries()].sort((a, b) => b[1] - a[1]);
+  return `
+    <p class="dash-chart-hint" style="margin-top:10px">Ainda não temos o bairro/endereço de cada contrato dentro de Salvador — a posição de cada bolinha aqui é só organização visual (arranjo em espiral), não geografia real. Assim que essa lista existir, os pontos entram no lugar certo. Por enquanto, a cor já mostra de qual área gestora é cada um:</p>
+    <div style="display:flex;flex-wrap:wrap;gap:8px 16px;margin-top:8px;font-size:var(--fs-ui-sm)">
+      ${linhas.map(([nome, qtd]) => {
+        const { cor } = entidadeIconeCorArea(nome, contratos);
+        return `<div style="display:flex;align-items:center;gap:6px">
+          <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${cor}"></span>
+          <span style="color:#8B93A3;font-family:'IBM Plex Mono',monospace">${escapeHTML(nome)} (${qtd})</span>
+        </div>`;
+      }).join("")}
+    </div>`;
+}
+
 // Extraído de dentro de renderFiltroUnidade (Por Área/Por Categoria) pra também
 // servir a landing de "Por Categoria" (mapa de visão geral, antes de escolher
 // uma categoria) sem duplicar a mesma conta duas vezes.
@@ -6761,6 +6824,16 @@ function renderPorDimensaoContratos(lista, cfg) {
     // "o gráfico da DEPIN com um acréscimo" — é UM gráfico geográfico só,
     // com duas fontes de dado.
     const contratosSemUnidade = listaFiltrada.filter((c) => !(c.unidades || []).length);
+    // Pedido direto: "tem esse mapa que é Bahia... mas um outro mapa que é
+    // só Salvador dentro dele, sabe?... clicando na própria bolha
+    // Salvador" — quem conta como "de Salvador" aqui: os sem unidade
+    // nenhuma (Outras Áreas) MAIS quem tem a Sede da DEPIN cadastrada como
+    // uma das unidades (esses já sabemos que são de Salvador de verdade).
+    const contratosSalvador = listaFiltrada.filter((c) => !(c.unidades || []).length || (c.unidades || []).some((u) => u.nomeUnidade === "Sede (Salvador)"));
+    // Salva de um estado preso: se o modo salvo era "salvador" (de outra
+    // área/categoria que tinha isso) e aqui não tem ninguém de Salvador,
+    // volta pro mapa normal em vez de tentar desenhar um zoom vazio.
+    if (modoGraficoUnidade === "salvador" && !contratosSalvador.length) modoGraficoUnidade = "mapa";
     const dirpinsDisponiveis = [...new Set(todasUnidades.map((u) => u.dirpin).filter(Boolean))].sort();
     const coorpinsDisponiveis = [
       ...new Set(todasUnidades.filter((u) => !filtroDirpin || u.dirpin === filtroDirpin).map((u) => u.nomeUnidade)),
@@ -6808,6 +6881,7 @@ function renderPorDimensaoContratos(lista, cfg) {
         <div class="linha-troca-grafico"><div class="dash-toggle" id="${p}-toggle-grafico-unidade">
           <button class="dash-toggle-btn" data-modo="barras" title="Lista as 26, ordenada por número — melhor pra achar uma específica ou comparar valores">BARRAS</button>
           <button class="dash-toggle-btn" data-modo="mapa" title="Mostra onde cada sede fica no estado — melhor pra enxergar a distribuição geográfica (mapa de PONTOS: cidade-sede de cada COORPIN, ainda não o território que cada uma cobre)">MAPA</button>
+          ${contratosSalvador.length ? `<button class="dash-toggle-btn" data-modo="salvador" title="Zoom só em Salvador — ${contratosSalvador.length} contrato(s) sem unidade do interior (Sede da DEPIN + outras áreas), um por bolinha">SALVADOR</button>` : ""}
         </div></div>
         <div id="${p}-grafico-unidade"></div>
         <div id="${p}-legenda-mapa-unidade"></div>
@@ -6867,46 +6941,61 @@ function renderPorDimensaoContratos(lista, cfg) {
       const d = linhasUnidade.find((l) => l.label === nomeUnidade)?.dirpin;
       return d && d !== CHAVE_OUTRAS_AREAS ? d : "";
     };
-    el("grafico-unidade").innerHTML = modoGraficoUnidade === "mapa"
-      ? mapaCoorpinSVG(linhasUnidade, { destacarFn: destacarUnidadeFn })
-      : barraContagemHorizontalSVG(linhasUnidade, {
-          tituloTooltip: (l) => l.label === OUTRAS_AREAS_LABEL ? `${l.label}: ${l.total} contrato(s) (localização presumida)` : `${l.label} (DIRPIN ${l.dirpin}): ${l.total} contrato(s)`,
-          destacarFn: destacarUnidadeFn,
-        });
-    adicionarControlesGrafico(el("grafico-unidade"));
-    el("grafico-unidade").addEventListener("click", (ev) => {
-      const barra = ev.target.closest("[data-cat]");
-      if (!barra) return;
-      const nomeUnidade = barra.dataset.cat;
-      filtroCoorpin = filtroCoorpin === nomeUnidade ? "" : nomeUnidade;
-      filtroDirpin = filtroCoorpin ? dirpinParaFiltro(nomeUnidade) : filtroDirpin;
-      filtroApenasCompartilhados = false;
-      atualizar();
-    });
-    // Pedido direto: "faltou legenda pra esse mapa né, tanto para cores
-    // quanto números" — sem isso, só passando o mouse ponto a ponto pra
-    // saber quem é quem. Uma legenda só (agrupada por DIRPIN) responde as
-    // duas perguntas juntas — "essa cor é de qual DIRPIN" e "esse número é
-    // qual COORPIN" — em vez de duas legendas soltas repetindo a mesma
-    // lista. Só aparece no modo mapa: nas barras, o nome já está escrito
-    // ao lado de cada uma, não precisa de legenda pra decifrar nada.
-    if (modoGraficoUnidade === "mapa") {
-      // Pedido direto: "tinha contrato que tava só como sede?... precisa
-      // incluir no filtro de unidade regional" — Sede não é uma DIRPIN,
-      // então tem grupo próprio na legenda em vez de aparecer como
-      // "DIRPIN —" (não faz sentido) ou ficar escondida num grupo alheio.
-      el("legenda-mapa-unidade").innerHTML = legendaMapaUnidadeHTML(linhasUnidade, destacarUnidadeFn);
-      el("legenda-mapa-unidade").addEventListener("click", (ev) => {
-        const item = ev.target.closest("[data-cat]");
-        if (!item) return;
-        const nomeUnidade = item.dataset.cat;
+    if (modoGraficoUnidade === "salvador") {
+      // Pedido direto: "você coloca a distribuição da forma que dá, já que
+      // não temos as unidades atingidas como fins em Salvador, por hora...
+      // mas é bom já deixar isso quase pronto pra verem a utilidade e
+      // aplicação" — zoom só nos contratos de Salvador (Sede da DEPIN +
+      // Outras Áreas), 1 bolinha por contrato, cor por área gestora (a
+      // única dimensão que já temos pra qualquer um deles). Sem
+      // "isolar/filtrar" igual às barras/mapa — aqui o clique na bolinha já
+      // abre o contrato direto (ligarTooltipLinhas cuida disso).
+      el("grafico-unidade").innerHTML = mapaSalvadorSVG(contratosSalvador);
+      adicionarControlesGrafico(el("grafico-unidade"));
+      ligarTooltipLinhas(el("grafico-unidade"), porId);
+      el("legenda-mapa-unidade").innerHTML = legendaAreaGestoraHTML(contratosSalvador);
+    } else {
+      el("grafico-unidade").innerHTML = modoGraficoUnidade === "mapa"
+        ? mapaCoorpinSVG(linhasUnidade, { destacarFn: destacarUnidadeFn })
+        : barraContagemHorizontalSVG(linhasUnidade, {
+            tituloTooltip: (l) => l.label === OUTRAS_AREAS_LABEL ? `${l.label}: ${l.total} contrato(s) (localização presumida)` : `${l.label} (DIRPIN ${l.dirpin}): ${l.total} contrato(s)`,
+            destacarFn: destacarUnidadeFn,
+          });
+      adicionarControlesGrafico(el("grafico-unidade"));
+      el("grafico-unidade").addEventListener("click", (ev) => {
+        const barra = ev.target.closest("[data-cat]");
+        if (!barra) return;
+        const nomeUnidade = barra.dataset.cat;
         filtroCoorpin = filtroCoorpin === nomeUnidade ? "" : nomeUnidade;
         filtroDirpin = filtroCoorpin ? dirpinParaFiltro(nomeUnidade) : filtroDirpin;
         filtroApenasCompartilhados = false;
         atualizar();
       });
-    } else {
-      el("legenda-mapa-unidade").innerHTML = "";
+      // Pedido direto: "faltou legenda pra esse mapa né, tanto para cores
+      // quanto números" — sem isso, só passando o mouse ponto a ponto pra
+      // saber quem é quem. Uma legenda só (agrupada por DIRPIN) responde as
+      // duas perguntas juntas — "essa cor é de qual DIRPIN" e "esse número
+      // é qual COORPIN" — em vez de duas legendas soltas repetindo a mesma
+      // lista. Só aparece no modo mapa: nas barras, o nome já está escrito
+      // ao lado de cada uma, não precisa de legenda pra decifrar nada.
+      if (modoGraficoUnidade === "mapa") {
+        // Pedido direto: "tinha contrato que tava só como sede?... precisa
+        // incluir no filtro de unidade regional" — Sede não é uma DIRPIN,
+        // então tem grupo próprio na legenda em vez de aparecer como
+        // "DIRPIN —" (não faz sentido) ou ficar escondida num grupo alheio.
+        el("legenda-mapa-unidade").innerHTML = legendaMapaUnidadeHTML(linhasUnidade, destacarUnidadeFn);
+        el("legenda-mapa-unidade").addEventListener("click", (ev) => {
+          const item = ev.target.closest("[data-cat]");
+          if (!item) return;
+          const nomeUnidade = item.dataset.cat;
+          filtroCoorpin = filtroCoorpin === nomeUnidade ? "" : nomeUnidade;
+          filtroDirpin = filtroCoorpin ? dirpinParaFiltro(nomeUnidade) : filtroDirpin;
+          filtroApenasCompartilhados = false;
+          atualizar();
+        });
+      } else {
+        el("legenda-mapa-unidade").innerHTML = "";
+      }
     }
     document.querySelectorAll(`#${p}-toggle-grafico-unidade [data-modo]`).forEach((btn) => {
       btn.classList.toggle("active", btn.dataset.modo === modoGraficoUnidade);
