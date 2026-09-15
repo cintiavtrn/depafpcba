@@ -4776,6 +4776,28 @@ function renderMatrizAreaGestora(linhasArea) {
     </table>`;
 }
 
+// Pedido direto: "acho que deveria no objeto selecionado melhorar a
+// descrição, adicionar algumas informações relevantes mesmo que não
+// esteja na coluna de objeto... tem esse contrato de correios que
+// precisa de mais descrição". O objeto vem pronto da planilha ("Prestação
+// de serviços postais (Correios) para as unidades da DEPIN") e não diz
+// QUAIS unidades — a resposta já existe no dado (contrato_unidades), só
+// não aparecia junto do objeto. Não reescreve a planilha, só ACRESCENTA
+// uma linha calculada a partir do que o contrato realmente atende — se um
+// dia a cobertura de um contrato mudar, a frase muda sozinha, sem precisar
+// editar texto na mão.
+function descricaoCoberturaUnidades(c) {
+  const unidades = c.unidades || [];
+  if (!unidades.length) return "";
+  const temSede = unidades.some((u) => u.nomeUnidade === "Sede (Salvador)");
+  const coorpins = unidades.filter((u) => u.nomeUnidade !== "Sede (Salvador)");
+  if (coorpins.length >= 26) {
+    return temSede ? "Atende a Sede e as 26 COORPINs (todo o estado)." : "Atende as 26 COORPINs (todo o estado).";
+  }
+  const nomes = unidades.map((u) => u.nomeUnidade).join(", ");
+  return `Atende: ${nomes}.`;
+}
+
 function tooltipContratoHTML(c) {
   const pessoasPorPapel = (papel) => c.pessoas.filter(p => p.papel === papel).map(p => p.nomePessoa).join(", ") || "—";
   return `
@@ -5852,7 +5874,7 @@ function renderOperacionalContratos(lista, portalSlug) {
       : "";
     document.getElementById("op-campos-selecionados").innerHTML = `
       <div class="dados-grid">
-        <div class="dado"><div class="valor" style="font-size:var(--fs-titulo);line-height:1.2">${selecionado ? escapeHTML(selecionado.objeto || "—") : "--"}</div><div class="rotulo">Objeto Selecionado</div></div>
+        <div class="dado"><div class="valor" style="font-size:var(--fs-titulo);line-height:1.2">${selecionado ? escapeHTML(selecionado.objeto || "—") : "--"}</div>${selecionado && descricaoCoberturaUnidades(selecionado) ? `<div class="font-mono" style="font-size:var(--fs-ui-sm);color:#8B93A3;margin-top:4px" title="Calculado a partir das unidades cadastradas — não é texto da planilha">${escapeHTML(descricaoCoberturaUnidades(selecionado))}</div>` : ""}<div class="rotulo">Objeto Selecionado</div></div>
         <div class="dado"><div class="valor" style="font-size:var(--fs-titulo)">${selecionado ? escapeHTML(selecionado.empresa) : "--"}</div><div class="rotulo">Empresa Selecionada</div></div>
         <div class="dado"><div class="valor">${selecionado ? formatarDataBR(selecionado.dataInicio) : "--"}</div><div class="rotulo">Data Início Selecionada</div></div>
         <div class="dado"><div class="valor">${selecionado ? formatarDataBR(selecionado.dataFim) : "--"}</div><div class="rotulo">Data Término Selecionada</div>${rotuloRenovado}</div>
