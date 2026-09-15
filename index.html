@@ -6305,6 +6305,46 @@ function mapaCoorpinSVG(linhas, opcoes = {}) {
     ${pontos}
   </svg>`;
 }
+
+// Extraído de dentro de renderFiltroUnidade (Por Área/Por Categoria) pra também
+// servir a landing de "Por Categoria" (mapa de visão geral, antes de escolher
+// uma categoria) sem duplicar a mesma conta duas vezes.
+function agruparPorUnidade(todasUnidades) {
+  const porUnidade = new Map(); // nomeUnidade -> { total, dirpin }
+  for (const u of todasUnidades) {
+    const atual = porUnidade.get(u.nomeUnidade) || { total: 0, dirpin: u.dirpin };
+    atual.total += 1;
+    porUnidade.set(u.nomeUnidade, atual);
+  }
+  return [...porUnidade.entries()]
+    .map(([label, v]) => ({ label, total: v.total, dirpin: v.dirpin }))
+    .sort((a, b) => (parseInt(a.label, 10) || 0) - (parseInt(b.label, 10) || 0));
+}
+
+// Mesma legenda (cor por DIRPIN + número por COORPIN, Sede em grupo próprio)
+// usada no mapa de dentro do perfil — extraída pra reaproveitar na landing.
+function legendaMapaUnidadeHTML(linhasUnidade, destacarUnidadeFn = () => false) {
+  const porDirpinLegenda = new Map();
+  for (const l of linhasUnidade) {
+    const chave = l.dirpin || "Sede";
+    if (!porDirpinLegenda.has(chave)) porDirpinLegenda.set(chave, []);
+    porDirpinLegenda.get(chave).push(l);
+  }
+  return `
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;margin-top:12px;font-size:var(--fs-ui-sm)">
+      ${[...porDirpinLegenda.entries()].map(([dirpin, unidades]) => `
+        <div>
+          <div style="display:flex;align-items:center;gap:6px;font-weight:700;margin-bottom:3px">
+            <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${CORES_DIRPIN[dirpin] || "var(--carvao)"}"></span>
+            ${dirpin === "Sede" ? "Sede" : `DIRPIN ${escapeHTML(dirpin)}`}
+          </div>
+          <div style="color:#8B93A3;font-family:'IBM Plex Mono',monospace">
+            ${unidades.map((u) => `<span class="legenda-unidade-item" data-cat="${escapeAttr(u.label)}" style="cursor:pointer;${destacarUnidadeFn(u) ? "text-decoration:underline;color:var(--carvao)" : ""}">${escapeHTML(u.label)}</span>`).join(" · ")}
+          </div>
+        </div>
+      `).join("")}
+    </div>`;
+}
 function renderPorDimensaoContratos(lista, cfg) {
   const p = cfg.prefixo;
   const el = (sufixo) => document.getElementById(`${p}-${sufixo}`);
@@ -6337,6 +6377,13 @@ function renderPorDimensaoContratos(lista, cfg) {
   // opção, ainda não elimine as barras" — os dois ficam, a pessoa escolhe;
   // por padrão continua nas barras (o que já existia).
   let modoGraficoUnidade = lerGraficoSalvo(`cpg-${p}-unidade`) || "barras";
+  // Pedido direto: "na área por categoria deveria de novo aparecer o mapa...
+  // invés desse gráfico de rosca... pelo menos por hora" — só faz sentido em
+  // Por Categoria (a landing de Por Área já é só DEPAF/DEPIN, escolher entre
+  // 2 cartões não pede mapa; a de Categoria tem 6, então ver ANTES onde cada
+  // uma pesa geograficamente ajuda). Mantém a rosca como opção — troca só o
+  // padrão de qual das duas abre primeiro.
+  let modoLandingComplementar = p === "categoria" ? (lerGraficoSalvo(`cpg-${p}-landing`) || "mapa") : "rosca";
 
   alvo.innerHTML = `
     <div class="dash-filtros">
@@ -6413,13 +6460,26 @@ function renderPorDimensaoContratos(lista, cfg) {
   function renderLanding() {
     const porGrupo = agruparPorAreaCriticidade(lista, cfg.campoAgrupador, cfg.rotuloVazio);
     const valorPorGrupo = new Map(agruparValorPorCampo(lista, cfg.campoAgrupador, cfg.rotuloVazio).map((l) => [l.label, l]));
+    // Só a landing de Por Categoria ganha o toggle — Por Área continua só
+    // com a rosca, do jeito que já estava (pedido era específico da Categoria).
+    const todasUnidadesLanding = p === "categoria" ? lista.flatMap((c) => c.unidades || []) : [];
+    const temUnidadeLanding = p === "categoria" && todasUnidadesLanding.length > 0;
     el("landing").innerHTML = `
       <p class="dash-chart-hint">${cfg.dicaLanding}</p>
       <div class="kpi-row" style="grid-template-columns:repeat(auto-fill,minmax(200px,1fr));margin-top:10px" id="${p}-cards"></div>
       <div class="dash-chart-box" style="margin-top:16px">
-        <h4>${escapeHTML(cfg.complementar.titulo)} (visão geral, todas as ${cfg.labelBusca.toLowerCase()}s)</h4>
-        <p class="dash-chart-hint">Antes de escolher uma ${cfg.labelBusca.toLowerCase()}: como o total já se divide do outro lado. Clique numa fatia pra abrir o perfil completo dela em "${escapeHTML(cfg.complementar.tituloAba)}".</p>
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+          <h4 style="margin:0">${escapeHTML(cfg.complementar.titulo)} (visão geral, todas as ${cfg.labelBusca.toLowerCase()}s)</h4>
+          ${temUnidadeLanding ? `<div class="dash-toggle" id="${p}-toggle-landing">
+            <button class="dash-toggle-btn" data-modo="rosca" title="Quanto cada área gestora representa do total">ROSCA</button>
+            <button class="dash-toggle-btn" data-modo="mapa" title="Onde as unidades da DEPIN ficam no estado, somando todas as categorias">MAPA</button>
+          </div>` : ""}
+        </div>
+        <p class="dash-chart-hint">${temUnidadeLanding && modoLandingComplementar === "mapa"
+          ? "Onde as unidades da DEPIN estão hoje, somando contratos de todas as categorias — clique num ponto pra abrir o perfil da DEPIN já isolado naquela unidade."
+          : `Antes de escolher uma ${cfg.labelBusca.toLowerCase()}: como o total já se divide do outro lado. Clique numa fatia pra abrir o perfil completo dela em "${escapeHTML(cfg.complementar.tituloAba)}".`}</p>
         <div id="${p}-landing-complementar"></div>
+        <div id="${p}-landing-complementar-legenda"></div>
       </div>
     `;
     el("cards").innerHTML = porGrupo.map((l) => {
@@ -6434,17 +6494,76 @@ function renderPorDimensaoContratos(lista, cfg) {
     el("cards").querySelectorAll(`[data-${p}-card]`).forEach((card) => {
       card.addEventListener("click", () => selecionar(card.dataset[`${p}Card`]));
     });
-    el("landing-complementar").innerHTML = roscaValorPorCampoSVG(
-      agruparValorPorCampo(lista, cfg.complementar.campoFn, cfg.complementar.rotuloVazio)
-    );
-    adicionarControlesGrafico(el("landing-complementar"));
-    el("landing-complementar").addEventListener("click", (ev) => {
-      const alvoClicado = ev.target.closest("[data-cat]");
-      if (!alvoClicado) return;
-      document.querySelector(`[data-subtab-contratos="por${cfg.complementar.prefixoAlvo}"]`)?.click();
-      const sel = document.getElementById(`${cfg.complementar.prefixoAlvo}-select`);
-      if (sel) { sel.value = alvoClicado.dataset.cat; sel.dispatchEvent(new Event("change", { bubbles: true })); }
-    });
+
+    function desenharComplementar() {
+      if (temUnidadeLanding && modoLandingComplementar === "mapa") {
+        const linhasUnidadeLanding = agruparPorUnidade(todasUnidadesLanding);
+        el("landing-complementar").innerHTML = mapaCoorpinSVG(linhasUnidadeLanding, {});
+        el("landing-complementar-legenda").innerHTML = legendaMapaUnidadeHTML(linhasUnidadeLanding);
+        adicionarControlesGrafico(el("landing-complementar"));
+        // Clique aqui não isola nada NESTA aba (a landing não tem uma
+        // categoria escolhida ainda) — abre o perfil da DEPIN em "Por Área
+        // Gestora" já com aquela COORPIN isolada, igual o cartão "Unidades
+        // Beneficiadas" já faz, só que direto na unidade certa.
+        el("landing-complementar").addEventListener("click", (ev) => {
+          const alvoClicado = ev.target.closest("[data-cat]");
+          if (!alvoClicado) return;
+          irParaUnidadeDepinEmPorArea(alvoClicado.dataset.cat);
+        });
+        el("landing-complementar-legenda").addEventListener("click", (ev) => {
+          const alvoClicado = ev.target.closest("[data-cat]");
+          if (!alvoClicado) return;
+          irParaUnidadeDepinEmPorArea(alvoClicado.dataset.cat);
+        });
+      } else {
+        el("landing-complementar-legenda").innerHTML = "";
+        el("landing-complementar").innerHTML = roscaValorPorCampoSVG(
+          agruparValorPorCampo(lista, cfg.complementar.campoFn, cfg.complementar.rotuloVazio)
+        );
+        adicionarControlesGrafico(el("landing-complementar"));
+        el("landing-complementar").addEventListener("click", (ev) => {
+          const alvoClicado = ev.target.closest("[data-cat]");
+          if (!alvoClicado) return;
+          document.querySelector(`[data-subtab-contratos="por${cfg.complementar.prefixoAlvo}"]`)?.click();
+          const sel = document.getElementById(`${cfg.complementar.prefixoAlvo}-select`);
+          if (sel) { sel.value = alvoClicado.dataset.cat; sel.dispatchEvent(new Event("change", { bubbles: true })); }
+        });
+      }
+    }
+    desenharComplementar();
+    if (temUnidadeLanding) {
+      const toggleLanding = el("toggle-landing");
+      toggleLanding.querySelectorAll("button").forEach((btn) => {
+        btn.classList.toggle("active", btn.dataset.modo === modoLandingComplementar);
+      });
+      toggleLanding.addEventListener("click", (ev) => {
+        const btn = ev.target.closest("button[data-modo]");
+        if (!btn || btn.dataset.modo === modoLandingComplementar) return;
+        modoLandingComplementar = btn.dataset.modo;
+        salvarGrafico(`cpg-${p}-landing`, modoLandingComplementar);
+        renderLanding();
+      });
+    }
+  }
+
+  // Reaproveitado pelo mapa da landing de Por Categoria e (via
+  // "Unidades Beneficiadas") pelo Gerencial: pula pra Por Área Gestora,
+  // seleciona DEPIN e isola a COORPIN clicada — mesmo destino, agora também
+  // com a unidade já pré-filtrada, não só o perfil geral.
+  function irParaUnidadeDepinEmPorArea(nomeUnidade) {
+    document.querySelector('[data-subtab-contratos="porarea"]')?.click();
+    const selArea = document.getElementById("area-select");
+    if (selArea) { selArea.value = "DEPIN"; selArea.dispatchEvent(new Event("change", { bubbles: true })); }
+    setTimeout(() => {
+      const selCoorpin = document.getElementById("area-filtro-coorpin");
+      if (selCoorpin) { selCoorpin.value = nomeUnidade; selCoorpin.dispatchEvent(new Event("change", { bubbles: true })); }
+      setTimeout(() => {
+        const caixa = document.getElementById("area-grafico-unidade-caixa");
+        caixa?.scrollIntoView?.({ behavior: "smooth", block: "center" });
+        caixa?.classList.add("destaque-temporario");
+        setTimeout(() => caixa?.classList.remove("destaque-temporario"), 1400);
+      }, 200);
+    }, 250);
   }
 
   // Só desenha o filtro quando a área/categoria selecionada tem alguma
@@ -6531,15 +6650,7 @@ function renderPorDimensaoContratos(lista, cfg) {
     // quantos contratos cada COORPIN tem — a mesma pergunta que a métrica
     // promete responder, respondida de fato, não só um lugar pra filtrar
     // uma de cada vez.
-    const porUnidade = new Map(); // nomeUnidade -> { total, dirpin }
-    for (const u of todasUnidades) {
-      const atual = porUnidade.get(u.nomeUnidade) || { total: 0, dirpin: u.dirpin };
-      atual.total += 1;
-      porUnidade.set(u.nomeUnidade, atual);
-    }
-    const linhasUnidade = [...porUnidade.entries()]
-      .map(([label, v]) => ({ label, total: v.total, dirpin: v.dirpin }))
-      .sort((a, b) => (parseInt(a.label, 10) || 0) - (parseInt(b.label, 10) || 0));
+    const linhasUnidade = agruparPorUnidade(todasUnidades);
     // Pedido direto: "quando filtramos por região da DIRPIN tem que
     // destacar no mapa, só isso, assim como na barra" — com uma COORPIN
     // escolhida, destaca só ELA; com só a DIRPIN escolhida (sem COORPIN
@@ -6570,30 +6681,11 @@ function renderPorDimensaoContratos(lista, cfg) {
     // lista. Só aparece no modo mapa: nas barras, o nome já está escrito
     // ao lado de cada uma, não precisa de legenda pra decifrar nada.
     if (modoGraficoUnidade === "mapa") {
-      const porDirpinLegenda = new Map();
-      for (const l of linhasUnidade) {
-        // Pedido direto: "tinha contrato que tava só como sede?... precisa
-        // incluir no filtro de unidade regional" — Sede não é uma DIRPIN,
-        // então tem grupo próprio na legenda em vez de aparecer como
-        // "DIRPIN —" (não faz sentido) ou ficar escondida num grupo alheio.
-        const chave = l.dirpin || "Sede";
-        if (!porDirpinLegenda.has(chave)) porDirpinLegenda.set(chave, []);
-        porDirpinLegenda.get(chave).push(l);
-      }
-      el("legenda-mapa-unidade").innerHTML = `
-        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;margin-top:12px;font-size:var(--fs-ui-sm)">
-          ${[...porDirpinLegenda.entries()].map(([dirpin, unidades]) => `
-            <div>
-              <div style="display:flex;align-items:center;gap:6px;font-weight:700;margin-bottom:3px">
-                <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${CORES_DIRPIN[dirpin] || "var(--carvao)"}"></span>
-                ${dirpin === "Sede" ? "Sede" : `DIRPIN ${escapeHTML(dirpin)}`}
-              </div>
-              <div style="color:#8B93A3;font-family:'IBM Plex Mono',monospace">
-                ${unidades.map((u) => `<span class="legenda-unidade-item" data-cat="${escapeAttr(u.label)}" style="cursor:pointer;${destacarUnidadeFn(u) ? "text-decoration:underline;color:var(--carvao)" : ""}">${escapeHTML(u.label)}</span>`).join(" · ")}
-              </div>
-            </div>
-          `).join("")}
-        </div>`;
+      // Pedido direto: "tinha contrato que tava só como sede?... precisa
+      // incluir no filtro de unidade regional" — Sede não é uma DIRPIN,
+      // então tem grupo próprio na legenda em vez de aparecer como
+      // "DIRPIN —" (não faz sentido) ou ficar escondida num grupo alheio.
+      el("legenda-mapa-unidade").innerHTML = legendaMapaUnidadeHTML(linhasUnidade, destacarUnidadeFn);
       el("legenda-mapa-unidade").addEventListener("click", (ev) => {
         const item = ev.target.closest("[data-cat]");
         if (!item) return;
