@@ -6745,9 +6745,12 @@ function renderPorDimensaoContratos(lista, cfg) {
         <div class="kpi-card kpi-clicavel" data-compartilhados title="Clique pra ver quais são — cada um atende mais de uma DIRPIN ao mesmo tempo" style="--kpi-cor:var(--crit-alto);cursor:pointer;${filtroApenasCompartilhados ? "outline:2px solid var(--crit-alto);outline-offset:-2px" : ""}"><div class="kpi-cabeca">${kpiIcone("alerta")}<div class="kpi-label">Compartilhados entre DIRPIN</div></div><div class="kpi-value">${compartilhados}</div></div>
       </div>
       <p class="dash-chart-hint" style="margin-top:4px">${exclusivos} contrato(s) atende(m) uma DIRPIN só — os outros ${compartilhados} atendem mais de uma (por isso a soma dos filtros de DIRPIN acima passa de ${contratosComUnidade.length}). Útil saber antes de montar relatório ou apresentação com esse corte.</p>` : ""}
-      <div class="dash-chart-box" id="${p}-grafico-unidade-caixa" style="margin-top:16px">
-        <h4>Contratos por Unidade Regional (COORPIN)</h4>
-        <p class="dash-chart-hint">Quantos contratos cada unidade tem hoje — um contrato "geral" (que atende várias) entra na barra/ponto de cada uma. Clique numa barra ou num ponto do mapa pra isolar só aquela unidade.</p>
+      <div class="dash-chart-box" id="${p}-grafico-unidade-caixa" style="margin-top:16px;border-left:4px solid var(--dourado);background:color-mix(in srgb, var(--dourado) 7%, transparent)">
+        <h4 style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <span style="background:var(--dourado);color:var(--paper);padding:2px 8px;border-radius:3px;font-size:var(--fs-ui-sm);font-weight:700;letter-spacing:.02em">SÓ NA DEPIN</span>
+          Contratos por Unidade Regional (COORPIN)
+        </h4>
+        <p class="dash-chart-hint">Quantos contratos DA DEPIN cada unidade tem hoje — um contrato "geral" (que atende várias) entra na barra/ponto de cada uma. ${p === "categoria" ? `Esta categoria também pode ter contrato de outras áreas gestoras na tabela "Detalhamento dos Contratos" mais abaixo — só a DEPIN cadastra unidade regional, por isso só ela aparece neste gráfico.` : `Só a DEPIN cadastra unidade regional (por isso o gráfico é só dela, mesmo que a tabela abaixo já esteja filtrada só em DEPIN).`} Clique numa barra ou num ponto do mapa pra isolar só aquela unidade — ou veja tudo isso de uma vez, com a tabela de contratos de cada unidade, na aba <button type="button" id="${p}-ir-aba-unidades" class="link-botao" style="font:inherit;color:inherit;text-decoration:underline;cursor:pointer">UNIDADES</button>.</p>
         <div class="linha-troca-grafico"><div class="dash-toggle" id="${p}-toggle-grafico-unidade">
           <button class="dash-toggle-btn" data-modo="barras" title="Lista as 26, ordenada por número — melhor pra achar uma específica ou comparar valores">BARRAS</button>
           <button class="dash-toggle-btn" data-modo="mapa" title="Mostra onde cada sede fica no estado — melhor pra enxergar a distribuição geográfica (mapa de PONTOS: cidade-sede de cada COORPIN, ainda não o território que cada uma cobre)">MAPA</button>
@@ -6755,6 +6758,9 @@ function renderPorDimensaoContratos(lista, cfg) {
         <div id="${p}-grafico-unidade"></div>
         <div id="${p}-legenda-mapa-unidade"></div>
       </div>`;
+    el("ir-aba-unidades")?.addEventListener("click", () => {
+      document.querySelector('[data-subtab-contratos="unidades"]')?.click();
+    });
     el("filtro-dirpin").addEventListener("change", (ev) => {
       filtroDirpin = ev.target.value;
       // Se a COORPIN escolhida não pertence mais à DIRPIN nova, esvazia —
