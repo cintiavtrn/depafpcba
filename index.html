@@ -6261,6 +6261,16 @@ function renderPorDimensaoContratos(lista, cfg) {
     const coorpinsDisponiveis = [...new Set(
       todasUnidades.filter((u) => !filtroDirpin || u.dirpin === filtroDirpin).map((u) => u.nomeUnidade)
     )].sort((a, b) => (parseInt(a, 10) || 0) - (parseInt(b, 10) || 0));
+    // Pedido direto: "mostrar ao lado quantos são exclusivos vs.
+    // compartilhados" — depois de reparar que a soma dos cartões por DIRPIN
+    // passa do total de contratos (18+13+12+16+10=69, sendo só 52
+    // contratos). A diferença é isso aqui: contrato de alimentação ou de
+    // correio pode atender mais de uma DIRPIN ao mesmo tempo, então conta
+    // em cada uma que atende — não é filtro quebrado, é contrato que serve
+    // mais de um lugar.
+    const contratosComUnidade = listaFiltrada.filter((c) => (c.unidades || []).length > 0);
+    const compartilhados = contratosComUnidade.filter((c) => new Set(c.unidades.map((u) => u.dirpin)).size > 1).length;
+    const exclusivos = contratosComUnidade.length - compartilhados;
     container.innerHTML = `
       <div class="dash-filtros">
         <div class="dash-filtro">
@@ -6271,7 +6281,8 @@ function renderPorDimensaoContratos(lista, cfg) {
           <label>COORPIN / UNIDADE REGIONAL</label>
           <select id="${p}-filtro-coorpin"><option value="">Todas</option>${coorpinsDisponiveis.map((c) => `<option value="${escapeAttr(c)}"${c === filtroCoorpin ? " selected" : ""}>${escapeHTML(c)}</option>`).join("")}</select>
         </div>
-      </div>`;
+      </div>
+      <p class="dash-chart-hint" style="margin-top:4px">${contratosComUnidade.length} contrato(s) com unidade cadastrada — <b>${exclusivos}</b> atende(m) uma DIRPIN só${compartilhados ? ` e <b>${compartilhados}</b> atende(m) mais de uma (por isso a soma dos filtros de DIRPIN passa de ${contratosComUnidade.length})` : ""}.</p>`;
     el("filtro-dirpin").addEventListener("change", (ev) => {
       filtroDirpin = ev.target.value;
       // Se a COORPIN escolhida não pertence mais à DIRPIN nova, esvazia —
