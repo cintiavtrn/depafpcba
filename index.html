@@ -7052,12 +7052,66 @@ async function carregarContratosPortal(portalSlug) {
     decisoesRenovacao = new Map(linhasDecisoes.map((r) => [r.contratoId, r]));
   } catch { /* segue sem — ver comentário acima */ }
 
+  // Pedido direto: "DEPIN é uma unidade gestora, assim como o DEPAF...
+  // temos que adicionar abas parte de unidade que vai ter tudo que já tem
+  // (gerencial, tático, operacional...)" — em vez de duplicar as 6 abas
+  // inteiras pra cada unidade (o dobro de código pra manter em sincronia
+  // pra sempre), um seletor no topo filtra a MESMA estrutura já existente.
+  // "no do DEPIN, como está na área gestora, coloca DEPIN/CONTRATOS de
+  // forma provisória" — mesma troca aplicada no import (ver
+  // seed-contratos-depin.js); aqui só lê o que a API já manda.
+  function unidadeGestoraTopo(c) {
+    return c.areaGestora === "DEPIN/CONTRATOS" ? "DEPIN" : "DEPAF";
+  }
+  const UNIDADES_GESTORAS_DISPONIVEIS = [...new Set(lista.map(unidadeGestoraTopo))].sort();
+
+  // Mesmo formato que /contratos/resumo devolve, recalculado no navegador
+  // em cima da lista JÁ FILTRADA pela unidade — o endpoint sempre soma
+  // TUDO (não sabe de DEPAF/DEPIN). Cada contrato já chega com
+  // criticidade/status/dias calculados pelo servidor — aqui só agrupa,
+  // não refaz a conta de vencimento (uma fonte de verdade só pra isso).
+  function calcularResumo(lst) {
+    const porCriticidade = {};
+    for (const c of lst) porCriticidade[c.criticidade] = (porCriticidade[c.criticidade] ?? 0) + 1;
+    const porStatus = {};
+    for (const c of lst) porStatus[c.statusVigencia] = (porStatus[c.statusVigencia] ?? 0) + 1;
+    const porUnidade = {};
+    for (const c of lst) { const chave = c.unidadeGestora || "(sem unidade)"; porUnidade[chave] = (porUnidade[chave] ?? 0) + 1; }
+    const comGarantiaInformada = lst.filter((c) => c.garantiaExigida != null && c.garantiaExigida !== "");
+    const comGarantiaSim = comGarantiaInformada.filter((c) => c.garantiaExigida === "Sim");
+    const somaOnde = (campo) => lst.reduce((acc, c) => acc + (c[campo] ?? 0), 0);
+    const unidadesDistintas = new Set(lst.flatMap((c) => (c.unidades || []).map((u) => u.nomeUnidade)));
+    return {
+      qtdContratos: lst.length,
+      qtdVigentes: porStatus["Vigente"] ?? 0,
+      qtdAVencer: porStatus["A Vencer"] ?? 0,
+      qtdVencidos: porStatus["Vencido"] ?? 0,
+      qtdAContratar: porStatus["A Contratar"] ?? 0,
+      valorGlobalInicialTotal: somaOnde("valorGlobalInicial"),
+      valorGlobalAtualTotal: somaOnde("valorGlobalAtual"),
+      qtdTotalAditivos: somaOnde("qtdAditivos"),
+      mediaAditivosPorContrato: lst.length ? somaOnde("qtdAditivos") / lst.length : null,
+      percentualComGarantia: comGarantiaInformada.length ? comGarantiaSim.length / comGarantiaInformada.length : null,
+      valorExecutadoTotal: null,
+      saldoDisponivelTotal: null,
+      qtdUnidadesBeneficiadas: unidadesDistintas.size || null,
+      porCriticidade, porStatus, porUnidade,
+    };
+  }
+
   // 3 páginas fiéis ao painel de Power BI de referência (contratos-2026/
   // painelgerencialcontratos.pbip) — Gerencial, Tático, Operacional — mais
   // uma 4ª, "Por Área Gestora": inspirada no SEI Municípios (escolhe uma
   // área, cai num perfil com abas temáticas), pedido direto depois de ela
   // usar aquele painel e comparar com este.
   painel.innerHTML = `
+    ${UNIDADES_GESTORAS_DISPONIVEIS.length > 1 ? `
+    <div class="dash-filtros" style="margin-bottom:12px">
+      <div class="dash-filtro">
+        <label>UNIDADE GESTORA</label>
+        <select id="contratos-filtro-unidade-gestora"><option value="">Todos (${lista.length})</option>${UNIDADES_GESTORAS_DISPONIVEIS.map((u) => `<option value="${escapeAttr(u)}">${escapeHTML(u)} (${lista.filter((c) => unidadeGestoraTopo(c) === u).length})</option>`).join("")}</select>
+      </div>
+    </div>` : ""}
     <div id="contratos-resumo-rapido"></div>
     <div id="contratos-alerta"></div>
     ${dicaLeituraContratosHTML()}
@@ -7076,17 +7130,8 @@ async function carregarContratosPortal(portalSlug) {
     <div class="tab-panel" id="contratos-sub-porcategoria" hidden></div>
     <div class="tab-panel" id="contratos-sub-atualizados" hidden></div>
   `;
-  renderAlertaVencimentoContratos(lista, new Map(lista.map((c) => [c.id, c])), decisoesRenovacao);
 
   const SUBABAS_CONTRATOS = ["gerencial", "tatico", "operacional", "porarea", "porcategoria", "atualizados"];
-
-  const gerencialHandle = renderGerencialContratos(lista, resumo);
-  const taticoHandle = renderTaticoContratos(lista);
-  const operacionalHandle = renderOperacionalContratos(lista, portalSlug);
-  const porAreaHandle = renderPorAreaContratos(lista);
-  const porCategoriaHandle = renderPorCategoriaContratos(lista);
-  renderAtualizadosRecentemente(lista, decisoesRenovacao);
-
   // Pedido direto: "se eu isolo aí uma área aí depois ela fica marcada e
   // não volta ao normal... um desatento pode esquecer de desmarcar... eu
   // já vi em alguns serviços que em casos assim volta pro geral, em
@@ -7098,14 +7143,44 @@ async function carregarContratosPortal(portalSlug) {
   // recorte que ninguém mais lembra que existia. Cada aba expõe seu
   // próprio resetar() (zera as variáveis de filtro e redesenha) — sem
   // recriar o HTML inteiro, os campos continuam sendo os MESMOS elementos.
-  const RESETAR_SUBABA_CONTRATOS = {
-    gerencial: () => gerencialHandle?.resetar(),
-    tatico: () => taticoHandle?.resetar(),
-    operacional: () => operacionalHandle?.resetar(),
-    porarea: () => porAreaHandle?.resetar(),
-    porcategoria: () => porCategoriaHandle?.resetar(),
-  };
+  let RESETAR_SUBABA_CONTRATOS = {};
   let subabaContratosAtiva = "gerencial";
+
+  // Reconstrói o CONTEÚDO das 6 abas (não os botões — esses ficam parados,
+  // o clique neles é ligado uma vez só, mais abaixo) em cima da lista que
+  // deve aparecer agora (tudo, ou só a unidade escolhida). Chamada na
+  // carga inicial E toda vez que o seletor de unidade muda.
+  function montarAbas(listaExibida, resumoExibido) {
+    renderAlertaVencimentoContratos(listaExibida, new Map(listaExibida.map((c) => [c.id, c])), decisoesRenovacao);
+
+    const gerencialHandle = renderGerencialContratos(listaExibida, resumoExibido);
+    const taticoHandle = renderTaticoContratos(listaExibida);
+    const operacionalHandle = renderOperacionalContratos(listaExibida, portalSlug);
+    const porAreaHandle = renderPorAreaContratos(listaExibida);
+    const porCategoriaHandle = renderPorCategoriaContratos(listaExibida);
+    renderAtualizadosRecentemente(listaExibida, decisoesRenovacao);
+
+    RESETAR_SUBABA_CONTRATOS = {
+      gerencial: () => gerencialHandle?.resetar(),
+      tatico: () => taticoHandle?.resetar(),
+      operacional: () => operacionalHandle?.resetar(),
+      porarea: () => porAreaHandle?.resetar(),
+      porcategoria: () => porCategoriaHandle?.resetar(),
+    };
+    // Toda vez que a BASE muda (trocou de unidade gestora), volta pra
+    // Gerencial — ficar num filtro isolado de uma unidade que nem está
+    // mais em tela não faz sentido.
+    subabaContratosAtiva = "gerencial";
+    painel.querySelectorAll("[data-subtab-contratos]").forEach((b) => b.classList.toggle("active", b.dataset.subtabContratos === "gerencial"));
+    SUBABAS_CONTRATOS.forEach((nome) => { painel.querySelector(`#contratos-sub-${nome}`).hidden = nome !== "gerencial"; });
+
+    // Depois de Gerencial/Por Área já existirem no DOM — os cliques do
+    // Resumo Rápido disparam eventos em cima dos elementos DELES (cartão
+    // de status, <select> de área), então eles precisam estar montados
+    // primeiro.
+    renderResumoRapido(listaExibida, resumoExibido);
+  }
+
   painel.querySelectorAll("[data-subtab-contratos]").forEach((btn) => {
     btn.addEventListener("click", () => {
       const alvo = btn.dataset.subtabContratos;
@@ -7116,12 +7191,17 @@ async function carregarContratosPortal(portalSlug) {
       SUBABAS_CONTRATOS.forEach((nome) => { painel.querySelector(`#contratos-sub-${nome}`).hidden = alvo !== nome; });
     });
   });
-  // Depois de Gerencial/Por Área já existirem no DOM — os cliques do Resumo
-  // Rápido disparam eventos em cima dos elementos DELES (cartão de status,
-  // <select> de área), então eles precisam estar montados primeiro. A
-  // posição na tela não muda (o container já está lá em cima desde o
-  // template inicial); só QUANDO ele é preenchido é que muda.
-  renderResumoRapido(lista, resumo);
+
+  montarAbas(lista, resumo);
+
+  const seletorUnidadeGestora = document.getElementById("contratos-filtro-unidade-gestora");
+  if (seletorUnidadeGestora) {
+    seletorUnidadeGestora.addEventListener("change", (ev) => {
+      const valor = ev.target.value;
+      const listaExibida = valor ? lista.filter((c) => unidadeGestoraTopo(c) === valor) : lista;
+      montarAbas(listaExibida, calcularResumo(listaExibida));
+    });
+  }
 }
 
 // "Atualizados Recentemente" — pedido direto: depois de marcar a renovação
