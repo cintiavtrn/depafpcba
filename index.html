@@ -5264,6 +5264,14 @@ function renderGerencialContratos(lista, resumo) {
     const qtdAContratar = filtrada.filter((c) => c.statusVigencia === "A Contratar").length;
     const valorInicial = filtrada.reduce((a, c) => a + (c.valorGlobalInicial || 0), 0);
     const valorAtual = filtrada.reduce((a, c) => a + (c.valorGlobalAtual || 0), 0);
+    // Pedido direto: "no DEPIN tem muitos contratos vencidos já... isso
+    // infla os números... poderia ter algo só com vigente". "Vigente" aqui
+    // não é só o status técnico ">90 dias" (isso excluiria até quem só
+    // falta 5 dias, que ainda tá bem em vigor) — é "não vencido": tira só
+    // quem já passou da data, mantém A Vencer e Vigente juntos.
+    const naoVencidos = filtrada.filter((c) => c.statusVigencia !== "Vencido");
+    const qtdNaoVencidos = naoVencidos.length;
+    const valorAtualNaoVencidos = naoVencidos.reduce((a, c) => a + (c.valorGlobalAtual || 0), 0);
     const qtdBaixo = filtrada.filter((c) => c.criticidade === "Baixo (>90 dias)").length;
     const pctBaixo = filtrada.length ? (qtdBaixo / filtrada.length) * 100 : 0;
     const qtdTotalAditivos = filtrada.reduce((a, c) => a + (c.qtdAditivos || 0), 0);
@@ -5311,9 +5319,12 @@ function renderGerencialContratos(lista, resumo) {
     // Operacional.
     const partesTitulo = chipsAtivos.map((c) => c.rotulo);
     if (filtroStatusKpi === "Todos") partesTitulo.push("todos os contratos");
+    else if (filtroStatusKpi === "NaoVencido") partesTitulo.push("não vencidos");
     else if (filtroStatusKpi) partesTitulo.push(filtroStatusKpi.toLowerCase());
     if (partesTitulo.length) {
-      const contratosTabela = filtroStatusKpi && filtroStatusKpi !== "Todos" ? filtrada.filter((c) => c.statusVigencia === filtroStatusKpi) : filtrada;
+      const contratosTabela = filtroStatusKpi === "NaoVencido"
+        ? filtrada.filter((c) => c.statusVigencia !== "Vencido")
+        : filtroStatusKpi && filtroStatusKpi !== "Todos" ? filtrada.filter((c) => c.statusVigencia === filtroStatusKpi) : filtrada;
       // Coluna extra só quando o filtro é justamente por Nº de Aditivos —
       // é aí que a pergunta "qual é o número do SEI desse aditivo" faz
       // sentido; nas outras tabelas seria uma coluna vazia poluindo à toa.
@@ -5403,7 +5414,9 @@ function renderGerencialContratos(lista, resumo) {
       <div class="kpi-card kpi-clicavel" data-acao="aditivos" title="Clique pra ver a distribuição" style="cursor:pointer"><div class="kpi-cabeca">${kpiIcone("aditivo")}<div class="kpi-label">Média de Aditivos / Contrato</div></div><div class="kpi-value">${mediaAditivos.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}</div></div>
       <div class="kpi-card kpi-clicavel" data-garantia="Sim" title="Clique pra ver quais são" style="cursor:pointer;${filtroGarantia ? "outline:2px solid var(--carvao);outline-offset:-2px" : ""}"><div class="kpi-cabeca">${kpiIcone("escudo")}<div class="kpi-label">% com Garantia Exigida</div></div><div class="kpi-value">${pctGarantia === null ? "—" : pctGarantia.toLocaleString("pt-BR", { maximumFractionDigits: 1 }) + "%"}</div></div>
       <div class="kpi-card kpi-clicavel" data-garantia="Sim" title="Clique pra ver quais são" style="cursor:pointer;${filtroGarantia ? "outline:2px solid var(--carvao);outline-offset:-2px" : ""}"><div class="kpi-cabeca">${kpiIcone("escudo")}<div class="kpi-label">Contratos Garantia Exigida</div></div><div class="kpi-value">${qtdGarantiaExigida.toLocaleString("pt-BR")}</div></div>
-      <div class="kpi-card${qtdUnidadesBeneficiadas ? " kpi-clicavel" : ""}" ${qtdUnidadesBeneficiadas ? 'data-acao="unidades-beneficiadas"' : ""} title="${qtdUnidadesBeneficiadas ? "Clique pra ver o detalhe por unidade — " : ""}hoje só contratos da DEPIN têm essa informação" style="${qtdUnidadesBeneficiadas ? "cursor:pointer" : ""}"><div class="kpi-cabeca">${kpiIcone("predio")}<div class="kpi-label">Unidades Beneficiadas</div></div><div class="kpi-value">${qtdUnidadesBeneficiadas ? qtdUnidadesBeneficiadas.toLocaleString("pt-BR") : "—"}</div></div>`;
+      <div class="kpi-card${qtdUnidadesBeneficiadas ? " kpi-clicavel" : ""}" ${qtdUnidadesBeneficiadas ? 'data-acao="unidades-beneficiadas"' : ""} title="${qtdUnidadesBeneficiadas ? "Clique pra ver o detalhe por unidade — " : ""}hoje só contratos da DEPIN têm essa informação" style="${qtdUnidadesBeneficiadas ? "cursor:pointer" : ""}"><div class="kpi-cabeca">${kpiIcone("predio")}<div class="kpi-label">Unidades Beneficiadas</div></div><div class="kpi-value">${qtdUnidadesBeneficiadas ? qtdUnidadesBeneficiadas.toLocaleString("pt-BR") : "—"}</div></div>
+      <div class="kpi-card kpi-clicavel" data-status="NaoVencido" title="Clique pra ver quais são — tira só os vencidos, mantém A Vencer e Vigente" style="--kpi-cor:var(--crit-baixo);cursor:pointer;${filtroStatusKpi === "NaoVencido" ? "outline:2px solid var(--crit-baixo);outline-offset:-2px" : ""}"><div class="kpi-cabeca">${kpiIcone("relogio")}<div class="kpi-label">Qtd Contratos Não Vencidos</div></div><div class="kpi-value">${qtdNaoVencidos.toLocaleString("pt-BR")}</div></div>
+      <div class="kpi-card kpi-clicavel" data-status="NaoVencido" title="Clique pra ver quais são — soma só quem não tá vencido, pra não inflar o total com contrato que já passou da data" style="--kpi-cor:var(--crit-baixo);cursor:pointer;${filtroStatusKpi === "NaoVencido" ? "outline:2px solid var(--crit-baixo);outline-offset:-2px" : ""}"><div class="kpi-cabeca">${kpiIcone("moeda")}<div class="kpi-label">Valor Atual (Não Vencidos)</div></div><div class="kpi-value">R$ ${formatarEixo(valorAtualNaoVencidos)}</div><div class="kpi-valor-exato">${formatarMoedaBR(valorAtualNaoVencidos)}</div></div>`;
   }
 
   document.getElementById("ger-filtro-area").addEventListener("change", (ev) => { filtroArea = ev.target.value; atualizar(); });
