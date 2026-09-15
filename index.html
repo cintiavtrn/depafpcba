@@ -6426,6 +6426,7 @@ function renderPorDimensaoContratos(lista, cfg) {
           <button class="dash-toggle-btn" data-modo="mapa" title="Mostra onde cada sede fica no estado — melhor pra enxergar a distribuição geográfica (mapa de PONTOS: cidade-sede de cada COORPIN, ainda não o território que cada uma cobre)">MAPA</button>
         </div></div>
         <div id="${p}-grafico-unidade"></div>
+        <div id="${p}-legenda-mapa-unidade"></div>
       </div>`;
     el("filtro-dirpin").addEventListener("change", (ev) => {
       filtroDirpin = ev.target.value;
@@ -6484,6 +6485,46 @@ function renderPorDimensaoContratos(lista, cfg) {
       filtroApenasCompartilhados = false;
       atualizar();
     });
+    // Pedido direto: "faltou legenda pra esse mapa né, tanto para cores
+    // quanto números" — sem isso, só passando o mouse ponto a ponto pra
+    // saber quem é quem. Uma legenda só (agrupada por DIRPIN) responde as
+    // duas perguntas juntas — "essa cor é de qual DIRPIN" e "esse número é
+    // qual COORPIN" — em vez de duas legendas soltas repetindo a mesma
+    // lista. Só aparece no modo mapa: nas barras, o nome já está escrito
+    // ao lado de cada uma, não precisa de legenda pra decifrar nada.
+    if (modoGraficoUnidade === "mapa") {
+      const porDirpinLegenda = new Map();
+      for (const l of linhasUnidade) {
+        const chave = l.dirpin || "—";
+        if (!porDirpinLegenda.has(chave)) porDirpinLegenda.set(chave, []);
+        porDirpinLegenda.get(chave).push(l);
+      }
+      el("legenda-mapa-unidade").innerHTML = `
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;margin-top:12px;font-size:var(--fs-ui-sm)">
+          ${[...porDirpinLegenda.entries()].map(([dirpin, unidades]) => `
+            <div>
+              <div style="display:flex;align-items:center;gap:6px;font-weight:700;margin-bottom:3px">
+                <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${CORES_DIRPIN[dirpin] || "var(--carvao)"}"></span>
+                DIRPIN ${escapeHTML(dirpin)}
+              </div>
+              <div style="color:#8B93A3;font-family:'IBM Plex Mono',monospace">
+                ${unidades.map((u) => `<span class="legenda-unidade-item" data-cat="${escapeAttr(u.label)}" style="cursor:pointer;${filtroCoorpin === u.label ? "text-decoration:underline;color:var(--carvao)" : ""}">${escapeHTML(u.label)}</span>`).join(" · ")}
+              </div>
+            </div>
+          `).join("")}
+        </div>`;
+      el("legenda-mapa-unidade").addEventListener("click", (ev) => {
+        const item = ev.target.closest("[data-cat]");
+        if (!item) return;
+        const nomeUnidade = item.dataset.cat;
+        filtroCoorpin = filtroCoorpin === nomeUnidade ? "" : nomeUnidade;
+        filtroDirpin = filtroCoorpin ? (linhasUnidade.find((l) => l.label === nomeUnidade)?.dirpin || "") : filtroDirpin;
+        filtroApenasCompartilhados = false;
+        atualizar();
+      });
+    } else {
+      el("legenda-mapa-unidade").innerHTML = "";
+    }
     document.querySelectorAll(`#${p}-toggle-grafico-unidade [data-modo]`).forEach((btn) => {
       btn.classList.toggle("active", btn.dataset.modo === modoGraficoUnidade);
     });
