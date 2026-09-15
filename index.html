@@ -6745,16 +6745,22 @@ function renderPorDimensaoContratos(lista, cfg) {
   // container fica vazio, sem selects inúteis sempre em "Todos".
   function renderFiltroUnidade(listaFiltrada) {
     const container = el("filtro-unidade");
+    if (!listaFiltrada.length) { container.innerHTML = ""; return; }
     const todasUnidades = listaFiltrada.flatMap((c) => c.unidades || []);
-    if (!todasUnidades.length) { container.innerHTML = ""; return; }
-    // Pedido direto: "adicionar também os contratos outros no mapa e
-    // gráfico... aí você sabe que é tudo Salvador" — só em Por Categoria
-    // (onde a mistura DEPIN + outras áreas acontece de fato). Quem não tem
-    // `.unidades` nenhuma vira um ponto/barra só, agregado, com estilo
-    // visual diferente (ver OUTRAS_AREAS_LABEL em mapaCoorpinSVG) — não é
-    // uma COORPIN de verdade, é a melhor aproximação que dá pra fazer sem
-    // inventar dado que a planilha não tem.
-    const contratosSemUnidade = p === "categoria" ? listaFiltrada.filter((c) => !(c.unidades || []).length) : [];
+    // Pedido direto: "você não consegue colocar o mapa pra corresponder a
+    // Salvador sem ficar totalmente preso à DEPIN?... quando eu te peço é
+    // pra pegar essa parte e acoplar também Salvador com lógica de mapa...
+    // e aí em tudo ter um mapa adaptado, não só nos que aparecem DEPIN" —
+    // antes, esta seção inteira sumia (container.innerHTML = "") sempre
+    // que a área/categoria não tinha NENHUM contrato da DEPIN — o mapa
+    // ficava "preso" à DEPIN existir ali. Agora é ao contrário: o mapa
+    // aparece sempre que existe QUALQUER contrato (com ou sem unidade
+    // cadastrada) — quem tem COORPIN vira ponto por unidade, quem não tem
+    // (de qualquer área, DEPIN incluída se algum dia ela também deixar de
+    // cadastrar) entra agregado em "Salvador (outras áreas)". Não é mais
+    // "o gráfico da DEPIN com um acréscimo" — é UM gráfico geográfico só,
+    // com duas fontes de dado.
+    const contratosSemUnidade = listaFiltrada.filter((c) => !(c.unidades || []).length);
     const dirpinsDisponiveis = [...new Set(todasUnidades.map((u) => u.dirpin).filter(Boolean))].sort();
     const coorpinsDisponiveis = [
       ...new Set(todasUnidades.filter((u) => !filtroDirpin || u.dirpin === filtroDirpin).map((u) => u.nomeUnidade)),
@@ -6792,11 +6798,13 @@ function renderPorDimensaoContratos(lista, cfg) {
       </div>
       <p class="dash-chart-hint" style="margin-top:4px">${exclusivos} contrato(s) atende(m) uma DIRPIN só — os outros ${compartilhados} atendem mais de uma (por isso a soma dos filtros de DIRPIN acima passa de ${contratosComUnidade.length}). Útil saber antes de montar relatório ou apresentação com esse corte.</p>` : ""}
       <div class="dash-chart-box" id="${p}-grafico-unidade-caixa" style="margin-top:16px;border-left:4px solid var(--dourado);background:color-mix(in srgb, var(--dourado) 7%, transparent)">
-        <h4 style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-          <span style="background:var(--dourado);color:var(--paper);padding:2px 8px;border-radius:3px;font-size:var(--fs-ui-sm);font-weight:700;letter-spacing:.02em">SÓ NA DEPIN</span>
-          Contratos por Unidade Regional (COORPIN)
-        </h4>
-        <p class="dash-chart-hint">Quantos contratos DA DEPIN cada unidade tem hoje — um contrato "geral" (que atende várias) entra na barra/ponto de cada uma. ${p === "categoria" ? `Esta categoria também pode ter contrato de outras áreas gestoras na tabela "Detalhamento dos Contratos" mais abaixo — só a DEPIN cadastra unidade regional, por isso só ela aparece neste gráfico.` : `Só a DEPIN cadastra unidade regional (por isso o gráfico é só dela, mesmo que a tabela abaixo já esteja filtrada só em DEPIN).`} Clique numa barra ou num ponto do mapa pra isolar só aquela unidade — ou veja tudo isso de uma vez, com a tabela de contratos de cada unidade, na aba <button type="button" id="${p}-ir-aba-unidades" class="link-botao" style="font:inherit;color:inherit;text-decoration:underline;cursor:pointer">UNIDADES</button>.</p>
+        <h4>Distribuição Geográfica</h4>
+        <p class="dash-chart-hint">${contratosComUnidade.length && contratosSemUnidade.length
+          ? `${contratosComUnidade.length} contrato(s) têm unidade regional (COORPIN) cadastrada e entram um a um no mapa; ${contratosSemUnidade.length} são de outras áreas gestoras (sem essa informação, hoje só a DEPIN cadastra) e entram juntos em "Salvador (outras áreas)" — a maioria dessas áreas é coordenação central do estado, então Salvador é a melhor aproximação sem inventar dado que a planilha não tem.`
+          : contratosComUnidade.length
+          ? `Todos os ${contratosComUnidade.length} contrato(s) desta seleção têm unidade regional (COORPIN) cadastrada.`
+          : `Nenhum destes ${contratosSemUnidade.length} contrato(s) tem unidade regional cadastrada (hoje só a DEPIN cadastra) — todos entram juntos em "Salvador (outras áreas)", a melhor aproximação geográfica sem inventar dado que a planilha não tem.`
+        } Clique numa barra ou num ponto do mapa pra isolar — ou veja tudo isso de uma vez, com a tabela de contratos de cada unidade, na aba <button type="button" id="${p}-ir-aba-unidades" class="link-botao" style="font:inherit;color:inherit;text-decoration:underline;cursor:pointer">UNIDADES</button> (unidades da DEPIN só, por enquanto).</p>
         <div class="linha-troca-grafico"><div class="dash-toggle" id="${p}-toggle-grafico-unidade">
           <button class="dash-toggle-btn" data-modo="barras" title="Lista as 26, ordenada por número — melhor pra achar uma específica ou comparar valores">BARRAS</button>
           <button class="dash-toggle-btn" data-modo="mapa" title="Mostra onde cada sede fica no estado — melhor pra enxergar a distribuição geográfica (mapa de PONTOS: cidade-sede de cada COORPIN, ainda não o território que cada uma cobre)">MAPA</button>
