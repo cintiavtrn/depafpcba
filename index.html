@@ -6005,8 +6005,12 @@ function renderResumoRapido(lista, resumo) {
     return `
       <div class="kpi-row">
         <div class="kpi-card kpi-clicavel" data-resumo-ir="gerencial-todos" title="Clique pra ver a lista completa" style="cursor:pointer">
-          <div class="kpi-cabeca">${kpiIcone("competencia_normas")}<div class="kpi-label">Qtd Contratos <span class="kpi-info" title="Todos os contratos cadastrados no sistema, em qualquer situação de vigência.">ⓘ</span></div></div>
+          <div class="kpi-cabeca">${kpiIcone("competencia_normas")}<div class="kpi-label">Qtd Contratos <span class="kpi-info" title="Todos os contratos cadastrados no sistema, em qualquer situação de vigência — inclusive os já vencidos.">ⓘ</span></div></div>
           <div class="kpi-value">${resumo.qtdContratos.toLocaleString("pt-BR")}</div>
+        </div>
+        <div class="kpi-card kpi-clicavel" data-resumo-status="NaoVencido" title="Clique pra ver quais são" style="--kpi-cor:var(--crit-baixo);cursor:pointer">
+          <div class="kpi-cabeca">${kpiIcone("relogio")}<div class="kpi-label">Não Vencidos <span class="kpi-info" title="Quantos ainda estão de fato em vigor — o total de cima menos os já vencidos. Pra responder 'quantos contratos essa unidade gere hoje', é este número, não o total bruto.">ⓘ</span></div></div>
+          <div class="kpi-value">${resumo.qtdNaoVencidos.toLocaleString("pt-BR")}</div>
         </div>
         <div class="kpi-card kpi-clicavel" data-resumo-ir="gerencial-valor" title="Clique pra ver os maiores contratos" style="cursor:pointer">
           <div class="kpi-cabeca">${kpiIcone("moeda")}<div class="kpi-label">Valor Atual Total <span class="kpi-info" title="Soma do Valor Global Atual de todos os contratos — já considerando as renovações marcadas manualmente, mesmo antes da planilha ser reimportada.">ⓘ</span></div></div>
@@ -6062,7 +6066,16 @@ function renderResumoRapido(lista, resumo) {
   // até o Top 10 Maiores Contratos lá dentro (mesmo cartão "Valor Global
   // Atual Total" clicável de lá). O listener fica no container (não se
   // refaz a cada desenhar()), então continua funcionando depois de trocar
-  // o toggle.
+  // o toggle. O `if` de baixo existe porque, desde o seletor de Unidade
+  // Gestora, esta função passou a rodar MAIS de uma vez por carregamento
+  // (uma a cada troca de unidade) — e o container (#contratos-resumo-
+  // rapido) é o MESMO elemento a cada vez, só o conteúdo de dentro é
+  // trocado. Sem essa guarda, cada troca de unidade empilhava mais um
+  // listener aqui, e um clique real disparava a ação em dobro — cancelando
+  // a si mesma (toggle liga e desliga no mesmo clique, "parece que não faz
+  // nada"). Foi exatamente o bug reportado no cartão "Não Vencidos".
+  if (!alvo.dataset.cliqueLigado) {
+  alvo.dataset.cliqueLigado = "1";
   alvo.addEventListener("click", (ev) => {
     const cardIr = ev.target.closest("[data-resumo-ir]");
     if (cardIr) {
@@ -6098,6 +6111,7 @@ function renderResumoRapido(lista, resumo) {
       if (sel) { sel.value = cardCategoria.dataset.resumoCategoria; sel.dispatchEvent(new Event("change", { bubbles: true })); }
     }
   });
+  }
 }
 
 // Alerta de vencimento, logo ao abrir a página — pedido direto: hoje só dá
@@ -7094,8 +7108,11 @@ async function carregarContratosPortal(portalSlug) {
     const comGarantiaSim = comGarantiaInformada.filter((c) => c.garantiaExigida === "Sim");
     const somaOnde = (campo) => lst.reduce((acc, c) => acc + (c[campo] ?? 0), 0);
     const unidadesDistintas = new Set(lst.flatMap((c) => (c.unidades || []).map((u) => u.nomeUnidade)));
+    const naoVencidos = lst.filter((c) => c.statusVigencia !== "Vencido");
     return {
       qtdContratos: lst.length,
+      qtdNaoVencidos: naoVencidos.length,
+      valorAtualNaoVencidosTotal: naoVencidos.reduce((acc, c) => acc + (c.valorGlobalAtual ?? 0), 0),
       qtdVigentes: porStatus["Vigente"] ?? 0,
       qtdAVencer: porStatus["A Vencer"] ?? 0,
       qtdVencidos: porStatus["Vencido"] ?? 0,
