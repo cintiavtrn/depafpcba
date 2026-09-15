@@ -5124,6 +5124,16 @@ function renderGerencialContratos(lista, resumo) {
     if (cardCriticidade) return selecionarCriticidadeBaixo();
     const acaoRodape = ev.target.closest("[data-acao]");
     if (acaoRodape?.dataset.acao === "aditivos") rolarEDestacar("ger-aditivos");
+    // Pedido direto: "o cartão de clique de unidades beneficiadas não
+    // funciona" — não tinha clique nenhum (só informativo). Isolar por
+    // "quantidade de unidade" não faz sentido como filtro aqui; o destino
+    // útil é abrir o perfil de onde essa informação é detalhada — hoje só
+    // a DEPIN tem unidade cadastrada (mesmo texto do title do cartão).
+    if (acaoRodape?.dataset.acao === "unidades-beneficiadas") {
+      document.querySelector('[data-subtab-contratos="porarea"]')?.click();
+      const sel = document.getElementById("area-select");
+      if (sel) { sel.value = "DEPIN"; sel.dispatchEvent(new Event("change", { bubbles: true })); }
+    }
   });
   document.getElementById("ger-matriz").addEventListener("click", (ev) => {
     const tr = ev.target.closest("[data-cat]");
@@ -5348,7 +5358,7 @@ function renderGerencialContratos(lista, resumo) {
       <div class="kpi-card kpi-clicavel" data-acao="aditivos" title="Clique pra ver a distribuição" style="cursor:pointer"><div class="kpi-cabeca">${kpiIcone("aditivo")}<div class="kpi-label">Média de Aditivos / Contrato</div></div><div class="kpi-value">${mediaAditivos.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}</div></div>
       <div class="kpi-card kpi-clicavel" data-garantia="Sim" title="Clique pra ver quais são" style="cursor:pointer;${filtroGarantia ? "outline:2px solid var(--carvao);outline-offset:-2px" : ""}"><div class="kpi-cabeca">${kpiIcone("escudo")}<div class="kpi-label">% com Garantia Exigida</div></div><div class="kpi-value">${pctGarantia === null ? "—" : pctGarantia.toLocaleString("pt-BR", { maximumFractionDigits: 1 }) + "%"}</div></div>
       <div class="kpi-card kpi-clicavel" data-garantia="Sim" title="Clique pra ver quais são" style="cursor:pointer;${filtroGarantia ? "outline:2px solid var(--carvao);outline-offset:-2px" : ""}"><div class="kpi-cabeca">${kpiIcone("escudo")}<div class="kpi-label">Contratos Garantia Exigida</div></div><div class="kpi-value">${qtdGarantiaExigida.toLocaleString("pt-BR")}</div></div>
-      <div class="kpi-card" title="Quantas COORPIN/unidades regionais distintas os contratos aqui exibidos atendem — hoje só contratos da DEPIN têm essa informação"><div class="kpi-cabeca">${kpiIcone("predio")}<div class="kpi-label">Unidades Beneficiadas</div></div><div class="kpi-value">${qtdUnidadesBeneficiadas ? qtdUnidadesBeneficiadas.toLocaleString("pt-BR") : "—"}</div></div>`;
+      <div class="kpi-card${qtdUnidadesBeneficiadas ? " kpi-clicavel" : ""}" ${qtdUnidadesBeneficiadas ? 'data-acao="unidades-beneficiadas"' : ""} title="${qtdUnidadesBeneficiadas ? "Clique pra ver o detalhe por unidade — " : ""}hoje só contratos da DEPIN têm essa informação" style="${qtdUnidadesBeneficiadas ? "cursor:pointer" : ""}"><div class="kpi-cabeca">${kpiIcone("predio")}<div class="kpi-label">Unidades Beneficiadas</div></div><div class="kpi-value">${qtdUnidadesBeneficiadas ? qtdUnidadesBeneficiadas.toLocaleString("pt-BR") : "—"}</div></div>`;
   }
 
   document.getElementById("ger-filtro-area").addEventListener("change", (ev) => { filtroArea = ev.target.value; atualizar(); });
