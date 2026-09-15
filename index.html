@@ -4837,20 +4837,24 @@ function abrirContratoNoOperacional(contratoId) {
 // HTML — quem chama ainda decide onde colocar e roda ligarTooltipLinhas()
 // depois de inserir no documento.
 function tabelaContratosHTML(lista, opcoes = {}) {
-  const { comSei = false, dirpinAtual = null } = opcoes;
+  const { comSei = false, dirpinAtual = null, destacarCompartilhados = false } = opcoes;
   if (!lista.length) return `<p class="tela-intro">Nenhum contrato nessa faixa.</p>`;
   return `<table class="dash-tabela">
       <thead><tr><th>Nº CONTRATO</th><th>ÁREA GESTORA</th><th>EMPRESA</th><th>DIAS PARA VENCER</th><th>CRITICIDADE</th>${comSei ? "<th>SEI DOS ADITIVOS</th>" : ""}</tr></thead>
       <tbody>${lista.map((c) => {
         // Pedido direto: "pensei que vc fosse na hora que filtra por
         // dirpin dizer algo como esse contrato está compartilhado com x"
-        // — só faz sentido com uma DIRPIN escolhida (dirpinAtual), pra
-        // saber COM QUEM ela compartilha, não só QUE compartilha.
+        // — com uma DIRPIN escolhida (dirpinAtual), mostra só as OUTRAS
+        // que ela também atende. Sem DIRPIN escolhida mas olhando só os
+        // compartilhados (destacarCompartilhados, cartão "Compartilhados
+        // entre DIRPIN"), mostra a lista inteira — não tem uma DIRPIN
+        // "atual" pra excluir.
+        const dirpinsDoContrato = [...new Set((c.unidades || []).map((u) => u.dirpin).filter(Boolean))];
         const outrasDirpins = dirpinAtual
-          ? [...new Set((c.unidades || []).map((u) => u.dirpin).filter((d) => d && d !== dirpinAtual))]
-          : [];
+          ? dirpinsDoContrato.filter((d) => d !== dirpinAtual)
+          : (destacarCompartilhados && dirpinsDoContrato.length > 1 ? dirpinsDoContrato : []);
         const selosCompartilhado = outrasDirpins.length
-          ? ` <span class="badge-compartilhado" title="Esse contrato também atende a DIRPIN ${escapeAttr(outrasDirpins.join(" e "))}">🔗 também ${escapeHTML(outrasDirpins.join(", "))}</span>`
+          ? ` <span class="badge-compartilhado" title="Esse contrato também atende a DIRPIN ${escapeAttr(outrasDirpins.join(" e "))}">🔗 ${dirpinAtual ? "também " : ""}${escapeHTML(outrasDirpins.join(", "))}</span>`
           : "";
         return `
         <tr class="linha-contrato" data-contrato-id="${escapeAttr(c.id)}">
@@ -5798,7 +5802,10 @@ function renderOperacionalContratos(lista, portalSlug) {
     document.getElementById("op-resumo").querySelectorAll("[data-resumo-op]").forEach((card) => {
       card.addEventListener("click", () => {
         document.querySelector('[data-subtab-contratos="gerencial"]')?.click();
-        document.querySelector(`#ger-kpis [data-status="${CSS.escape(card.dataset.resumoOp)}"]`)?.dispatchEvent(new Event("click", { bubbles: true }));
+        // Bug real: "A Contratar" mora no #ger-rodape, não no #ger-kpis —
+        // cliente clicava, trocava de aba e nada isolava, "parecia não
+        // funcionar". Busca no painel inteiro do Gerencial, não só no topo.
+        document.querySelector(`#contratos-sub-gerencial [data-status="${CSS.escape(card.dataset.resumoOp)}"]`)?.dispatchEvent(new Event("click", { bubbles: true }));
       });
     });
 
@@ -5993,16 +6000,20 @@ function renderResumoRapido(lista, resumo) {
     if (cardIr) {
       document.querySelector('[data-subtab-contratos="gerencial"]')?.click();
       if (cardIr.dataset.resumoIr === "gerencial-todos") {
-        document.querySelector('#ger-kpis [data-status="Todos"]')?.dispatchEvent(new Event("click", { bubbles: true }));
+        document.querySelector('#contratos-sub-gerencial [data-status="Todos"]')?.dispatchEvent(new Event("click", { bubbles: true }));
       } else if (cardIr.dataset.resumoIr === "gerencial-valor") {
-        document.querySelector('#ger-kpis [data-acao="top-contratos"]')?.dispatchEvent(new Event("click", { bubbles: true }));
+        document.querySelector('#contratos-sub-gerencial [data-acao="top-contratos"]')?.dispatchEvent(new Event("click", { bubbles: true }));
       }
       return;
     }
     const cardStatus = ev.target.closest("[data-resumo-status]");
     if (cardStatus) {
       document.querySelector('[data-subtab-contratos="gerencial"]')?.click();
-      document.querySelector(`#ger-kpis [data-status="${CSS.escape(cardStatus.dataset.resumoStatus)}"]`)?.dispatchEvent(new Event("click", { bubbles: true }));
+      // Busca no painel inteiro (não só #ger-kpis) — mesmo motivo do
+      // conserto do cartão "A Contratar" do Operacional: nem todo cartão
+      // data-status mora no topo, e procurar num escopo estreito faz o
+      // clique "não fazer nada" pros que moram no rodapé.
+      document.querySelector(`#contratos-sub-gerencial [data-status="${CSS.escape(cardStatus.dataset.resumoStatus)}"]`)?.dispatchEvent(new Event("click", { bubbles: true }));
       return;
     }
     const cardArea = ev.target.closest("[data-resumo-area]");
@@ -6154,6 +6165,11 @@ function renderPorDimensaoContratos(lista, cfg) {
   // COORPIN escolhida não pertença mais a essa DIRPIN.
   let filtroDirpin = "";
   let filtroCoorpin = "";
+  // Pedido direto: "precisar saber que esses contratos são compartilhados
+  // [pra] elaborar um relatório ou apresentação rápida" — a nota de texto
+  // sozinha não chamava atenção o bastante; virou cartão clicável (igual
+  // qualquer outro KPI do sistema) que isola só os compartilhados.
+  let filtroApenasCompartilhados = false;
 
   alvo.innerHTML = `
     <div class="dash-filtros">
@@ -6218,6 +6234,7 @@ function renderPorDimensaoContratos(lista, cfg) {
     filtroUrgenciaPrazo = "";
     filtroDirpin = "";
     filtroCoorpin = "";
+    filtroApenasCompartilhados = false;
     atualizar();
     alvo.scrollIntoView?.({ behavior: "smooth", block: "start" });
   }
@@ -6280,7 +6297,11 @@ function renderPorDimensaoContratos(lista, cfg) {
     // contratos). A diferença é isso aqui: contrato de alimentação ou de
     // correio pode atender mais de uma DIRPIN ao mesmo tempo, então conta
     // em cada uma que atende — não é filtro quebrado, é contrato que serve
-    // mais de um lugar.
+    // mais de um lugar. Segunda rodada, pedido direto: "deveria chamar
+    // mais atenção... a pessoa pode ter que elaborar um relatório...
+    // precisar saber que esses contratos são compartilhados" — a nota de
+    // texto sozinha não bastava; virou cartão CLICÁVEL (igual qualquer
+    // outro KPI do sistema), que isola só os compartilhados na tabela.
     const contratosComUnidade = listaFiltrada.filter((c) => (c.unidades || []).length > 0);
     const compartilhados = contratosComUnidade.filter((c) => new Set(c.unidades.map((u) => u.dirpin)).size > 1).length;
     const exclusivos = contratosComUnidade.length - compartilhados;
@@ -6295,7 +6316,12 @@ function renderPorDimensaoContratos(lista, cfg) {
           <select id="${p}-filtro-coorpin"><option value="">Todas</option>${coorpinsDisponiveis.map((c) => `<option value="${escapeAttr(c)}"${c === filtroCoorpin ? " selected" : ""}>${escapeHTML(c)}</option>`).join("")}</select>
         </div>
       </div>
-      <p class="dash-chart-hint" style="margin-top:4px">${contratosComUnidade.length} contrato(s) com unidade cadastrada — <b>${exclusivos}</b> atende(m) uma DIRPIN só${compartilhados ? ` e <b>${compartilhados}</b> atende(m) mais de uma (por isso a soma dos filtros de DIRPIN passa de ${contratosComUnidade.length})` : ""}.</p>`;
+      ${compartilhados ? `
+      <div class="kpi-row" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr));margin-top:10px">
+        <div class="kpi-card"><div class="kpi-cabeca">${kpiIcone("predio")}<div class="kpi-label">Contratos com Unidade Cadastrada</div></div><div class="kpi-value">${contratosComUnidade.length}</div></div>
+        <div class="kpi-card kpi-clicavel" data-compartilhados title="Clique pra ver quais são — cada um atende mais de uma DIRPIN ao mesmo tempo" style="--kpi-cor:var(--crit-alto);cursor:pointer;${filtroApenasCompartilhados ? "outline:2px solid var(--crit-alto);outline-offset:-2px" : ""}"><div class="kpi-cabeca">${kpiIcone("alerta")}<div class="kpi-label">Compartilhados entre DIRPIN</div></div><div class="kpi-value">${compartilhados}</div></div>
+      </div>
+      <p class="dash-chart-hint" style="margin-top:4px">${exclusivos} contrato(s) atende(m) uma DIRPIN só — os outros ${compartilhados} atendem mais de uma (por isso a soma dos filtros de DIRPIN acima passa de ${contratosComUnidade.length}). Útil saber antes de montar relatório ou apresentação com esse corte.</p>` : ""}`;
     el("filtro-dirpin").addEventListener("change", (ev) => {
       filtroDirpin = ev.target.value;
       // Se a COORPIN escolhida não pertence mais à DIRPIN nova, esvazia —
@@ -6304,9 +6330,22 @@ function renderPorDimensaoContratos(lista, cfg) {
         const aindaValida = todasUnidades.some((u) => u.nomeUnidade === filtroCoorpin && u.dirpin === filtroDirpin);
         if (!aindaValida) filtroCoorpin = "";
       }
+      filtroApenasCompartilhados = false;
       atualizar();
     });
-    el("filtro-coorpin").addEventListener("change", (ev) => { filtroCoorpin = ev.target.value; atualizar(); });
+    const cardCompartilhados = el("filtro-unidade").querySelector("[data-compartilhados]");
+    if (cardCompartilhados) {
+      cardCompartilhados.addEventListener("click", () => {
+        filtroApenasCompartilhados = !filtroApenasCompartilhados;
+        // Isolar "só compartilhados" não faz sentido junto de "só de tal
+        // DIRPIN/COORPIN" — são duas lentes diferentes sobre o mesmo
+        // conjunto, ligar as duas ao mesmo tempo deixaria fácil de zerar a
+        // tabela sem entender por quê.
+        if (filtroApenasCompartilhados) { filtroDirpin = ""; filtroCoorpin = ""; }
+        atualizar();
+      });
+    }
+    el("filtro-coorpin").addEventListener("change", (ev) => { filtroCoorpin = ev.target.value; filtroApenasCompartilhados = false; atualizar(); });
   }
 
   function renderCabecalho(listaFiltrada) {
@@ -6351,7 +6390,7 @@ function renderPorDimensaoContratos(lista, cfg) {
         <p class="dash-chart-hint">Passe o mouse numa linha pra ver o detalhe rápido — clique pra abrir o panorama completo do contrato.</p>
         <div id="${p}-visao-tabela" class="tabela-rolavel" style="max-height:360px"></div>
       </div>`;
-    el("visao-tabela").innerHTML = tabelaContratosHTML(tabelaAlvo, { dirpinAtual: filtroDirpin || null });
+    el("visao-tabela").innerHTML = tabelaContratosHTML(tabelaAlvo, { dirpinAtual: filtroDirpin || null, destacarCompartilhados: filtroApenasCompartilhados });
     ligarTooltipLinhas(el("visao-tabela"), porId);
     el("sub-visao").querySelectorAll("[data-status-visao]").forEach((card) => {
       card.addEventListener("click", () => {
@@ -6468,7 +6507,7 @@ function renderPorDimensaoContratos(lista, cfg) {
           <p class="dash-chart-hint">Passe o mouse numa linha pra ver o detalhe rápido — clique pra abrir o panorama completo do contrato.</p>
           <div class="tabela-rolavel" style="max-height:320px" id="${p}-prazos-tabela-conteudo"></div>
         </div>`;
-      el("prazos-tabela-conteudo").innerHTML = tabelaContratosHTML(contratosDaFaixa, { dirpinAtual: filtroDirpin || null });
+      el("prazos-tabela-conteudo").innerHTML = tabelaContratosHTML(contratosDaFaixa, { dirpinAtual: filtroDirpin || null, destacarCompartilhados: filtroApenasCompartilhados });
       ligarTooltipLinhas(el("prazos-tabela-conteudo"), porId);
       const btnLimparUrgencia = alvo.querySelector(`[data-limpar-urgencia-${p}]`);
       if (btnLimparUrgencia) btnLimparUrgencia.addEventListener("click", () => { filtroUrgenciaPrazo = ""; renderPrazos(listaFiltrada); });
@@ -6480,7 +6519,7 @@ function renderPorDimensaoContratos(lista, cfg) {
           <p class="dash-chart-hint">Passe o mouse numa linha pra ver o detalhe rápido — clique pra abrir o panorama completo do contrato.</p>
           <div class="tabela-rolavel" style="max-height:320px" id="${p}-prazos-tabela-conteudo"></div>
         </div>`;
-      el("prazos-tabela-conteudo").innerHTML = tabelaContratosHTML(contratosDoMes, { dirpinAtual: filtroDirpin || null });
+      el("prazos-tabela-conteudo").innerHTML = tabelaContratosHTML(contratosDoMes, { dirpinAtual: filtroDirpin || null, destacarCompartilhados: filtroApenasCompartilhados });
       ligarTooltipLinhas(el("prazos-tabela-conteudo"), porId);
     } else {
       el("prazos-tabela").innerHTML = "";
@@ -6607,7 +6646,7 @@ function renderPorDimensaoContratos(lista, cfg) {
       alvo.querySelectorAll(`[data-chip-financeiro-${p}]`).forEach((btn) => {
         btn.addEventListener("click", () => chipsFinanceiro[+btn.dataset[`chipFinanceiro${p[0].toUpperCase()}${p.slice(1)}`]].limpar());
       });
-      el("financeiro-tabela-conteudo").innerHTML = tabelaContratosHTML(filtrada, { comSei: filtroAditivos !== null, dirpinAtual: filtroDirpin || null });
+      el("financeiro-tabela-conteudo").innerHTML = tabelaContratosHTML(filtrada, { comSei: filtroAditivos !== null, dirpinAtual: filtroDirpin || null, destacarCompartilhados: filtroApenasCompartilhados });
       ligarTooltipLinhas(el("financeiro-tabela-conteudo"), porId);
     } else {
       el("financeiro-tabela").innerHTML = "";
@@ -6698,7 +6737,7 @@ function renderPorDimensaoContratos(lista, cfg) {
           <h4>Contratos — ${tituloFiltroPessoa}</h4>
           <div class="tabela-rolavel" style="max-height:320px" id="${p}-pessoas-tabela-conteudo"></div>
         </div>`;
-      el("pessoas-tabela-conteudo").innerHTML = tabelaContratosHTML(contratosDoFiltro, { dirpinAtual: filtroDirpin || null });
+      el("pessoas-tabela-conteudo").innerHTML = tabelaContratosHTML(contratosDoFiltro, { dirpinAtual: filtroDirpin || null, destacarCompartilhados: filtroApenasCompartilhados });
       ligarTooltipLinhas(el("pessoas-tabela-conteudo"), porId);
     } else {
       el("pessoas-tabela").innerHTML = "";
@@ -6718,6 +6757,7 @@ function renderPorDimensaoContratos(lista, cfg) {
     let listaFiltrada = listaArea;
     if (filtroDirpin) listaFiltrada = listaFiltrada.filter((c) => (c.unidades || []).some((u) => u.dirpin === filtroDirpin));
     if (filtroCoorpin) listaFiltrada = listaFiltrada.filter((c) => (c.unidades || []).some((u) => u.nomeUnidade === filtroCoorpin));
+    if (filtroApenasCompartilhados) listaFiltrada = listaFiltrada.filter((c) => new Set((c.unidades || []).map((u) => u.dirpin)).size > 1);
     renderCabecalho(listaFiltrada);
     renderVisaoGeral(listaFiltrada);
     renderPrazos(listaFiltrada);
