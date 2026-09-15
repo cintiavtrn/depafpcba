@@ -318,6 +318,7 @@ body{background:var(--paper);color:var(--carvao);font-family:'IBM Plex Sans',san
 .renov-tramite-data{display:block;opacity:.65;font-size:var(--fs-ui-xs);text-decoration:none}
 .renov-badge{font-family:'IBM Plex Mono',monospace;font-size:var(--fs-ui-xs);color:var(--crit-baixo);margin-top:3px;cursor:help}
 .badge-renovado{cursor:help;font-size:0.85em}
+.badge-compartilhado{cursor:help;font-size:var(--fs-ui-xs);font-family:'IBM Plex Mono',monospace;color:#8B93A3;margin-left:4px;white-space:nowrap}
 
 /* Rolagem DENTRO da tabela (como no Power BI) — o cabeçalho fica fixo e só o
    corpo rola, em vez da tabela empurrar a página inteira pra baixo quando
@@ -4836,14 +4837,26 @@ function abrirContratoNoOperacional(contratoId) {
 // HTML — quem chama ainda decide onde colocar e roda ligarTooltipLinhas()
 // depois de inserir no documento.
 function tabelaContratosHTML(lista, opcoes = {}) {
-  const { comSei = false } = opcoes;
+  const { comSei = false, dirpinAtual = null } = opcoes;
   if (!lista.length) return `<p class="tela-intro">Nenhum contrato nessa faixa.</p>`;
   return `<table class="dash-tabela">
       <thead><tr><th>Nº CONTRATO</th><th>ÁREA GESTORA</th><th>EMPRESA</th><th>DIAS PARA VENCER</th><th>CRITICIDADE</th>${comSei ? "<th>SEI DOS ADITIVOS</th>" : ""}</tr></thead>
-      <tbody>${lista.map((c) => `
+      <tbody>${lista.map((c) => {
+        // Pedido direto: "pensei que vc fosse na hora que filtra por
+        // dirpin dizer algo como esse contrato está compartilhado com x"
+        // — só faz sentido com uma DIRPIN escolhida (dirpinAtual), pra
+        // saber COM QUEM ela compartilha, não só QUE compartilha.
+        const outrasDirpins = dirpinAtual
+          ? [...new Set((c.unidades || []).map((u) => u.dirpin).filter((d) => d && d !== dirpinAtual))]
+          : [];
+        const selosCompartilhado = outrasDirpins.length
+          ? ` <span class="badge-compartilhado" title="Esse contrato também atende a DIRPIN ${escapeAttr(outrasDirpins.join(" e "))}">🔗 também ${escapeHTML(outrasDirpins.join(", "))}</span>`
+          : "";
+        return `
         <tr class="linha-contrato" data-contrato-id="${escapeAttr(c.id)}">
-          <td>${escapeHTML(c.numeroContrato)}${badgeRenovado(c)}</td><td>${escapeHTML(c.unidadeGestora || "—")}</td><td>${escapeHTML(c.empresa)}</td><td class="num">${formatarDiasBR(c.diasParaVencer)}</td><td>${pillCriticidade(c.criticidade)}</td>${comSei ? `<td>${(c.aditivos || []).map((a) => `${a.numeroAditivo}º: ${escapeHTML(a.processoSeiAditivo || "—")}`).join("<br>") || "—"}</td>` : ""}
-        </tr>`).join("")}</tbody>
+          <td>${escapeHTML(c.numeroContrato)}${badgeRenovado(c)}${selosCompartilhado}</td><td>${escapeHTML(c.unidadeGestora || "—")}</td><td>${escapeHTML(c.empresa)}</td><td class="num">${formatarDiasBR(c.diasParaVencer)}</td><td>${pillCriticidade(c.criticidade)}</td>${comSei ? `<td>${(c.aditivos || []).map((a) => `${a.numeroAditivo}º: ${escapeHTML(a.processoSeiAditivo || "—")}`).join("<br>") || "—"}</td>` : ""}
+        </tr>`;
+      }).join("")}</tbody>
     </table>`;
 }
 
@@ -6338,7 +6351,7 @@ function renderPorDimensaoContratos(lista, cfg) {
         <p class="dash-chart-hint">Passe o mouse numa linha pra ver o detalhe rápido — clique pra abrir o panorama completo do contrato.</p>
         <div id="${p}-visao-tabela" class="tabela-rolavel" style="max-height:360px"></div>
       </div>`;
-    el("visao-tabela").innerHTML = tabelaContratosHTML(tabelaAlvo);
+    el("visao-tabela").innerHTML = tabelaContratosHTML(tabelaAlvo, { dirpinAtual: filtroDirpin || null });
     ligarTooltipLinhas(el("visao-tabela"), porId);
     el("sub-visao").querySelectorAll("[data-status-visao]").forEach((card) => {
       card.addEventListener("click", () => {
@@ -6455,7 +6468,7 @@ function renderPorDimensaoContratos(lista, cfg) {
           <p class="dash-chart-hint">Passe o mouse numa linha pra ver o detalhe rápido — clique pra abrir o panorama completo do contrato.</p>
           <div class="tabela-rolavel" style="max-height:320px" id="${p}-prazos-tabela-conteudo"></div>
         </div>`;
-      el("prazos-tabela-conteudo").innerHTML = tabelaContratosHTML(contratosDaFaixa);
+      el("prazos-tabela-conteudo").innerHTML = tabelaContratosHTML(contratosDaFaixa, { dirpinAtual: filtroDirpin || null });
       ligarTooltipLinhas(el("prazos-tabela-conteudo"), porId);
       const btnLimparUrgencia = alvo.querySelector(`[data-limpar-urgencia-${p}]`);
       if (btnLimparUrgencia) btnLimparUrgencia.addEventListener("click", () => { filtroUrgenciaPrazo = ""; renderPrazos(listaFiltrada); });
@@ -6467,7 +6480,7 @@ function renderPorDimensaoContratos(lista, cfg) {
           <p class="dash-chart-hint">Passe o mouse numa linha pra ver o detalhe rápido — clique pra abrir o panorama completo do contrato.</p>
           <div class="tabela-rolavel" style="max-height:320px" id="${p}-prazos-tabela-conteudo"></div>
         </div>`;
-      el("prazos-tabela-conteudo").innerHTML = tabelaContratosHTML(contratosDoMes);
+      el("prazos-tabela-conteudo").innerHTML = tabelaContratosHTML(contratosDoMes, { dirpinAtual: filtroDirpin || null });
       ligarTooltipLinhas(el("prazos-tabela-conteudo"), porId);
     } else {
       el("prazos-tabela").innerHTML = "";
@@ -6594,7 +6607,7 @@ function renderPorDimensaoContratos(lista, cfg) {
       alvo.querySelectorAll(`[data-chip-financeiro-${p}]`).forEach((btn) => {
         btn.addEventListener("click", () => chipsFinanceiro[+btn.dataset[`chipFinanceiro${p[0].toUpperCase()}${p.slice(1)}`]].limpar());
       });
-      el("financeiro-tabela-conteudo").innerHTML = tabelaContratosHTML(filtrada, { comSei: filtroAditivos !== null });
+      el("financeiro-tabela-conteudo").innerHTML = tabelaContratosHTML(filtrada, { comSei: filtroAditivos !== null, dirpinAtual: filtroDirpin || null });
       ligarTooltipLinhas(el("financeiro-tabela-conteudo"), porId);
     } else {
       el("financeiro-tabela").innerHTML = "";
@@ -6685,7 +6698,7 @@ function renderPorDimensaoContratos(lista, cfg) {
           <h4>Contratos — ${tituloFiltroPessoa}</h4>
           <div class="tabela-rolavel" style="max-height:320px" id="${p}-pessoas-tabela-conteudo"></div>
         </div>`;
-      el("pessoas-tabela-conteudo").innerHTML = tabelaContratosHTML(contratosDoFiltro);
+      el("pessoas-tabela-conteudo").innerHTML = tabelaContratosHTML(contratosDoFiltro, { dirpinAtual: filtroDirpin || null });
       ligarTooltipLinhas(el("pessoas-tabela-conteudo"), porId);
     } else {
       el("pessoas-tabela").innerHTML = "";
