@@ -6215,6 +6215,9 @@ const COORPIN_GEO = {
   "24ª Bom Jesus da Lapa": [-43.4192, -13.2553],
   "25ª Euclides da Cunha": [-38.9975, -10.5067],
   "26ª Santa Maria da Vitória": [-44.1875, -13.3931],
+  // Pedido direto: "a sede é Salvador, fica aqui no centro na sede da
+  // polícia civil" — não é uma COORPIN, é a sede central da DEPIN.
+  "Sede (Salvador)": [-38.5014, -12.9714],
 };
 
 // Mesmas 5 cores das outras categorias do sistema (TONS), fixas por DIRPIN — pra não
@@ -6240,7 +6243,9 @@ function mapaCoorpinSVG(linhas, opcoes = {}) {
     const destacado = destacarFn ? destacarFn(l) : selecionado === l.label;
     const algumDestaque = destacarFn ? linhas.some(destacarFn) : !!selecionado;
     const dim = algumDestaque && !destacado;
-    const numero = parseInt(l.label, 10) || "";
+    // Sede não começa com número (não é COORPIN) — "S" no lugar do
+    // número, mesma lógica visual, só o rótulo muda.
+    const numero = parseInt(l.label, 10) || (l.dirpin ? "" : "S");
     pontos += `<g data-cat="${escapeAttr(l.label)}" style="cursor:pointer" opacity="${dim ? 0.35 : 1}">`;
     pontos += `<circle cx="${cx}" cy="${cy}" r="${raio.toFixed(3)}" fill="${CORES_DIRPIN[l.dirpin] || "var(--carvao)"}" stroke="var(--paper)" stroke-width="${destacado ? 0.03 : 0.015}"><title>${escapeHTML(l.label)} (DIRPIN ${escapeHTML(l.dirpin || "—")}): ${l.total} contrato(s)</title></circle>`;
     pontos += `<text x="${cx}" y="${(cy + raio * 0.35).toFixed(3)}" text-anchor="middle" font-family="monospace" font-size="${(raio * 0.9).toFixed(3)}" font-weight="700" fill="var(--paper)" style="pointer-events:none">${numero}</text>`;
@@ -6518,7 +6523,11 @@ function renderPorDimensaoContratos(lista, cfg) {
     if (modoGraficoUnidade === "mapa") {
       const porDirpinLegenda = new Map();
       for (const l of linhasUnidade) {
-        const chave = l.dirpin || "—";
+        // Pedido direto: "tinha contrato que tava só como sede?... precisa
+        // incluir no filtro de unidade regional" — Sede não é uma DIRPIN,
+        // então tem grupo próprio na legenda em vez de aparecer como
+        // "DIRPIN —" (não faz sentido) ou ficar escondida num grupo alheio.
+        const chave = l.dirpin || "Sede";
         if (!porDirpinLegenda.has(chave)) porDirpinLegenda.set(chave, []);
         porDirpinLegenda.get(chave).push(l);
       }
@@ -6528,7 +6537,7 @@ function renderPorDimensaoContratos(lista, cfg) {
             <div>
               <div style="display:flex;align-items:center;gap:6px;font-weight:700;margin-bottom:3px">
                 <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${CORES_DIRPIN[dirpin] || "var(--carvao)"}"></span>
-                DIRPIN ${escapeHTML(dirpin)}
+                ${dirpin === "Sede" ? "Sede" : `DIRPIN ${escapeHTML(dirpin)}`}
               </div>
               <div style="color:#8B93A3;font-family:'IBM Plex Mono',monospace">
                 ${unidades.map((u) => `<span class="legenda-unidade-item" data-cat="${escapeAttr(u.label)}" style="cursor:pointer;${destacarUnidadeFn(u) ? "text-decoration:underline;color:var(--carvao)" : ""}">${escapeHTML(u.label)}</span>`).join(" · ")}
