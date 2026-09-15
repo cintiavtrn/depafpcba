@@ -4372,6 +4372,13 @@ function barraContagemHorizontalSVG(linhas, opcoes = {}) {
     rotuloExtra = null,
     tituloTooltip = (l) => `${l.label}: ${formatarValor(l.total)}`,
     selecionado = "",
+    // Pedido direto: "quando filtramos por região da DIRPIN tem que
+    // destacar no mapa, só isso, assim como na barra" — `selecionado` só
+    // sabe comparar rótulo exato (uma COORPIN); quando o filtro é de
+    // DIRPIN (um grupo INTEIRO de linhas, não uma só), precisa de uma
+    // função em vez de um valor único. Opcional — quem não passa continua
+    // exatamente como antes.
+    destacarFn = null,
   } = opcoes;
   // padR reservava um número fixo de pixels (44, ou 150 com rotuloExtra) —
   // verificação com dado real (área DGTI, "R$ 10,3M") mostrou que um valor
@@ -4394,6 +4401,9 @@ function barraContagemHorizontalSVG(linhas, opcoes = {}) {
   const w = padL + larguraPlot + padR;
   const h = padT + alturas.reduce((a, b) => a + b, 0) + 4;
   const maxTotal = maxSeguro(linhas.map((l) => l.total));
+  // Se destacarFn não bate em NENHUMA linha (ninguém filtrado ainda), não
+  // apaga tudo — some com o destaque, mas mantém todo mundo na cor normal.
+  const algumDestaque = destacarFn ? linhas.some(destacarFn) : !!selecionado;
 
   let corpo = "";
   let y = padT;
@@ -4401,7 +4411,8 @@ function barraContagemHorizontalSVG(linhas, opcoes = {}) {
     const rowH = alturas[i];
     const yBarra = y + (rowH - alturaBarra) / 2;
     const larg = maxTotal ? larguraPlot * (l.total / maxTotal) : 0;
-    const dim = selecionado && selecionado !== l.label;
+    const destacado = destacarFn ? destacarFn(l) : selecionado === l.label;
+    const dim = algumDestaque && !destacado;
     const atributosContrato = l.id ? ` class="linha-contrato" data-contrato-id="${escapeAttr(l.id)}"` : "";
     // Algumas categorias (Nº de Aditivos) precisam do valor NUMÉRICO puro pra
     // filtrar, não do texto do rótulo ("6 aditivos") — data-valor carrega
@@ -4409,7 +4420,7 @@ function barraContagemHorizontalSVG(linhas, opcoes = {}) {
     const atributoValor = l.valor !== undefined ? ` data-valor="${escapeAttr(l.valor)}"` : "";
     corpo += `<g data-cat="${escapeAttr(l.label)}"${atributoValor}${atributosContrato} style="cursor:pointer" opacity="${dim ? 0.4 : 1}">`;
     corpo += `<rect class="area-hit" x="0" y="${y.toFixed(1)}" width="${w}" height="${rowH}" fill="transparent" />`;
-    corpo += textoSVG(l.label, padL - 8, y + rowH / 2, { maxChars: maxRotulo, anchor: "end", fontSize: 9, alturaLinha: ALTURA_LINHA_TEXTO, peso: selecionado === l.label ? 700 : 400 });
+    corpo += textoSVG(l.label, padL - 8, y + rowH / 2, { maxChars: maxRotulo, anchor: "end", fontSize: 9, alturaLinha: ALTURA_LINHA_TEXTO, peso: destacado ? 700 : 400 });
     corpo += `<rect x="${padL}" y="${yBarra.toFixed(1)}" width="${Math.max(larg, 1.5).toFixed(1)}" height="${alturaBarra}" fill="${corCategoria(i)}"><title>${escapeHTML(tituloTooltip(l))}</title></rect>`;
     const textoValor = formatarValor(l.total) + (rotuloExtra ? ` ${rotuloExtra(l)}` : "");
     corpo += `<text x="${(padL + larg + 6).toFixed(1)}" y="${(yBarra + alturaBarra / 2 + 3.5).toFixed(1)}" font-family="monospace" font-size="9" font-weight="700" fill="var(--carvao)">${escapeHTML(textoValor)}</text>`;
@@ -6211,7 +6222,11 @@ const COORPIN_GEO = {
 const CORES_DIRPIN = { Leste: TONS[0], Norte: TONS[1], Sul: TONS[2], Sudoeste: TONS[3], "Oeste/Chapada": TONS[4] };
 
 function mapaCoorpinSVG(linhas, opcoes = {}) {
-  const { selecionado = "" } = opcoes;
+  // Pedido direto: "quando filtramos por região da DIRPIN tem que
+  // destacar no mapa, só isso, assim como na barra" — `selecionado`
+  // sozinho só sabe marcar UMA COORPIN; `destacarFn` (opcional) decide
+  // por linha, então também cobre "toda uma DIRPIN inteira" de uma vez.
+  const { selecionado = "", destacarFn = null } = opcoes;
   const [vbX, vbY, vbW, vbH] = MAPA_BAHIA_VIEWBOX.split(" ").map(Number);
   const maxTotal = maxSeguro(linhas.map((l) => l.total)) || 1;
   const raioMin = 0.09, raioMax = 0.22;
@@ -6222,10 +6237,12 @@ function mapaCoorpinSVG(linhas, opcoes = {}) {
     const [lon, lat] = geo;
     const cx = lon, cy = -lat;
     const raio = raioMin + (raioMax - raioMin) * Math.sqrt(l.total / maxTotal);
-    const dim = selecionado && selecionado !== l.label;
+    const destacado = destacarFn ? destacarFn(l) : selecionado === l.label;
+    const algumDestaque = destacarFn ? linhas.some(destacarFn) : !!selecionado;
+    const dim = algumDestaque && !destacado;
     const numero = parseInt(l.label, 10) || "";
     pontos += `<g data-cat="${escapeAttr(l.label)}" style="cursor:pointer" opacity="${dim ? 0.35 : 1}">`;
-    pontos += `<circle cx="${cx}" cy="${cy}" r="${raio.toFixed(3)}" fill="${CORES_DIRPIN[l.dirpin] || "var(--carvao)"}" stroke="var(--paper)" stroke-width="${selecionado === l.label ? 0.03 : 0.015}"><title>${escapeHTML(l.label)} (DIRPIN ${escapeHTML(l.dirpin || "—")}): ${l.total} contrato(s)</title></circle>`;
+    pontos += `<circle cx="${cx}" cy="${cy}" r="${raio.toFixed(3)}" fill="${CORES_DIRPIN[l.dirpin] || "var(--carvao)"}" stroke="var(--paper)" stroke-width="${destacado ? 0.03 : 0.015}"><title>${escapeHTML(l.label)} (DIRPIN ${escapeHTML(l.dirpin || "—")}): ${l.total} contrato(s)</title></circle>`;
     pontos += `<text x="${cx}" y="${(cy + raio * 0.35).toFixed(3)}" text-anchor="middle" font-family="monospace" font-size="${(raio * 0.9).toFixed(3)}" font-weight="700" fill="var(--paper)" style="pointer-events:none">${numero}</text>`;
     pontos += `</g>`;
   }
@@ -6469,11 +6486,17 @@ function renderPorDimensaoContratos(lista, cfg) {
     const linhasUnidade = [...porUnidade.entries()]
       .map(([label, v]) => ({ label, total: v.total, dirpin: v.dirpin }))
       .sort((a, b) => (parseInt(a.label, 10) || 0) - (parseInt(b.label, 10) || 0));
+    // Pedido direto: "quando filtramos por região da DIRPIN tem que
+    // destacar no mapa, só isso, assim como na barra" — com uma COORPIN
+    // escolhida, destaca só ELA; com só a DIRPIN escolhida (sem COORPIN
+    // específica), destaca o GRUPO inteiro dela — nas duas telas, não só
+    // na barra.
+    const destacarUnidadeFn = (l) => (filtroCoorpin ? l.label === filtroCoorpin : filtroDirpin ? l.dirpin === filtroDirpin : false);
     el("grafico-unidade").innerHTML = modoGraficoUnidade === "mapa"
-      ? mapaCoorpinSVG(linhasUnidade, { selecionado: filtroCoorpin })
+      ? mapaCoorpinSVG(linhasUnidade, { destacarFn: destacarUnidadeFn })
       : barraContagemHorizontalSVG(linhasUnidade, {
           tituloTooltip: (l) => `${l.label} (DIRPIN ${l.dirpin}): ${l.total} contrato(s)`,
-          selecionado: filtroCoorpin,
+          destacarFn: destacarUnidadeFn,
         });
     adicionarControlesGrafico(el("grafico-unidade"));
     el("grafico-unidade").addEventListener("click", (ev) => {
@@ -6508,7 +6531,7 @@ function renderPorDimensaoContratos(lista, cfg) {
                 DIRPIN ${escapeHTML(dirpin)}
               </div>
               <div style="color:#8B93A3;font-family:'IBM Plex Mono',monospace">
-                ${unidades.map((u) => `<span class="legenda-unidade-item" data-cat="${escapeAttr(u.label)}" style="cursor:pointer;${filtroCoorpin === u.label ? "text-decoration:underline;color:var(--carvao)" : ""}">${escapeHTML(u.label)}</span>`).join(" · ")}
+                ${unidades.map((u) => `<span class="legenda-unidade-item" data-cat="${escapeAttr(u.label)}" style="cursor:pointer;${destacarUnidadeFn(u) ? "text-decoration:underline;color:var(--carvao)" : ""}">${escapeHTML(u.label)}</span>`).join(" · ")}
               </div>
             </div>
           `).join("")}
