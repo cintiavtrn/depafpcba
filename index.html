@@ -5129,10 +5129,22 @@ function renderGerencialContratos(lista, resumo) {
     // "quantidade de unidade" não faz sentido como filtro aqui; o destino
     // útil é abrir o perfil de onde essa informação é detalhada — hoje só
     // a DEPIN tem unidade cadastrada (mesmo texto do title do cartão).
+    // Segunda rodada, pedido direto: "deveria dizer a unidade e não
+    // mostrar só os contratos" — abrir o perfil sozinho caía na mesma
+    // lista de sempre, sem falar de unidade nenhuma; agora rola até o
+    // gráfico "Contratos por Unidade Regional (COORPIN)" que foi criado
+    // ali dentro, com destaque temporário, igual o resto do sistema faz
+    // pra cartão sem um "isolar" óbvio.
     if (acaoRodape?.dataset.acao === "unidades-beneficiadas") {
       document.querySelector('[data-subtab-contratos="porarea"]')?.click();
       const sel = document.getElementById("area-select");
       if (sel) { sel.value = "DEPIN"; sel.dispatchEvent(new Event("change", { bubbles: true })); }
+      setTimeout(() => {
+        const caixa = document.getElementById("area-grafico-unidade-caixa");
+        caixa?.scrollIntoView?.({ behavior: "smooth", block: "center" });
+        caixa?.classList.add("destaque-temporario");
+        setTimeout(() => caixa?.classList.remove("destaque-temporario"), 1400);
+      }, 250);
     }
   });
   document.getElementById("ger-matriz").addEventListener("click", (ev) => {
@@ -6331,7 +6343,12 @@ function renderPorDimensaoContratos(lista, cfg) {
         <div class="kpi-card"><div class="kpi-cabeca">${kpiIcone("predio")}<div class="kpi-label">Contratos com Unidade Cadastrada</div></div><div class="kpi-value">${contratosComUnidade.length}</div></div>
         <div class="kpi-card kpi-clicavel" data-compartilhados title="Clique pra ver quais são — cada um atende mais de uma DIRPIN ao mesmo tempo" style="--kpi-cor:var(--crit-alto);cursor:pointer;${filtroApenasCompartilhados ? "outline:2px solid var(--crit-alto);outline-offset:-2px" : ""}"><div class="kpi-cabeca">${kpiIcone("alerta")}<div class="kpi-label">Compartilhados entre DIRPIN</div></div><div class="kpi-value">${compartilhados}</div></div>
       </div>
-      <p class="dash-chart-hint" style="margin-top:4px">${exclusivos} contrato(s) atende(m) uma DIRPIN só — os outros ${compartilhados} atendem mais de uma (por isso a soma dos filtros de DIRPIN acima passa de ${contratosComUnidade.length}). Útil saber antes de montar relatório ou apresentação com esse corte.</p>` : ""}`;
+      <p class="dash-chart-hint" style="margin-top:4px">${exclusivos} contrato(s) atende(m) uma DIRPIN só — os outros ${compartilhados} atendem mais de uma (por isso a soma dos filtros de DIRPIN acima passa de ${contratosComUnidade.length}). Útil saber antes de montar relatório ou apresentação com esse corte.</p>` : ""}
+      <div class="dash-chart-box" id="${p}-grafico-unidade-caixa" style="margin-top:16px">
+        <h4>Contratos por Unidade Regional (COORPIN)</h4>
+        <p class="dash-chart-hint">Quantos contratos cada unidade tem hoje — um contrato "geral" (que atende várias) entra na barra de cada uma. Clique numa barra pra isolar só aquela unidade.</p>
+        <div id="${p}-grafico-unidade"></div>
+      </div>`;
     el("filtro-dirpin").addEventListener("change", (ev) => {
       filtroDirpin = ev.target.value;
       // Se a COORPIN escolhida não pertence mais à DIRPIN nova, esvazia —
@@ -6356,6 +6373,37 @@ function renderPorDimensaoContratos(lista, cfg) {
       });
     }
     el("filtro-coorpin").addEventListener("change", (ev) => { filtroCoorpin = ev.target.value; filtroApenasCompartilhados = false; atualizar(); });
+
+    // Pedido direto: "deveria dizer a unidade e não mostrar só os
+    // contratos" — o cartão "Unidades Beneficiadas" levava pro perfil da
+    // DEPIN, mas lá só tinha a lista de contrato (a mesma de sempre), sem
+    // nada que realmente falasse de UNIDADE. Este gráfico é o que faltava:
+    // quantos contratos cada COORPIN tem — a mesma pergunta que a métrica
+    // promete responder, respondida de fato, não só um lugar pra filtrar
+    // uma de cada vez.
+    const porUnidade = new Map(); // nomeUnidade -> { total, dirpin }
+    for (const u of todasUnidades) {
+      const atual = porUnidade.get(u.nomeUnidade) || { total: 0, dirpin: u.dirpin };
+      atual.total += 1;
+      porUnidade.set(u.nomeUnidade, atual);
+    }
+    const linhasUnidade = [...porUnidade.entries()]
+      .map(([label, v]) => ({ label, total: v.total, dirpin: v.dirpin }))
+      .sort((a, b) => (parseInt(a.label, 10) || 0) - (parseInt(b.label, 10) || 0));
+    el("grafico-unidade").innerHTML = barraContagemHorizontalSVG(linhasUnidade, {
+      tituloTooltip: (l) => `${l.label} (DIRPIN ${l.dirpin}): ${l.total} contrato(s)`,
+      selecionado: filtroCoorpin,
+    });
+    adicionarControlesGrafico(el("grafico-unidade"));
+    el("grafico-unidade").addEventListener("click", (ev) => {
+      const barra = ev.target.closest("[data-cat]");
+      if (!barra) return;
+      const nomeUnidade = barra.dataset.cat;
+      filtroCoorpin = filtroCoorpin === nomeUnidade ? "" : nomeUnidade;
+      filtroDirpin = filtroCoorpin ? (linhasUnidade.find((l) => l.label === nomeUnidade)?.dirpin || "") : filtroDirpin;
+      filtroApenasCompartilhados = false;
+      atualizar();
+    });
   }
 
   function renderCabecalho(listaFiltrada) {
