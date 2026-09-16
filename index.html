@@ -260,6 +260,7 @@ body{background:var(--paper);color:var(--carvao);font-family:'IBM Plex Sans',san
 .tab-btn.active{	background:var(--surface);top:0;padding-bottom:13px;font-weight:600}
 .tab-panel{padding-top:26px}
 .tab-panel[hidden]{display:none}
+.dash-filtros[hidden]{display:none}
 
 /* Pedido direto: "os slicer de seleção... a forma de exibição das seções
    onde aparece os gráficos e tabelas" — mesmo raciocínio do kpi-card: sai
@@ -279,12 +280,12 @@ body{background:var(--paper);color:var(--carvao);font-family:'IBM Plex Sans',san
    resto do design" — o campo de busca (BUSCAR Nº, EMPRESA...) tinha
    ficado com o branco padrão do navegador, único elemento claro numa tela
    inteira escura. Mesmo tratamento do <select> ao lado dele. */
-.dash-filtro input[type="text"],.dash-filtro input[type="date"]{
+.dash-filtro input[type="text"],.dash-filtro input[type="date"],.dash-filtro input[type="email"],.dash-filtro input[type="password"]{
   font-family:'IBM Plex Mono',monospace;font-size:var(--fs-ui);padding:7px 10px;border:1.5px solid var(--paper-line);background:var(--paper);color:var(--carvao);border-radius:var(--radius-sm);
-  color-scheme:dark;
+  color-scheme:dark;width:100%
 }
-.dash-filtro input[type="text"]::placeholder{color:#6E7A90}
-.dash-filtro input[type="text"]:hover,.dash-filtro input[type="text"]:focus,.dash-filtro input[type="date"]:hover,.dash-filtro input[type="date"]:focus{border-color:var(--tinta)}
+.dash-filtro input[type="text"]::placeholder,.dash-filtro input[type="email"]::placeholder,.dash-filtro input[type="password"]::placeholder{color:#6E7A90}
+.dash-filtro input[type="text"]:hover,.dash-filtro input[type="text"]:focus,.dash-filtro input[type="date"]:hover,.dash-filtro input[type="date"]:focus,.dash-filtro input[type="email"]:hover,.dash-filtro input[type="email"]:focus,.dash-filtro input[type="password"]:hover,.dash-filtro input[type="password"]:focus{border-color:var(--tinta)}
 
 .dash-charts{display:grid;grid-template-columns:1fr 1.05fr;gap:14px;margin-bottom:14px}
 @media (max-width:760px){.dash-charts{grid-template-columns:1fr}}
@@ -660,6 +661,36 @@ select:focus-visible,input:focus-visible{
     <div id="google-signin-botao"></div>
   </div>
   <p id="login-status" class="font-mono" style="text-align:center;margin-top:16px;font-size:var(--fs-ui);color:#9AA3B2"></p>
+
+  <!-- Pedido direto: "queria mudar a forma de login... adicionar a
+       possibilidade de login com pcivil.ba.gov.br... a pessoa escolhe a
+       própria senha [do app]... eu aprovo cadastro ou não". Convive com o
+       Google acima, não substitui — pensado pra quem não tem/usa conta
+       Google vinculada ao e-mail institucional. -->
+  <div style="max-width:340px;margin:28px auto 0;padding-top:20px;border-top:1.5px solid var(--paper-line)">
+    <p class="font-mono" style="text-align:center;font-size:var(--fs-ui-sm);letter-spacing:.08em;color:#9AA3B2;margin-bottom:14px">OU ENTRE COM E-MAIL INSTITUCIONAL</p>
+
+    <form id="form-login-senha" class="dash-filtros" style="flex-direction:column">
+      <div class="dash-filtro"><input type="email" id="login-senha-email" placeholder="seu.nome@pcivil.ba.gov.br" required autocomplete="username" /></div>
+      <div class="dash-filtro"><input type="password" id="login-senha-senha" placeholder="Senha" required autocomplete="current-password" /></div>
+      <button type="submit" class="btn-primario" style="width:100%">ENTRAR</button>
+    </form>
+    <p id="login-senha-status" class="font-mono" style="text-align:center;margin-top:10px;font-size:var(--fs-ui-sm);color:#9AA3B2"></p>
+    <p style="text-align:center;margin-top:8px">
+      <button type="button" id="btn-ir-cadastro" style="background:none;border:none;font:inherit;color:var(--tinta);text-decoration:underline;cursor:pointer;font-family:'IBM Plex Mono',monospace;font-size:var(--fs-ui-sm)">Não tem conta? Cadastre-se</button>
+    </p>
+
+    <form id="form-cadastro" class="dash-filtros" style="flex-direction:column" hidden>
+      <div class="dash-filtro"><input type="text" id="cadastro-nome" placeholder="Nome completo" required maxlength="200" /></div>
+      <div class="dash-filtro"><input type="email" id="cadastro-email" placeholder="seu.nome@pcivil.ba.gov.br" required autocomplete="username" /></div>
+      <div class="dash-filtro"><input type="password" id="cadastro-senha" placeholder="Escolha uma senha (mín. 8 caracteres)" required minlength="8" autocomplete="new-password" /></div>
+      <button type="submit" class="btn-primario" style="width:100%">CRIAR CONTA</button>
+    </form>
+    <p id="cadastro-status" class="font-mono" style="text-align:center;margin-top:10px;font-size:var(--fs-ui-sm);color:#9AA3B2"></p>
+    <p id="p-ir-login-senha" style="text-align:center;margin-top:8px" hidden>
+      <button type="button" id="btn-ir-login-senha" style="background:none;border:none;font:inherit;color:var(--tinta);text-decoration:underline;cursor:pointer;font-family:'IBM Plex Mono',monospace;font-size:var(--fs-ui-sm)">Já tem conta? Entrar</button>
+    </p>
+  </div>
 </section>
 
 <div id="tela-inicio" hidden>
@@ -725,6 +756,7 @@ select:focus-visible,input:focus-visible{
     sem acesso a portal nenhum — e fica vendo a tela vazia até alguém decidir. Esta tela
     registra <b>quem</b> entrou e <b>quando</b>, não o que a pessoa consultou ou alterou.
   </p>
+  <div id="lista-cadastros-pendentes"></div>
   <div id="lista-usuarios"></div>
 </section>
 
@@ -1675,6 +1707,95 @@ function iniciarApp() {
   }
 }
 iniciarApp();
+
+// Pedido direto: "adicionar a possibilidade de login com pcivil.ba.gov.br...
+// a pessoa escolhe a própria senha... eu aprovo cadastro ou não e ela
+// recebe comunicação no email dela". Fica FORA de iniciarApp() de propósito
+// — não depende do SDK do Google terminar de carregar pra funcionar (o
+// Google é lento às vezes; login por senha não precisa esperar por ele).
+async function aoSubmeterLoginSenha(ev) {
+  ev.preventDefault();
+  const status = document.getElementById("login-senha-status");
+  status.textContent = "Entrando...";
+  try {
+    const resultado = await apiFetch("/api/auth/login-senha", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email: document.getElementById("login-senha-email").value,
+        senha: document.getElementById("login-senha-senha").value,
+      }),
+    });
+    salvarSessao(resultado);
+    status.textContent = "";
+    mostrarAppLogado(resultado.usuario);
+    await carregarPortais();
+  } catch (erro) {
+    status.textContent = erro.message;
+  }
+}
+document.getElementById("form-login-senha").addEventListener("submit", aoSubmeterLoginSenha);
+
+async function aoSubmeterCadastro(ev) {
+  ev.preventDefault();
+  const status = document.getElementById("cadastro-status");
+  status.textContent = "Enviando...";
+  try {
+    const resultado = await apiFetch("/api/auth/cadastro", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        nome: document.getElementById("cadastro-nome").value,
+        email: document.getElementById("cadastro-email").value,
+        senha: document.getElementById("cadastro-senha").value,
+      }),
+    });
+    document.getElementById("form-cadastro").hidden = true;
+    status.textContent = `${resultado.mensagem} Depois de confirmar, seu cadastro ainda passa pela aprovação de um administrador antes de liberar o acesso.`;
+  } catch (erro) {
+    status.textContent = erro.message;
+  }
+}
+document.getElementById("form-cadastro").addEventListener("submit", aoSubmeterCadastro);
+
+// Alterna entre os dois formulários — só um visível por vez, pra não
+// confundir "entrar" com "criar conta" na mesma tela.
+document.getElementById("btn-ir-cadastro").addEventListener("click", () => {
+  document.getElementById("form-login-senha").hidden = true;
+  document.getElementById("btn-ir-cadastro").closest("p").hidden = true;
+  document.getElementById("login-senha-status").textContent = "";
+  document.getElementById("form-cadastro").hidden = false;
+  document.getElementById("p-ir-login-senha").hidden = false;
+});
+document.getElementById("btn-ir-login-senha").addEventListener("click", () => {
+  document.getElementById("form-cadastro").hidden = true;
+  document.getElementById("p-ir-login-senha").hidden = true;
+  document.getElementById("cadastro-status").textContent = "";
+  document.getElementById("form-login-senha").hidden = false;
+  document.getElementById("btn-ir-cadastro").closest("p").hidden = false;
+});
+
+// Clique no link do e-mail de confirmação cai aqui com "?ativar=TOKEN" na
+// URL. Independe de estar logado ou não — quem clica normalmente ainda nem
+// tem sessão nenhuma.
+(async function verificarLinkDeAtivacao() {
+  const params = new URLSearchParams(location.search);
+  const token = params.get("ativar");
+  if (!token) return;
+  history.replaceState(null, "", location.pathname); // tira o token da URL, não fica em histórico/favoritos
+  const status = document.getElementById("login-senha-status");
+  status.textContent = "Confirmando e-mail...";
+  try {
+    const resultado = await apiFetch("/api/auth/ativar", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token }),
+    });
+    status.textContent = resultado.mensagem;
+  } catch (erro) {
+    status.textContent = erro.message;
+  }
+})();
 
 window.addEventListener("resize", () => {
   clearTimeout(window._hubResizeT);
@@ -7898,22 +8019,52 @@ async function abrirTelaUsuarios() {
   window.scrollTo({ top: 0, behavior: "smooth" });
 
   const alvo = document.getElementById("lista-usuarios");
+  const alvoCadastros = document.getElementById("lista-cadastros-pendentes");
   alvo.innerHTML = htmlCarregando("Carregando contas");
+  alvoCadastros.innerHTML = "";
   try {
-    const [usuarios, portais] = await Promise.all([
+    const [usuarios, portais, cadastrosPendentes] = await Promise.all([
       apiFetch("/api/usuarios"),
       apiFetch("/api/portais"),
+      apiFetch("/api/usuarios/cadastros-pendentes"),
     ]);
     const meuId = obterSessao()?.usuario?.id;
     const pendentes = usuarios.filter(u => u.aguardandoDecisao).length;
     const aviso = pendentes
       ? `<p class="dash-chart-hint" style="border-left-color:var(--mostarda)"><b>${pendentes} conta(s) aguardando decisão.</b> Já entraram no sistema e não veem nada até você conceder acesso a algum portal.</p>`
       : "";
+    alvoCadastros.innerHTML = renderCadastrosPendentesHTML(cadastrosPendentes);
     alvo.innerHTML = aviso + usuarios.map(u => renderCartaoUsuario(u, portais, u.id === meuId)).join("");
     ligarAcoesUsuarios();
   } catch (erro) {
     alvo.innerHTML = `<p class="font-mono" style="font-size:var(--fs-ui-sm);color:var(--terracota)">Não consegui carregar: ${escapeHTML(erro.message)}</p>`;
   }
+}
+
+// Pedido direto: "eu aprovo cadastro ou não e ela recebe comunicação no
+// email dela" — fila separada, acima da lista geral de contas: são pedidos
+// de acesso por SENHA (e-mail já confirmado pelo link) esperando decisão,
+// diferente da lista de baixo (contas já dentro, esperando PORTAL).
+function renderCadastrosPendentesHTML(lista) {
+  if (!lista.length) return "";
+  return `
+    <div class="dash-chart-box" style="margin-bottom:16px;border-left:3px solid var(--dourado)">
+      <h4>Cadastros por senha aguardando aprovação (${lista.length})</h4>
+      <p class="dash-chart-hint">E-mail já confirmado pela própria pessoa (clicou no link) — falta só você decidir. Aprovando, ela já entra com o e-mail e a senha que escolheu; recusando, a conta fica bloqueada. Nos dois casos ela recebe um e-mail avisando.</p>
+      ${lista.map(u => `
+        <div class="dash-chart-box" style="margin:10px 0 0;box-shadow:none;border:1.5px solid var(--paper-line)">
+          <div class="dash-chart-head">
+            <div style="min-width:0">
+              <h4 style="margin-bottom:2px">${escapeHTML(u.nome)}</h4>
+              <p class="font-mono" style="font-size:var(--fs-ui-sm);color:#8B93A3;margin:0;word-break:break-all">${escapeHTML(u.email)} · pediu em ${dataCurta(u.criadoEm)}</p>
+            </div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap">
+              <button class="btn-primario" data-aprovar-cadastro="${escapeAttr(u.id)}">APROVAR</button>
+              <button class="btn-perigo" data-recusar-cadastro="${escapeAttr(u.id)}">RECUSAR</button>
+            </div>
+          </div>
+        </div>`).join("")}
+    </div>`;
 }
 
 function ligarAcoesUsuarios() {
@@ -8000,6 +8151,32 @@ function ligarAcoesUsuarios() {
         toastOk(`${r.sessoesEncerradas} sessão(ões) encerrada(s). A conta continua autorizada.`);
         abrirTelaUsuarios();
       } catch (erro) { toastErro("Não consegui encerrar: " + erro.message); }
+    });
+  });
+
+  tela.querySelectorAll("[data-aprovar-cadastro]").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      try {
+        const r = await apiFetch(`/api/usuarios/${btn.dataset.aprovarCadastro}/aprovar-cadastro`, { method: "POST" });
+        toastOk(`Cadastro de ${r.email} aprovado — ela já recebeu o e-mail.`);
+        abrirTelaUsuarios();
+      } catch (erro) { toastErro("Não consegui aprovar: " + erro.message); }
+    });
+  });
+  tela.querySelectorAll("[data-recusar-cadastro]").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const confirmado = await confirmarAcao({
+        titulo: "Recusar este cadastro?",
+        alvo: btn.closest(".dash-chart-box").querySelector("p").textContent.trim(),
+        texto: "A conta fica bloqueada pra login por senha. A pessoa recebe um e-mail avisando que o cadastro não foi aprovado.",
+        rotuloConfirmar: "RECUSAR CADASTRO",
+      });
+      if (!confirmado) return;
+      try {
+        const r = await apiFetch(`/api/usuarios/${btn.dataset.recusarCadastro}/recusar-cadastro`, { method: "POST" });
+        toastOk(`Cadastro de ${r.email} recusado.`);
+        abrirTelaUsuarios();
+      } catch (erro) { toastErro("Não consegui recusar: " + erro.message); }
     });
   });
 }
