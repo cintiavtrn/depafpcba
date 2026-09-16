@@ -4614,6 +4614,53 @@ function agruparValorPorCampo(lista, campoFn, rotuloVazio = "(não informado)") 
   return [...mapa.entries()].map(([label, g]) => ({ label, total: g.total, qtd: g.qtd })).sort((a, b) => b.total - a.total);
 }
 
+// Pedido direto: "a COORPIN não seria conceitualmente a área gestora...
+// mas o equivalente talvez fosse a COORPIN... pra gente conseguir
+// responder o mesmo que respondemos no DEPAF: qual área gasta mais, qual
+// área tem mais contrato". Dentro da DEPIN, TODO contrato tem o MESMO
+// unidadeGestora ("DEPIN") — agrupar por área não responde nada (um
+// bloco só); COORPIN é quem de fato varia contrato a contrato ali. Só
+// troca quando a seleção é 100% DEPIN — em qualquer outra (Todos, DEPAF,
+// uma área específica não-DEPIN), "Área Gestora" continua sendo a
+// pergunta certa.
+function ehSomenteDepin(lista) {
+  return lista.length > 0 && lista.every((c) => c.areaGestora === "DEPIN/CONTRATOS");
+}
+
+// Análogas a agruparValorPorCampo/agruparPorAreaCriticidade, mas pra
+// COORPIN — que é MULTIVALORADO (`.unidades`, um contrato pode atender
+// mais de uma COORPIN ao mesmo tempo — "contratos compartilhados"),
+// diferente de unidadeGestora (sempre um valor só). Por isso não dá pra
+// só passar um campoFn pras funções de sempre — precisam iterar
+// `c.unidades` uma a uma. Cada contrato entra inteiro (valor total,
+// não dividido) em CADA unidade que atende — mesma convenção já usada no
+// resto do sistema pra "quantos contratos cada COORPIN tem".
+function agruparValorPorUnidadeGestora(lista) {
+  const mapa = new Map();
+  for (const c of lista) {
+    if (c.valorGlobalAtual == null) continue;
+    for (const u of c.unidades || []) {
+      if (!mapa.has(u.nomeUnidade)) mapa.set(u.nomeUnidade, { total: 0, qtd: 0 });
+      const g = mapa.get(u.nomeUnidade);
+      g.total += c.valorGlobalAtual;
+      g.qtd += 1;
+    }
+  }
+  return [...mapa.entries()].map(([label, g]) => ({ label, total: g.total, qtd: g.qtd })).sort((a, b) => b.total - a.total);
+}
+function agruparPorUnidadeCriticidade(lista) {
+  const mapa = new Map();
+  for (const c of lista) {
+    for (const u of c.unidades || []) {
+      if (!mapa.has(u.nomeUnidade)) mapa.set(u.nomeUnidade, { label: u.nomeUnidade, total: 0, porCrit: {} });
+      const g = mapa.get(u.nomeUnidade);
+      g.total++;
+      g.porCrit[c.criticidade] = (g.porCrit[c.criticidade] || 0) + 1;
+    }
+  }
+  return [...mapa.values()].sort((a, b) => b.total - a.total);
+}
+
 // Gestor e Fiscal vêm da tabela relacional ContratoPessoa (um contrato pode
 // ter mais de um gestor/fiscal, e a mesma pessoa aparece em vários
 // contratos) — bem diferente de Analista, que é um campo direto do
@@ -5080,7 +5127,21 @@ function ligarTooltipLinhas(container, porId) {
 function renderGerencialContratos(lista, resumo) {
   const alvo = document.getElementById("contratos-sub-gerencial");
   const porId = new Map(lista.map((c) => [c.id, c]));
-  const areasDisponiveis = [...new Set(lista.map((c) => c.unidadeGestora || "(sem unidade)"))].sort();
+  // Pedido direto: "a COORPIN não seria conceitualmente a área gestora...
+  // mas o equivalente talvez fosse a COORPIN... pra gente conseguir
+  // responder o mesmo que respondemos no DEPAF: qual área gasta mais,
+  // qual área tem mais contrato". Pra DEPIN, TODOS os contratos têm o
+  // MESMO unidadeGestora ("DEPIN") — agrupar por área ali não responde
+  // nada (um bloco só). A COORPIN é quem de fato varia contrato a
+  // contrato dentro da DEPIN — o equivalente funcional. Só troca quando a
+  // seleção atual é 100% DEPIN (ver ehSomenteDepin) — em "Todos", DEPAF
+  // ou qualquer outra área, "Área Gestora" continua sendo a pergunta
+  // certa, sem mudar nada.
+  const modoCoorpin = ehSomenteDepin(lista);
+  const areasDisponiveis = modoCoorpin
+    ? [...new Set(lista.flatMap((c) => (c.unidades || []).map((u) => u.nomeUnidade)))].sort((a, b) => (parseInt(a, 10) || 0) - (parseInt(b, 10) || 0))
+    : [...new Set(lista.map((c) => c.unidadeGestora || "(sem unidade)"))].sort();
+  const rotuloDimensaoArea = modoCoorpin ? "Unidade Regional (COORPIN)" : "Área Gestora";
   let filtroArea = "";
   let filtroTipo = "";
   let filtroAnalista = "";
@@ -5096,7 +5157,7 @@ function renderGerencialContratos(lista, resumo) {
   alvo.innerHTML = `
     <div class="dash-filtros">
       <div class="dash-filtro">
-        <label>ÁREA GESTORA</label>
+        <label>${rotuloDimensaoArea.toUpperCase()}</label>
         <select id="ger-filtro-area"><option value="">Todos</option>${areasDisponiveis.map((a) => `<option value="${escapeAttr(a)}">${escapeHTML(a)}</option>`).join("")}</select>
       </div>
       <div class="dash-filtro" style="flex:1;min-width:280px">
@@ -5110,17 +5171,17 @@ function renderGerencialContratos(lista, resumo) {
     <div id="ger-kpi-tabela" style="margin-bottom:16px"></div>
     <div class="dash-charts" style="grid-template-columns:1.1fr 1fr">
       <div class="dash-chart-box">
-        <h4>Detalhamento por Área Gestora</h4>
-        <p class="dash-chart-hint">Clique numa linha ou numa barra pra isolar só aquela área (a lista de contratos aparece logo abaixo dos cartões) — clique de novo (ou em "Todos" acima) pra voltar a ver tudo.</p>
+        <h4>Detalhamento por ${escapeHTML(rotuloDimensaoArea)}</h4>
+        <p class="dash-chart-hint">Clique numa linha ou numa barra pra isolar só aquela ${modoCoorpin ? "unidade" : "área"} (a lista de contratos aparece logo abaixo dos cartões) — clique de novo (ou em "Todos" acima) pra voltar a ver tudo.</p>
         <div style="text-align:right;margin-bottom:6px"><button type="button" class="dash-toggle-btn" id="ger-matriz-baixar" title="Baixar esta tabela como imagem">⬇ TABELA (PNG)</button></div>
         <div id="ger-matriz" class="tabela-rolavel"></div>
       </div>
       <div class="dash-chart-box">
-        <h4>Contratos por Criticidade e Área Gestora</h4>
+        <h4>Contratos por Criticidade e ${escapeHTML(rotuloDimensaoArea)}</h4>
         <div class="linha-troca-grafico"><div class="dash-toggle" id="ger-barra-toggle">
-          <button class="dash-toggle-btn" data-modo="proporcao" title="Compara a composição de criticidade de cada área">% POR ÁREA</button>
-          <button class="dash-toggle-btn" data-modo="absoluto" title="Compara o tamanho das áreas entre si">QTD POR ÁREA</button>
-          <button class="dash-toggle-btn" data-modo="treemap" title="Bloco = tamanho da área; cor = pior criticidade presente nela">MAPA</button>
+          <button class="dash-toggle-btn" data-modo="proporcao" title="Compara a composição de criticidade de cada ${modoCoorpin ? "unidade" : "área"}">${modoCoorpin ? "% POR UNIDADE" : "% POR ÁREA"}</button>
+          <button class="dash-toggle-btn" data-modo="absoluto" title="Compara o tamanho das ${modoCoorpin ? "unidades" : "áreas"} entre si">${modoCoorpin ? "QTD POR UNIDADE" : "QTD POR ÁREA"}</button>
+          <button class="dash-toggle-btn" data-modo="treemap" title="Bloco = tamanho da ${modoCoorpin ? "unidade" : "área"}; cor = pior criticidade presente nela">MAPA</button>
           <button class="dash-toggle-btn" data-modo="calor" title="Cor = criticidade; intensidade = volume de contratos na célula">MAPA DE CALOR</button>
         </div></div>
         <div id="ger-barra"></div>
@@ -5128,8 +5189,8 @@ function renderGerencialContratos(lista, resumo) {
     </div>
     <div class="dash-charts" style="grid-template-columns:1fr">
       <div class="dash-chart-box">
-        <h4>Valor Total por Área Gestora</h4>
-        <p class="dash-chart-hint">Pra responder rápido "quanto se gasta em tal área" sem precisar somar na mão. Clique numa barra pra isolar aquela área.</p>
+        <h4>Valor Total por ${escapeHTML(rotuloDimensaoArea)}</h4>
+        <p class="dash-chart-hint">Pra responder rápido "quanto se gasta em tal ${modoCoorpin ? "unidade" : "área"}" sem precisar somar na mão. Clique numa barra pra isolar aquela ${modoCoorpin ? "unidade" : "área"}.</p>
         <div id="ger-valor-area"></div>
       </div>
     </div>
@@ -5376,7 +5437,7 @@ function renderGerencialContratos(lista, resumo) {
 
   function atualizar() {
     const filtrada = lista.filter((c) =>
-      (!filtroArea || (c.unidadeGestora || "(sem unidade)") === filtroArea) &&
+      (!filtroArea || (modoCoorpin ? (c.unidades || []).some((u) => u.nomeUnidade === filtroArea) : (c.unidadeGestora || "(sem unidade)") === filtroArea)) &&
       (!filtroTipo || (c.tipoObjeto || "(sem tipo)") === filtroTipo) &&
       (!filtroAnalista || (c.analista || "(sem analista)") === filtroAnalista) &&
       (!filtroGestor || (c.pessoas || []).some((p) => p.papel === "Gestor" && p.nomePessoa === filtroGestor)) &&
@@ -5393,7 +5454,7 @@ function renderGerencialContratos(lista, resumo) {
     // bloco if/então 8 vezes ficaria ilegível; um array de {rotulo, limpar}
     // escala sem repetição.
     const chipsAtivos = [
-      filtroArea && { rotulo: `área: ${filtroArea}`, limpar: () => selecionarArea(filtroArea) },
+      filtroArea && { rotulo: `${modoCoorpin ? "unidade" : "área"}: ${filtroArea}`, limpar: () => selecionarArea(filtroArea) },
       filtroTipo && { rotulo: `tipo: ${filtroTipo}`, limpar: () => selecionarTipo(filtroTipo) },
       filtroAnalista && { rotulo: `analista: ${filtroAnalista}`, limpar: () => selecionarAnalista(filtroAnalista) },
       filtroGestor && { rotulo: `gestor: ${filtroGestor}`, limpar: () => selecionarGestor(filtroGestor) },
@@ -5435,7 +5496,7 @@ function renderGerencialContratos(lista, resumo) {
     // área o card mostra 0, sem quebrar nada, até outra área também passar
     // a ter esse detalhe.
     const qtdUnidadesBeneficiadas = new Set(filtrada.flatMap((c) => (c.unidades || []).map((u) => u.nomeUnidade))).size;
-    const porArea = agruparPorAreaCriticidade(filtrada);
+    const porArea = modoCoorpin ? agruparPorUnidadeCriticidade(filtrada) : agruparPorAreaCriticidade(filtrada);
 
     // Pedido direto: "os cartões de quantidade de contrato e valor atual
     // poderiam também direcionar como os outros... no de contrato mostrar
@@ -5501,7 +5562,7 @@ function renderGerencialContratos(lista, resumo) {
       btn.classList.toggle("active", btn.dataset.modo === modoBarra);
     });
     document.getElementById("ger-valor-area").innerHTML = barraContagemHorizontalSVG(
-      agruparValorPorCampo(filtrada, (c) => c.unidadeGestora, "(sem unidade)"),
+      modoCoorpin ? agruparValorPorUnidadeGestora(filtrada) : agruparValorPorCampo(filtrada, (c) => c.unidadeGestora, "(sem unidade)"),
       {
         formatarValor: (v) => "R$ " + formatarEixo(v),
         rotuloExtra: (l) => `(${l.qtd} contrato${l.qtd === 1 ? "" : "s"})`,
@@ -6131,7 +6192,14 @@ function dicaLeituraContratosHTML() {
 function renderResumoRapido(lista, resumo) {
   const alvo = document.getElementById("contratos-resumo-rapido");
   if (!alvo) return;
-  const top3Areas = agruparValorPorCampo(lista, (c) => c.unidadeGestora, "(sem unidade)").slice(0, 3);
+  // Pedido direto: "a COORPIN não seria conceitualmente a área gestora...
+  // o equivalente talvez fosse a COORPIN... pra gente conseguir responder
+  // o mesmo que respondemos no DEPAF: qual área gasta mais" — mesma troca
+  // aplicada no Gerencial (ver ehSomenteDepin/agruparValorPorUnidadeGestora).
+  const modoCoorpin = ehSomenteDepin(lista);
+  const top3Areas = modoCoorpin
+    ? agruparValorPorUnidadeGestora(lista).slice(0, 3)
+    : agruparValorPorCampo(lista, (c) => c.unidadeGestora, "(sem unidade)").slice(0, 3);
   const top3Categorias = agruparValorPorCampo(lista, (c) => c.tipoObjeto, "(sem tipo)").slice(0, 3);
   // Pedido direto, olhando o SEI Municípios (as abas Dengue/Zika/
   // Chikungunya sobre o MESMO gráfico): "onde mais se gasta" também podia
@@ -6143,7 +6211,7 @@ function renderResumoRapido(lista, resumo) {
   function corpoHTML() {
     const top3 = modoRanking === "area" ? top3Areas : top3Categorias;
     const atributoRanking = modoRanking === "area" ? "data-resumo-area" : "data-resumo-categoria";
-    const rotuloPlural = modoRanking === "area" ? "áreas gestoras" : "categorias";
+    const rotuloPlural = modoRanking === "area" ? (modoCoorpin ? "unidades regionais (COORPIN)" : "áreas gestoras") : "categorias";
     // Pedido direto: "os cartões de quantidade de contrato e valor atual
     // poderiam também direcionar como os outros... no de contrato mostrar
     // aquela tabela dos contratos totais e o de valor atual mostrar em
@@ -6181,7 +6249,7 @@ function renderResumoRapido(lista, resumo) {
       <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin:14px 0 6px">
         <p class="dash-chart-hint" style="margin:0">Onde mais se gasta (top 3 ${rotuloPlural} por valor) — clique pra abrir o perfil completo:</p>
         <div class="dash-toggle" id="resumo-ranking-toggle">
-          <button class="dash-toggle-btn${modoRanking === "area" ? " active" : ""}" data-modo="area" title="Quebrar por área gestora">ÁREA GESTORA</button>
+          <button class="dash-toggle-btn${modoRanking === "area" ? " active" : ""}" data-modo="area" title="Quebrar por ${modoCoorpin ? "unidade regional (COORPIN)" : "área gestora"}">${modoCoorpin ? "COORPIN" : "ÁREA GESTORA"}</button>
           <button class="dash-toggle-btn${modoRanking === "categoria" ? " active" : ""}" data-modo="categoria" title="Quebrar por categoria (tipo de objeto)">CATEGORIA</button>
         </div>
       </div>
@@ -6252,7 +6320,24 @@ function renderResumoRapido(lista, resumo) {
     if (cardArea) {
       document.querySelector('[data-subtab-contratos="porarea"]')?.click();
       const sel = document.getElementById("area-select");
-      if (sel) { sel.value = cardArea.dataset.resumoArea; sel.dispatchEvent(new Event("change", { bubbles: true })); }
+      if (modoCoorpin) {
+        // O rótulo aqui é uma COORPIN, não um valor de unidadeGestora —
+        // mesmo destino do cartão "Unidades Beneficiadas": DEPIN → subaba
+        // Unidades, já com essa COORPIN isolada (ver
+        // irParaUnidadeDepinEmPorArea, mesma lógica replicada aqui porque
+        // vive numa closure diferente).
+        if (sel) { sel.value = "DEPIN"; sel.dispatchEvent(new Event("change", { bubbles: true })); }
+        setTimeout(() => {
+          document.querySelector('[data-subtab-area="unidades"]')?.click();
+          setTimeout(() => {
+            const selCoorpin = document.getElementById("area-filtro-coorpin");
+            if (selCoorpin) { selCoorpin.value = cardArea.dataset.resumoArea; selCoorpin.dispatchEvent(new Event("change", { bubbles: true })); }
+          }, 150);
+        }, 250);
+      } else if (sel) {
+        sel.value = cardArea.dataset.resumoArea;
+        sel.dispatchEvent(new Event("change", { bubbles: true }));
+      }
       return;
     }
     const cardCategoria = ev.target.closest("[data-resumo-categoria]");
