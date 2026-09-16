@@ -4259,15 +4259,21 @@ const CRITICIDADE_VISUAL = [
 
 // campoFn/rotuloVazio generalizam pra qualquer dimensão (área OU categoria/
 // tipo de objeto) — default continua sendo área, pra não mudar nenhum dos
-// lugares que já chamavam isso sem os dois argumentos novos.
+// lugares que já chamavam isso sem os dois argumentos novos. campoFn pode
+// devolver um valor só OU uma lista (setor demandante da DEPIN é
+// multivalorado — ver setoresDemandantesDoContrato); um contrato compartilhado
+// entra INTEIRO em cada chave que atende, mesma convenção de sempre.
 function agruparPorAreaCriticidade(lista, campoFn = (c) => c.unidadeGestora, rotuloVazio = "(sem unidade)") {
   const mapa = new Map();
   for (const c of lista) {
-    const chave = campoFn(c) || rotuloVazio;
-    if (!mapa.has(chave)) mapa.set(chave, { label: chave, total: 0, porCrit: {} });
-    const g = mapa.get(chave);
-    g.total++;
-    g.porCrit[c.criticidade] = (g.porCrit[c.criticidade] || 0) + 1;
+    const bruto = campoFn(c);
+    const chaves = Array.isArray(bruto) ? (bruto.length ? bruto : [rotuloVazio]) : [bruto || rotuloVazio];
+    for (const chave of chaves) {
+      if (!mapa.has(chave)) mapa.set(chave, { label: chave, total: 0, porCrit: {} });
+      const g = mapa.get(chave);
+      g.total++;
+      g.porCrit[c.criticidade] = (g.porCrit[c.criticidade] || 0) + 1;
+    }
   }
   return [...mapa.values()].sort((a, b) => b.total - a.total);
 }
@@ -4605,60 +4611,56 @@ function agruparValorPorCampo(lista, campoFn, rotuloVazio = "(não informado)") 
   const mapa = new Map();
   for (const c of lista) {
     if (c.valorGlobalAtual == null) continue;
-    const chave = campoFn(c) || rotuloVazio;
-    if (!mapa.has(chave)) mapa.set(chave, { total: 0, qtd: 0 });
-    const g = mapa.get(chave);
-    g.total += c.valorGlobalAtual;
-    g.qtd += 1;
-  }
-  return [...mapa.entries()].map(([label, g]) => ({ label, total: g.total, qtd: g.qtd })).sort((a, b) => b.total - a.total);
-}
-
-// Pedido direto: "a COORPIN não seria conceitualmente a área gestora...
-// mas o equivalente talvez fosse a COORPIN... pra gente conseguir
-// responder o mesmo que respondemos no DEPAF: qual área gasta mais, qual
-// área tem mais contrato". Dentro da DEPIN, TODO contrato tem o MESMO
-// unidadeGestora ("DEPIN") — agrupar por área não responde nada (um
-// bloco só); COORPIN é quem de fato varia contrato a contrato ali. Só
-// troca quando a seleção é 100% DEPIN — em qualquer outra (Todos, DEPAF,
-// uma área específica não-DEPIN), "Área Gestora" continua sendo a
-// pergunta certa.
-function ehSomenteDepin(lista) {
-  return lista.length > 0 && lista.every((c) => c.areaGestora === "DEPIN/CONTRATOS");
-}
-
-// Análogas a agruparValorPorCampo/agruparPorAreaCriticidade, mas pra
-// COORPIN — que é MULTIVALORADO (`.unidades`, um contrato pode atender
-// mais de uma COORPIN ao mesmo tempo — "contratos compartilhados"),
-// diferente de unidadeGestora (sempre um valor só). Por isso não dá pra
-// só passar um campoFn pras funções de sempre — precisam iterar
-// `c.unidades` uma a uma. Cada contrato entra inteiro (valor total,
-// não dividido) em CADA unidade que atende — mesma convenção já usada no
-// resto do sistema pra "quantos contratos cada COORPIN tem".
-function agruparValorPorUnidadeGestora(lista) {
-  const mapa = new Map();
-  for (const c of lista) {
-    if (c.valorGlobalAtual == null) continue;
-    for (const u of c.unidades || []) {
-      if (!mapa.has(u.nomeUnidade)) mapa.set(u.nomeUnidade, { total: 0, qtd: 0 });
-      const g = mapa.get(u.nomeUnidade);
+    const bruto = campoFn(c);
+    const chaves = Array.isArray(bruto) ? (bruto.length ? bruto : [rotuloVazio]) : [bruto || rotuloVazio];
+    for (const chave of chaves) {
+      if (!mapa.has(chave)) mapa.set(chave, { total: 0, qtd: 0 });
+      const g = mapa.get(chave);
       g.total += c.valorGlobalAtual;
       g.qtd += 1;
     }
   }
   return [...mapa.entries()].map(([label, g]) => ({ label, total: g.total, qtd: g.qtd })).sort((a, b) => b.total - a.total);
 }
-function agruparPorUnidadeCriticidade(lista) {
-  const mapa = new Map();
-  for (const c of lista) {
-    for (const u of c.unidades || []) {
-      if (!mapa.has(u.nomeUnidade)) mapa.set(u.nomeUnidade, { label: u.nomeUnidade, total: 0, porCrit: {} });
-      const g = mapa.get(u.nomeUnidade);
-      g.total++;
-      g.porCrit[c.criticidade] = (g.porCrit[c.criticidade] || 0) + 1;
-    }
+
+// Pedido direto: "a área gestora do contrato é a unidade administrativa,
+// setor ou departamento... responsável por coordenar, acompanhar,
+// fiscalizar... existe mais de um entendimento possível... eu entendo que
+// o DEPAF, DPSV, ACADEPOL etc seriam unidades centrais de tudo, e isso que
+// o sistema tá chamando de área gestora seria setor requisitante/
+// demandante" — o campo unidadeGestora (CFPC, DEMEP, CORE/SAER...) sempre
+// foi, na prática, QUEM PEDIU o contrato, não a unidade central que
+// administra o processo (essa é a Unidade Gestora do seletor do topo:
+// DEPAF/DEPIN/...). Pra DEPAF, o setor demandante É o unidadeGestora de
+// sempre. Pra DEPIN, unidadeGestora é uma constante ("DEPIN/CONTRATOS") —
+// quem de fato varia contrato a contrato é a COORPIN (`c.unidades`,
+// multivalorado: um contrato pode atender mais de uma ao mesmo tempo,
+// "contratos compartilhados"). Retorna sempre uma LISTA (1 item pra
+// DEPAF, 0+ pra DEPIN) pra servir de campoFn multivalorado em qualquer
+// função de agrupamento da tela — a mesma pergunta ("qual setor gasta
+// mais, qual tem mais contrato") passa a ser respondível igual nos dois
+// casos, inclusive misturados (Todos).
+function setoresDemandantesDoContrato(c) {
+  if (c.areaGestora === "DEPIN/CONTRATOS") {
+    const nomes = (c.unidades || []).map((u) => u.nomeUnidade);
+    return nomes.length ? nomes : ["(sem unidade regional)"];
   }
-  return [...mapa.values()].sort((a, b) => b.total - a.total);
+  return [c.unidadeGestora || "(sem unidade)"];
+}
+// Mesma coisa, mas pra EXIBIÇÃO numa célula de tabela (uma string só) —
+// junta os vários setores de um contrato compartilhado com "+".
+function setorDemandanteExibicao(c) {
+  return setoresDemandantesDoContrato(c).join(" + ");
+}
+// Ordena setor demandante misto (nome de área tipo "CFPC" ao lado de
+// COORPIN tipo "15ª Serrinha") pelo número da COORPIN quando os dois lados
+// comparados são COORPIN — sem isso, ordenação alfabética simples deixa
+// "10ª" antes de "2ª" (comparação de texto, não de número).
+function compararSetorDemandante(a, b) {
+  const numA = /^\d+ª\s/.test(a), numB = /^\d+ª\s/.test(b);
+  if (numA && numB) return (parseInt(a, 10) || 0) - (parseInt(b, 10) || 0);
+  if (numA !== numB) return numA ? 1 : -1;
+  return a.localeCompare(b, "pt-BR");
 }
 
 // Gestor e Fiscal vêm da tabela relacional ContratoPessoa (um contrato pode
@@ -4706,6 +4708,7 @@ function indiceBuscaContrato(c) {
     formatarMoedaBR(c.valorGlobalInicial), formatarMoedaBR(c.valorGlobalAtual),
     formatarDataBR(c.dataInicio), formatarDataBR(c.dataFim),
     ...(c.pessoas || []).map((p) => p.nomePessoa),
+    ...(c.unidades || []).map((u) => u.nomeUnidade),
   ];
   return normalizarBusca(campos.filter(Boolean).join(" ␟"));
 }
@@ -4728,10 +4731,10 @@ function ligarBuscaContratos(lista, porId, idInput, idResultado) {
         <h4>Resultado da busca</h4>
         <p class="dash-chart-hint">${encontrados.length} contrato(s) encontrado(s) pra "${escapeHTML(input.value.trim())}" — em número, empresa, objeto, valor, data, área, analista, gestor ou fiscal. Clique numa linha pra abrir o panorama completo do contrato.</p>
         ${encontrados.length ? `<div class="tabela-rolavel" style="max-height:320px"><table class="dash-tabela">
-          <thead><tr><th>Nº CONTRATO</th><th>ÁREA GESTORA</th><th>EMPRESA</th><th>OBJETO</th></tr></thead>
+          <thead><tr><th>Nº CONTRATO</th><th>SETOR DEMANDANTE</th><th>EMPRESA</th><th>OBJETO</th></tr></thead>
           <tbody>${encontrados.map((c) => `
             <tr class="linha-contrato" data-contrato-id="${escapeAttr(c.id)}">
-              <td>${escapeHTML(c.numeroContrato)}${badgeRenovado(c)}</td><td>${escapeHTML(c.unidadeGestora || "—")}</td><td>${escapeHTML(c.empresa)}</td><td>${escapeHTML(c.objeto || "—")}</td>
+              <td>${escapeHTML(c.numeroContrato)}${badgeRenovado(c)}</td><td>${escapeHTML(setorDemandanteExibicao(c) || "—")}</td><td>${escapeHTML(c.empresa)}</td><td>${escapeHTML(c.objeto || "—")}</td>
             </tr>`).join("")}</tbody>
         </table></div>` : ""}
       </div>`;
@@ -4967,7 +4970,7 @@ function renderMatrizAreaGestora(linhasArea) {
     </tr>`).join("");
   return `
     <table class="dash-tabela">
-      <thead><tr><th>ÁREA GESTORA</th><th>QTD CONTRATOS</th>${colunasCrit.map((l) => `<th>QTD ${escapeHTML(l.replace(/\s*\(.*\)/, "").toUpperCase())}</th>`).join("")}</tr></thead>
+      <thead><tr><th>SETOR DEMANDANTE</th><th>QTD CONTRATOS</th>${colunasCrit.map((l) => `<th>QTD ${escapeHTML(l.replace(/\s*\(.*\)/, "").toUpperCase())}</th>`).join("")}</tr></thead>
       <tbody>${linhasHtml}
         <tr style="border-top:2px solid var(--carvao);font-weight:700">
           <td>TOTAL</td><td class="num">${totalGeral.total}</td>
@@ -5074,7 +5077,7 @@ function tabelaContratosHTML(lista, opcoes = {}) {
   const { comSei = false, dirpinAtual = null, destacarCompartilhados = false } = opcoes;
   if (!lista.length) return `<p class="tela-intro">Nenhum contrato nessa faixa.</p>`;
   return `<table class="dash-tabela">
-      <thead><tr><th>Nº CONTRATO</th><th>ÁREA GESTORA</th><th>EMPRESA</th><th>DIAS PARA VENCER</th><th>CRITICIDADE</th>${comSei ? "<th>SEI DOS ADITIVOS</th>" : ""}</tr></thead>
+      <thead><tr><th>Nº CONTRATO</th><th>SETOR DEMANDANTE</th><th>EMPRESA</th><th>DIAS PARA VENCER</th><th>CRITICIDADE</th>${comSei ? "<th>SEI DOS ADITIVOS</th>" : ""}</tr></thead>
       <tbody>${lista.map((c) => {
         // Pedido direto: "pensei que vc fosse na hora que filtra por
         // dirpin dizer algo como esse contrato está compartilhado com x"
@@ -5092,7 +5095,7 @@ function tabelaContratosHTML(lista, opcoes = {}) {
           : "";
         return `
         <tr class="linha-contrato" data-contrato-id="${escapeAttr(c.id)}">
-          <td>${escapeHTML(c.numeroContrato)}${badgeRenovado(c)}${selosCompartilhado}</td><td>${escapeHTML(c.unidadeGestora || "—")}</td><td>${escapeHTML(c.empresa)}</td><td class="num">${formatarDiasBR(c.diasParaVencer)}</td><td>${pillCriticidade(c.criticidade)}</td>${comSei ? `<td>${(c.aditivos || []).map((a) => `${a.numeroAditivo}º: ${escapeHTML(a.processoSeiAditivo || "—")}`).join("<br>") || "—"}</td>` : ""}
+          <td>${escapeHTML(c.numeroContrato)}${badgeRenovado(c)}${selosCompartilhado}</td><td>${escapeHTML(setorDemandanteExibicao(c) || "—")}</td><td>${escapeHTML(c.empresa)}</td><td class="num">${formatarDiasBR(c.diasParaVencer)}</td><td>${pillCriticidade(c.criticidade)}</td>${comSei ? `<td>${(c.aditivos || []).map((a) => `${a.numeroAditivo}º: ${escapeHTML(a.processoSeiAditivo || "—")}`).join("<br>") || "—"}</td>` : ""}
         </tr>`;
       }).join("")}</tbody>
     </table>`;
@@ -5127,21 +5130,7 @@ function ligarTooltipLinhas(container, porId) {
 function renderGerencialContratos(lista, resumo) {
   const alvo = document.getElementById("contratos-sub-gerencial");
   const porId = new Map(lista.map((c) => [c.id, c]));
-  // Pedido direto: "a COORPIN não seria conceitualmente a área gestora...
-  // mas o equivalente talvez fosse a COORPIN... pra gente conseguir
-  // responder o mesmo que respondemos no DEPAF: qual área gasta mais,
-  // qual área tem mais contrato". Pra DEPIN, TODOS os contratos têm o
-  // MESMO unidadeGestora ("DEPIN") — agrupar por área ali não responde
-  // nada (um bloco só). A COORPIN é quem de fato varia contrato a
-  // contrato dentro da DEPIN — o equivalente funcional. Só troca quando a
-  // seleção atual é 100% DEPIN (ver ehSomenteDepin) — em "Todos", DEPAF
-  // ou qualquer outra área, "Área Gestora" continua sendo a pergunta
-  // certa, sem mudar nada.
-  const modoCoorpin = ehSomenteDepin(lista);
-  const areasDisponiveis = modoCoorpin
-    ? [...new Set(lista.flatMap((c) => (c.unidades || []).map((u) => u.nomeUnidade)))].sort((a, b) => (parseInt(a, 10) || 0) - (parseInt(b, 10) || 0))
-    : [...new Set(lista.map((c) => c.unidadeGestora || "(sem unidade)"))].sort();
-  const rotuloDimensaoArea = modoCoorpin ? "Unidade Regional (COORPIN)" : "Área Gestora";
+  const areasDisponiveis = [...new Set(lista.flatMap(setoresDemandantesDoContrato))].sort(compararSetorDemandante);
   let filtroArea = "";
   let filtroTipo = "";
   let filtroAnalista = "";
@@ -5157,7 +5146,7 @@ function renderGerencialContratos(lista, resumo) {
   alvo.innerHTML = `
     <div class="dash-filtros">
       <div class="dash-filtro">
-        <label>${rotuloDimensaoArea.toUpperCase()}</label>
+        <label>SETOR DEMANDANTE</label>
         <select id="ger-filtro-area"><option value="">Todos</option>${areasDisponiveis.map((a) => `<option value="${escapeAttr(a)}">${escapeHTML(a)}</option>`).join("")}</select>
       </div>
       <div class="dash-filtro" style="flex:1;min-width:280px">
@@ -5171,17 +5160,17 @@ function renderGerencialContratos(lista, resumo) {
     <div id="ger-kpi-tabela" style="margin-bottom:16px"></div>
     <div class="dash-charts" style="grid-template-columns:1.1fr 1fr">
       <div class="dash-chart-box">
-        <h4>Detalhamento por ${escapeHTML(rotuloDimensaoArea)}</h4>
-        <p class="dash-chart-hint">Clique numa linha ou numa barra pra isolar só aquela ${modoCoorpin ? "unidade" : "área"} (a lista de contratos aparece logo abaixo dos cartões) — clique de novo (ou em "Todos" acima) pra voltar a ver tudo.</p>
+        <h4>Detalhamento por Setor Demandante</h4>
+        <p class="dash-chart-hint">Clique numa linha ou numa barra pra isolar só aquele setor (a lista de contratos aparece logo abaixo dos cartões) — clique de novo (ou em "Todos" acima) pra voltar a ver tudo.</p>
         <div style="text-align:right;margin-bottom:6px"><button type="button" class="dash-toggle-btn" id="ger-matriz-baixar" title="Baixar esta tabela como imagem">⬇ TABELA (PNG)</button></div>
         <div id="ger-matriz" class="tabela-rolavel"></div>
       </div>
       <div class="dash-chart-box">
-        <h4>Contratos por Criticidade e ${escapeHTML(rotuloDimensaoArea)}</h4>
+        <h4>Contratos por Criticidade e Setor Demandante</h4>
         <div class="linha-troca-grafico"><div class="dash-toggle" id="ger-barra-toggle">
-          <button class="dash-toggle-btn" data-modo="proporcao" title="Compara a composição de criticidade de cada ${modoCoorpin ? "unidade" : "área"}">${modoCoorpin ? "% POR UNIDADE" : "% POR ÁREA"}</button>
-          <button class="dash-toggle-btn" data-modo="absoluto" title="Compara o tamanho das ${modoCoorpin ? "unidades" : "áreas"} entre si">${modoCoorpin ? "QTD POR UNIDADE" : "QTD POR ÁREA"}</button>
-          <button class="dash-toggle-btn" data-modo="treemap" title="Bloco = tamanho da ${modoCoorpin ? "unidade" : "área"}; cor = pior criticidade presente nela">MAPA</button>
+          <button class="dash-toggle-btn" data-modo="proporcao" title="Compara a composição de criticidade de cada setor">% POR SETOR</button>
+          <button class="dash-toggle-btn" data-modo="absoluto" title="Compara o tamanho dos setores entre si">QTD POR SETOR</button>
+          <button class="dash-toggle-btn" data-modo="treemap" title="Bloco = tamanho do setor; cor = pior criticidade presente nele">MAPA</button>
           <button class="dash-toggle-btn" data-modo="calor" title="Cor = criticidade; intensidade = volume de contratos na célula">MAPA DE CALOR</button>
         </div></div>
         <div id="ger-barra"></div>
@@ -5189,8 +5178,8 @@ function renderGerencialContratos(lista, resumo) {
     </div>
     <div class="dash-charts" style="grid-template-columns:1fr">
       <div class="dash-chart-box">
-        <h4>Valor Total por ${escapeHTML(rotuloDimensaoArea)}</h4>
-        <p class="dash-chart-hint">Pra responder rápido "quanto se gasta em tal ${modoCoorpin ? "unidade" : "área"}" sem precisar somar na mão. Clique numa barra pra isolar aquela ${modoCoorpin ? "unidade" : "área"}.</p>
+        <h4>Valor Total por Setor Demandante</h4>
+        <p class="dash-chart-hint">Pra responder rápido "quanto se gasta em tal setor" sem precisar somar na mão. Clique numa barra pra isolar aquele setor.</p>
         <div id="ger-valor-area"></div>
       </div>
     </div>
@@ -5375,21 +5364,15 @@ function renderGerencialContratos(lista, resumo) {
     // Pedido direto: "o cartão de clique de unidades beneficiadas não
     // funciona" — não tinha clique nenhum (só informativo). Isolar por
     // "quantidade de unidade" não faz sentido como filtro aqui; o destino
-    // útil é abrir o perfil de onde essa informação é detalhada — hoje só
-    // a DEPIN tem unidade cadastrada (mesmo texto do title do cartão).
-    // Terceira rodada, pedido direto: "vale adicionar uma aba que mostre
-    // unidades beneficiadas/atendidas". Quarta rodada, pedido direto:
-    // "unidades (a aba) só deveria aparecer quando tivesse selecionado
-    // pra área gestora DEPIN... ela pra ser uma aba dentro da aba de área
-    // gestora" — deixou de ser aba própria (irmã de Gerencial/Tático/...)
-    // e virou subaba de "Por Área Gestora", só quando DEPIN é a área
-    // escolhida (hoje, a única unidade gestora com unidade regional
-    // cadastrada).
+    // útil é abrir o perfil de onde essa informação é detalhada. Como
+    // "Por Setor Demandante" já lista cada COORPIN como seu próprio
+    // cartão (junto dos setores do DEPAF), a landing dessa aba JÁ é a
+    // visão "quantos contratos cada unidade tem" — não precisa mais de um
+    // destino especial pra DEPIN.
     if (acaoRodape?.dataset.acao === "unidades-beneficiadas") {
       document.querySelector('[data-subtab-contratos="porarea"]')?.click();
       const selArea = document.getElementById("area-select");
-      if (selArea) { selArea.value = "DEPIN"; selArea.dispatchEvent(new Event("change", { bubbles: true })); }
-      setTimeout(() => { document.querySelector('[data-subtab-area="unidades"]')?.click(); }, 250);
+      if (selArea && selArea.value) { selArea.value = ""; selArea.dispatchEvent(new Event("change", { bubbles: true })); }
     }
   });
   document.getElementById("ger-matriz").addEventListener("click", (ev) => {
@@ -5437,7 +5420,7 @@ function renderGerencialContratos(lista, resumo) {
 
   function atualizar() {
     const filtrada = lista.filter((c) =>
-      (!filtroArea || (modoCoorpin ? (c.unidades || []).some((u) => u.nomeUnidade === filtroArea) : (c.unidadeGestora || "(sem unidade)") === filtroArea)) &&
+      (!filtroArea || setoresDemandantesDoContrato(c).includes(filtroArea)) &&
       (!filtroTipo || (c.tipoObjeto || "(sem tipo)") === filtroTipo) &&
       (!filtroAnalista || (c.analista || "(sem analista)") === filtroAnalista) &&
       (!filtroGestor || (c.pessoas || []).some((p) => p.papel === "Gestor" && p.nomePessoa === filtroGestor)) &&
@@ -5454,7 +5437,7 @@ function renderGerencialContratos(lista, resumo) {
     // bloco if/então 8 vezes ficaria ilegível; um array de {rotulo, limpar}
     // escala sem repetição.
     const chipsAtivos = [
-      filtroArea && { rotulo: `${modoCoorpin ? "unidade" : "área"}: ${filtroArea}`, limpar: () => selecionarArea(filtroArea) },
+      filtroArea && { rotulo: `setor: ${filtroArea}`, limpar: () => selecionarArea(filtroArea) },
       filtroTipo && { rotulo: `tipo: ${filtroTipo}`, limpar: () => selecionarTipo(filtroTipo) },
       filtroAnalista && { rotulo: `analista: ${filtroAnalista}`, limpar: () => selecionarAnalista(filtroAnalista) },
       filtroGestor && { rotulo: `gestor: ${filtroGestor}`, limpar: () => selecionarGestor(filtroGestor) },
@@ -5496,7 +5479,7 @@ function renderGerencialContratos(lista, resumo) {
     // área o card mostra 0, sem quebrar nada, até outra área também passar
     // a ter esse detalhe.
     const qtdUnidadesBeneficiadas = new Set(filtrada.flatMap((c) => (c.unidades || []).map((u) => u.nomeUnidade))).size;
-    const porArea = modoCoorpin ? agruparPorUnidadeCriticidade(filtrada) : agruparPorAreaCriticidade(filtrada);
+    const porArea = agruparPorAreaCriticidade(filtrada, setoresDemandantesDoContrato);
 
     // Pedido direto: "os cartões de quantidade de contrato e valor atual
     // poderiam também direcionar como os outros... no de contrato mostrar
@@ -5562,7 +5545,7 @@ function renderGerencialContratos(lista, resumo) {
       btn.classList.toggle("active", btn.dataset.modo === modoBarra);
     });
     document.getElementById("ger-valor-area").innerHTML = barraContagemHorizontalSVG(
-      modoCoorpin ? agruparValorPorUnidadeGestora(filtrada) : agruparValorPorCampo(filtrada, (c) => c.unidadeGestora, "(sem unidade)"),
+      agruparValorPorCampo(filtrada, setoresDemandantesDoContrato, "(sem unidade)"),
       {
         formatarValor: (v) => "R$ " + formatarEixo(v),
         rotuloExtra: (l) => `(${l.qtd} contrato${l.qtd === 1 ? "" : "s"})`,
@@ -5759,10 +5742,10 @@ function renderTaticoContratos(lista) {
     if (btnLimparMes) btnLimparMes.addEventListener("click", () => selecionarMes(filtroMes));
     document.getElementById("tat-tabela").innerHTML = filtrada.length
       ? `<table class="dash-tabela">
-          <thead><tr><th>Nº CONTRATO</th><th>ÁREA GESTORA</th><th>EMPRESA</th><th>OBJETO</th></tr></thead>
+          <thead><tr><th>Nº CONTRATO</th><th>SETOR DEMANDANTE</th><th>EMPRESA</th><th>OBJETO</th></tr></thead>
           <tbody>${filtrada.map((c) => `
             <tr class="linha-contrato" data-contrato-id="${escapeAttr(c.id)}">
-              <td>${escapeHTML(c.numeroContrato)}${badgeRenovado(c)}</td><td>${escapeHTML(c.unidadeGestora || "—")}</td><td>${escapeHTML(c.empresa)}</td><td>${escapeHTML(c.objeto || "—")}</td>
+              <td>${escapeHTML(c.numeroContrato)}${badgeRenovado(c)}</td><td>${escapeHTML(setorDemandanteExibicao(c) || "—")}</td><td>${escapeHTML(c.empresa)}</td><td>${escapeHTML(c.objeto || "—")}</td>
             </tr>`).join("")}</tbody>
         </table>`
       : `<p class="tela-intro">Nenhum contrato nessa faixa.</p>`;
@@ -6192,14 +6175,7 @@ function dicaLeituraContratosHTML() {
 function renderResumoRapido(lista, resumo) {
   const alvo = document.getElementById("contratos-resumo-rapido");
   if (!alvo) return;
-  // Pedido direto: "a COORPIN não seria conceitualmente a área gestora...
-  // o equivalente talvez fosse a COORPIN... pra gente conseguir responder
-  // o mesmo que respondemos no DEPAF: qual área gasta mais" — mesma troca
-  // aplicada no Gerencial (ver ehSomenteDepin/agruparValorPorUnidadeGestora).
-  const modoCoorpin = ehSomenteDepin(lista);
-  const top3Areas = modoCoorpin
-    ? agruparValorPorUnidadeGestora(lista).slice(0, 3)
-    : agruparValorPorCampo(lista, (c) => c.unidadeGestora, "(sem unidade)").slice(0, 3);
+  const top3Areas = agruparValorPorCampo(lista, setoresDemandantesDoContrato, "(sem unidade)").slice(0, 3);
   const top3Categorias = agruparValorPorCampo(lista, (c) => c.tipoObjeto, "(sem tipo)").slice(0, 3);
   // Pedido direto, olhando o SEI Municípios (as abas Dengue/Zika/
   // Chikungunya sobre o MESMO gráfico): "onde mais se gasta" também podia
@@ -6211,7 +6187,7 @@ function renderResumoRapido(lista, resumo) {
   function corpoHTML() {
     const top3 = modoRanking === "area" ? top3Areas : top3Categorias;
     const atributoRanking = modoRanking === "area" ? "data-resumo-area" : "data-resumo-categoria";
-    const rotuloPlural = modoRanking === "area" ? (modoCoorpin ? "unidades regionais (COORPIN)" : "áreas gestoras") : "categorias";
+    const rotuloPlural = modoRanking === "area" ? "setores demandantes" : "categorias";
     // Pedido direto: "os cartões de quantidade de contrato e valor atual
     // poderiam também direcionar como os outros... no de contrato mostrar
     // aquela tabela dos contratos totais e o de valor atual mostrar em
@@ -6249,7 +6225,7 @@ function renderResumoRapido(lista, resumo) {
       <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin:14px 0 6px">
         <p class="dash-chart-hint" style="margin:0">Onde mais se gasta (top 3 ${rotuloPlural} por valor) — clique pra abrir o perfil completo:</p>
         <div class="dash-toggle" id="resumo-ranking-toggle">
-          <button class="dash-toggle-btn${modoRanking === "area" ? " active" : ""}" data-modo="area" title="Quebrar por ${modoCoorpin ? "unidade regional (COORPIN)" : "área gestora"}">${modoCoorpin ? "COORPIN" : "ÁREA GESTORA"}</button>
+          <button class="dash-toggle-btn${modoRanking === "area" ? " active" : ""}" data-modo="area" title="Quebrar por setor demandante">SETOR DEMANDANTE</button>
           <button class="dash-toggle-btn${modoRanking === "categoria" ? " active" : ""}" data-modo="categoria" title="Quebrar por categoria (tipo de objeto)">CATEGORIA</button>
         </div>
       </div>
@@ -6320,24 +6296,7 @@ function renderResumoRapido(lista, resumo) {
     if (cardArea) {
       document.querySelector('[data-subtab-contratos="porarea"]')?.click();
       const sel = document.getElementById("area-select");
-      if (modoCoorpin) {
-        // O rótulo aqui é uma COORPIN, não um valor de unidadeGestora —
-        // mesmo destino do cartão "Unidades Beneficiadas": DEPIN → subaba
-        // Unidades, já com essa COORPIN isolada (ver
-        // irParaUnidadeDepinEmPorArea, mesma lógica replicada aqui porque
-        // vive numa closure diferente).
-        if (sel) { sel.value = "DEPIN"; sel.dispatchEvent(new Event("change", { bubbles: true })); }
-        setTimeout(() => {
-          document.querySelector('[data-subtab-area="unidades"]')?.click();
-          setTimeout(() => {
-            const selCoorpin = document.getElementById("area-filtro-coorpin");
-            if (selCoorpin) { selCoorpin.value = cardArea.dataset.resumoArea; selCoorpin.dispatchEvent(new Event("change", { bubbles: true })); }
-          }, 150);
-        }, 250);
-      } else if (sel) {
-        sel.value = cardArea.dataset.resumoArea;
-        sel.dispatchEvent(new Event("change", { bubbles: true }));
-      }
+      if (sel) { sel.value = cardArea.dataset.resumoArea; sel.dispatchEvent(new Event("change", { bubbles: true })); }
       return;
     }
     const cardCategoria = ev.target.closest("[data-resumo-categoria]");
@@ -6436,13 +6395,18 @@ function renderAlertaVencimentoContratos(lista, porId, decisoesRenovacao = new M
 function configPorArea() {
   return {
     prefixo: "area",
-    campoAgrupador: (c) => c.unidadeGestora,
+    // Setor demandante: pra DEPAF é o unidadeGestora de sempre (CFPC,
+    // DEMEP...); pra DEPIN é a(s) COORPIN(s) — multivalorado, ver
+    // setoresDemandantesDoContrato. Assim a mesma aba responde "qual setor
+    // gasta mais/tem mais contrato" igual nos dois casos, inclusive Todos.
+    campoAgrupador: (c) => setoresDemandantesDoContrato(c),
     rotuloVazio: "(sem unidade)",
-    labelSelect: "SELECIONE A ÁREA GESTORA",
-    opcaoPadrao: "— Escolha uma área —",
-    labelBusca: "ÁREA",
-    labelTrocar: "← TROCAR DE ÁREA",
-    dicaLanding: "Escolha uma área gestora (no campo acima, ou clicando num cartão abaixo) pra ver o perfil completo dela — vencimentos, financeiro, pessoas.",
+    compararValores: compararSetorDemandante,
+    labelSelect: "SELECIONE O SETOR DEMANDANTE",
+    opcaoPadrao: "— Escolha um setor —",
+    labelBusca: "SETOR",
+    labelTrocar: "← TROCAR DE SETOR",
+    dicaLanding: "Escolha um setor demandante (no campo acima, ou clicando num cartão abaixo) pra ver o perfil completo dele — vencimentos, financeiro, pessoas.",
     complementar: { campoFn: (c) => c.tipoObjeto, rotuloVazio: "(sem tipo)", titulo: "Valor por Tipo de Objeto", prefixoAlvo: "categoria", tituloAba: "Por Categoria" },
   };
 }
@@ -6456,7 +6420,7 @@ function configPorCategoria() {
     labelBusca: "CATEGORIA",
     labelTrocar: "← TROCAR DE CATEGORIA",
     dicaLanding: "Escolha uma categoria (no campo acima, ou clicando num cartão abaixo) pra ver o perfil completo dela — vencimentos, financeiro, pessoas.",
-    complementar: { campoFn: (c) => c.unidadeGestora, rotuloVazio: "(sem unidade)", titulo: "Valor por Área Gestora", prefixoAlvo: "area", tituloAba: "Por Área Gestora" },
+    complementar: { campoFn: (c) => setoresDemandantesDoContrato(c), rotuloVazio: "(sem unidade)", titulo: "Valor por Setor Demandante", prefixoAlvo: "area", tituloAba: "Por Setor Demandante" },
   };
 }
 
@@ -6600,7 +6564,7 @@ function mapaCoorpinSVG(linhas, opcoes = {}) {
 function coresPorAreaGestoraSVG(contratos) {
   const porArea = new Map(); // nomeArea -> qtd
   for (const c of contratos) {
-    const nome = c.unidadeGestora || "(sem unidade gestora)";
+    const nome = setorDemandanteExibicao(c) || "(sem setor)";
     porArea.set(nome, (porArea.get(nome) || 0) + 1);
   }
   // Ordem estável (maior quantidade primeiro, empate por nome) — mesma
@@ -6627,9 +6591,9 @@ function mapaSalvadorSVG(contratos, opcoes = {}) {
     const theta = i * ANGULO_OURO;
     const x = cx + r * Math.cos(theta);
     const y = cy + r * Math.sin(theta);
-    const cor = cores.get(c.unidadeGestora || "(sem unidade gestora)");
+    const cor = cores.get(setorDemandanteExibicao(c) || "(sem setor)");
     const destacado = destacarId && c.id === destacarId;
-    pontos += `<circle class="linha-contrato" data-contrato-id="${escapeAttr(c.id)}" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${raioPonto}" fill="${cor}" stroke="var(--paper)" stroke-width="${destacado ? 1.6 : 0.6}" style="cursor:pointer"><title>${escapeHTML(c.numeroContrato)} — ${escapeHTML(c.empresa)} (${escapeHTML(c.unidadeGestora || "—")})</title></circle>`;
+    pontos += `<circle class="linha-contrato" data-contrato-id="${escapeAttr(c.id)}" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${raioPonto}" fill="${cor}" stroke="var(--paper)" stroke-width="${destacado ? 1.6 : 0.6}" style="cursor:pointer"><title>${escapeHTML(c.numeroContrato)} — ${escapeHTML(c.empresa)} (${escapeHTML(setorDemandanteExibicao(c) || "—")})</title></circle>`;
   });
   return `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="max-width:340px;width:100%;height:auto;display:block;margin:0 auto">
     <circle cx="${cx}" cy="${cy}" r="${R + 16}" fill="var(--paper-line)" stroke="var(--carvao)" stroke-width="1.5" stroke-dasharray="5,4"></circle>
@@ -6646,7 +6610,7 @@ function legendaAreaGestoraHTML(contratos) {
   const { porArea, cores } = coresPorAreaGestoraSVG(contratos);
   const linhas = [...porArea.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
   return `
-    <p class="dash-chart-hint" style="margin-top:10px">Ainda não temos o bairro/endereço de cada contrato dentro de Salvador — a posição de cada bolinha aqui é só organização visual (arranjo em espiral), não geografia real. Assim que essa lista existir, os pontos entram no lugar certo. Por enquanto, a cor já mostra de qual área gestora é cada um:</p>
+    <p class="dash-chart-hint" style="margin-top:10px">Ainda não temos o bairro/endereço de cada contrato dentro de Salvador — a posição de cada bolinha aqui é só organização visual (arranjo em espiral), não geografia real. Assim que essa lista existir, os pontos entram no lugar certo. Por enquanto, a cor já mostra de qual setor demandante é cada um:</p>
     <div style="display:flex;flex-wrap:wrap;gap:8px 16px;margin-top:8px;font-size:var(--fs-ui-sm)">
       ${linhas.map(([nome, qtd]) => {
         const cor = cores.get(nome);
@@ -6703,7 +6667,24 @@ function renderPorDimensaoContratos(lista, cfg) {
   const el = (sufixo) => document.getElementById(`${p}-${sufixo}`);
   const alvo = document.getElementById(`contratos-sub-por${p}`);
   const porId = new Map(lista.map((c) => [c.id, c]));
-  const valoresDisponiveis = [...new Set(lista.map((c) => cfg.campoAgrupador(c) || cfg.rotuloVazio))].sort();
+  // campoFn (de cfg OU de cfg.complementar) pode devolver um valor só
+  // (categoria/tipoObjeto) OU uma lista (setor demandante — ver
+  // setoresDemandantesDoContrato); estas funções normalizam os dois
+  // formatos pro resto da função não precisar saber qual é qual.
+  function valoresDoCampo(campoFn, rotuloVazio, c) {
+    const v = campoFn(c);
+    return Array.isArray(v) ? (v.length ? v : [rotuloVazio]) : [v || rotuloVazio];
+  }
+  function pertenceAoValorGenerico(campoFn, rotuloVazio, c, valor) {
+    return valoresDoCampo(campoFn, rotuloVazio, c).includes(valor);
+  }
+  function valoresDoContrato(c) {
+    return valoresDoCampo(cfg.campoAgrupador, cfg.rotuloVazio, c);
+  }
+  function pertenceAoValor(c, valor) {
+    return pertenceAoValorGenerico(cfg.campoAgrupador, cfg.rotuloVazio, c, valor);
+  }
+  const valoresDisponiveis = [...new Set(lista.flatMap(valoresDoContrato))].sort(cfg.compararValores || ((a, b) => a.localeCompare(b, "pt-BR")));
   let selecionada = "";
   let filtroComplementar = "";
   let modoComplementar = "padrao"; // "padrao" (dimensão complementar de cfg) | "analista"
@@ -6759,18 +6740,11 @@ function renderPorDimensaoContratos(lista, cfg) {
         <button class="tab-btn" data-subtab-${p}="prazos">PRAZOS E VENCIMENTOS</button>
         <button class="tab-btn" data-subtab-${p}="financeiro">FINANCEIRO</button>
         <button class="tab-btn" data-subtab-${p}="pessoas">PESSOAS</button>
-        ${/* Pedido direto: "unidades (a aba) só deveria aparecer quando
-           tivesse selecionado pra área gestora DEPIN... ela pra ser uma
-           aba dentro da aba de área gestora" — só existe em Por Área
-           Gestora (nunca em Por Categoria), e começa escondida: atualizar()
-           decide se mostra, a cada vez que a área escolhida muda. */ ""}
-        ${p === "area" ? `<button class="tab-btn" data-subtab-${p}="unidades" id="${p}-subtab-btn-unidades" hidden>UNIDADES</button>` : ""}
       </div>
       <div class="tab-panel" id="${p}-sub-visao"></div>
       <div class="tab-panel" id="${p}-sub-prazos" hidden></div>
       <div class="tab-panel" id="${p}-sub-financeiro" hidden></div>
       <div class="tab-panel" id="${p}-sub-pessoas" hidden></div>
-      ${p === "area" ? `<div class="tab-panel" id="${p}-sub-unidades" hidden></div>` : ""}
       ${/* Pedido direto: "talvez na categoria hierarquizar melhor colocando
          a tabela acima dessa possibilidade de 'só na DEPIN'" — só em Por
          Categoria (onde a tabela de baixo mistura áreas), o quadro da DEPIN
@@ -6784,7 +6758,7 @@ function renderPorDimensaoContratos(lista, cfg) {
 
   ligarBuscaContratos(lista, porId, `${p}-busca`, `${p}-busca-resultado`);
 
-  const SUBABAS = p === "area" ? ["visao", "prazos", "financeiro", "pessoas", "unidades"] : ["visao", "prazos", "financeiro", "pessoas"];
+  const SUBABAS = ["visao", "prazos", "financeiro", "pessoas"];
   alvo.querySelectorAll(`[data-subtab-${p}]`).forEach((btn) => {
     btn.addEventListener("click", () => {
       alvo.querySelectorAll(`[data-subtab-${p}]`).forEach((b) => b.classList.remove("active"));
@@ -6839,12 +6813,12 @@ function renderPorDimensaoContratos(lista, cfg) {
         <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
           <h4 style="margin:0">${escapeHTML(cfg.complementar.titulo)} (visão geral, todas as ${cfg.labelBusca.toLowerCase()}s)</h4>
           ${temUnidadeLanding ? `<div class="dash-toggle" id="${p}-toggle-landing">
-            <button class="dash-toggle-btn" data-modo="rosca" title="Quanto cada área gestora representa do total">ROSCA</button>
+            <button class="dash-toggle-btn" data-modo="rosca" title="Quanto cada setor demandante representa do total">ROSCA</button>
             <button class="dash-toggle-btn" data-modo="mapa" title="Onde as unidades da DEPIN ficam no estado, somando todas as categorias">MAPA</button>
           </div>` : ""}
         </div>
         <p class="dash-chart-hint">${temUnidadeLanding && modoLandingComplementar === "mapa"
-          ? "Onde as unidades da DEPIN estão hoje, somando contratos de todas as categorias — clique num ponto pra abrir o perfil da DEPIN já isolado naquela unidade."
+          ? "Onde as unidades da DEPIN estão hoje, somando contratos de todas as categorias — clique num ponto pra abrir o perfil completo daquela unidade."
           : `Antes de escolher uma ${cfg.labelBusca.toLowerCase()}: como o total já se divide do outro lado. Clique numa fatia pra abrir o perfil completo dela em "${escapeHTML(cfg.complementar.tituloAba)}".`}</p>
         <div id="${p}-landing-complementar"></div>
         <div id="${p}-landing-complementar-legenda"></div>
@@ -6915,27 +6889,14 @@ function renderPorDimensaoContratos(lista, cfg) {
   }
 
   // Reaproveitado pelo mapa da landing de Por Categoria: pula pra "Por
-  // Área Gestora", seleciona DEPIN e já abre a subaba "UNIDADES" com a
-  // COORPIN clicada isolada. Pedido direto: "unidades (a aba) só deveria
-  // aparecer quando tivesse selecionado pra área gestora DEPIN... ela pra
-  // ser uma aba dentro da aba de área gestora" — por isso agora precisa
-  // selecionar DEPIN explicitamente aqui (a subaba só existe dentro do
-  // perfil da DEPIN), mesmo que a lista já filtrada pelo seletor de
-  // Unidade Gestora lá em cima já tivesse unidade.
+  // Setor Demandante" já com a COORPIN clicada isolada — a COORPIN é uma
+  // opção normal do seletor de setor (igual qualquer setor do DEPAF), não
+  // precisa mais de nenhum passo intermediário.
   function irParaUnidadeDepinEmPorArea(nomeUnidade) {
     document.querySelector('[data-subtab-contratos="porarea"]')?.click();
+    if (!nomeUnidade) return;
     const selArea = document.getElementById("area-select");
-    if (selArea) { selArea.value = "DEPIN"; selArea.dispatchEvent(new Event("change", { bubbles: true })); }
-    setTimeout(() => {
-      document.querySelector('[data-subtab-area="unidades"]')?.click();
-      if (!nomeUnidade) return;
-      setTimeout(() => {
-        // Mesmo <select> do quadro "Distribuição Geográfica" — a subaba
-        // Unidades reaproveita esse filtro em vez de duplicar outro igual.
-        const selCoorpin = document.getElementById("area-filtro-coorpin");
-        if (selCoorpin) { selCoorpin.value = nomeUnidade; selCoorpin.dispatchEvent(new Event("change", { bubbles: true })); }
-      }, 150);
-    }, 250);
+    if (selArea) { selArea.value = nomeUnidade; selArea.dispatchEvent(new Event("change", { bubbles: true })); }
   }
 
   // Só desenha o filtro quando a área/categoria selecionada tem alguma
@@ -7012,11 +6973,7 @@ function renderPorDimensaoContratos(lista, cfg) {
           : contratosComUnidade.length
           ? `Todos os ${contratosComUnidade.length} contrato(s) desta seleção têm unidade regional (COORPIN) cadastrada.`
           : `Nenhum destes ${contratosSemUnidade.length} contrato(s) tem unidade regional cadastrada (hoje só a DEPIN cadastra) — todos entram juntos em "Salvador (outras áreas)", a melhor aproximação geográfica sem inventar dado que a planilha não tem.`
-        } Clique numa barra ou num ponto do mapa pra isolar.${
-          p === "categoria" || selecionada === "DEPIN"
-            ? ` Ou veja tudo isso de uma vez, com a tabela de contratos de cada unidade, na subaba <button type="button" id="${p}-ir-aba-unidades" class="link-botao" style="font:inherit;color:inherit;text-decoration:underline;cursor:pointer">UNIDADES</button>${p === "categoria" ? ' (dentro de "Por Área Gestora → DEPIN")' : ""}.`
-            : ""
-        }</p>
+        } Clique numa barra ou num ponto do mapa pra isolar.</p>
         <div class="linha-troca-grafico"><div class="dash-toggle" id="${p}-toggle-grafico-unidade">
           <button class="dash-toggle-btn" data-modo="barras" title="Lista as 26, ordenada por número — melhor pra achar uma específica ou comparar valores">BARRAS</button>
           <button class="dash-toggle-btn" data-modo="mapa" title="Mostra onde cada sede fica no estado — melhor pra enxergar a distribuição geográfica (mapa de PONTOS: cidade-sede de cada COORPIN, ainda não o território que cada uma cobre)">MAPA</button>
@@ -7025,15 +6982,6 @@ function renderPorDimensaoContratos(lista, cfg) {
         <div id="${p}-grafico-unidade"></div>
         <div id="${p}-legenda-mapa-unidade"></div>
       </div>`;
-    el("ir-aba-unidades")?.addEventListener("click", () => {
-      if (p === "area") {
-        // Já estamos dentro do perfil da DEPIN (só aparece aqui quando
-        // selecionada === "DEPIN") — só troca de subaba, sem navegar.
-        document.querySelector('[data-subtab-area="unidades"]')?.click();
-      } else {
-        irParaUnidadeDepinEmPorArea(); // sem unidade nenhuma pré-selecionada
-      }
-    });
     el("filtro-dirpin").addEventListener("change", (ev) => {
       filtroDirpin = ev.target.value;
       // Se a COORPIN escolhida não pertence mais à DIRPIN nova, esvazia —
@@ -7390,7 +7338,7 @@ function renderPorDimensaoContratos(lista, cfg) {
     // valores (só com o escolhido em destaque), senão não daria pra trocar
     // de fatia depois de escolher uma.
     const filtrada = listaFiltrada.filter((c) =>
-      (!filtroComplementar || (dimensaoAtiva.campoFn(c) || dimensaoAtiva.rotuloVazio) === filtroComplementar) &&
+      (!filtroComplementar || pertenceAoValorGenerico(dimensaoAtiva.campoFn, dimensaoAtiva.rotuloVazio, c, filtroComplementar)) &&
       (filtroAditivos === null || (c.qtdAditivos ?? 0) === filtroAditivos)
     );
 
@@ -7550,46 +7498,6 @@ function renderPorDimensaoContratos(lista, cfg) {
     }
   }
 
-  // Pedido direto: "unidades (a aba) só deveria aparecer quando tivesse
-  // selecionado pra área gestora DEPIN... porque por enquanto só temos
-  // essa unidade gestora informando o que são atingidos... ela pra ser
-  // uma aba dentro da aba de área gestora". Reaproveita o MESMO
-  // filtroDirpin/filtroCoorpin/filtroApenasCompartilhados do quadro
-  // "Distribuição Geográfica" logo acima (mesma seleção reflete nos dois,
-  // em vez de duplicar outro DIRPIN/COORPIN igual) — só acrescenta o que
-  // faltava ali: a lista de contratos de cada unidade, "de forma
-  // separada".
-  function renderUnidadesSubaba(listaArea) {
-    const alvoSub = el("sub-unidades");
-    if (!alvoSub) return;
-    const contratosComUnidade = listaArea.filter((c) => (c.unidades || []).length > 0);
-    const linhasUnidade = agruparPorUnidade(listaArea.flatMap((c) => c.unidades || []));
-    let listaFiltradaSub = contratosComUnidade;
-    if (filtroDirpin) listaFiltradaSub = listaFiltradaSub.filter((c) => c.unidades.some((u) => u.dirpin === filtroDirpin));
-    if (filtroCoorpin && filtroCoorpin !== OUTRAS_AREAS_LABEL) listaFiltradaSub = listaFiltradaSub.filter((c) => c.unidades.some((u) => u.nomeUnidade === filtroCoorpin));
-    if (filtroApenasCompartilhados) listaFiltradaSub = listaFiltradaSub.filter((c) => new Set(c.unidades.map((u) => u.dirpin)).size > 1);
-    const tituloTabela = filtroCoorpin && filtroCoorpin !== OUTRAS_AREAS_LABEL
-      ? `Contratos — ${filtroCoorpin}`
-      : filtroDirpin
-      ? `Contratos — DIRPIN ${filtroDirpin}`
-      : filtroApenasCompartilhados
-      ? "Contratos — compartilhados entre DIRPIN"
-      : "Todos os contratos com unidade regional cadastrada";
-    alvoSub.innerHTML = `
-      <p class="dash-chart-hint">Quais contratos cada unidade regional (COORPIN) da DEPIN atende, de forma separada. Use o filtro DIRPIN/COORPIN ali em cima, na "Distribuição Geográfica" — a tabela abaixo acompanha a mesma seleção.</p>
-      <div class="kpi-row" style="grid-template-columns:repeat(auto-fit,minmax(200px,1fr));margin:12px 0">
-        <div class="kpi-card"><div class="kpi-cabeca">${kpiIcone("predio")}<div class="kpi-label">Unidades Atendidas</div></div><div class="kpi-value">${linhasUnidade.length.toLocaleString("pt-BR")}</div></div>
-        <div class="kpi-card"><div class="kpi-cabeca">${kpiIcone("competencia_normas")}<div class="kpi-label">Contratos com Unidade Cadastrada</div></div><div class="kpi-value">${contratosComUnidade.length.toLocaleString("pt-BR")}</div></div>
-      </div>
-      <div class="dash-chart-box" style="margin-top:16px">
-        <h4>${escapeHTML(tituloTabela)}</h4>
-        <div class="tabela-rolavel" style="max-height:420px" id="${p}-unidades-tabela-conteudo"></div>
-      </div>
-    `;
-    el("unidades-tabela-conteudo").innerHTML = tabelaContratosHTML(listaFiltradaSub, { dirpinAtual: filtroDirpin || null, destacarCompartilhados: filtroApenasCompartilhados });
-    ligarTooltipLinhas(el("unidades-tabela-conteudo"), porId);
-  }
-
   function atualizar() {
     if (!selecionada) {
       el("perfil").hidden = true;
@@ -7598,7 +7506,7 @@ function renderPorDimensaoContratos(lista, cfg) {
     }
     el("landing").innerHTML = "";
     el("perfil").hidden = false;
-    const listaArea = lista.filter((c) => (cfg.campoAgrupador(c) || cfg.rotuloVazio) === selecionada);
+    const listaArea = lista.filter((c) => pertenceAoValor(c, selecionada));
     renderFiltroUnidade(listaArea);
     let listaFiltrada = listaArea;
     if (filtroDirpin) listaFiltrada = listaFiltrada.filter((c) => (c.unidades || []).some((u) => u.dirpin === filtroDirpin));
@@ -7614,22 +7522,6 @@ function renderPorDimensaoContratos(lista, cfg) {
     renderPrazos(listaFiltrada);
     renderFinanceiro(listaFiltrada);
     renderPessoas(listaFiltrada);
-    if (p === "area") {
-      const btnUnidades = document.getElementById(`${p}-subtab-btn-unidades`);
-      const ehDepin = selecionada === "DEPIN";
-      if (btnUnidades) {
-        btnUnidades.hidden = !ehDepin;
-        // Caiu numa área sem unidade regional enquanto a subaba Unidades
-        // estava ativa (ex.: trocou de DEPIN pra DEPAF) — volta pra Visão
-        // Geral em vez de deixar uma subaba escondida marcada como ativa.
-        if (!ehDepin && btnUnidades.classList.contains("active")) {
-          btnUnidades.classList.remove("active");
-          alvo.querySelector(`[data-subtab-${p}="visao"]`)?.classList.add("active");
-          SUBABAS.forEach((nome) => { el(`sub-${nome}`).hidden = nome !== "visao"; });
-        }
-      }
-      if (ehDepin) renderUnidadesSubaba(listaArea);
-    }
   }
 
   atualizar();
@@ -7774,7 +7666,7 @@ async function carregarContratosPortal(portalSlug) {
       <button class="tab-btn active" data-subtab-contratos="gerencial">${ICONS.painel_dashboard}GERENCIAL</button>
       <button class="tab-btn" data-subtab-contratos="tatico">${ICONS.mira}TÁTICO</button>
       <button class="tab-btn" data-subtab-contratos="operacional">${ICONS.engrenagem}OPERACIONAL</button>
-      <button class="tab-btn" data-subtab-contratos="porarea">${ICONS.predio}POR ÁREA GESTORA</button>
+      <button class="tab-btn" data-subtab-contratos="porarea">${ICONS.predio}POR SETOR DEMANDANTE</button>
       <button class="tab-btn" data-subtab-contratos="porcategoria">${ICONS.categoria_tag}POR CATEGORIA</button>
       <button class="tab-btn" data-subtab-contratos="atualizados">${ICONS.atualizar}ATUALIZADOS RECENTEMENTE</button>
     </div>
@@ -7901,14 +7793,14 @@ function renderAtualizadosRecentemente(lista, decisoesRenovacao) {
 
   document.getElementById("atualizados-tabela").innerHTML = `
     <table class="dash-tabela">
-      <thead><tr><th>Nº CONTRATO</th><th>ÁREA GESTORA</th><th>EMPRESA</th><th>DECISÃO</th><th>RESPONSÁVEL</th><th>TRÂMITES</th><th>ATUALIZADO EM</th></tr></thead>
+      <thead><tr><th>Nº CONTRATO</th><th>SETOR DEMANDANTE</th><th>EMPRESA</th><th>DECISÃO</th><th>RESPONSÁVEL</th><th>TRÂMITES</th><th>ATUALIZADO EM</th></tr></thead>
       <tbody>${linhas.map((a) => {
         const c = porId.get(a.contratoId);
         const concluidos = (a.tramites || []).filter((t) => t.concluido).length;
         return `
           <tr class="linha-contrato" data-contrato-id="${escapeAttr(c.id)}">
             <td>${escapeHTML(c.numeroContrato)}${badgeRenovado(c)}</td>
-            <td>${escapeHTML(c.unidadeGestora || "—")}</td>
+            <td>${escapeHTML(setorDemandanteExibicao(c) || "—")}</td>
             <td>${escapeHTML(c.empresa)}</td>
             <td>${escapeHTML(a.decisao || "—")}</td>
             <td>${escapeHTML(a.responsavel || "—")}</td>
