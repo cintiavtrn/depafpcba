@@ -5138,23 +5138,7 @@ function ligarTooltipLinhas(container, porId) {
 function renderGerencialContratos(lista, resumo) {
   const alvo = document.getElementById("contratos-sub-gerencial");
   const porId = new Map(lista.map((c) => [c.id, c]));
-  // Pedido direto: "DIRPIN devia entrar como outro toggle" — DIRPIN é uma
-  // camada ACIMA da COORPIN (agrupa várias COORPINs numa região), então é
-  // uma pergunta genuinamente diferente de "setor demandante" (que hoje já
-  // é a COORPIN, pro lado da DEPIN) — não redundante como o COORPIN dentro
-  // do próprio setor já escolhido (ver renderFiltroUnidade). Só existe pra
-  // contrato da DEPIN; contrato do DEPAF entra em "(sem DIRPIN)".
-  let modoAgrupamento = "setor"; // "setor" | "dirpin"
-  function camposAgrupamento(c) {
-    return modoAgrupamento === "dirpin" ? dirpinsDoContrato(c) : setoresDemandantesDoContrato(c);
-  }
-  function areasDoModoAtual() {
-    const valores = [...new Set(lista.flatMap(camposAgrupamento))];
-    return modoAgrupamento === "dirpin" ? valores.sort((a, b) => a.localeCompare(b, "pt-BR")) : valores.sort(compararSetorDemandante);
-  }
-  function rotuloAgrupamento() {
-    return modoAgrupamento === "dirpin" ? "DIRPIN" : "Setor Demandante";
-  }
+  const areasDisponiveis = [...new Set(lista.flatMap(setoresDemandantesDoContrato))].sort(compararSetorDemandante);
   let filtroArea = "";
   let filtroTipo = "";
   let filtroAnalista = "";
@@ -5170,35 +5154,31 @@ function renderGerencialContratos(lista, resumo) {
   alvo.innerHTML = `
     <div class="dash-filtros">
       <div class="dash-filtro">
-        <label id="ger-rotulo-filtro">SETOR DEMANDANTE</label>
-        <select id="ger-filtro-area"></select>
+        <label>SETOR DEMANDANTE</label>
+        <select id="ger-filtro-area"><option value="">Todos</option>${areasDisponiveis.map((a) => `<option value="${escapeAttr(a)}">${escapeHTML(a)}</option>`).join("")}</select>
       </div>
       <div class="dash-filtro" style="flex:1;min-width:280px">
         <label>BUSCAR (Nº, EMPRESA, OBJETO, VALOR, DATA, ÁREA, ANALISTA, GESTOR, FISCAL...)</label>
         <input type="text" id="ger-busca" placeholder="Digite qualquer parte do que lembrar..." />
       </div>
     </div>
-    <div class="linha-troca-grafico" style="margin-bottom:14px"><div class="dash-toggle" id="ger-agrupamento-toggle">
-      <button class="dash-toggle-btn active" data-modo="setor" title="Quem pediu o contrato — CFPC/DEMEP... pro DEPAF, a COORPIN pra DEPIN">SETOR DEMANDANTE</button>
-      <button class="dash-toggle-btn" data-modo="dirpin" title="Região que agrupa várias COORPINs — só existe pra contrato da DEPIN">DIRPIN</button>
-    </div></div>
     <div id="ger-busca-resultado"></div>
     <div id="ger-chip-filtro"></div>
     <div id="ger-kpis" style="margin-bottom:16px"></div>
     <div id="ger-kpi-tabela" style="margin-bottom:16px"></div>
     <div class="dash-charts" style="grid-template-columns:1.1fr 1fr">
       <div class="dash-chart-box">
-        <h4>Detalhamento por <span id="ger-rotulo-h1">Setor Demandante</span></h4>
-        <p class="dash-chart-hint">Clique numa linha ou numa barra pra isolar só aquele grupo (a lista de contratos aparece logo abaixo dos cartões) — clique de novo (ou em "Todos" acima) pra voltar a ver tudo.</p>
+        <h4>Detalhamento por Setor Demandante</h4>
+        <p class="dash-chart-hint">Clique numa linha ou numa barra pra isolar só aquele setor (a lista de contratos aparece logo abaixo dos cartões) — clique de novo (ou em "Todos" acima) pra voltar a ver tudo.</p>
         <div style="text-align:right;margin-bottom:6px"><button type="button" class="dash-toggle-btn" id="ger-matriz-baixar" title="Baixar esta tabela como imagem">⬇ TABELA (PNG)</button></div>
         <div id="ger-matriz" class="tabela-rolavel"></div>
       </div>
       <div class="dash-chart-box">
-        <h4>Contratos por Criticidade e <span id="ger-rotulo-h2">Setor Demandante</span></h4>
+        <h4>Contratos por Criticidade e Setor Demandante</h4>
         <div class="linha-troca-grafico"><div class="dash-toggle" id="ger-barra-toggle">
-          <button class="dash-toggle-btn" data-modo="proporcao" title="Compara a composição de criticidade de cada grupo">% POR GRUPO</button>
-          <button class="dash-toggle-btn" data-modo="absoluto" title="Compara o tamanho dos grupos entre si">QTD POR GRUPO</button>
-          <button class="dash-toggle-btn" data-modo="treemap" title="Bloco = tamanho do grupo; cor = pior criticidade presente nele">MAPA</button>
+          <button class="dash-toggle-btn" data-modo="proporcao" title="Compara a composição de criticidade de cada setor">% POR SETOR</button>
+          <button class="dash-toggle-btn" data-modo="absoluto" title="Compara o tamanho dos setores entre si">QTD POR SETOR</button>
+          <button class="dash-toggle-btn" data-modo="treemap" title="Bloco = tamanho do setor; cor = pior criticidade presente nele">MAPA</button>
           <button class="dash-toggle-btn" data-modo="calor" title="Cor = criticidade; intensidade = volume de contratos na célula">MAPA DE CALOR</button>
         </div></div>
         <div id="ger-barra"></div>
@@ -5206,8 +5186,8 @@ function renderGerencialContratos(lista, resumo) {
     </div>
     <div class="dash-charts" style="grid-template-columns:1fr">
       <div class="dash-chart-box">
-        <h4>Valor Total por <span id="ger-rotulo-h3">Setor Demandante</span></h4>
-        <p class="dash-chart-hint">Pra responder rápido "quanto se gasta em tal grupo" sem precisar somar na mão. Clique numa barra pra isolar aquele grupo.</p>
+        <h4>Valor Total por Setor Demandante</h4>
+        <p class="dash-chart-hint">Pra responder rápido "quanto se gasta em tal setor" sem precisar somar na mão. Clique numa barra pra isolar aquele setor.</p>
         <div id="ger-valor-area"></div>
       </div>
     </div>
@@ -5263,32 +5243,6 @@ function renderGerencialContratos(lista, resumo) {
   `;
 
   ligarBuscaContratos(lista, porId, "ger-busca", "ger-busca-resultado");
-
-  // Preenche o <select> e os 4 rótulos "Setor Demandante"/"DIRPIN" de
-  // acordo com modoAgrupamento — chamada na carga inicial e de novo toda
-  // vez que o toggle SETOR DEMANDANTE/DIRPIN muda (o select em si troca de
-  // opções, então precisa ser reconstruído, não só o valor).
-  function redesenharFiltroArea() {
-    const rotulo = rotuloAgrupamento();
-    document.getElementById("ger-rotulo-filtro").textContent = rotulo.toUpperCase();
-    document.getElementById("ger-rotulo-h1").textContent = rotulo;
-    document.getElementById("ger-rotulo-h2").textContent = rotulo;
-    document.getElementById("ger-rotulo-h3").textContent = rotulo;
-    const select = document.getElementById("ger-filtro-area");
-    select.innerHTML = `<option value="">Todos</option>${areasDoModoAtual().map((a) => `<option value="${escapeAttr(a)}">${escapeHTML(a)}</option>`).join("")}`;
-  }
-  redesenharFiltroArea();
-
-  document.getElementById("ger-agrupamento-toggle").addEventListener("click", (ev) => {
-    const btn = ev.target.closest("[data-modo]");
-    if (!btn || btn.dataset.modo === modoAgrupamento) return;
-    modoAgrupamento = btn.dataset.modo;
-    document.querySelectorAll("#ger-agrupamento-toggle [data-modo]").forEach((b) => b.classList.toggle("active", b.dataset.modo === modoAgrupamento));
-    filtroArea = "";
-    redesenharFiltroArea();
-    atualizar();
-    rolarParaTopoGerencial();
-  });
 
   document.getElementById("ger-barra-toggle").addEventListener("click", (ev) => {
     const btn = ev.target.closest("[data-modo]");
@@ -5474,7 +5428,7 @@ function renderGerencialContratos(lista, resumo) {
 
   function atualizar() {
     const filtrada = lista.filter((c) =>
-      (!filtroArea || camposAgrupamento(c).includes(filtroArea)) &&
+      (!filtroArea || setoresDemandantesDoContrato(c).includes(filtroArea)) &&
       (!filtroTipo || (c.tipoObjeto || "(sem tipo)") === filtroTipo) &&
       (!filtroAnalista || (c.analista || "(sem analista)") === filtroAnalista) &&
       (!filtroGestor || (c.pessoas || []).some((p) => p.papel === "Gestor" && p.nomePessoa === filtroGestor)) &&
@@ -5491,7 +5445,7 @@ function renderGerencialContratos(lista, resumo) {
     // bloco if/então 8 vezes ficaria ilegível; um array de {rotulo, limpar}
     // escala sem repetição.
     const chipsAtivos = [
-      filtroArea && { rotulo: `${modoAgrupamento === "dirpin" ? "dirpin" : "setor"}: ${filtroArea}`, limpar: () => selecionarArea(filtroArea) },
+      filtroArea && { rotulo: `setor: ${filtroArea}`, limpar: () => selecionarArea(filtroArea) },
       filtroTipo && { rotulo: `tipo: ${filtroTipo}`, limpar: () => selecionarTipo(filtroTipo) },
       filtroAnalista && { rotulo: `analista: ${filtroAnalista}`, limpar: () => selecionarAnalista(filtroAnalista) },
       filtroGestor && { rotulo: `gestor: ${filtroGestor}`, limpar: () => selecionarGestor(filtroGestor) },
@@ -5533,7 +5487,7 @@ function renderGerencialContratos(lista, resumo) {
     // área o card mostra 0, sem quebrar nada, até outra área também passar
     // a ter esse detalhe.
     const qtdUnidadesBeneficiadas = new Set(filtrada.flatMap((c) => (c.unidades || []).map((u) => u.nomeUnidade))).size;
-    const porArea = agruparPorAreaCriticidade(filtrada, camposAgrupamento, modoAgrupamento === "dirpin" ? "(sem DIRPIN)" : "(sem unidade)");
+    const porArea = agruparPorAreaCriticidade(filtrada, setoresDemandantesDoContrato);
 
     // Pedido direto: "os cartões de quantidade de contrato e valor atual
     // poderiam também direcionar como os outros... no de contrato mostrar
@@ -5599,7 +5553,7 @@ function renderGerencialContratos(lista, resumo) {
       btn.classList.toggle("active", btn.dataset.modo === modoBarra);
     });
     document.getElementById("ger-valor-area").innerHTML = barraContagemHorizontalSVG(
-      agruparValorPorCampo(filtrada, camposAgrupamento, modoAgrupamento === "dirpin" ? "(sem DIRPIN)" : "(sem unidade)"),
+      agruparValorPorCampo(filtrada, setoresDemandantesDoContrato, "(sem unidade)"),
       {
         formatarValor: (v) => "R$ " + formatarEixo(v),
         rotuloExtra: (l) => `(${l.qtd} contrato${l.qtd === 1 ? "" : "s"})`,
@@ -5684,9 +5638,7 @@ function renderGerencialContratos(lista, resumo) {
       filtroArea = ""; filtroTipo = ""; filtroAnalista = ""; filtroGestor = ""; filtroFiscal = "";
       filtroFornecedor = ""; filtroAditivos = null; filtroGarantia = false; filtroCriticidadeBaixo = false;
       filtroStatusKpi = "";
-      modoAgrupamento = "setor";
-      document.querySelectorAll("#ger-agrupamento-toggle [data-modo]").forEach((b) => b.classList.toggle("active", b.dataset.modo === "setor"));
-      redesenharFiltroArea();
+      document.getElementById("ger-filtro-area").value = "";
       const buscaInput = document.getElementById("ger-busca");
       if (buscaInput) buscaInput.value = "";
       const buscaResultado = document.getElementById("ger-busca-resultado");
@@ -6364,12 +6316,8 @@ function renderResumoRapido(lista, resumo) {
     }
     const cardDirpin = ev.target.closest("[data-resumo-dirpin]");
     if (cardDirpin) {
-      // DIRPIN não tem perfil próprio (não é um valor de "setor
-      // demandante") — o destino natural é o Gerencial, já no modo de
-      // agrupamento DIRPIN e isolado naquela região.
-      document.querySelector('[data-subtab-contratos="gerencial"]')?.click();
-      document.querySelector('#ger-agrupamento-toggle [data-modo="dirpin"]')?.click();
-      const selDirpin = document.getElementById("ger-filtro-area");
+      document.querySelector('[data-subtab-contratos="pordirpin"]')?.click();
+      const selDirpin = document.getElementById("dirpin-select");
       if (selDirpin) { selDirpin.value = cardDirpin.dataset.resumoDirpin; selDirpin.dispatchEvent(new Event("change", { bubbles: true })); }
       return;
     }
@@ -6494,6 +6442,28 @@ function configPorCategoria() {
     labelBusca: "CATEGORIA",
     labelTrocar: "← TROCAR DE CATEGORIA",
     dicaLanding: "Escolha uma categoria (no campo acima, ou clicando num cartão abaixo) pra ver o perfil completo dela — vencimentos, financeiro, pessoas.",
+    complementar: { campoFn: (c) => setoresDemandantesDoContrato(c), rotuloVazio: "(sem unidade)", titulo: "Valor por Setor Demandante", prefixoAlvo: "area", tituloAba: "Por Setor Demandante" },
+  };
+}
+// Pedido direto: "acho que falei toggle mas era aba, como tem gerencial,
+// tático, operacional... se eu seleciono o setor demandante já deveria
+// selecionar automaticamente a DIRPIN e a COORPIN, não permitir outra
+// seleção" — DIRPIN não é uma dimensão PARALELA a setor demandante (isso
+// era o erro do toggle que troquei ontem): é uma camada ACIMA da COORPIN,
+// hierárquica. Por isso vira aba própria (mesmo padrão de Por Setor
+// Demandante/Por Categoria) em vez de um modo alternativo dentro do
+// Gerencial — escolher uma DIRPIN aqui não compete com escolher um setor
+// demandante lá, são níveis diferentes da mesma árvore.
+function configPorDirpin() {
+  return {
+    prefixo: "dirpin",
+    campoAgrupador: (c) => dirpinsDoContrato(c),
+    rotuloVazio: "(sem DIRPIN)",
+    labelSelect: "SELECIONE A DIRPIN",
+    opcaoPadrao: "— Escolha uma DIRPIN —",
+    labelBusca: "DIRPIN",
+    labelTrocar: "← TROCAR DE DIRPIN",
+    dicaLanding: "Escolha uma DIRPIN (no campo acima, ou clicando num cartão abaixo) pra ver o perfil completo dela — vencimentos, financeiro, pessoas, e as COORPINs que ela agrupa.",
     complementar: { campoFn: (c) => setoresDemandantesDoContrato(c), rotuloVazio: "(sem unidade)", titulo: "Valor por Setor Demandante", prefixoAlvo: "area", tituloAba: "Por Setor Demandante" },
   };
 }
@@ -6902,7 +6872,7 @@ function renderPorDimensaoContratos(lista, cfg) {
       const v = valorPorGrupo.get(l.label);
       const piorCrit = CRITICIDADE_VISUAL.find((cv) => l.porCrit[cv.label] > 0);
       return `<div class="kpi-card" data-${p}-card="${escapeAttr(l.label)}" style="cursor:pointer;--kpi-cor:${piorCrit ? piorCrit.cor : "var(--carvao)"}">
-        <div class="kpi-cabeca">${p === "area" ? badgeEntidadeAreaHTML(l.label, lista) : badgeEntidadeHTML(l.label)}<div class="kpi-label">${escapeHTML(l.label)}</div></div>
+        <div class="kpi-cabeca">${p === "area" || p === "dirpin" ? badgeEntidadeAreaHTML(l.label, lista) : badgeEntidadeHTML(l.label)}<div class="kpi-label">${escapeHTML(l.label)}</div></div>
         <div class="kpi-value" style="font-size:var(--fs-subtitulo)">${l.total} contrato${l.total === 1 ? "" : "s"}</div>
         <div class="font-mono" style="font-size:var(--fs-ui-sm);color:#8B93A3">${v ? formatarMoedaBR(v.total) : "—"}</div>
       </div>`;
@@ -7194,7 +7164,7 @@ function renderPorDimensaoContratos(lista, cfg) {
     el("cabecalho").innerHTML = `
       <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px">
         <div style="display:flex;align-items:center;gap:12px">
-          ${p === "area" ? badgeEntidadeAreaHTML(selecionada, lista) : badgeEntidadeHTML(selecionada)}
+          ${p === "area" || p === "dirpin" ? badgeEntidadeAreaHTML(selecionada, lista) : badgeEntidadeHTML(selecionada)}
           <div>
             <h4 style="margin-bottom:2px">${escapeHTML(selecionada)}</h4>
             <p class="font-mono" style="font-size:var(--fs-ui-sm);color:#8B93A3">${listaFiltrada.length} contrato(s) · ${formatarMoedaBR(valorAtual)} em valor atual${qtdVencidos ? ` · ${qtdVencidos} vencido(s)` : ""}</p>
@@ -7627,6 +7597,7 @@ function renderPorDimensaoContratos(lista, cfg) {
 }
 function renderPorAreaContratos(lista) { return renderPorDimensaoContratos(lista, configPorArea()); }
 function renderPorCategoriaContratos(lista) { return renderPorDimensaoContratos(lista, configPorCategoria()); }
+function renderPorDirpinContratos(lista) { return renderPorDimensaoContratos(lista, configPorDirpin()); }
 
 async function carregarContratosPortal(portalSlug) {
   const painel = document.getElementById("tab-contratos");
@@ -7753,6 +7724,7 @@ async function carregarContratosPortal(portalSlug) {
       <button class="tab-btn" data-subtab-contratos="tatico">${ICONS.mira}TÁTICO</button>
       <button class="tab-btn" data-subtab-contratos="operacional">${ICONS.engrenagem}OPERACIONAL</button>
       <button class="tab-btn" data-subtab-contratos="porarea">${ICONS.predio}POR SETOR DEMANDANTE</button>
+      <button class="tab-btn" data-subtab-contratos="pordirpin">${ICONS.unidade_depin}POR DIRPIN</button>
       <button class="tab-btn" data-subtab-contratos="porcategoria">${ICONS.categoria_tag}POR CATEGORIA</button>
       <button class="tab-btn" data-subtab-contratos="atualizados">${ICONS.atualizar}ATUALIZADOS RECENTEMENTE</button>
     </div>
@@ -7760,11 +7732,12 @@ async function carregarContratosPortal(portalSlug) {
     <div class="tab-panel" id="contratos-sub-tatico" hidden></div>
     <div class="tab-panel" id="contratos-sub-operacional" hidden></div>
     <div class="tab-panel" id="contratos-sub-porarea" hidden></div>
+    <div class="tab-panel" id="contratos-sub-pordirpin" hidden></div>
     <div class="tab-panel" id="contratos-sub-porcategoria" hidden></div>
     <div class="tab-panel" id="contratos-sub-atualizados" hidden></div>
   `;
 
-  const SUBABAS_CONTRATOS = ["gerencial", "tatico", "operacional", "porarea", "porcategoria", "atualizados"];
+  const SUBABAS_CONTRATOS = ["gerencial", "tatico", "operacional", "porarea", "pordirpin", "porcategoria", "atualizados"];
   // Pedido direto: "se eu isolo aí uma área aí depois ela fica marcada e
   // não volta ao normal... um desatento pode esquecer de desmarcar... eu
   // já vi em alguns serviços que em casos assim volta pro geral, em
@@ -7790,6 +7763,7 @@ async function carregarContratosPortal(portalSlug) {
     const taticoHandle = renderTaticoContratos(listaExibida);
     const operacionalHandle = renderOperacionalContratos(listaExibida, portalSlug);
     const porAreaHandle = renderPorAreaContratos(listaExibida);
+    const porDirpinHandle = renderPorDirpinContratos(listaExibida);
     const porCategoriaHandle = renderPorCategoriaContratos(listaExibida);
     renderAtualizadosRecentemente(listaExibida, decisoesRenovacao);
 
@@ -7798,6 +7772,7 @@ async function carregarContratosPortal(portalSlug) {
       tatico: () => taticoHandle?.resetar(),
       operacional: () => operacionalHandle?.resetar(),
       porarea: () => porAreaHandle?.resetar(),
+      pordirpin: () => porDirpinHandle?.resetar(),
       porcategoria: () => porCategoriaHandle?.resetar(),
     };
     // Toda vez que a BASE muda (trocou de unidade gestora), volta pra
