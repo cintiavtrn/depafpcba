@@ -5370,17 +5370,16 @@ function renderGerencialContratos(lista, resumo) {
     const acaoRodape = ev.target.closest("[data-acao]");
     if (acaoRodape?.dataset.acao === "aditivos") rolarEDestacar("ger-aditivos");
     // Pedido direto: "o cartão de clique de unidades beneficiadas não
-    // funciona" — não tinha clique nenhum (só informativo). Isolar por
-    // "quantidade de unidade" não faz sentido como filtro aqui; o destino
-    // útil é abrir o perfil de onde essa informação é detalhada. Como
-    // "Por Setor Demandante" já lista cada COORPIN como seu próprio
-    // cartão (junto dos setores do DEPAF), a landing dessa aba JÁ é a
-    // visão "quantos contratos cada unidade tem" — não precisa mais de um
-    // destino especial pra DEPIN.
+    // funciona" — não tinha clique nenhum (só informativo). "Unidades
+    // Beneficiadas" é conceitualmente diferente de "Setor Demandante"
+    // (quem USA vs quem PEDIU o contrato — pra DEPIN as duas coincidem,
+    // mas "Por Setor Demandante" mistura os setores do DEPAF junto, o que
+    // confunde essa leitura). "Por DIRPIN" é a aba certa: só DEPIN, sem
+    // mistura, e já mostra cada COORPIN como sua própria unidade.
     if (acaoRodape?.dataset.acao === "unidades-beneficiadas") {
-      document.querySelector('[data-subtab-contratos="porarea"]')?.click();
-      const selArea = document.getElementById("area-select");
-      if (selArea && selArea.value) { selArea.value = ""; selArea.dispatchEvent(new Event("change", { bubbles: true })); }
+      document.querySelector('[data-subtab-contratos="pordirpin"]')?.click();
+      const selDirpin = document.getElementById("dirpin-select");
+      if (selDirpin && selDirpin.value) { selDirpin.value = ""; selDirpin.dispatchEvent(new Event("change", { bubbles: true })); }
     }
   });
   document.getElementById("ger-matriz").addEventListener("click", (ev) => {
