@@ -6986,10 +6986,23 @@ function renderPorDimensaoContratos(lista, cfg) {
     // volta pro mapa normal em vez de tentar desenhar um zoom vazio.
     if (modoGraficoUnidade === "salvador" && !contratosSalvador.length) modoGraficoUnidade = "mapa";
     const dirpinsDisponiveis = [...new Set(todasUnidades.map((u) => u.dirpin).filter(Boolean))].sort();
+    // Pedido direto: "quando vou na aba por dirpin e clico em oeste chapada
+    // aparece um segundo slicer de todas e coorpin... dá a sensação de que
+    // a pessoa pode escolher de novo quando não pode... se eu selecionei
+    // dirpin oeste tem que ser só as que fazem parte do oeste" — dentro de
+    // "Por DIRPIN", a DIRPIN já está fixada pela seleção de fora
+    // (`selecionada`); reoferecer um select de DIRPIN aqui (que deixaria
+    // pular pra uma OUTRA região sem passar por "← TROCAR DE DIRPIN") é
+    // exatamente a mesma confusão que ela já tinha apontado pro COORPIN
+    // dentro do setor demandante. `dirpinEfetivo` trava nisso: dentro de
+    // Por DIRPIN, é sempre a região já escolhida; nas outras abas
+    // (setor demandante/categoria), continua sendo o filtro interno de
+    // sempre.
+    const dirpinEfetivo = p === "dirpin" ? selecionada : filtroDirpin;
     const coorpinsDisponiveis = [
-      ...new Set(todasUnidades.filter((u) => !filtroDirpin || u.dirpin === filtroDirpin).map((u) => u.nomeUnidade)),
+      ...new Set(todasUnidades.filter((u) => !dirpinEfetivo || u.dirpin === dirpinEfetivo).map((u) => u.nomeUnidade)),
     ].sort((a, b) => (parseInt(a, 10) || 0) - (parseInt(b, 10) || 0));
-    if (contratosSemUnidade.length && !filtroDirpin) coorpinsDisponiveis.push(OUTRAS_AREAS_LABEL);
+    if (contratosSemUnidade.length && !dirpinEfetivo) coorpinsDisponiveis.push(OUTRAS_AREAS_LABEL);
     // Pedido direto: "mostrar ao lado quantos são exclusivos vs.
     // compartilhados" — depois de reparar que a soma dos cartões por DIRPIN
     // passa do total de contratos (18+13+12+16+10=69, sendo só 52
@@ -7014,7 +7027,7 @@ function renderPorDimensaoContratos(lista, cfg) {
     // categoria/DEPAF que ainda não escolheu unidade nenhuma). Sem opção real
     // de escolha, o select nem aparece — em vez de mostrar um dropdown de
     // item único fingindo ser filtro.
-    const mostrarFiltroDirpin = dirpinsDisponiveis.length > 1;
+    const mostrarFiltroDirpin = p !== "dirpin" && dirpinsDisponiveis.length > 1;
     const mostrarFiltroCoorpin = coorpinsDisponiveis.length > 1;
     container.innerHTML = `
       ${mostrarFiltroDirpin || mostrarFiltroCoorpin ? `<div class="dash-filtros">
@@ -7081,11 +7094,15 @@ function renderPorDimensaoContratos(lista, cfg) {
     // quantos contratos cada COORPIN tem — a mesma pergunta que a métrica
     // promete responder, respondida de fato, não só um lugar pra filtrar
     // uma de cada vez.
-    const linhasUnidade = agruparPorUnidade(todasUnidades);
+    // Dentro de Por DIRPIN, o mapa/barras também tem que ficar só com as
+    // COORPINs desta região — sem o filtro, contrato compartilhado com
+    // OUTRA DIRPIN fazia unidade de fora aparecer no gráfico de uma DIRPIN
+    // que não é a dela.
+    const linhasUnidade = agruparPorUnidade(p === "dirpin" ? todasUnidades.filter((u) => u.dirpin === selecionada) : todasUnidades);
     // Entra só quando tem pelo menos 1 contrato sem unidade E não tem
     // filtro de DIRPIN ativo (a "Outras Áreas" não pertence a DIRPIN
     // nenhuma — filtrar por uma DIRPIN real não deveria trazê-la junto).
-    if (contratosSemUnidade.length && !filtroDirpin) {
+    if (contratosSemUnidade.length && !dirpinEfetivo) {
       linhasUnidade.push({ label: OUTRAS_AREAS_LABEL, total: contratosSemUnidade.length, dirpin: CHAVE_OUTRAS_AREAS });
     }
     // Pedido direto: "quando filtramos por região da DIRPIN tem que
