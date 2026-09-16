@@ -6341,19 +6341,48 @@ function mapaCoorpinSVG(linhas, opcoes = {}) {
 // dentro de Salvador — é organização visual, deixado bem explícito no
 // texto ao lado — mas já mostra a ideia funcionando: filtra, tem
 // legenda, clica e abre o contrato.
+// Pedido direto: "tem unidades com a mesma cor... isso não confunde? na
+// hora dos pontinhos" — tinha mesmo: entidadeIconeCorArea usa hash sobre só
+// 6 cores fixas (as mesmas TONS do resto do sistema), então basta 7 áreas
+// diferentes aparecendo JUNTAS numa mesma tela pra alguma colidir (foi
+// exatamente o caso: DRACO e "(sem unidade gestora)" caíram na mesma). Ali
+// nos outros lugares do sistema tudo bem — é um badge por vez, sozinho, sem
+// nada pra comparar ao lado. Aqui não: é um mapa cheio de bolinhas de cores
+// diferentes juntas, a cor É a informação. Em vez do hash fixo, distribui
+// as cores em roda (matiz espaçado igualmente em 360°) só entre as áreas
+// que aparecem NESTA lista — nunca duas cores iguais na mesma tela, não
+// importa quantas áreas apareçam desta vez (mesmo além das 6 de sempre).
+function coresPorAreaGestoraSVG(contratos) {
+  const porArea = new Map(); // nomeArea -> qtd
+  for (const c of contratos) {
+    const nome = c.unidadeGestora || "(sem unidade gestora)";
+    porArea.set(nome, (porArea.get(nome) || 0) + 1);
+  }
+  // Ordem estável (maior quantidade primeiro, empate por nome) — mesma
+  // ordem usada na legenda, então a cor de cada área bate nos dois lugares.
+  const nomes = [...porArea.keys()].sort((a, b) => porArea.get(b) - porArea.get(a) || a.localeCompare(b));
+  const cores = new Map();
+  nomes.forEach((nome, i) => {
+    const matiz = nomes.length > 1 ? Math.round((i * 360) / nomes.length) : 200;
+    cores.set(nome, `hsl(${matiz}, 68%, 62%)`);
+  });
+  return { porArea, cores };
+}
+
 function mapaSalvadorSVG(contratos, opcoes = {}) {
   const { destacarId = null } = opcoes;
   const W = 320, H = 320, cx = W / 2, cy = H / 2, R = 128;
   const n = contratos.length;
   const raioPonto = n > 80 ? 3 : n > 40 ? 3.8 : n > 15 ? 4.6 : 6;
   const ANGULO_OURO = 2.399963; // ~137,5°, em radianos
+  const { cores } = coresPorAreaGestoraSVG(contratos);
   let pontos = "";
   contratos.forEach((c, i) => {
     const r = n > 1 ? R * Math.sqrt(i / (n - 1)) : 0;
     const theta = i * ANGULO_OURO;
     const x = cx + r * Math.cos(theta);
     const y = cy + r * Math.sin(theta);
-    const { cor } = entidadeIconeCorArea(c.unidadeGestora || "(sem unidade gestora)", contratos);
+    const cor = cores.get(c.unidadeGestora || "(sem unidade gestora)");
     const destacado = destacarId && c.id === destacarId;
     pontos += `<circle class="linha-contrato" data-contrato-id="${escapeAttr(c.id)}" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${raioPonto}" fill="${cor}" stroke="var(--paper)" stroke-width="${destacado ? 1.6 : 0.6}" style="cursor:pointer"><title>${escapeHTML(c.numeroContrato)} — ${escapeHTML(c.empresa)} (${escapeHTML(c.unidadeGestora || "—")})</title></circle>`;
   });
@@ -6364,23 +6393,18 @@ function mapaSalvadorSVG(contratos, opcoes = {}) {
   </svg>`;
 }
 
-// Legenda do mapaSalvadorSVG — cor por área gestora (mesmo esquema hash de
-// sempre, badgeEntidadeAreaHTML/entidadeIconeCorArea), ordenada da maior
-// pra menor quantidade. Não tenta ser exaustiva: mostra todas as que
-// aparecem na seleção atual, que tende a ser pequena (poucas dezenas de
-// contratos no máximo).
+// Legenda do mapaSalvadorSVG — mesma roda de cores (coresPorAreaGestoraSVG),
+// ordenada da maior pra menor quantidade. Não tenta ser exaustiva: mostra
+// todas as que aparecem na seleção atual, que tende a ser pequena (poucas
+// dezenas de contratos no máximo).
 function legendaAreaGestoraHTML(contratos) {
-  const porArea = new Map(); // nomeArea -> qtd
-  for (const c of contratos) {
-    const nome = c.unidadeGestora || "(sem unidade gestora)";
-    porArea.set(nome, (porArea.get(nome) || 0) + 1);
-  }
-  const linhas = [...porArea.entries()].sort((a, b) => b[1] - a[1]);
+  const { porArea, cores } = coresPorAreaGestoraSVG(contratos);
+  const linhas = [...porArea.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
   return `
     <p class="dash-chart-hint" style="margin-top:10px">Ainda não temos o bairro/endereço de cada contrato dentro de Salvador — a posição de cada bolinha aqui é só organização visual (arranjo em espiral), não geografia real. Assim que essa lista existir, os pontos entram no lugar certo. Por enquanto, a cor já mostra de qual área gestora é cada um:</p>
     <div style="display:flex;flex-wrap:wrap;gap:8px 16px;margin-top:8px;font-size:var(--fs-ui-sm)">
       ${linhas.map(([nome, qtd]) => {
-        const { cor } = entidadeIconeCorArea(nome, contratos);
+        const cor = cores.get(nome);
         return `<div style="display:flex;align-items:center;gap:6px">
           <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${cor}"></span>
           <span style="color:#8B93A3;font-family:'IBM Plex Mono',monospace">${escapeHTML(nome)} (${qtd})</span>
