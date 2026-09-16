@@ -6190,7 +6190,14 @@ function renderResumoRapido(lista, resumo) {
   // existe pra contrato da DEPIN, então o botão nem aparece quando a
   // seleção atual não tem nenhum (ex.: DEPAF sozinho).
   const temDirpin = lista.some((c) => dirpinsDoContrato(c).length > 0);
-  const top3Dirpin = agruparValorPorCampo(lista, dirpinsDoContrato, "(sem DIRPIN)").slice(0, 3);
+  // Pedido direto: "o cartão sem DIRPIN precisa ser melhor explicado...
+  // a pessoa pode ter uma leitura confusa" — nem é só de explicar: em
+  // "Todos", o balde de contrato SEM DIRPIN (tudo que não é DEPIN) soma
+  // muito mais que qualquer DIRPIN de verdade (ex.: R$121M vs ~R$7M),
+  // então ele sempre ganhava o "top 3" e escondia as DIRPINs de verdade —
+  // um "não é DIRPIN nenhuma" não devia nem competir nesse ranking. Filtra
+  // ANTES de agrupar: só entra quem tem DIRPIN de fato.
+  const top3Dirpin = agruparValorPorCampo(lista.filter((c) => dirpinsDoContrato(c).length > 0), dirpinsDoContrato, "(sem DIRPIN)").slice(0, 3);
   // Pedido direto, olhando o SEI Municípios (as abas Dengue/Zika/
   // Chikungunya sobre o MESMO gráfico): "onde mais se gasta" também podia
   // trocar de classificação sem sair do Resumo Rápido — reaproveita o
@@ -6458,12 +6465,16 @@ function configPorDirpin() {
   return {
     prefixo: "dirpin",
     campoAgrupador: (c) => dirpinsDoContrato(c),
-    rotuloVazio: "(sem DIRPIN)",
+    // Pedido direto: "o cartão sem DIRPIN precisa ser melhor explicado...
+    // a pessoa pode ter uma leitura confusa" — DIRPIN só existe pra
+    // contrato da DEPIN; o rótulo sozinho ("(sem DIRPIN)") não deixa claro
+    // que é isso, não um dado faltando por erro.
+    rotuloVazio: "Fora da DEPIN (sem DIRPIN)",
     labelSelect: "SELECIONE A DIRPIN",
     opcaoPadrao: "— Escolha uma DIRPIN —",
     labelBusca: "DIRPIN",
     labelTrocar: "← TROCAR DE DIRPIN",
-    dicaLanding: "Escolha uma DIRPIN (no campo acima, ou clicando num cartão abaixo) pra ver o perfil completo dela — vencimentos, financeiro, pessoas, e as COORPINs que ela agrupa.",
+    dicaLanding: "Escolha uma DIRPIN (no campo acima, ou clicando num cartão abaixo) pra ver o perfil completo dela — vencimentos, financeiro, pessoas, e as COORPINs que ela agrupa. DIRPIN só existe pra contrato da DEPIN — o cartão \"Fora da DEPIN (sem DIRPIN)\" reúne todo o resto (DEPAF e demais unidades), que ainda não cadastra essa informação.",
     complementar: { campoFn: (c) => setoresDemandantesDoContrato(c), rotuloVazio: "(sem unidade)", titulo: "Valor por Setor Demandante", prefixoAlvo: "area", tituloAba: "Por Setor Demandante" },
   };
 }
