@@ -5317,12 +5317,18 @@ function renderGerencialContratos(lista, resumo) {
     // útil é abrir o perfil de onde essa informação é detalhada — hoje só
     // a DEPIN tem unidade cadastrada (mesmo texto do title do cartão).
     // Terceira rodada, pedido direto: "vale adicionar uma aba que mostre
-    // unidades beneficiadas/atendidas pra dizer quais seriam ali de forma
-    // separadas" — a aba dedicada "UNIDADES" existe agora, então o destino
-    // passa a ser ela direto (sem precisar mais escolher DEPIN como área
-    // gestora primeiro pra só então achar o gráfico lá dentro).
+    // unidades beneficiadas/atendidas". Quarta rodada, pedido direto:
+    // "unidades (a aba) só deveria aparecer quando tivesse selecionado
+    // pra área gestora DEPIN... ela pra ser uma aba dentro da aba de área
+    // gestora" — deixou de ser aba própria (irmã de Gerencial/Tático/...)
+    // e virou subaba de "Por Área Gestora", só quando DEPIN é a área
+    // escolhida (hoje, a única unidade gestora com unidade regional
+    // cadastrada).
     if (acaoRodape?.dataset.acao === "unidades-beneficiadas") {
-      document.querySelector('[data-subtab-contratos="unidades"]')?.click();
+      document.querySelector('[data-subtab-contratos="porarea"]')?.click();
+      const selArea = document.getElementById("area-select");
+      if (selArea) { selArea.value = "DEPIN"; selArea.dispatchEvent(new Event("change", { bubbles: true })); }
+      setTimeout(() => { document.querySelector('[data-subtab-area="unidades"]')?.click(); }, 250);
     }
   });
   document.getElementById("ger-matriz").addEventListener("click", (ev) => {
@@ -6607,159 +6613,6 @@ function legendaMapaUnidadeHTML(linhasUnidade, destacarUnidadeFn = () => false) 
     </div>`;
 }
 
-// Pedido direto: "na DEPIN eu acho que vale adicionar uma aba que mostre
-// unidades beneficiadas/atendidas pra dizer quais seriam ali de forma
-// separadas" — até aqui, essa informação só existia ENTERRADA dentro de
-// "Por Área Gestora" (precisava escolher DEPIN primeiro pra ver) e sem
-// listar OS CONTRATOS de cada unidade, só a contagem. Esta aba é
-// dedicada: mapa/barras + filtro DIRPIN/COORPIN (igual já existia) MAIS
-// uma tabela embaixo com os contratos de verdade da unidade escolhida —
-// "de forma separada", unidade por unidade.
-function renderUnidadesContratos(lista) {
-  const alvo = document.getElementById("contratos-sub-unidades");
-  let filtroDirpin = "";
-  let filtroCoorpin = "";
-  let filtroApenasCompartilhados = false;
-  let modoGraficoUnidade = lerGraficoSalvo("cpg-unidades-grafico") || "mapa";
-
-  function resetar() {
-    filtroDirpin = "";
-    filtroCoorpin = "";
-    filtroApenasCompartilhados = false;
-    atualizar();
-  }
-
-  function atualizar() {
-    const todasUnidades = lista.flatMap((c) => c.unidades || []);
-    // Hoje só a DEPIN cadastra unidade regional — filtrando por DEPAF (ou
-    // Todos, quando a DEPIN ainda nem existia como opção) a aba fica vazia,
-    // com aviso claro em vez de uma tela quebrada.
-    if (!todasUnidades.length) {
-      alvo.innerHTML = `<p class="tela-intro">Hoje só contratos da DEPIN têm unidade regional (COORPIN) cadastrada. Troque o filtro "Unidade Gestora" lá no topo pra "Todos" ou "DEPIN" pra ver esta aba.</p>`;
-      return;
-    }
-    const el = (sufixo) => document.getElementById(`unidades-${sufixo}`);
-    const linhasUnidade = agruparPorUnidade(todasUnidades);
-    const dirpinsDisponiveis = [...new Set(todasUnidades.map((u) => u.dirpin).filter(Boolean))].sort();
-    const coorpinsDisponiveis = [...new Set(
-      todasUnidades.filter((u) => !filtroDirpin || u.dirpin === filtroDirpin).map((u) => u.nomeUnidade)
-    )].sort((a, b) => (parseInt(a, 10) || 0) - (parseInt(b, 10) || 0));
-    const contratosComUnidade = lista.filter((c) => (c.unidades || []).length > 0);
-    const compartilhados = contratosComUnidade.filter((c) => new Set(c.unidades.map((u) => u.dirpin)).size > 1).length;
-
-    let listaFiltrada = contratosComUnidade;
-    if (filtroApenasCompartilhados) listaFiltrada = listaFiltrada.filter((c) => new Set(c.unidades.map((u) => u.dirpin)).size > 1);
-    if (filtroDirpin) listaFiltrada = listaFiltrada.filter((c) => c.unidades.some((u) => u.dirpin === filtroDirpin));
-    if (filtroCoorpin) listaFiltrada = listaFiltrada.filter((c) => c.unidades.some((u) => u.nomeUnidade === filtroCoorpin));
-    const tituloTabela = filtroCoorpin
-      ? `Contratos — ${filtroCoorpin}`
-      : filtroDirpin
-      ? `Contratos — DIRPIN ${filtroDirpin}`
-      : filtroApenasCompartilhados
-      ? "Contratos — compartilhados entre DIRPIN"
-      : "Todos os contratos com unidade cadastrada";
-
-    alvo.innerHTML = `
-      <p class="dash-chart-hint">Quais unidades regionais (COORPIN) a DEPIN atende hoje, e quais contratos servem cada uma. Escolha uma DIRPIN/COORPIN (ou clique numa barra, num ponto do mapa ou na legenda) pra ver os contratos dela na tabela, embaixo.</p>
-      <div class="kpi-row" style="grid-template-columns:repeat(auto-fit,minmax(200px,1fr));margin:12px 0">
-        <div class="kpi-card"><div class="kpi-cabeca">${kpiIcone("predio")}<div class="kpi-label">Unidades Atendidas</div></div><div class="kpi-value">${linhasUnidade.length.toLocaleString("pt-BR")}</div></div>
-        <div class="kpi-card"><div class="kpi-cabeca">${kpiIcone("competencia_normas")}<div class="kpi-label">Contratos com Unidade Cadastrada</div></div><div class="kpi-value">${contratosComUnidade.length.toLocaleString("pt-BR")}</div></div>
-        ${compartilhados ? `<div class="kpi-card kpi-clicavel" data-compartilhados title="Clique pra ver quais são — cada um atende mais de uma DIRPIN ao mesmo tempo" style="--kpi-cor:var(--crit-alto);cursor:pointer;${filtroApenasCompartilhados ? "outline:2px solid var(--crit-alto);outline-offset:-2px" : ""}"><div class="kpi-cabeca">${kpiIcone("alerta")}<div class="kpi-label">Compartilhados entre DIRPIN</div></div><div class="kpi-value">${compartilhados.toLocaleString("pt-BR")}</div></div>` : ""}
-      </div>
-      <div class="dash-filtros">
-        <div class="dash-filtro">
-          <label>DIRPIN</label>
-          <select id="unidades-filtro-dirpin"><option value="">Todas</option>${dirpinsDisponiveis.map((d) => `<option value="${escapeAttr(d)}"${d === filtroDirpin ? " selected" : ""}>${escapeHTML(d)}</option>`).join("")}</select>
-        </div>
-        <div class="dash-filtro">
-          <label>COORPIN / UNIDADE REGIONAL</label>
-          <select id="unidades-filtro-coorpin"><option value="">Todas</option>${coorpinsDisponiveis.map((c) => `<option value="${escapeAttr(c)}"${c === filtroCoorpin ? " selected" : ""}>${escapeHTML(c)}</option>`).join("")}</select>
-        </div>
-      </div>
-      <div class="dash-chart-box" style="margin-top:16px">
-        <h4>Contratos por Unidade Regional (COORPIN)</h4>
-        <div class="linha-troca-grafico"><div class="dash-toggle" id="unidades-toggle-grafico">
-          <button class="dash-toggle-btn" data-modo="barras" title="Lista as 26 + Sede, ordenada por número">BARRAS</button>
-          <button class="dash-toggle-btn" data-modo="mapa" title="Mostra onde cada sede fica no estado">MAPA</button>
-        </div></div>
-        <div id="unidades-grafico"></div>
-        <div id="unidades-legenda-mapa"></div>
-      </div>
-      <div class="dash-chart-box" style="margin-top:16px">
-        <h4>${escapeHTML(tituloTabela)}</h4>
-        <div class="tabela-rolavel" style="max-height:420px" id="unidades-tabela-conteudo"></div>
-      </div>
-    `;
-
-    el("filtro-dirpin").addEventListener("change", (ev) => {
-      filtroDirpin = ev.target.value;
-      if (filtroDirpin && filtroCoorpin) {
-        const aindaValida = todasUnidades.some((u) => u.nomeUnidade === filtroCoorpin && u.dirpin === filtroDirpin);
-        if (!aindaValida) filtroCoorpin = "";
-      }
-      filtroApenasCompartilhados = false;
-      atualizar();
-    });
-    el("filtro-coorpin").addEventListener("change", (ev) => { filtroCoorpin = ev.target.value; filtroApenasCompartilhados = false; atualizar(); });
-    const cardCompartilhados = alvo.querySelector("[data-compartilhados]");
-    if (cardCompartilhados) {
-      cardCompartilhados.addEventListener("click", () => {
-        filtroApenasCompartilhados = !filtroApenasCompartilhados;
-        if (filtroApenasCompartilhados) { filtroDirpin = ""; filtroCoorpin = ""; }
-        atualizar();
-      });
-    }
-
-    const destacarUnidadeFn = (l) => (filtroCoorpin ? l.label === filtroCoorpin : filtroDirpin ? l.dirpin === filtroDirpin : false);
-    el("grafico").innerHTML = modoGraficoUnidade === "mapa"
-      ? mapaCoorpinSVG(linhasUnidade, { destacarFn: destacarUnidadeFn })
-      : barraContagemHorizontalSVG(linhasUnidade, {
-          tituloTooltip: (l) => `${l.label} (DIRPIN ${l.dirpin || "—"}): ${l.total} contrato(s)`,
-          destacarFn: destacarUnidadeFn,
-        });
-    adicionarControlesGrafico(el("grafico"));
-    el("grafico").addEventListener("click", (ev) => {
-      const item = ev.target.closest("[data-cat]");
-      if (!item) return;
-      const nomeUnidade = item.dataset.cat;
-      filtroCoorpin = filtroCoorpin === nomeUnidade ? "" : nomeUnidade;
-      filtroDirpin = filtroCoorpin ? (linhasUnidade.find((l) => l.label === nomeUnidade)?.dirpin || "") : filtroDirpin;
-      filtroApenasCompartilhados = false;
-      atualizar();
-    });
-    if (modoGraficoUnidade === "mapa") {
-      el("legenda-mapa").innerHTML = legendaMapaUnidadeHTML(linhasUnidade, destacarUnidadeFn);
-      el("legenda-mapa").addEventListener("click", (ev) => {
-        const item = ev.target.closest("[data-cat]");
-        if (!item) return;
-        const nomeUnidade = item.dataset.cat;
-        filtroCoorpin = filtroCoorpin === nomeUnidade ? "" : nomeUnidade;
-        filtroDirpin = filtroCoorpin ? (linhasUnidade.find((l) => l.label === nomeUnidade)?.dirpin || "") : filtroDirpin;
-        filtroApenasCompartilhados = false;
-        atualizar();
-      });
-    } else {
-      el("legenda-mapa").innerHTML = "";
-    }
-    const toggleGrafico = el("toggle-grafico");
-    toggleGrafico.querySelectorAll("button").forEach((btn) => btn.classList.toggle("active", btn.dataset.modo === modoGraficoUnidade));
-    toggleGrafico.addEventListener("click", (ev) => {
-      const btn = ev.target.closest("button[data-modo]");
-      if (!btn || btn.dataset.modo === modoGraficoUnidade) return;
-      modoGraficoUnidade = btn.dataset.modo;
-      salvarGrafico("cpg-unidades-grafico", modoGraficoUnidade);
-      atualizar();
-    });
-
-    const porId = new Map(lista.map((c) => [c.id, c]));
-    el("tabela-conteudo").innerHTML = tabelaContratosHTML(listaFiltrada, { dirpinAtual: filtroDirpin || null, destacarCompartilhados: filtroApenasCompartilhados });
-    ligarTooltipLinhas(el("tabela-conteudo"), porId);
-  }
-
-  atualizar();
-  return { resetar };
-}
-
 function renderPorDimensaoContratos(lista, cfg) {
   const p = cfg.prefixo;
   const el = (sufixo) => document.getElementById(`${p}-${sufixo}`);
@@ -6821,11 +6674,18 @@ function renderPorDimensaoContratos(lista, cfg) {
         <button class="tab-btn" data-subtab-${p}="prazos">PRAZOS E VENCIMENTOS</button>
         <button class="tab-btn" data-subtab-${p}="financeiro">FINANCEIRO</button>
         <button class="tab-btn" data-subtab-${p}="pessoas">PESSOAS</button>
+        ${/* Pedido direto: "unidades (a aba) só deveria aparecer quando
+           tivesse selecionado pra área gestora DEPIN... ela pra ser uma
+           aba dentro da aba de área gestora" — só existe em Por Área
+           Gestora (nunca em Por Categoria), e começa escondida: atualizar()
+           decide se mostra, a cada vez que a área escolhida muda. */ ""}
+        ${p === "area" ? `<button class="tab-btn" data-subtab-${p}="unidades" id="${p}-subtab-btn-unidades" hidden>UNIDADES</button>` : ""}
       </div>
       <div class="tab-panel" id="${p}-sub-visao"></div>
       <div class="tab-panel" id="${p}-sub-prazos" hidden></div>
       <div class="tab-panel" id="${p}-sub-financeiro" hidden></div>
       <div class="tab-panel" id="${p}-sub-pessoas" hidden></div>
+      ${p === "area" ? `<div class="tab-panel" id="${p}-sub-unidades" hidden></div>` : ""}
       ${/* Pedido direto: "talvez na categoria hierarquizar melhor colocando
          a tabela acima dessa possibilidade de 'só na DEPIN'" — só em Por
          Categoria (onde a tabela de baixo mistura áreas), o quadro da DEPIN
@@ -6839,7 +6699,7 @@ function renderPorDimensaoContratos(lista, cfg) {
 
   ligarBuscaContratos(lista, porId, `${p}-busca`, `${p}-busca-resultado`);
 
-  const SUBABAS = ["visao", "prazos", "financeiro", "pessoas"];
+  const SUBABAS = p === "area" ? ["visao", "prazos", "financeiro", "pessoas", "unidades"] : ["visao", "prazos", "financeiro", "pessoas"];
   alvo.querySelectorAll(`[data-subtab-${p}]`).forEach((btn) => {
     btn.addEventListener("click", () => {
       alvo.querySelectorAll(`[data-subtab-${p}]`).forEach((b) => b.classList.remove("active"));
@@ -6969,15 +6829,27 @@ function renderPorDimensaoContratos(lista, cfg) {
     }
   }
 
-  // Reaproveitado pelo mapa da landing de Por Categoria: pula pra aba
-  // dedicada "UNIDADES" já com a COORPIN clicada isolada. Não precisa mais
-  // selecionar DEPIN em lugar nenhum — se este mapa está visível, a lista já
-  // filtrada pelo seletor de Unidade Gestora lá em cima já tem unidade.
+  // Reaproveitado pelo mapa da landing de Por Categoria: pula pra "Por
+  // Área Gestora", seleciona DEPIN e já abre a subaba "UNIDADES" com a
+  // COORPIN clicada isolada. Pedido direto: "unidades (a aba) só deveria
+  // aparecer quando tivesse selecionado pra área gestora DEPIN... ela pra
+  // ser uma aba dentro da aba de área gestora" — por isso agora precisa
+  // selecionar DEPIN explicitamente aqui (a subaba só existe dentro do
+  // perfil da DEPIN), mesmo que a lista já filtrada pelo seletor de
+  // Unidade Gestora lá em cima já tivesse unidade.
   function irParaUnidadeDepinEmPorArea(nomeUnidade) {
-    document.querySelector('[data-subtab-contratos="unidades"]')?.click();
+    document.querySelector('[data-subtab-contratos="porarea"]')?.click();
+    const selArea = document.getElementById("area-select");
+    if (selArea) { selArea.value = "DEPIN"; selArea.dispatchEvent(new Event("change", { bubbles: true })); }
     setTimeout(() => {
-      const selCoorpin = document.getElementById("unidades-filtro-coorpin");
-      if (selCoorpin) { selCoorpin.value = nomeUnidade; selCoorpin.dispatchEvent(new Event("change", { bubbles: true })); }
+      document.querySelector('[data-subtab-area="unidades"]')?.click();
+      if (!nomeUnidade) return;
+      setTimeout(() => {
+        // Mesmo <select> do quadro "Distribuição Geográfica" — a subaba
+        // Unidades reaproveita esse filtro em vez de duplicar outro igual.
+        const selCoorpin = document.getElementById("area-filtro-coorpin");
+        if (selCoorpin) { selCoorpin.value = nomeUnidade; selCoorpin.dispatchEvent(new Event("change", { bubbles: true })); }
+      }, 150);
     }, 250);
   }
 
@@ -7055,7 +6927,11 @@ function renderPorDimensaoContratos(lista, cfg) {
           : contratosComUnidade.length
           ? `Todos os ${contratosComUnidade.length} contrato(s) desta seleção têm unidade regional (COORPIN) cadastrada.`
           : `Nenhum destes ${contratosSemUnidade.length} contrato(s) tem unidade regional cadastrada (hoje só a DEPIN cadastra) — todos entram juntos em "Salvador (outras áreas)", a melhor aproximação geográfica sem inventar dado que a planilha não tem.`
-        } Clique numa barra ou num ponto do mapa pra isolar — ou veja tudo isso de uma vez, com a tabela de contratos de cada unidade, na aba <button type="button" id="${p}-ir-aba-unidades" class="link-botao" style="font:inherit;color:inherit;text-decoration:underline;cursor:pointer">UNIDADES</button> (unidades da DEPIN só, por enquanto).</p>
+        } Clique numa barra ou num ponto do mapa pra isolar.${
+          p === "categoria" || selecionada === "DEPIN"
+            ? ` Ou veja tudo isso de uma vez, com a tabela de contratos de cada unidade, na subaba <button type="button" id="${p}-ir-aba-unidades" class="link-botao" style="font:inherit;color:inherit;text-decoration:underline;cursor:pointer">UNIDADES</button>${p === "categoria" ? ' (dentro de "Por Área Gestora → DEPIN")' : ""}.`
+            : ""
+        }</p>
         <div class="linha-troca-grafico"><div class="dash-toggle" id="${p}-toggle-grafico-unidade">
           <button class="dash-toggle-btn" data-modo="barras" title="Lista as 26, ordenada por número — melhor pra achar uma específica ou comparar valores">BARRAS</button>
           <button class="dash-toggle-btn" data-modo="mapa" title="Mostra onde cada sede fica no estado — melhor pra enxergar a distribuição geográfica (mapa de PONTOS: cidade-sede de cada COORPIN, ainda não o território que cada uma cobre)">MAPA</button>
@@ -7065,7 +6941,13 @@ function renderPorDimensaoContratos(lista, cfg) {
         <div id="${p}-legenda-mapa-unidade"></div>
       </div>`;
     el("ir-aba-unidades")?.addEventListener("click", () => {
-      document.querySelector('[data-subtab-contratos="unidades"]')?.click();
+      if (p === "area") {
+        // Já estamos dentro do perfil da DEPIN (só aparece aqui quando
+        // selecionada === "DEPIN") — só troca de subaba, sem navegar.
+        document.querySelector('[data-subtab-area="unidades"]')?.click();
+      } else {
+        irParaUnidadeDepinEmPorArea(); // sem unidade nenhuma pré-selecionada
+      }
     });
     el("filtro-dirpin").addEventListener("change", (ev) => {
       filtroDirpin = ev.target.value;
@@ -7583,6 +7465,46 @@ function renderPorDimensaoContratos(lista, cfg) {
     }
   }
 
+  // Pedido direto: "unidades (a aba) só deveria aparecer quando tivesse
+  // selecionado pra área gestora DEPIN... porque por enquanto só temos
+  // essa unidade gestora informando o que são atingidos... ela pra ser
+  // uma aba dentro da aba de área gestora". Reaproveita o MESMO
+  // filtroDirpin/filtroCoorpin/filtroApenasCompartilhados do quadro
+  // "Distribuição Geográfica" logo acima (mesma seleção reflete nos dois,
+  // em vez de duplicar outro DIRPIN/COORPIN igual) — só acrescenta o que
+  // faltava ali: a lista de contratos de cada unidade, "de forma
+  // separada".
+  function renderUnidadesSubaba(listaArea) {
+    const alvoSub = el("sub-unidades");
+    if (!alvoSub) return;
+    const contratosComUnidade = listaArea.filter((c) => (c.unidades || []).length > 0);
+    const linhasUnidade = agruparPorUnidade(listaArea.flatMap((c) => c.unidades || []));
+    let listaFiltradaSub = contratosComUnidade;
+    if (filtroDirpin) listaFiltradaSub = listaFiltradaSub.filter((c) => c.unidades.some((u) => u.dirpin === filtroDirpin));
+    if (filtroCoorpin && filtroCoorpin !== OUTRAS_AREAS_LABEL) listaFiltradaSub = listaFiltradaSub.filter((c) => c.unidades.some((u) => u.nomeUnidade === filtroCoorpin));
+    if (filtroApenasCompartilhados) listaFiltradaSub = listaFiltradaSub.filter((c) => new Set(c.unidades.map((u) => u.dirpin)).size > 1);
+    const tituloTabela = filtroCoorpin && filtroCoorpin !== OUTRAS_AREAS_LABEL
+      ? `Contratos — ${filtroCoorpin}`
+      : filtroDirpin
+      ? `Contratos — DIRPIN ${filtroDirpin}`
+      : filtroApenasCompartilhados
+      ? "Contratos — compartilhados entre DIRPIN"
+      : "Todos os contratos com unidade regional cadastrada";
+    alvoSub.innerHTML = `
+      <p class="dash-chart-hint">Quais contratos cada unidade regional (COORPIN) da DEPIN atende, de forma separada. Use o filtro DIRPIN/COORPIN ali em cima, na "Distribuição Geográfica" — a tabela abaixo acompanha a mesma seleção.</p>
+      <div class="kpi-row" style="grid-template-columns:repeat(auto-fit,minmax(200px,1fr));margin:12px 0">
+        <div class="kpi-card"><div class="kpi-cabeca">${kpiIcone("predio")}<div class="kpi-label">Unidades Atendidas</div></div><div class="kpi-value">${linhasUnidade.length.toLocaleString("pt-BR")}</div></div>
+        <div class="kpi-card"><div class="kpi-cabeca">${kpiIcone("competencia_normas")}<div class="kpi-label">Contratos com Unidade Cadastrada</div></div><div class="kpi-value">${contratosComUnidade.length.toLocaleString("pt-BR")}</div></div>
+      </div>
+      <div class="dash-chart-box" style="margin-top:16px">
+        <h4>${escapeHTML(tituloTabela)}</h4>
+        <div class="tabela-rolavel" style="max-height:420px" id="${p}-unidades-tabela-conteudo"></div>
+      </div>
+    `;
+    el("unidades-tabela-conteudo").innerHTML = tabelaContratosHTML(listaFiltradaSub, { dirpinAtual: filtroDirpin || null, destacarCompartilhados: filtroApenasCompartilhados });
+    ligarTooltipLinhas(el("unidades-tabela-conteudo"), porId);
+  }
+
   function atualizar() {
     if (!selecionada) {
       el("perfil").hidden = true;
@@ -7607,6 +7529,22 @@ function renderPorDimensaoContratos(lista, cfg) {
     renderPrazos(listaFiltrada);
     renderFinanceiro(listaFiltrada);
     renderPessoas(listaFiltrada);
+    if (p === "area") {
+      const btnUnidades = document.getElementById(`${p}-subtab-btn-unidades`);
+      const ehDepin = selecionada === "DEPIN";
+      if (btnUnidades) {
+        btnUnidades.hidden = !ehDepin;
+        // Caiu numa área sem unidade regional enquanto a subaba Unidades
+        // estava ativa (ex.: trocou de DEPIN pra DEPAF) — volta pra Visão
+        // Geral em vez de deixar uma subaba escondida marcada como ativa.
+        if (!ehDepin && btnUnidades.classList.contains("active")) {
+          btnUnidades.classList.remove("active");
+          alvo.querySelector(`[data-subtab-${p}="visao"]`)?.classList.add("active");
+          SUBABAS.forEach((nome) => { el(`sub-${nome}`).hidden = nome !== "visao"; });
+        }
+      }
+      if (ehDepin) renderUnidadesSubaba(listaArea);
+    }
   }
 
   atualizar();
@@ -7752,7 +7690,6 @@ async function carregarContratosPortal(portalSlug) {
       <button class="tab-btn" data-subtab-contratos="tatico">${ICONS.mira}TÁTICO</button>
       <button class="tab-btn" data-subtab-contratos="operacional">${ICONS.engrenagem}OPERACIONAL</button>
       <button class="tab-btn" data-subtab-contratos="porarea">${ICONS.predio}POR ÁREA GESTORA</button>
-      <button class="tab-btn" data-subtab-contratos="unidades">${ICONS.predio}UNIDADES</button>
       <button class="tab-btn" data-subtab-contratos="porcategoria">${ICONS.categoria_tag}POR CATEGORIA</button>
       <button class="tab-btn" data-subtab-contratos="atualizados">${ICONS.atualizar}ATUALIZADOS RECENTEMENTE</button>
     </div>
@@ -7760,12 +7697,11 @@ async function carregarContratosPortal(portalSlug) {
     <div class="tab-panel" id="contratos-sub-tatico" hidden></div>
     <div class="tab-panel" id="contratos-sub-operacional" hidden></div>
     <div class="tab-panel" id="contratos-sub-porarea" hidden></div>
-    <div class="tab-panel" id="contratos-sub-unidades" hidden></div>
     <div class="tab-panel" id="contratos-sub-porcategoria" hidden></div>
     <div class="tab-panel" id="contratos-sub-atualizados" hidden></div>
   `;
 
-  const SUBABAS_CONTRATOS = ["gerencial", "tatico", "operacional", "porarea", "unidades", "porcategoria", "atualizados"];
+  const SUBABAS_CONTRATOS = ["gerencial", "tatico", "operacional", "porarea", "porcategoria", "atualizados"];
   // Pedido direto: "se eu isolo aí uma área aí depois ela fica marcada e
   // não volta ao normal... um desatento pode esquecer de desmarcar... eu
   // já vi em alguns serviços que em casos assim volta pro geral, em
@@ -7791,7 +7727,6 @@ async function carregarContratosPortal(portalSlug) {
     const taticoHandle = renderTaticoContratos(listaExibida);
     const operacionalHandle = renderOperacionalContratos(listaExibida, portalSlug);
     const porAreaHandle = renderPorAreaContratos(listaExibida);
-    const unidadesHandle = renderUnidadesContratos(listaExibida);
     const porCategoriaHandle = renderPorCategoriaContratos(listaExibida);
     renderAtualizadosRecentemente(listaExibida, decisoesRenovacao);
 
@@ -7800,7 +7735,6 @@ async function carregarContratosPortal(portalSlug) {
       tatico: () => taticoHandle?.resetar(),
       operacional: () => operacionalHandle?.resetar(),
       porarea: () => porAreaHandle?.resetar(),
-      unidades: () => unidadesHandle?.resetar(),
       porcategoria: () => porCategoriaHandle?.resetar(),
     };
     // Toda vez que a BASE muda (trocou de unidade gestora), volta pra
