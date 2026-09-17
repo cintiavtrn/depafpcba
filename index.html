@@ -4595,10 +4595,6 @@ function agruparContagemPorCampo(lista, campoFn, rotuloVazio = "(não informado)
   return [...mapa.entries()].map(([label, total]) => ({ label, total })).sort((a, b) => b.total - a.total);
 }
 
-function agruparPorTipoObjeto(lista) {
-  return agruparContagemPorCampo(lista, (c) => c.tipoObjeto, "(sem tipo)");
-}
-
 // Não é uma linha do tempo (isso exigiria a data de CADA aditivo, que a
 // planilha não tem) — é a distribuição de "quantos aditivos esse contrato
 // já teve", por isso ordenada pelo próprio número (0, 1, 2...) e não por
@@ -5461,6 +5457,25 @@ function renderGerencialContratos(lista, resumo) {
   const areasDisponiveis = [...new Set(lista.flatMap(setoresDemandantesDoContrato))].sort(compararSetorDemandante);
   let filtroArea = "";
   let filtroTipo = "";
+  // Grupos de análise personalizados — mesmo mecanismo do Painel de Obras
+  // (ver DIMENSOES_OBRAS/valorEfetivoDimensao), pedido dela depois de ver
+  // funcionando lá: "adicione lá em contratos... gostei muito". Começa só em
+  // Tipo de Objeto — é o único campo grande aqui com a MESMA forma de Obras
+  // (1 valor só por contrato); Setor Demandante é N:N (um contrato pode
+  // atender mais de um setor ao mesmo tempo) e os de pessoa (Analista/
+  // Gestor/Fiscal) têm outra estrutura — dá pra estender se ela quiser.
+  let modoAgruparTipo = false;
+  const selecaoAgruparTipo = new Set();
+  let gruposTipoObjeto = lerGraficoSalvo("cpg-gerencial-grupos-tipo") || [];
+  function valorEfetivoTipo(c) {
+    const bruto = c.tipoObjeto || "(sem tipo)";
+    const grupo = gruposTipoObjeto.find((g) => g.membros.includes(bruto));
+    return grupo ? grupo.nome : bruto;
+  }
+  function membrosDeTipo(rotulo) {
+    const grupo = gruposTipoObjeto.find((g) => g.nome === rotulo);
+    return grupo ? grupo.membros : [rotulo];
+  }
   let filtroAnalista = "";
   let filtroGestor = "";
   let filtroFiscal = "";
@@ -5513,9 +5528,13 @@ function renderGerencialContratos(lista, resumo) {
     </div>
     <div class="dash-charts" style="grid-template-columns:1fr 1fr">
       <div class="dash-chart-box">
-        <h4>Contratos por Tipo de Objeto</h4>
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">
+          <h4 style="margin-bottom:0">Contratos por Tipo de Objeto</h4>
+          <button type="button" class="dash-toggle-btn" id="ger-tipo-agrupar-toggle" title="Selecionar categorias pra juntar num grupo personalizado, tipo o Power BI">AGRUPAR</button>
+        </div>
         <p class="dash-chart-hint">Qual tipo de objeto reina mais no portfólio, em QUANTIDADE. Clique numa barra pra isolar aquele tipo.</p>
         <div id="ger-tipo"></div>
+        <div id="ger-tipo-agrupar" class="dash-chart-hint" hidden></div>
       </div>
       <div class="dash-chart-box">
         <h4>Valor por Tipo de Objeto</h4>
@@ -5714,14 +5733,71 @@ function renderGerencialContratos(lista, resumo) {
     const alvoClicado = ev.target.closest("[data-cat]");
     if (alvoClicado) selecionarArea(alvoClicado.dataset.cat);
   });
-  document.getElementById("ger-tipo").addEventListener("click", (ev) => {
+  function cliqueTipoOuAgrupar(ev) {
     const alvoClicado = ev.target.closest("[data-cat]");
-    if (alvoClicado) selecionarTipo(alvoClicado.dataset.cat);
+    if (!alvoClicado) return;
+    if (modoAgruparTipo) {
+      const rotulo = alvoClicado.dataset.cat;
+      if (selecaoAgruparTipo.has(rotulo)) selecaoAgruparTipo.delete(rotulo); else selecaoAgruparTipo.add(rotulo);
+      desenharAgrupamentoTipo();
+      return;
+    }
+    selecionarTipo(alvoClicado.dataset.cat);
+  }
+  document.getElementById("ger-tipo").addEventListener("click", cliqueTipoOuAgrupar);
+  document.getElementById("ger-valor-tipo").addEventListener("click", cliqueTipoOuAgrupar);
+  document.getElementById("ger-tipo-agrupar-toggle").addEventListener("click", () => {
+    modoAgruparTipo = !modoAgruparTipo;
+    selecaoAgruparTipo.clear();
+    desenharAgrupamentoTipo();
   });
-  document.getElementById("ger-valor-tipo").addEventListener("click", (ev) => {
-    const alvoClicado = ev.target.closest("[data-cat]");
-    if (alvoClicado) selecionarTipo(alvoClicado.dataset.cat);
-  });
+
+  function desenharAgrupamentoTipo() {
+    const caixa = document.getElementById("ger-tipo-agrupar");
+    document.getElementById("ger-tipo-agrupar-toggle").classList.toggle("active", modoAgruparTipo);
+    const partes = [];
+    if (gruposTipoObjeto.length) {
+      partes.push(`<div class="filter-chips">${gruposTipoObjeto.map((g, i) => `
+        <span class="filter-chip">Grupo "${escapeHTML(g.nome)}" (${g.membros.length})<button type="button" data-remover-grupo-tipo="${i}" title="Desfazer este grupo">${iconeInline("fechar", 10, -1)}</button></span>`).join("")}</div>`);
+    }
+    if (modoAgruparTipo) {
+      partes.push(selecaoAgruparTipo.size
+        ? `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:${gruposTipoObjeto.length ? "8px" : "0"}">
+            <span>${selecaoAgruparTipo.size} selecionado${selecaoAgruparTipo.size === 1 ? "" : "s"}: ${[...selecaoAgruparTipo].map((r) => escapeHTML(r)).join(", ")}</span>
+            <input type="text" id="ger-tipo-nome-grupo" placeholder="nome do grupo novo" style="width:170px">
+            <button type="button" class="dash-toggle-btn" data-criar-grupo-tipo="1">CRIAR GRUPO</button>
+            <button type="button" class="dash-toggle-btn" data-limpar-selecao-tipo="1">LIMPAR SELEÇÃO</button>
+          </div>`
+        : `<p style="margin-top:${gruposTipoObjeto.length ? "8px" : "0"}">Clique em 2 ou mais categorias no gráfico acima pra juntar num grupo novo.</p>`);
+    }
+    caixa.innerHTML = partes.join("");
+    caixa.hidden = partes.length === 0;
+    caixa.querySelectorAll("[data-remover-grupo-tipo]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        gruposTipoObjeto.splice(+btn.dataset.removerGrupoTipo, 1);
+        salvarGrafico("cpg-gerencial-grupos-tipo", gruposTipoObjeto);
+        atualizar();
+      });
+    });
+    const btnCriar = caixa.querySelector("[data-criar-grupo-tipo]");
+    if (btnCriar) {
+      btnCriar.addEventListener("click", () => {
+        const inputNome = document.getElementById("ger-tipo-nome-grupo");
+        const nome = inputNome.value.trim();
+        if (!nome) { inputNome.focus(); return; }
+        const membros = [...new Set([...selecaoAgruparTipo].flatMap((r) => membrosDeTipo(r)))];
+        const gruposRestantes = gruposTipoObjeto.filter((g) => !selecaoAgruparTipo.has(g.nome));
+        gruposRestantes.push({ nome, membros });
+        gruposTipoObjeto = gruposRestantes;
+        salvarGrafico("cpg-gerencial-grupos-tipo", gruposRestantes);
+        selecaoAgruparTipo.clear();
+        modoAgruparTipo = false;
+        atualizar();
+      });
+    }
+    const btnLimpar = caixa.querySelector("[data-limpar-selecao-tipo]");
+    if (btnLimpar) btnLimpar.addEventListener("click", () => { selecaoAgruparTipo.clear(); desenharAgrupamentoTipo(); });
+  }
   document.getElementById("ger-analista").addEventListener("click", (ev) => {
     const alvoClicado = ev.target.closest("[data-cat]");
     if (alvoClicado) selecionarAnalista(alvoClicado.dataset.cat);
@@ -5748,7 +5824,7 @@ function renderGerencialContratos(lista, resumo) {
   function atualizar() {
     const filtrada = lista.filter((c) =>
       (!filtroArea || setoresDemandantesDoContrato(c).includes(filtroArea)) &&
-      (!filtroTipo || (c.tipoObjeto || "(sem tipo)") === filtroTipo) &&
+      (!filtroTipo || valorEfetivoTipo(c) === filtroTipo) &&
       (!filtroAnalista || (c.analista || "(sem analista)") === filtroAnalista) &&
       (!filtroGestor || (c.pessoas || []).some((p) => p.papel === "Gestor" && p.nomePessoa === filtroGestor)) &&
       (!filtroFiscal || (c.pessoas || []).some((p) => p.papel === "Fiscal" && p.nomePessoa === filtroFiscal)) &&
@@ -5883,7 +5959,7 @@ function renderGerencialContratos(lista, resumo) {
         mostrarPercentual: true,
       }
     );
-    document.getElementById("ger-tipo").innerHTML = barraOuTabelaSVG(agruparPorTipoObjeto(filtrada), {
+    document.getElementById("ger-tipo").innerHTML = barraOuTabelaSVG(agruparContagemPorCampo(filtrada, valorEfetivoTipo, "(sem tipo)"), {
       tituloTooltip: (l) => `${l.label}: ${l.total} contrato(s)`,
       selecionado: filtroTipo,
       colunaRotulo: "TIPO DE OBJETO",
@@ -5895,7 +5971,7 @@ function renderGerencialContratos(lista, resumo) {
     // "muita barra" tinha, só que em forma de pizza. % do total substitui a
     // leitura de "fatia" que a rosca dava.
     document.getElementById("ger-valor-tipo").innerHTML = barraOuTabelaSVG(
-      agruparValorPorCampo(filtrada, (c) => c.tipoObjeto, "(sem tipo)"),
+      agruparValorPorCampo(filtrada, valorEfetivoTipo, "(sem tipo)"),
       {
         formatarValor: (v) => "R$ " + formatarMoedaCompacta(v),
         rotuloExtra: (l) => `(${l.qtd} contrato${l.qtd === 1 ? "" : "s"})`,
@@ -5905,6 +5981,7 @@ function renderGerencialContratos(lista, resumo) {
         mostrarPercentual: true,
       }
     );
+    desenharAgrupamentoTipo();
     document.getElementById("ger-analista").innerHTML = barraOuTabelaSVG(
       agruparContagemPorCampo(filtrada, (c) => c.analista, "(sem analista)"),
       {
