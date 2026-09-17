@@ -4492,7 +4492,11 @@ function treemapAreaCriticidadeSVG(linhasAreaOriginal) {
 // isso é a mesma pergunta de magnitude que barraContagemHorizontalSVG já
 // responde com corUnica, só que em forma de mapa em vez de lista.
 function treemapValorSVG(linhas, opcoes = {}) {
-  const { formatarValor = (v) => "R$ " + formatarMoedaCompacta(v) } = opcoes;
+  // substantivoQtd: o "contrato(s)" do tooltip era fixo — bug real achado ao
+  // verificar o treemap de Manutenção do Painel de Obras dizendo "11
+  // contratos" (a função nasceu em Contratos e foi reaproveitada sem mudança
+  // pra Obras, onde a unidade de contagem é "unidade", não "contrato").
+  const { formatarValor = (v) => "R$ " + formatarMoedaCompacta(v), substantivoQtd = "contrato" } = opcoes;
   const linhasOrd = [...linhas].sort((a, b) => b.total - a.total);
   const w = 500, h = 280;
   const valores = linhasOrd.map((l) => l.total);
@@ -4513,7 +4517,7 @@ function treemapValorSVG(linhas, opcoes = {}) {
     const rotulo = l.label.length > maxChars ? l.label.slice(0, maxChars - 1) + "…" : l.label;
     const pct = somaTotal ? Math.round((l.total / somaTotal) * 1000) / 10 : 0;
     corpo += `<g data-cat="${escapeAttr(l.label)}" style="cursor:pointer">
-      <rect x="${r.x.toFixed(1)}" y="${r.y.toFixed(1)}" width="${Math.max(r.w - 1.5, 0.5).toFixed(1)}" height="${Math.max(r.h - 1.5, 0.5).toFixed(1)}" fill="${TONS[0]}" fill-opacity="${intensidade.toFixed(2)}" stroke="var(--paper)" stroke-width="1.5"><title>${escapeHTML(l.label)}: ${formatarValor(l.total)} (${pct}% do total)${l.qtd != null ? ` — ${l.qtd} contrato${l.qtd === 1 ? "" : "s"}` : ""}</title></rect>
+      <rect x="${r.x.toFixed(1)}" y="${r.y.toFixed(1)}" width="${Math.max(r.w - 1.5, 0.5).toFixed(1)}" height="${Math.max(r.h - 1.5, 0.5).toFixed(1)}" fill="${TONS[0]}" fill-opacity="${intensidade.toFixed(2)}" stroke="var(--paper)" stroke-width="1.5"><title>${escapeHTML(l.label)}: ${formatarValor(l.total)} (${pct}% do total)${l.qtd != null ? ` — ${l.qtd} ${substantivoQtd}${l.qtd === 1 ? "" : "s"}` : ""}</title></rect>
       ${cabe ? `<text x="${(r.x + 5).toFixed(1)}" y="${(r.y + 12).toFixed(1)}" font-family="monospace" font-size="8.5" font-weight="700" fill="var(--paper)" style="pointer-events:none">${escapeHTML(rotulo)}</text>` : ""}
       ${cabe ? `<text x="${(r.x + 5).toFixed(1)}" y="${(r.y + r.h - 8).toFixed(1)}" font-family="monospace" font-size="9" font-weight="700" fill="var(--paper)" style="pointer-events:none">${escapeHTML(formatarValor(l.total))}</text>` : ""}
     </g>`;
@@ -8553,6 +8557,14 @@ function unidadeDetalheHTML(u) {
 // ao próprio desenho, não só ao chip.
 const DIMENSOES_OBRAS = [
   { chave: "statusConstrutivo", campo: (u) => u.statusConstrutivo, rotulo: "Status Construtivo", colunaRotulo: "STATUS CONSTRUTIVO", containerId: "obras-status-construtivo", hintId: "obras-status-construtivo-hint", hintSubstantivo: "status registrado" },
+  // Pedido direto: "existe diferença entre concluída e inaugurada... a
+  // inauguração depende da agenda do governador... acho que status de
+  // ocupação não foi aproveitada". Já era campo SEPARADO no schema desde a
+  // Fase 1 (statusDeUtilizacao ≠ statusConstrutivo — nunca foram misturados),
+  // só nunca tinha virado gráfico próprio, ficava só no perfil da unidade.
+  // Só 2 valores reais existem na planilha-fonte: Inaugurada e Não ocupada
+  // (conferido direto no banco — "Ocupada" não aparece em nenhuma linha).
+  { chave: "statusDeUtilizacao", campo: (u) => u.statusDeUtilizacao, rotulo: "Status de Utilização", colunaRotulo: "STATUS DE UTILIZAÇÃO", containerId: "obras-status-utilizacao", hintId: "obras-status-utilizacao-hint", hintSubstantivo: "status de utilização registrado (diferente de Status Construtivo — uma obra pode estar \"Concluída\" e ainda não \"Inaugurada\", a cerimônia depende da agenda do governador)" },
   // Pedido direto: "faltou gráfico que mostra construção, obra e reforma".
   // Existia na planilha-fonte desde a Fase 1 (ver seed-obras.js,
   // NORMALIZACAO_TIPO_INTERVENCAO) mas nunca virou gráfico — só aparecia no
@@ -8647,6 +8659,7 @@ async function carregarObrasPortal(portalSlug) {
           <div class="dash-chart-box">
             <h4>Manutenção</h4>
             <p class="dash-chart-hint" id="obras-valor-manutencao-hint"></p>
+            <p class="dash-chart-hint">Valor PARCIAL: a fonte bruta de manutenção tem mais ordens de serviço do que as que deu pra vincular com segurança a uma unidade específica — o restante foi gasto, mas não sei em qual unidade exata.</p>
             <div id="obras-valor-manutencao"></div>
           </div>
         </div>
@@ -8850,7 +8863,7 @@ async function carregarObrasPortal(portalSlug) {
     document.getElementById("obras-kpis").innerHTML = `
       <div class="kpi-card"><div class="kpi-cabeca">${kpiIcone("predio")}<div class="kpi-label">Unidades</div></div><div class="kpi-value">${filtrada.length.toLocaleString("pt-BR")}</div></div>
       <div class="kpi-card"><div class="kpi-cabeca">${kpiIcone("moeda")}<div class="kpi-label">Valor Total da Obra</div></div><div class="kpi-value">R$ ${formatarMoedaCompacta(valorTotalObra)}</div><div class="kpi-valor-exato">${formatarMoedaBR(valorTotalObra)} — ${comValorObra.length} de ${filtrada.length} unidades</div></div>
-      <div class="kpi-card"><div class="kpi-cabeca">${kpiIcone("moeda")}<div class="kpi-label">Valor Total da Manutenção</div></div><div class="kpi-value">R$ ${formatarMoedaCompacta(valorTotalManutencao)}</div><div class="kpi-valor-exato">${formatarMoedaBR(valorTotalManutencao)} — ${comValorManutencao.length} de ${filtrada.length} unidades</div></div>
+      <div class="kpi-card"><div class="kpi-cabeca">${kpiIcone("moeda")}<div class="kpi-label">Valor Total da Manutenção</div></div><div class="kpi-value">R$ ${formatarMoedaCompacta(valorTotalManutencao)}</div><div class="kpi-valor-exato">${formatarMoedaBR(valorTotalManutencao)} — ${comValorManutencao.length} de ${filtrada.length} unidades (valor PARCIAL, só o que foi possível vincular a uma unidade)</div></div>
       <div class="kpi-card"><div class="kpi-cabeca">${kpiIcone("obras")}<div class="kpi-label">Obras Em Construção</div></div><div class="kpi-value">${obrasEmConstrucao.toLocaleString("pt-BR")}</div></div>
       <div class="kpi-card"><div class="kpi-cabeca">${kpiIcone("selo")}<div class="kpi-label">% Obras Concluídas</div></div><div class="kpi-value">${percentualConcluidas === null ? "—" : (percentualConcluidas * 100).toLocaleString("pt-BR", { maximumFractionDigits: 1 }) + "%"}</div><div class="kpi-valor-exato">${obrasConcluidas} de ${comStatus.length} com status registrado</div></div>
       <div class="kpi-card"><div class="kpi-cabeca">${kpiIcone("obras")}<div class="kpi-label">Unidades com Manutenção Registrada</div></div><div class="kpi-value">${percentualComManutencao === null ? "—" : (percentualComManutencao * 100).toLocaleString("pt-BR", { maximumFractionDigits: 1 }) + "%"}</div><div class="kpi-valor-exato">${comValorManutencao.length} de ${filtrada.length} unidades</div></div>
@@ -8896,10 +8909,10 @@ async function carregarObrasPortal(portalSlug) {
       mostrarPercentual: true,
     };
     document.getElementById("obras-valor-obra").innerHTML = modoVisualFinanceiro === "treemap"
-      ? treemapValorSVG(paraValorObra)
+      ? treemapValorSVG(paraValorObra, { substantivoQtd: "unidade" })
       : barraOuTabelaSVG(paraValorObra, opcoesVisualValor);
     document.getElementById("obras-valor-manutencao").innerHTML = modoVisualFinanceiro === "treemap"
-      ? treemapValorSVG(paraValorManutencao)
+      ? treemapValorSVG(paraValorManutencao, { substantivoQtd: "unidade" })
       : barraOuTabelaSVG(paraValorManutencao, opcoesVisualValor);
     adicionarControlesGrafico(document.getElementById("obras-valor-obra"));
     adicionarControlesGrafico(document.getElementById("obras-valor-manutencao"));
