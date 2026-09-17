@@ -375,6 +375,16 @@ body{background:var(--paper);color:var(--carvao);font-family:'IBM Plex Sans',san
 .dash-tabela th,.dash-tabela td{border:1px solid var(--paper-line);padding:8px 10px;font-size:var(--fs-corpo);text-align:left}
 .dash-tabela th{font-family:'IBM Plex Mono',monospace;font-size:var(--fs-ui-sm);letter-spacing:0.06em;background:var(--paper);color:#9AA3B2}
 .dash-tabela td.num{font-family:'IBM Plex Mono',monospace;text-align:right}
+/* Lista completa que aparece ao clicar na barra "outros" de um gráfico de
+   barra horizontal — mesma família visual da .dash-tabela, só mais
+   compacta (é uma lista de 2 colunas, não uma tabela de contrato cheia).
+   As linhas são clicáveis (mesmo data-cat de uma barra), então ganham o
+   mesmo hover de .linha-contrato pra avisar que dá pra clicar. */
+.lista-expandir{margin-top:6px;max-height:220px;overflow-y:auto}
+.dash-tabela-mini{width:100%;border-collapse:collapse;font-family:'IBM Plex Mono',monospace;font-size:var(--fs-ui-sm)}
+.dash-tabela-mini td{padding:5px 8px;border-bottom:1px solid var(--paper-line)}
+.dash-tabela-mini td.num{text-align:right;font-weight:700}
+.dash-tabela-mini tr:hover{background:var(--paper-line)}
 .dash-tabela tr.dim{opacity:0.35}
 .dash-tabela tr[data-cat]{cursor:pointer}
 .dash-tabela tr[data-cat]:hover{background:var(--paper-line)}
@@ -4615,7 +4625,37 @@ function barraContagemHorizontalSVG(linhas, opcoes = {}) {
     // função em vez de um valor único. Opcional — quem não passa continua
     // exatamente como antes.
     destacarFn = null,
+    // Pedido direto: "essas barras horizontais tem horas que são muitas e
+    // a seção fica muito grande e difícil de visualizar rápido" —
+    // confirmado pela própria diretriz de visualização: passado ~7-8
+    // categorias que carregam significado, a leitura degrada (recomendação
+    // ali é "tabela, ou tabela + gráfico"). Corta em `limite` barras +
+    // 1 barra "outros" resumindo o resto; clicar em "outros" revela a
+    // lista completa como tabela HTML simples, sem inflar o SVG.
+    limite = 8,
+    // Cor: por padrão TODA barra usa a MESMA cor — isto aqui é uma
+    // pergunta de MAGNITUDE ("quem tem mais"), não de identidade; um
+    // arco-íris por pessoa não ajuda a comparar e, com mais de 6 linhas,
+    // as cores já repetiam de qualquer jeito (só 6 tons na paleta). Vira
+    // `false` só quando a MESMA dimensão aparece em outro gráfico ao lado
+    // (ex.: Tipo de Objeto, pareado com a rosca de Valor por Tipo — aí a
+    // cor precisa bater nos dois pra dar pra identificar a fatia/barra).
+    corUnica = true,
   } = opcoes;
+  // Corta ANTES de medir padding/altura — "outros" precisa entrar na conta
+  // como se fosse mais uma linha comum.
+  const passouLimite = linhas.length > limite;
+  const linhasExtras = passouLimite ? linhas.slice(limite - 1) : [];
+  const rotuloOutros = `outros (${linhasExtras.length})`;
+  const totalOutros = linhasExtras.reduce((a, l) => a + l.total, 0);
+  const linhasPlot = passouLimite
+    ? [...linhas.slice(0, limite - 1), { label: rotuloOutros, total: totalOutros, ehOutros: true }]
+    : linhas;
+  // destacado "escondido" dentro de outros: se a linha filtrada não está
+  // mais visível (foi pro grupo outros), a barra "outros" que precisa
+  // carregar o destaque — senão parece que o filtro sumiu sem motivo.
+  const destacadoNosExtras = passouLimite && (destacarFn ? linhasExtras.some(destacarFn) : linhasExtras.some((l) => selecionado === l.label));
+
   // padR reservava um número fixo de pixels (44, ou 150 com rotuloExtra) —
   // verificação com dado real (área DGTI, "R$ 10,3M") mostrou que um valor
   // fixo vaza: 8 caracteres em negrito mono já passam de 44px. Em vez de
@@ -4623,7 +4663,7 @@ function barraContagemHorizontalSVG(linhas, opcoes = {}) {
   // linhas vai realmente desenhar (mesmo cálculo usado no gráfico por mês) e
   // reserva exatamente isso + a folga de 6px entre a barra e o texto.
   const padL = 170;
-  const maiorTextoValor = Math.max(0, ...linhas.map((l) => larguraTextoMonoAprox(formatarValor(l.total) + (rotuloExtra ? ` ${rotuloExtra(l)}` : ""), 9, true)));
+  const maiorTextoValor = Math.max(0, ...linhasPlot.map((l) => larguraTextoMonoAprox(formatarValor(l.total) + (rotuloExtra ? ` ${rotuloExtra(l)}` : ""), 9, true)));
   const padR = Math.max(44, maiorTextoValor + 10);
   const padT = 6;
   const larguraPlot = 250;
@@ -4633,47 +4673,87 @@ function barraContagemHorizontalSVG(linhas, opcoes = {}) {
   // a barra de baixo continuava colada, então a segunda/terceira linha do
   // rótulo invadia a linha vizinha. Cada linha agora tem a própria altura,
   // calculada em cima de quantas linhas o rótulo DELA precisa.
-  const alturas = linhas.map((l) => Math.max(22, linhasDoTexto(l.label, maxRotulo) * ALTURA_LINHA_TEXTO + 12));
+  const alturas = linhasPlot.map((l) => Math.max(22, linhasDoTexto(l.label, maxRotulo) * ALTURA_LINHA_TEXTO + 12));
   const w = padL + larguraPlot + padR;
   const h = padT + alturas.reduce((a, b) => a + b, 0) + 4;
+  // Escala calculada em cima de TODAS as linhas originais (não só as
+  // visíveis) — senão "outros" (que soma várias linhas pequenas) podia
+  // desenhar maior que o próprio maior item de verdade, se por acaso esse
+  // maior tivesse ficado de fora da conta da escala.
   const maxTotal = maxSeguro(linhas.map((l) => l.total));
   // Se destacarFn não bate em NENHUMA linha (ninguém filtrado ainda), não
   // apaga tudo — some com o destaque, mas mantém todo mundo na cor normal.
   const algumDestaque = destacarFn ? linhas.some(destacarFn) : !!selecionado;
+  const idExpandir = `barra-outros-${Math.random().toString(36).slice(2, 9)}`;
 
   let corpo = "";
   let y = padT;
-  linhas.forEach((l, i) => {
+  linhasPlot.forEach((l, i) => {
     const rowH = alturas[i];
     const yBarra = y + (rowH - alturaBarra) / 2;
     const larg = maxTotal ? larguraPlot * (l.total / maxTotal) : 0;
-    const destacado = destacarFn ? destacarFn(l) : selecionado === l.label;
-    const dim = algumDestaque && !destacado;
-    const atributosContrato = l.id ? ` class="linha-contrato" data-contrato-id="${escapeAttr(l.id)}"` : "";
-    // Algumas categorias (Nº de Aditivos) precisam do valor NUMÉRICO puro pra
-    // filtrar, não do texto do rótulo ("6 aditivos") — data-valor carrega
-    // esse número quando a linha tem um.
-    const atributoValor = l.valor !== undefined ? ` data-valor="${escapeAttr(l.valor)}"` : "";
-    corpo += `<g data-cat="${escapeAttr(l.label)}"${atributoValor}${atributosContrato} style="cursor:pointer" opacity="${dim ? 0.4 : 1}">`;
-    corpo += `<rect class="area-hit" x="0" y="${y.toFixed(1)}" width="${w}" height="${rowH}" fill="transparent" />`;
-    corpo += textoSVG(l.label, padL - 8, y + rowH / 2, { maxChars: maxRotulo, anchor: "end", fontSize: 9, alturaLinha: ALTURA_LINHA_TEXTO, peso: destacado ? 700 : 400 });
-    corpo += `<rect x="${padL}" y="${yBarra.toFixed(1)}" width="${Math.max(larg, 1.5).toFixed(1)}" height="${alturaBarra}" fill="${corCategoria(i)}"><title>${escapeHTML(tituloTooltip(l))}</title></rect>`;
     const textoValor = formatarValor(l.total) + (rotuloExtra ? ` ${rotuloExtra(l)}` : "");
-    corpo += `<text x="${(padL + larg + 6).toFixed(1)}" y="${(yBarra + alturaBarra / 2 + 3.5).toFixed(1)}" font-family="monospace" font-size="9" font-weight="700" fill="var(--carvao)">${escapeHTML(textoValor)}</text>`;
-    corpo += `</g>`;
+    if (l.ehOutros) {
+      const dim = algumDestaque && !destacadoNosExtras;
+      corpo += `<g data-expandir="${idExpandir}" style="cursor:pointer" opacity="${dim ? 0.4 : 1}">`;
+      corpo += `<rect class="area-hit" x="0" y="${y.toFixed(1)}" width="${w}" height="${rowH}" fill="transparent" />`;
+      corpo += textoSVG(l.label, padL - 8, y + rowH / 2, { maxChars: maxRotulo, anchor: "end", fontSize: 9, alturaLinha: ALTURA_LINHA_TEXTO, peso: destacadoNosExtras ? 700 : 400 });
+      corpo += `<rect x="${padL}" y="${yBarra.toFixed(1)}" width="${Math.max(larg, 1.5).toFixed(1)}" height="${alturaBarra}" fill="none" stroke="var(--carvao)" stroke-width="1.5" stroke-dasharray="3,2"><title>${linhasExtras.length} a mais — clique pra ver todos</title></rect>`;
+      corpo += `<text x="${(padL + larg + 6).toFixed(1)}" y="${(yBarra + alturaBarra / 2 + 3.5).toFixed(1)}" font-family="monospace" font-size="9" font-weight="700" fill="var(--carvao)">${escapeHTML(textoValor)}</text>`;
+      corpo += `</g>`;
+    } else {
+      const destacado = destacarFn ? destacarFn(l) : selecionado === l.label;
+      const dim = algumDestaque && !destacado;
+      const atributosContrato = l.id ? ` class="linha-contrato" data-contrato-id="${escapeAttr(l.id)}"` : "";
+      // Algumas categorias (Nº de Aditivos) precisam do valor NUMÉRICO puro
+      // pra filtrar, não do texto do rótulo ("6 aditivos") — data-valor
+      // carrega esse número quando a linha tem um.
+      const atributoValor = l.valor !== undefined ? ` data-valor="${escapeAttr(l.valor)}"` : "";
+      corpo += `<g data-cat="${escapeAttr(l.label)}"${atributoValor}${atributosContrato} style="cursor:pointer" opacity="${dim ? 0.4 : 1}">`;
+      corpo += `<rect class="area-hit" x="0" y="${y.toFixed(1)}" width="${w}" height="${rowH}" fill="transparent" />`;
+      corpo += textoSVG(l.label, padL - 8, y + rowH / 2, { maxChars: maxRotulo, anchor: "end", fontSize: 9, alturaLinha: ALTURA_LINHA_TEXTO, peso: destacado ? 700 : 400 });
+      corpo += `<rect x="${padL}" y="${yBarra.toFixed(1)}" width="${Math.max(larg, 1.5).toFixed(1)}" height="${alturaBarra}" fill="${corUnica ? TONS[0] : corCategoria(i)}"><title>${escapeHTML(tituloTooltip(l))}</title></rect>`;
+      corpo += `<text x="${(padL + larg + 6).toFixed(1)}" y="${(yBarra + alturaBarra / 2 + 3.5).toFixed(1)}" font-family="monospace" font-size="9" font-weight="700" fill="var(--carvao)">${escapeHTML(textoValor)}</text>`;
+      corpo += `</g>`;
+    }
     y += rowH;
   });
-  return `<svg viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg">${corpo}</svg>`;
+  const svg = `<svg viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg">${corpo}</svg>`;
+  if (!passouLimite) return svg;
+
+  // Lista completa em tabela HTML simples, escondida até clicar em
+  // "outros" — cada linha carrega o MESMO data-cat que uma barra normal
+  // teria, pra continuar funcionando com o filtro por clique que cada
+  // gráfico já tem (delegação de evento em cima de [data-cat], que não
+  // liga se está dentro de um <svg> ou de uma <table>).
+  const tabelaExtras = `
+    <div class="lista-expandir" id="${idExpandir}" hidden>
+      <table class="dash-tabela-mini">
+        <tbody>
+          ${linhasExtras.map((l) => `
+            <tr data-cat="${escapeAttr(l.label)}"${l.valor !== undefined ? ` data-valor="${escapeAttr(l.valor)}"` : ""} style="cursor:pointer">
+              <td>${escapeHTML(l.label)}</td>
+              <td class="num">${escapeHTML(formatarValor(l.total) + (rotuloExtra ? ` ${rotuloExtra(l)}` : ""))}</td>
+            </tr>`).join("")}
+        </tbody>
+      </table>
+    </div>`;
+  return svg + tabelaExtras;
 }
 
 // "Qual tipo de objeto reina mais" (pedido direto, espelhando o cartão
 // "Tipo de Objeto" do painel do TJMA) — fina camada sobre a barra genérica,
 // só acrescentando o cross-filter por tipo (as outras distribuições do
 // Gerencial são só leitura, esta participa do filtro clicável da página).
+// corUnica:false de propósito — esta é a ÚNICA barra que fica pareada com
+// uma rosca da MESMA dimensão (Valor por Tipo de Objeto, ao lado); a cor
+// de cada tipo precisa bater nos dois gráficos pra dar pra identificar a
+// fatia/barra sem reler o rótulo toda vez.
 function barraTipoObjetoSVG(linhas, tipoSelecionado = "") {
   return barraContagemHorizontalSVG(linhas, {
     selecionado: tipoSelecionado,
     tituloTooltip: (l) => `${l.label}: ${l.total} contrato(s)`,
+    corUnica: false,
   });
 }
 
@@ -5659,7 +5739,10 @@ function renderGerencialContratos(lista, resumo) {
     );
     document.getElementById("ger-top-contratos").innerHTML = barraContagemHorizontalSVG(
       agruparTopContratosPorValor(filtrada, 10),
-      { formatarValor: (v) => "R$ " + formatarEixo(v), tituloTooltip: (l) => `${l.label}: ${formatarMoedaBR(l.total)}` }
+      // limite alto de propósito: isso já É um Top 10 curado na origem —
+      // dobrar 3 deles em "outros" destruiria a própria resposta que o
+      // gráfico promete ("Top 10 Maiores").
+      { formatarValor: (v) => "R$ " + formatarEixo(v), tituloTooltip: (l) => `${l.label}: ${formatarMoedaBR(l.total)}`, limite: 20 }
     );
     ligarTooltipLinhas(document.getElementById("ger-top-contratos"), porId);
     document.getElementById("ger-top-fornecedores").innerHTML = barraContagemHorizontalSVG(
@@ -5668,6 +5751,7 @@ function renderGerencialContratos(lista, resumo) {
         formatarValor: (v) => "R$ " + formatarEixo(v),
         tituloTooltip: (l) => `${l.label}: ${formatarMoedaBR(l.total)} (${l.qtd} contrato${l.qtd > 1 ? "s" : ""})`,
         selecionado: filtroFornecedor,
+        limite: 20,
       }
     );
     adicionarControlesGrafico(document.getElementById("ger-barra"));
@@ -7507,7 +7591,8 @@ function renderPorDimensaoContratos(lista, cfg) {
     );
     el("top-contratos").innerHTML = barraContagemHorizontalSVG(
       agruparTopContratosPorValor(filtrada, 10),
-      { formatarValor: (v) => "R$ " + formatarEixo(v), tituloTooltip: (l) => `${l.label}: ${formatarMoedaBR(l.total)}` }
+      // limite alto: já é um Top 10 curado, não deve dobrar em "outros".
+      { formatarValor: (v) => "R$ " + formatarEixo(v), tituloTooltip: (l) => `${l.label}: ${formatarMoedaBR(l.total)}`, limite: 20 }
     );
     ligarTooltipLinhas(el("top-contratos"), porId);
     el("aditivos").innerHTML = barraContagemHorizontalSVG(
@@ -8793,6 +8878,27 @@ function adicionarControlesGrafico(container) {
     const [btnAmpliar, btnBaixar] = toolbar.querySelectorAll("button");
     btnAmpliar.addEventListener("click", () => abrirGraficoAmpliado(svg));
     btnBaixar.addEventListener("click", () => baixarGraficoComoImagem(svg, `grafico-${i + 1}.png`));
+
+    // Pedido direto: "essas barras horizontais... a seção fica muito
+    // grande e difícil de visualizar rápido" — barraContagemHorizontalSVG
+    // corta listas longas numa barra "outros" + uma <div class="lista-
+    // expandir"> irmã, escondida, com a lista completa. Aqui é o único
+    // lugar que precisa ligar o clique — todo chamador já roda
+    // adicionarControlesGrafico(), então nenhum call site precisa saber
+    // que esse recurso existe.
+    svg.querySelectorAll("[data-expandir]").forEach((btnOutros) => {
+      if (btnOutros.dataset.expandirLigado) return;
+      btnOutros.dataset.expandirLigado = "1";
+      const lista = container.querySelector(`#${btnOutros.dataset.expandir}`);
+      if (!lista) return;
+      const rotuloTexto = btnOutros.querySelector("text");
+      const rotuloFechado = rotuloTexto ? rotuloTexto.textContent : "";
+      btnOutros.addEventListener("click", () => {
+        const abrindo = lista.hidden;
+        lista.hidden = !abrindo;
+        if (rotuloTexto) rotuloTexto.textContent = abrindo ? "▲ recolher" : rotuloFechado;
+      });
+    });
   });
 }
 
