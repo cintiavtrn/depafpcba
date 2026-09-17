@@ -8331,6 +8331,49 @@ function agruparUnidadesPorCampo(lista, campoFn, rotuloVazio) {
   return { linhas, comValor: comValor.length, total: lista.length };
 }
 
+// Mesmo elemento flutuante e mesmo raciocínio de tooltipPessoaHTML/
+// ligarTooltipPessoa (Contratos) — pedido direto: "cliquei em concluída, aí
+// filtrou e mostrou a quantidade de tipo de unidade... se eu quiser saber
+// quais seriam as delegacias territoriais nesse cenário específico que tá
+// retornando 45... poderia ter um tooltip que mostre rápido quais seriam
+// conforme for afunilando". Cada barra já É o recorte cruzado (todos os
+// outros filtros ativos + a própria categoria) — só faltava mostrar OS NOMES
+// por trás do número, não só o total.
+function tooltipUnidadesHTML(rotulo, lista) {
+  const topo = lista.slice(0, 6);
+  const resto = lista.length - topo.length;
+  return `
+    <h4>${escapeHTML(rotulo)}</h4>
+    <p class="obj">${lista.length} unidade${lista.length === 1 ? "" : "s"} neste recorte</p>
+    <ul style="margin:6px 0 0;padding-left:16px;list-style:disc">
+      ${topo.map((u) => `<li>${escapeHTML(u.nomeDaUnidade)}</li>`).join("")}
+      ${resto > 0 ? `<li>+${resto} mais</li>` : ""}
+    </ul>`;
+}
+
+// Generalização de ligarTooltipPessoa pra qualquer container com [data-cat]
+// (barra OU tabela — mesmo seletor que o clique já usa) — só muda o
+// resolvedor de "rótulo clicável" pra "lista de unidades por trás dele".
+function ligarTooltipUnidades(container, resolverUnidadesDoRotulo) {
+  const tooltip = tooltipContratoEl();
+  container.querySelectorAll("[data-cat]").forEach((elCat) => {
+    const rotulo = elCat.dataset.cat;
+    elCat.addEventListener("mouseenter", () => {
+      tooltip.innerHTML = tooltipUnidadesHTML(rotulo, resolverUnidadesDoRotulo(rotulo));
+      tooltip.hidden = false;
+    });
+    elCat.addEventListener("mousemove", (ev) => {
+      const largura = 320, altura = tooltip.offsetHeight || 220;
+      let x = ev.clientX + 18, y = ev.clientY + 18;
+      if (x + largura > window.innerWidth) x = ev.clientX - largura - 18;
+      if (y + altura > window.innerHeight) y = Math.max(8, window.innerHeight - altura - 8);
+      tooltip.style.left = x + "px";
+      tooltip.style.top = y + "px";
+    });
+    elCat.addEventListener("mouseleave", () => { tooltip.hidden = true; });
+  });
+}
+
 // Mesma ideia de agruparValorPorCampo (Contratos), mas genérico no campo de
 // valor — lá é sempre c.valorGlobalAtual; aqui precisa servir tanto pra
 // valorDaObra quanto valorDaManutencao.
@@ -8643,6 +8686,13 @@ async function carregarObrasPortal(portalSlug) {
     if (!btn || btn.dataset.modoVisual === modoVisualFinanceiro) return;
     modoVisualFinanceiro = btn.dataset.modoVisual;
     salvarGrafico("cpg-obras-financeiro-visual", modoVisualFinanceiro);
+    // Os botões vivem no esqueleto estático (montado uma vez só) — atualizar()
+    // troca o CONTEÚDO dos gráficos, mas nunca toca de volta nesses botões,
+    // então o "active" precisa ser movido aqui, na hora do clique, senão o
+    // destaque branco fica parado no botão de antes.
+    document.querySelectorAll("#obras-financeiro-visual-toggle [data-modo-visual]").forEach((b) => {
+      b.classList.toggle("active", b.dataset.modoVisual === modoVisualFinanceiro);
+    });
     atualizar();
   });
 
@@ -8716,7 +8766,8 @@ async function carregarObrasPortal(portalSlug) {
     // os das outras) — assim continua mostrando todas as opções dela, com
     // a escolhida em destaque, em vez de desabar pra 1 barra só.
     DIMENSOES_OBRAS.forEach((d) => {
-      const para = agruparUnidadesPorCampo(unidades.filter((u) => bateFiltro(u, d.chave)), (u) => valorEfetivoDimensao(d, u));
+      const unidadesDoRecorte = unidades.filter((u) => bateFiltro(u, d.chave));
+      const para = agruparUnidadesPorCampo(unidadesDoRecorte, (u) => valorEfetivoDimensao(d, u));
       if (d.hintId) document.getElementById(d.hintId).textContent = `${para.comValor} de ${para.total} unidades com ${d.hintSubstantivo}.`;
       document.getElementById(d.containerId).innerHTML = barraOuTabelaSVG(para.linhas, {
         tituloTooltip: (l) => `${l.label}: ${l.total} unidade(s)`,
@@ -8725,6 +8776,10 @@ async function carregarObrasPortal(portalSlug) {
         colunaValor: "UNIDADES",
       });
       adicionarControlesGrafico(document.getElementById(d.containerId));
+      // Cada barra já É o recorte cruzado (todos os outros filtros ativos +
+      // esta categoria) — o tooltip só precisa filtrar unidadesDoRecorte pelo
+      // rótulo (bruto OU de grupo) que a barra representa.
+      ligarTooltipUnidades(document.getElementById(d.containerId), (rotulo) => unidadesDoRecorte.filter((u) => valorEfetivoDimensao(d, u) === rotulo));
       desenharAgrupamento(d);
     });
 
@@ -8754,6 +8809,8 @@ async function carregarObrasPortal(portalSlug) {
       : barraOuTabelaSVG(paraValorManutencao, opcoesVisualValor);
     adicionarControlesGrafico(document.getElementById("obras-valor-obra"));
     adicionarControlesGrafico(document.getElementById("obras-valor-manutencao"));
+    ligarTooltipUnidades(document.getElementById("obras-valor-obra"), (rotulo) => unidadesParaDiretoria.filter((u) => valorEfetivoDimensao(dimDiretoria, u) === rotulo && u.valorDaObra != null));
+    ligarTooltipUnidades(document.getElementById("obras-valor-manutencao"), (rotulo) => unidadesParaDiretoria.filter((u) => valorEfetivoDimensao(dimDiretoria, u) === rotulo && u.valorDaManutencao != null));
 
     // Busca de texto combina COM o cross-filter (recorte primeiro, texto
     // depois) — digitar um nome dentro de um recorte já isolado continua
