@@ -522,6 +522,10 @@ body{background:var(--paper);color:var(--carvao);font-family:'IBM Plex Sans',san
 .dash-tabela th.sortable::after{content:"⇅";margin-left:4px;opacity:.4;font-size:var(--fs-ui-xs)}
 .dash-tabela th.sort-asc::after{content:"▲";opacity:1}
 .dash-tabela th.sort-desc::after{content:"▼";opacity:1}
+/* Barra embutida na célula de valor da tabela-distribuição — mesma leitura
+   de grandeza que a barra horizontal dava, só que dentro da linha. */
+.barra-embutida{display:inline-block;width:54px;height:8px;background:var(--paper-line);vertical-align:middle;margin-right:8px;position:relative;top:-1px}
+.barra-embutida-fill{display:block;height:100%;background:var(--tinta)}
 
 .dash-chart-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px;flex-wrap:wrap}
 .dash-chart-head h4{margin-bottom:0}
@@ -1162,24 +1166,6 @@ function pieChartSVG(categorias, selectedLabel, opcoes = {}) {
   return `<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">${fatias}${rotulosFatia}${totalMeio}</svg><div class="donut-legenda">${legenda}</div>`;
 }
 
-// Rosca pro "Valor por Tipo de Objeto" (e qualquer outro valor-por-campo) —
-// virou rosca a pedido direto: a barra horizontal ficava com muita linha
-// quando tinha bastante tipo de objeto diferente, e "quanto se gasta em X"
-// é fundamentalmente uma pergunta de PARTE-DO-TODO, o desenho que a rosca
-// já resolve melhor que barra. Recebe o mesmo formato de linha que a barra
-// (agruparValorPorCampo: {label, total, qtd}) pra trocar uma pela outra sem
-// preparar o dado de novo.
-function roscaValorPorCampoSVG(linhas, selecionado) {
-  return pieChartSVG(
-    linhas.map((l) => ({ label: l.label, valor: l.total, qtd: l.qtd })),
-    selecionado,
-    {
-      formatarValor: (v) => "R$ " + formatarEixo(v),
-      formatarCentro: (v) => "R$ " + formatarEixo(v),
-      rotuloExtra: (c) => `(${c.qtd} contrato${c.qtd === 1 ? "" : "s"})`,
-    }
-  );
-}
 
 function barRankingChartSVG(categorias, selectedLabel) {
   const MAX_ROTULO = 20;
@@ -4741,20 +4727,63 @@ function barraContagemHorizontalSVG(linhas, opcoes = {}) {
   return svg + tabelaExtras;
 }
 
-// "Qual tipo de objeto reina mais" (pedido direto, espelhando o cartão
-// "Tipo de Objeto" do painel do TJMA) — fina camada sobre a barra genérica,
-// só acrescentando o cross-filter por tipo (as outras distribuições do
-// Gerencial são só leitura, esta participa do filtro clicável da página).
-// corUnica:false de propósito — esta é a ÚNICA barra que fica pareada com
-// uma rosca da MESMA dimensão (Valor por Tipo de Objeto, ao lado); a cor
-// de cada tipo precisa bater nos dois gráficos pra dar pra identificar a
-// fatia/barra sem reler o rótulo toda vez.
-function barraTipoObjetoSVG(linhas, tipoSelecionado = "") {
-  return barraContagemHorizontalSVG(linhas, {
-    selecionado: tipoSelecionado,
-    tituloTooltip: (l) => `${l.label}: ${l.total} contrato(s)`,
-    corUnica: false,
-  });
+// Escolhe entre barra e tabela pelo tamanho real da lista — mesmo limiar
+// que já cortava em "outros" (~7-8 categorias, recomendação da própria
+// diretriz de visualização). Abaixo disso a barra se lê mais rápido numa
+// olhada só; acima, "outros" escondia justo quem a pessoa mais queria achar
+// (um fiscal específico, por exemplo) — tabela ordenável mostra todo mundo
+// de uma vez e ainda dá pra procurar por nome.
+function barraOuTabelaSVG(linhas, opcoes = {}) {
+  const limiar = opcoes.limite ?? 8;
+  return linhas.length > limiar ? tabelaDistribuicaoHTML(linhas, opcoes) : barraContagemHorizontalSVG(linhas, opcoes);
+}
+
+// Mesmo formato de linha da barra ({label, total, qtd?, valor?}) e as mesmas
+// opções (formatarValor, rotuloExtra, selecionado, destacarFn) — troca uma
+// pela outra sem preparar o dado de novo. Ordenável por nome ou valor
+// (cabeçalho clicável, mesma classe .sortable que o resto do sistema já
+// tinha definida) porque depois de ver a lista inteira o próximo passo
+// costuma ser achar um item específico, não só olhar o topo.
+function tabelaDistribuicaoHTML(linhas, opcoes = {}) {
+  const {
+    formatarValor = (v) => v.toLocaleString("pt-BR"),
+    rotuloExtra = null,
+    selecionado = "",
+    destacarFn = null,
+    colunaRotulo = "CATEGORIA",
+    colunaValor = "TOTAL",
+    // Ativa a 3ª coluna (% do total) — é o que substitui a leitura de
+    // "fatia da rosca" quando esta tabela troca de lugar com uma rosca
+    // (valor por tipo de objeto, por setor demandante...): o número exato
+    // de participação continua ali, só que legível com 20+ linhas.
+    mostrarPercentual = false,
+  } = opcoes;
+  const somaTotal = linhas.reduce((a, l) => a + l.total, 0);
+  const maxTotal = maxSeguro(linhas.map((l) => l.total));
+  const linhasOrdenadas = linhas.slice().sort((a, b) => b.total - a.total);
+  const corpo = linhasOrdenadas.map((l) => {
+    const destacado = destacarFn ? destacarFn(l) : selecionado === l.label;
+    const pct = somaTotal ? Math.round((l.total / somaTotal) * 1000) / 10 : 0;
+    const texto = formatarValor(l.total) + (rotuloExtra ? ` ${rotuloExtra(l)}` : "");
+    const atributoValor = l.valor !== undefined ? ` data-valor="${escapeAttr(l.valor)}"` : "";
+    return `<tr data-cat="${escapeAttr(l.label)}" data-total-bruto="${l.total}"${atributoValor} class="${destacado ? "selecionada" : ""}">
+      <td>${escapeHTML(l.label)}</td>
+      <td class="num"><span class="barra-embutida"><span class="barra-embutida-fill" style="width:${maxTotal ? (l.total / maxTotal) * 100 : 0}%"></span></span>${escapeHTML(texto)}</td>
+      ${mostrarPercentual ? `<td class="num">${pct.toLocaleString("pt-BR")}%</td>` : ""}
+    </tr>`;
+  }).join("");
+  return `
+    <div class="tabela-rolavel" style="max-height:340px">
+      <table class="dash-tabela tabela-distribuicao">
+        <thead><tr>
+          <th class="sortable" data-campo="label">${escapeHTML(colunaRotulo)}</th>
+          <th class="sortable sort-desc num" data-campo="total">${escapeHTML(colunaValor)}</th>
+          ${mostrarPercentual ? `<th class="num">%</th>` : ""}
+        </tr></thead>
+        <tbody>${corpo}</tbody>
+      </table>
+    </div>
+    <p class="dash-chart-hint">${linhas.length} categorias — clique no cabeçalho pra ordenar por nome ou valor.</p>`;
 }
 
 // Mesma ideia de agruparContagemPorCampo, mas SOMANDO valor em vez de contar
@@ -5707,35 +5736,70 @@ function renderGerencialContratos(lista, resumo) {
     document.querySelectorAll("#ger-barra-toggle [data-modo]").forEach((btn) => {
       btn.classList.toggle("active", btn.dataset.modo === modoBarra);
     });
-    document.getElementById("ger-valor-area").innerHTML = barraContagemHorizontalSVG(
+    document.getElementById("ger-valor-area").innerHTML = barraOuTabelaSVG(
       agruparValorPorCampo(filtrada, setoresDemandantesDoContrato, "(sem unidade)"),
       {
         formatarValor: (v) => "R$ " + formatarEixo(v),
         rotuloExtra: (l) => `(${l.qtd} contrato${l.qtd === 1 ? "" : "s"})`,
         tituloTooltip: (l) => `${l.label}: ${formatarMoedaBR(l.total)} — ${l.qtd} contrato${l.qtd === 1 ? "" : "s"}`,
         selecionado: filtroArea,
+        colunaRotulo: "SETOR DEMANDANTE",
+        colunaValor: "VALOR (R$)",
+        mostrarPercentual: true,
       }
     );
-    document.getElementById("ger-tipo").innerHTML = barraTipoObjetoSVG(agruparPorTipoObjeto(filtrada), filtroTipo);
-    document.getElementById("ger-valor-tipo").innerHTML = roscaValorPorCampoSVG(
+    document.getElementById("ger-tipo").innerHTML = barraOuTabelaSVG(agruparPorTipoObjeto(filtrada), {
+      tituloTooltip: (l) => `${l.label}: ${l.total} contrato(s)`,
+      selecionado: filtroTipo,
+      colunaRotulo: "TIPO DE OBJETO",
+      colunaValor: "CONTRATOS",
+    });
+    // Rosca virou tabela: com os tipos de objeto reais de hoje (22
+    // distintos), uma fatia de rosca por tipo já passa de 3x o teto de ~6-7
+    // segmentos em que o olho ainda compara ângulo — a mesma degradação que
+    // "muita barra" tinha, só que em forma de pizza. % do total substitui a
+    // leitura de "fatia" que a rosca dava.
+    document.getElementById("ger-valor-tipo").innerHTML = barraOuTabelaSVG(
       agruparValorPorCampo(filtrada, (c) => c.tipoObjeto, "(sem tipo)"),
-      filtroTipo
+      {
+        formatarValor: (v) => "R$ " + formatarEixo(v),
+        rotuloExtra: (l) => `(${l.qtd} contrato${l.qtd === 1 ? "" : "s"})`,
+        selecionado: filtroTipo,
+        colunaRotulo: "TIPO DE OBJETO",
+        colunaValor: "VALOR (R$)",
+        mostrarPercentual: true,
+      }
     );
-    document.getElementById("ger-analista").innerHTML = barraContagemHorizontalSVG(
+    document.getElementById("ger-analista").innerHTML = barraOuTabelaSVG(
       agruparContagemPorCampo(filtrada, (c) => c.analista, "(sem analista)"),
-      { tituloTooltip: (l) => `${l.label}: ${l.total} contrato(s)`, selecionado: filtroAnalista }
+      {
+        tituloTooltip: (l) => `${l.label}: ${l.total} contrato(s)`,
+        selecionado: filtroAnalista,
+        colunaRotulo: "ANALISTA",
+        colunaValor: "CONTRATOS",
+      }
     );
     document.getElementById("ger-aditivos").innerHTML = barraContagemHorizontalSVG(
       agruparPorQtdAditivos(filtrada),
       { tituloTooltip: (l) => `${l.label}: ${l.total} contrato(s)` }
     );
-    document.getElementById("ger-gestor").innerHTML = barraContagemHorizontalSVG(
+    document.getElementById("ger-gestor").innerHTML = barraOuTabelaSVG(
       agruparContratosPorPessoa(filtrada, "Gestor"),
-      { tituloTooltip: (l) => `${l.label}: ${l.total} contrato(s)`, selecionado: filtroGestor }
+      {
+        tituloTooltip: (l) => `${l.label}: ${l.total} contrato(s)`,
+        selecionado: filtroGestor,
+        colunaRotulo: "GESTOR",
+        colunaValor: "CONTRATOS",
+      }
     );
-    document.getElementById("ger-fiscal").innerHTML = barraContagemHorizontalSVG(
+    document.getElementById("ger-fiscal").innerHTML = barraOuTabelaSVG(
       agruparContratosPorPessoa(filtrada, "Fiscal"),
-      { tituloTooltip: (l) => `${l.label}: ${l.total} contrato(s)`, selecionado: filtroFiscal }
+      {
+        tituloTooltip: (l) => `${l.label}: ${l.total} contrato(s)`,
+        selecionado: filtroFiscal,
+        colunaRotulo: "FISCAL",
+        colunaValor: "CONTRATOS",
+      }
     );
     document.getElementById("ger-top-contratos").innerHTML = barraContagemHorizontalSVG(
       agruparTopContratosPorValor(filtrada, 10),
@@ -7027,13 +7091,13 @@ function renderPorDimensaoContratos(lista, cfg) {
         <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
           <h4 style="margin:0">${escapeHTML(cfg.complementar.titulo)} (visão geral, todas as ${cfg.labelBusca.toLowerCase()}s)</h4>
           ${temUnidadeLanding ? `<div class="dash-toggle" id="${p}-toggle-landing">
-            <button class="dash-toggle-btn" data-modo="rosca" title="Quanto cada setor demandante representa do total">ROSCA</button>
+            <button class="dash-toggle-btn" data-modo="rosca" title="Quanto cada setor demandante representa do total">LISTA</button>
             <button class="dash-toggle-btn" data-modo="mapa" title="Onde as unidades da DEPIN ficam no estado, somando todas as categorias">MAPA</button>
           </div>` : ""}
         </div>
         <p class="dash-chart-hint">${temUnidadeLanding && modoLandingComplementar === "mapa"
           ? "Onde as unidades da DEPIN estão hoje, somando contratos de todas as categorias — clique num ponto pra abrir o perfil completo daquela unidade."
-          : `Antes de escolher uma ${cfg.labelBusca.toLowerCase()}: como o total já se divide do outro lado. Clique numa fatia pra abrir o perfil completo dela em "${escapeHTML(cfg.complementar.tituloAba)}".`}</p>
+          : `Antes de escolher uma ${cfg.labelBusca.toLowerCase()}: como o total já se divide do outro lado. Clique numa linha pra abrir o perfil completo dela em "${escapeHTML(cfg.complementar.tituloAba)}".`}</p>
         <div id="${p}-landing-complementar"></div>
         <div id="${p}-landing-complementar-legenda"></div>
       </div>
@@ -7073,8 +7137,18 @@ function renderPorDimensaoContratos(lista, cfg) {
         });
       } else {
         el("landing-complementar-legenda").innerHTML = "";
-        el("landing-complementar").innerHTML = roscaValorPorCampoSVG(
-          agruparValorPorCampo(lista, cfg.complementar.campoFn, cfg.complementar.rotuloVazio)
+        // Rosca virou barra/tabela: com 20-50 categorias reais (tipo de
+        // objeto ou setor demandante, dependendo do perfil), uma fatia por
+        // categoria já não se lê — mesmo limite de ~7-8 do resto do painel.
+        el("landing-complementar").innerHTML = barraOuTabelaSVG(
+          agruparValorPorCampo(lista, cfg.complementar.campoFn, cfg.complementar.rotuloVazio),
+          {
+            formatarValor: (v) => "R$ " + formatarEixo(v),
+            rotuloExtra: (l) => `(${l.qtd} contrato${l.qtd === 1 ? "" : "s"})`,
+            colunaRotulo: cfg.complementar.titulo.replace(/^Valor por /, "").toUpperCase(),
+            colunaValor: "VALOR (R$)",
+            mostrarPercentual: true,
+          }
         );
         adicionarControlesGrafico(el("landing-complementar"));
         el("landing-complementar").addEventListener("click", (ev) => {
@@ -7293,9 +7367,15 @@ function renderPorDimensaoContratos(lista, cfg) {
     } else {
       el("grafico-unidade").innerHTML = modoGraficoUnidade === "mapa"
         ? mapaCoorpinSVG(linhasUnidade, { destacarFn: destacarUnidadeFn })
-        : barraContagemHorizontalSVG(linhasUnidade, {
+        // Sem DIRPIN escolhida (Todos), passa de 20 unidades e vira tabela;
+        // escolhendo uma DIRPIN, sobra meia dúzia de COORPINs e continua
+        // barra — a mesma regra do resto do painel, só que essa lista muda
+        // de tamanho sozinha conforme o filtro, então o formato também muda.
+        : barraOuTabelaSVG(linhasUnidade, {
             tituloTooltip: (l) => l.label === OUTRAS_AREAS_LABEL ? `${l.label}: ${l.total} contrato(s) (localização presumida)` : `${l.label} (DIRPIN ${l.dirpin}): ${l.total} contrato(s)`,
             destacarFn: destacarUnidadeFn,
+            colunaRotulo: "UNIDADE (COORPIN)",
+            colunaValor: "CONTRATOS",
           });
       adicionarControlesGrafico(el("grafico-unidade"));
       el("grafico-unidade").addEventListener("click", (ev) => {
@@ -7574,20 +7654,30 @@ function renderPorDimensaoContratos(lista, cfg) {
     // contrato só — tooltip ao passar o mouse (empresa, objeto...) e
     // clique abre o panorama, em vez de só mostrar o número dele.
     ligarTooltipLinhas(el("sub-financeiro"), porId);
-    // Cross-filter à la BI: clicar numa fatia da rosca não só destaca ela —
-    // filtra TAMBÉM o Top 10 e o gráfico de aditivos pro valor escolhido da
-    // dimensão complementar (igual clicar num aspecto já isola o resto da
-    // tela em Gerencial). A própria rosca continua mostrando TODOS os
-    // valores (só com o escolhido em destaque), senão não daria pra trocar
-    // de fatia depois de escolher uma.
+    // Cross-filter à la BI: clicar num item da distribuição não só destaca
+    // ele — filtra TAMBÉM o Top 10 e o gráfico de aditivos pro valor
+    // escolhido da dimensão complementar (igual clicar num aspecto já isola
+    // o resto da tela em Gerencial). A própria distribuição continua
+    // mostrando TODOS os valores (só com o escolhido em destaque), senão
+    // não daria pra trocar de item depois de escolher um.
     const filtrada = listaFiltrada.filter((c) =>
       (!filtroComplementar || pertenceAoValorGenerico(dimensaoAtiva.campoFn, dimensaoAtiva.rotuloVazio, c, filtroComplementar)) &&
       (filtroAditivos === null || (c.qtdAditivos ?? 0) === filtroAditivos)
     );
 
-    el("complementar").innerHTML = roscaValorPorCampoSVG(
+    // Rosca virou barra/tabela pelo mesmo motivo do landing: Tipo de Objeto,
+    // Setor Demandante e até Analista (11) já passam do teto de ~6-7 fatias
+    // legíveis numa rosca — ver barraOuTabelaSVG.
+    el("complementar").innerHTML = barraOuTabelaSVG(
       agruparValorPorCampo(listaFiltrada, dimensaoAtiva.campoFn, dimensaoAtiva.rotuloVazio),
-      filtroComplementar
+      {
+        formatarValor: (v) => "R$ " + formatarEixo(v),
+        rotuloExtra: (l) => `(${l.qtd} contrato${l.qtd === 1 ? "" : "s"})`,
+        selecionado: filtroComplementar,
+        colunaRotulo: dimensaoAtiva.titulo.replace(/^Valor por /, "").toUpperCase(),
+        colunaValor: "VALOR (R$)",
+        mostrarPercentual: true,
+      }
     );
     el("top-contratos").innerHTML = barraContagemHorizontalSVG(
       agruparTopContratosPorValor(filtrada, 10),
@@ -7673,17 +7763,32 @@ function renderPorDimensaoContratos(lista, cfg) {
       <p class="dash-chart-hint">Clique num nome pra ver os contratos sob responsabilidade dele.</p>
       <div id="${p}-pessoas-tabela"></div>
     `;
-    el("analista").innerHTML = barraContagemHorizontalSVG(
+    el("analista").innerHTML = barraOuTabelaSVG(
       agruparContagemPorCampo(listaFiltrada, (c) => c.analista, "(sem analista)"),
-      { tituloTooltip: (l) => `${l.label}: ${l.total} contrato(s)`, selecionado: filtroPessoa?.tipo === "analista" ? filtroPessoa.nome : "" }
+      {
+        tituloTooltip: (l) => `${l.label}: ${l.total} contrato(s)`,
+        selecionado: filtroPessoa?.tipo === "analista" ? filtroPessoa.nome : "",
+        colunaRotulo: "ANALISTA",
+        colunaValor: "CONTRATOS",
+      }
     );
-    el("gestor").innerHTML = barraContagemHorizontalSVG(
+    el("gestor").innerHTML = barraOuTabelaSVG(
       agruparContratosPorPessoa(listaFiltrada, "Gestor"),
-      { tituloTooltip: (l) => `${l.label}: ${l.total} contrato(s)`, selecionado: filtroPessoa?.tipo === "gestor" ? filtroPessoa.nome : "" }
+      {
+        tituloTooltip: (l) => `${l.label}: ${l.total} contrato(s)`,
+        selecionado: filtroPessoa?.tipo === "gestor" ? filtroPessoa.nome : "",
+        colunaRotulo: "GESTOR",
+        colunaValor: "CONTRATOS",
+      }
     );
-    el("fiscal").innerHTML = barraContagemHorizontalSVG(
+    el("fiscal").innerHTML = barraOuTabelaSVG(
       agruparContratosPorPessoa(listaFiltrada, "Fiscal"),
-      { tituloTooltip: (l) => `${l.label}: ${l.total} contrato(s)`, selecionado: filtroPessoa?.tipo === "fiscal" ? filtroPessoa.nome : "" }
+      {
+        tituloTooltip: (l) => `${l.label}: ${l.total} contrato(s)`,
+        selecionado: filtroPessoa?.tipo === "fiscal" ? filtroPessoa.nome : "",
+        colunaRotulo: "FISCAL",
+        colunaValor: "CONTRATOS",
+      }
     );
     adicionarControlesGrafico(el("analista"));
     adicionarControlesGrafico(el("gestor"));
@@ -8898,6 +9003,32 @@ function adicionarControlesGrafico(container) {
         lista.hidden = !abrindo;
         if (rotuloTexto) rotuloTexto.textContent = abrindo ? "▲ recolher" : rotuloFechado;
       });
+    });
+  });
+  // Mesma ideia do "outros" acima: liga a ordenação uma vez só, aqui, pra
+  // nenhum call site de tabelaDistribuicaoHTML precisar saber que isso
+  // existe. Reordena os <tr> na hora (não reconstrói a tabela) — o clique
+  // por [data-cat] já delegado no container continua funcionando igual,
+  // não liga se a linha mudou de posição.
+  container.querySelectorAll("table.tabela-distribuicao th.sortable").forEach((th) => {
+    if (th.dataset.ordenacaoLigada) return;
+    th.dataset.ordenacaoLigada = "1";
+    th.addEventListener("click", () => {
+      const tabela = th.closest("table");
+      const tbody = tabela.querySelector("tbody");
+      const campo = th.dataset.campo;
+      const atual = th.classList.contains("sort-asc") ? "asc" : th.classList.contains("sort-desc") ? "desc" : null;
+      const novo = atual === "desc" ? "asc" : atual === "asc" ? "desc" : campo === "total" ? "desc" : "asc";
+      tabela.querySelectorAll("th.sortable").forEach((outro) => outro.classList.remove("sort-asc", "sort-desc"));
+      th.classList.add(novo === "asc" ? "sort-asc" : "sort-desc");
+      const linhas = [...tbody.querySelectorAll("tr")];
+      linhas.sort((a, b) => {
+        const cmp = campo === "total"
+          ? Number(a.dataset.totalBruto) - Number(b.dataset.totalBruto)
+          : a.dataset.cat.localeCompare(b.dataset.cat, "pt-BR");
+        return novo === "desc" ? -cmp : cmp;
+      });
+      linhas.forEach((tr) => tbody.appendChild(tr));
     });
   });
 }
