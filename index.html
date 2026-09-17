@@ -8349,29 +8349,35 @@ async function carregarObrasPortal(portalSlug) {
   const painel = document.getElementById("tab-obras");
   painel.innerHTML = `<p class="tela-intro">Carregando o painel de obras...</p>`;
 
-  let resumo, unidades;
+  let unidades;
   try {
-    [resumo, unidades] = await Promise.all([
-      apiFetch(`/api/portais/${portalSlug}/obras/resumo`),
-      apiFetch(`/api/portais/${portalSlug}/obras`),
-    ]);
+    unidades = await apiFetch(`/api/portais/${portalSlug}/obras`);
   } catch (erro) {
     painel.innerHTML = `<p class="tela-intro">Não consegui carregar o painel de obras: ${escapeHTML(erro.message)}</p>`;
     return;
   }
 
-  const porStatusConstrutivo = agruparUnidadesPorCampo(unidades, (u) => u.statusConstrutivo);
-  const porTipoDeUnidade = agruparUnidadesPorCampo(unidades, (u) => u.tipoDeUnidade);
-  const porDiretoriaRegional = agruparUnidadesPorCampo(unidades, (u) => u.diretoriaRegional);
-  const porDepartamento = agruparUnidadesPorCampo(unidades, (u) => u.departamento);
+  // Pedido direto: "os cartões e barras e linhas não estão clicáveis e
+  // redirecionando pra filtrar... cliquei em obra aí refiltrou e mostrou
+  // novos valores pra aquele contexto, e também status construtivo" — o
+  // mesmo cross-filter que Gerencial (Contratos) já tem: clicar numa barra
+  // de UMA dimensão recalcula os KPIs e as OUTRAS dimensões pra aquele
+  // recorte. Resumo agora é só client-side (não usa mais /obras/resumo) —
+  // com filtro, o resumo tem que refletir o recorte atual, não o total
+  // fixo que a API mandaria.
+  let filtroStatusConstrutivo = "";
+  let filtroTipoDeUnidade = "";
+  let filtroDiretoriaRegional = "";
+  let filtroDepartamento = "";
 
   painel.innerHTML = `
+    <div id="obras-chips"></div>
     <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start">
       <div id="obras-kpis" style="flex:0 0 220px;min-width:200px;display:flex;flex-direction:column;gap:12px"></div>
       <div style="flex:1;min-width:280px;display:flex;flex-direction:column;gap:16px">
         <div class="dash-chart-box">
           <h4>Situação Construtiva</h4>
-          <p class="dash-chart-hint">${porStatusConstrutivo.comValor} de ${porStatusConstrutivo.total} unidades com status registrado.</p>
+          <p class="dash-chart-hint" id="obras-status-construtivo-hint"></p>
           <div id="obras-status-construtivo"></div>
         </div>
         <div class="dash-charts" style="grid-template-columns:1fr 1fr">
@@ -8381,7 +8387,7 @@ async function carregarObrasPortal(portalSlug) {
           </div>
           <div class="dash-chart-box">
             <h4>Diretoria Regional</h4>
-            <p class="dash-chart-hint">${porDiretoriaRegional.comValor} de ${porDiretoriaRegional.total} unidades com diretoria registrada.</p>
+            <p class="dash-chart-hint" id="obras-diretoria-regional-hint"></p>
             <div id="obras-diretoria-regional"></div>
           </div>
         </div>
@@ -8394,58 +8400,128 @@ async function carregarObrasPortal(portalSlug) {
           <div class="dash-filtro" style="margin-bottom:10px">
             <input type="text" id="obras-busca" placeholder="Buscar por nome, departamento, município...">
           </div>
-          <p class="dash-chart-hint" id="obras-busca-contagem">${unidades.length} unidade(s).</p>
+          <p class="dash-chart-hint" id="obras-busca-contagem"></p>
           <div class="tabela-rolavel" style="max-height:420px" id="obras-tabela-unidades"></div>
         </div>
       </div>
     </div>
   `;
 
-  document.getElementById("obras-kpis").innerHTML = `
-    <div class="kpi-card"><div class="kpi-cabeca">${kpiIcone("predio")}<div class="kpi-label">Unidades</div></div><div class="kpi-value">${resumo.qtdUnidades.toLocaleString("pt-BR")}</div></div>
-    <div class="kpi-card"><div class="kpi-cabeca">${kpiIcone("moeda")}<div class="kpi-label">Valor Total da Obra</div></div><div class="kpi-value">R$ ${formatarMoedaCompacta(resumo.valorTotalObra)}</div><div class="kpi-valor-exato">${formatarMoedaBR(resumo.valorTotalObra)} — ${resumo.qtdComValorObra} de ${resumo.qtdUnidades} unidades</div></div>
-    <div class="kpi-card"><div class="kpi-cabeca">${kpiIcone("moeda")}<div class="kpi-label">Valor Total da Manutenção</div></div><div class="kpi-value">R$ ${formatarMoedaCompacta(resumo.valorTotalManutencao)}</div><div class="kpi-valor-exato">${formatarMoedaBR(resumo.valorTotalManutencao)} — ${resumo.qtdComValorManutencao} de ${resumo.qtdUnidades} unidades</div></div>
-    <div class="kpi-card"><div class="kpi-cabeca">${kpiIcone("obras")}<div class="kpi-label">Obras Em Construção</div></div><div class="kpi-value">${resumo.obrasEmConstrucao.toLocaleString("pt-BR")}</div></div>
-    <div class="kpi-card"><div class="kpi-cabeca">${kpiIcone("selo")}<div class="kpi-label">% Obras Concluídas</div></div><div class="kpi-value">${resumo.percentualConcluidas === null ? "—" : (resumo.percentualConcluidas * 100).toLocaleString("pt-BR", { maximumFractionDigits: 1 }) + "%"}</div><div class="kpi-valor-exato">${resumo.obrasConcluidas} de ${resumo.qtdComStatusConstrutivo} com status registrado</div></div>
-  `;
-
-  document.getElementById("obras-status-construtivo").innerHTML = barraOuTabelaSVG(porStatusConstrutivo.linhas, {
-    tituloTooltip: (l) => `${l.label}: ${l.total} unidade(s)`,
-    colunaRotulo: "STATUS CONSTRUTIVO",
-    colunaValor: "UNIDADES",
-  });
-  document.getElementById("obras-tipo-unidade").innerHTML = barraOuTabelaSVG(porTipoDeUnidade.linhas, {
-    tituloTooltip: (l) => `${l.label}: ${l.total} unidade(s)`,
-    colunaRotulo: "TIPO DE UNIDADE",
-    colunaValor: "UNIDADES",
-  });
-  document.getElementById("obras-diretoria-regional").innerHTML = barraOuTabelaSVG(porDiretoriaRegional.linhas, {
-    tituloTooltip: (l) => `${l.label}: ${l.total} unidade(s)`,
-    colunaRotulo: "DIRETORIA REGIONAL",
-    colunaValor: "UNIDADES",
-  });
-  document.getElementById("obras-departamento").innerHTML = barraOuTabelaSVG(porDepartamento.linhas, {
-    tituloTooltip: (l) => `${l.label}: ${l.total} unidade(s)`,
-    colunaRotulo: "DEPARTAMENTO",
-    colunaValor: "UNIDADES",
-  });
-  [
-    "obras-status-construtivo", "obras-tipo-unidade", "obras-diretoria-regional", "obras-departamento",
-  ].forEach((id) => adicionarControlesGrafico(document.getElementById(id)));
-
-  document.getElementById("obras-tabela-unidades").innerHTML = tabelaUnidadesHTML(unidades);
+  // Clique delegado UMA vez, nos containers estáveis (não recriados a cada
+  // atualizar()) — mesmo padrão já usado em toda distribuição de Contratos.
+  function ligarCliqueDimensao(idContainer, selecionarFn) {
+    document.getElementById(idContainer).addEventListener("click", (ev) => {
+      const alvoClicado = ev.target.closest("[data-cat]");
+      if (!alvoClicado) return;
+      selecionarFn(alvoClicado.dataset.cat);
+    });
+  }
+  ligarCliqueDimensao("obras-status-construtivo", (valor) => { filtroStatusConstrutivo = filtroStatusConstrutivo === valor ? "" : valor; atualizar(); });
+  ligarCliqueDimensao("obras-tipo-unidade", (valor) => { filtroTipoDeUnidade = filtroTipoDeUnidade === valor ? "" : valor; atualizar(); });
+  ligarCliqueDimensao("obras-diretoria-regional", (valor) => { filtroDiretoriaRegional = filtroDiretoriaRegional === valor ? "" : valor; atualizar(); });
+  ligarCliqueDimensao("obras-departamento", (valor) => { filtroDepartamento = filtroDepartamento === valor ? "" : valor; atualizar(); });
 
   const buscaUnidades = document.getElementById("obras-busca");
-  buscaUnidades.addEventListener("input", () => {
+  buscaUnidades.addEventListener("input", () => atualizar());
+
+  // Uma unidade bate no filtro cruzado se satisfaz TODOS os filtros ativos
+  // — `ignorar` deixa uma dimensão de fora da própria conta (senão, clicar
+  // "Concluída" faria a caixa de Status Construtivo desabar pra 1 barra só,
+  // em vez de continuar mostrando as 5 com a escolhida em destaque).
+  function bateFiltro(u, ignorar) {
+    return (ignorar === "status" || !filtroStatusConstrutivo || u.statusConstrutivo === filtroStatusConstrutivo) &&
+      (ignorar === "tipo" || !filtroTipoDeUnidade || u.tipoDeUnidade === filtroTipoDeUnidade) &&
+      (ignorar === "diretoria" || !filtroDiretoriaRegional || u.diretoriaRegional === filtroDiretoriaRegional) &&
+      (ignorar === "departamento" || !filtroDepartamento || u.departamento === filtroDepartamento);
+  }
+
+  function atualizar() {
+    const filtrada = unidades.filter((u) => bateFiltro(u, null));
+
+    const chipsAtivos = [
+      filtroStatusConstrutivo && { rotulo: `status construtivo: ${filtroStatusConstrutivo}`, limpar: () => { filtroStatusConstrutivo = ""; atualizar(); } },
+      filtroTipoDeUnidade && { rotulo: `tipo de unidade: ${filtroTipoDeUnidade}`, limpar: () => { filtroTipoDeUnidade = ""; atualizar(); } },
+      filtroDiretoriaRegional && { rotulo: `diretoria regional: ${filtroDiretoriaRegional}`, limpar: () => { filtroDiretoriaRegional = ""; atualizar(); } },
+      filtroDepartamento && { rotulo: `departamento: ${filtroDepartamento}`, limpar: () => { filtroDepartamento = ""; atualizar(); } },
+    ].filter(Boolean);
+    document.getElementById("obras-chips").innerHTML = chipsAtivos.length
+      ? `<div class="filter-chips">${chipsAtivos.map((c, i) => `<span class="filter-chip">Isolando ${escapeHTML(c.rotulo)}<button type="button" data-chip-limpar="${i}" title="Remover este filtro">${iconeInline("fechar", 10, -1)}</button></span>`).join("")}</div>`
+      : "";
+    document.querySelectorAll("#obras-chips [data-chip-limpar]").forEach((btn) => {
+      btn.addEventListener("click", () => chipsAtivos[+btn.dataset.chipLimpar].limpar());
+    });
+
+    // KPIs recalculados do recorte atual (filtrada), não do total fixo.
+    const comValorObra = filtrada.filter((u) => u.valorDaObra != null);
+    const comValorManutencao = filtrada.filter((u) => u.valorDaManutencao != null);
+    const valorTotalObra = comValorObra.reduce((a, u) => a + u.valorDaObra, 0);
+    const valorTotalManutencao = comValorManutencao.reduce((a, u) => a + u.valorDaManutencao, 0);
+    const comStatus = filtrada.filter((u) => u.statusConstrutivo);
+    const obrasConcluidas = filtrada.filter((u) => u.statusConstrutivo === "Concluída").length;
+    const obrasEmConstrucao = filtrada.filter((u) => u.statusConstrutivo === "Em construção").length;
+    const percentualConcluidas = comStatus.length ? obrasConcluidas / comStatus.length : null;
+
+    document.getElementById("obras-kpis").innerHTML = `
+      <div class="kpi-card"><div class="kpi-cabeca">${kpiIcone("predio")}<div class="kpi-label">Unidades</div></div><div class="kpi-value">${filtrada.length.toLocaleString("pt-BR")}</div></div>
+      <div class="kpi-card"><div class="kpi-cabeca">${kpiIcone("moeda")}<div class="kpi-label">Valor Total da Obra</div></div><div class="kpi-value">R$ ${formatarMoedaCompacta(valorTotalObra)}</div><div class="kpi-valor-exato">${formatarMoedaBR(valorTotalObra)} — ${comValorObra.length} de ${filtrada.length} unidades</div></div>
+      <div class="kpi-card"><div class="kpi-cabeca">${kpiIcone("moeda")}<div class="kpi-label">Valor Total da Manutenção</div></div><div class="kpi-value">R$ ${formatarMoedaCompacta(valorTotalManutencao)}</div><div class="kpi-valor-exato">${formatarMoedaBR(valorTotalManutencao)} — ${comValorManutencao.length} de ${filtrada.length} unidades</div></div>
+      <div class="kpi-card"><div class="kpi-cabeca">${kpiIcone("obras")}<div class="kpi-label">Obras Em Construção</div></div><div class="kpi-value">${obrasEmConstrucao.toLocaleString("pt-BR")}</div></div>
+      <div class="kpi-card"><div class="kpi-cabeca">${kpiIcone("selo")}<div class="kpi-label">% Obras Concluídas</div></div><div class="kpi-value">${percentualConcluidas === null ? "—" : (percentualConcluidas * 100).toLocaleString("pt-BR", { maximumFractionDigits: 1 }) + "%"}</div><div class="kpi-valor-exato">${obrasConcluidas} de ${comStatus.length} com status registrado</div></div>
+    `;
+
+    // Cada dimensão é calculada IGNORANDO o próprio filtro (mas respeitando
+    // os das outras) — assim continua mostrando todas as opções dela, com
+    // a escolhida em destaque, em vez de desabar pra 1 barra só.
+    const paraStatus = agruparUnidadesPorCampo(unidades.filter((u) => bateFiltro(u, "status")), (u) => u.statusConstrutivo);
+    const paraTipo = agruparUnidadesPorCampo(unidades.filter((u) => bateFiltro(u, "tipo")), (u) => u.tipoDeUnidade);
+    const paraDiretoria = agruparUnidadesPorCampo(unidades.filter((u) => bateFiltro(u, "diretoria")), (u) => u.diretoriaRegional);
+    const paraDepartamento = agruparUnidadesPorCampo(unidades.filter((u) => bateFiltro(u, "departamento")), (u) => u.departamento);
+
+    document.getElementById("obras-status-construtivo-hint").textContent = `${paraStatus.comValor} de ${paraStatus.total} unidades com status registrado.`;
+    document.getElementById("obras-diretoria-regional-hint").textContent = `${paraDiretoria.comValor} de ${paraDiretoria.total} unidades com diretoria registrada.`;
+
+    document.getElementById("obras-status-construtivo").innerHTML = barraOuTabelaSVG(paraStatus.linhas, {
+      tituloTooltip: (l) => `${l.label}: ${l.total} unidade(s)`,
+      selecionado: filtroStatusConstrutivo,
+      colunaRotulo: "STATUS CONSTRUTIVO",
+      colunaValor: "UNIDADES",
+    });
+    document.getElementById("obras-tipo-unidade").innerHTML = barraOuTabelaSVG(paraTipo.linhas, {
+      tituloTooltip: (l) => `${l.label}: ${l.total} unidade(s)`,
+      selecionado: filtroTipoDeUnidade,
+      colunaRotulo: "TIPO DE UNIDADE",
+      colunaValor: "UNIDADES",
+    });
+    document.getElementById("obras-diretoria-regional").innerHTML = barraOuTabelaSVG(paraDiretoria.linhas, {
+      tituloTooltip: (l) => `${l.label}: ${l.total} unidade(s)`,
+      selecionado: filtroDiretoriaRegional,
+      colunaRotulo: "DIRETORIA REGIONAL",
+      colunaValor: "UNIDADES",
+    });
+    document.getElementById("obras-departamento").innerHTML = barraOuTabelaSVG(paraDepartamento.linhas, {
+      tituloTooltip: (l) => `${l.label}: ${l.total} unidade(s)`,
+      selecionado: filtroDepartamento,
+      colunaRotulo: "DEPARTAMENTO",
+      colunaValor: "UNIDADES",
+    });
+    [
+      "obras-status-construtivo", "obras-tipo-unidade", "obras-diretoria-regional", "obras-departamento",
+    ].forEach((id) => adicionarControlesGrafico(document.getElementById(id)));
+
+    // Busca de texto combina COM o cross-filter (recorte primeiro, texto
+    // depois) — digitar um nome dentro de um recorte já isolado continua
+    // funcionando, não reseta o filtro.
     const termo = normalizarBusca(buscaUnidades.value.trim());
-    const filtradas = termo
-      ? unidades.filter((u) => normalizarBusca([u.nomeDaUnidade, u.departamento, u.diretoriaRegional, u.municipio?.municipio, u.tipoDeUnidade].filter(Boolean).join(" ")).includes(termo))
-      : unidades;
-    document.getElementById("obras-tabela-unidades").innerHTML = tabelaUnidadesHTML(filtradas);
+    const filtradaComBusca = termo
+      ? filtrada.filter((u) => normalizarBusca([u.nomeDaUnidade, u.departamento, u.diretoriaRegional, u.municipio?.municipio, u.tipoDeUnidade].filter(Boolean).join(" ")).includes(termo))
+      : filtrada;
+    document.getElementById("obras-tabela-unidades").innerHTML = tabelaUnidadesHTML(filtradaComBusca);
     document.getElementById("obras-busca-contagem").textContent = termo
-      ? `${filtradas.length} de ${unidades.length} unidade(s) — "${buscaUnidades.value.trim()}"`
-      : `${unidades.length} unidade(s).`;
-  });
+      ? `${filtradaComBusca.length} de ${filtrada.length} unidade(s) — "${buscaUnidades.value.trim()}"`
+      : `${filtrada.length} de ${unidades.length} unidade(s).`;
+  }
+
+  atualizar();
 }
 
 async function carregarContratosPortal(portalSlug) {
