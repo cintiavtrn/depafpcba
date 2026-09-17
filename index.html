@@ -8464,6 +8464,22 @@ async function carregarObrasPortal(portalSlug) {
   // {chave: valor} em vez de 7 variáveis soltas.
   const filtros = {};
   let unidadeSelecionadaId = "";
+  // "formar novos grupos de análise como o Power BI permite" — pedido dela,
+  // resposta direta a "eu queria só clicar": seleciona 2+ categorias de UMA
+  // dimensão, dá nome, e todo lugar que soma/conta aquela dimensão passa a
+  // enxergar o grupo no lugar das categorias originais. Nenhuma medida nova
+  // precisa ser escrita porque agruparUnidadesPorCampo/agruparValorObrasPorCampo
+  // já são genéricas no campo — só precisam receber o RÓTULO já agrupado em
+  // vez do valor bruto (ver valorEfetivoDimensao). Grupo é por navegador (não
+  // é dado do portal), mesmo padrão de lerGraficoSalvo/salvarGrafico.
+  const modoAgrupar = {};
+  const selecaoAgrupar = {};
+  const gruposPorDimensao = {};
+  DIMENSOES_OBRAS.forEach((d) => {
+    modoAgrupar[d.chave] = false;
+    selecaoAgrupar[d.chave] = new Set();
+    gruposPorDimensao[d.chave] = lerGraficoSalvo(`cpg-obras-grupos-${d.chave}`) || [];
+  });
   // Financeiro (Fase 2): mesmo toggle LISTA/TREEMAP de Contratos (eixo
   // separado de "qual dimensão" — aqui só tem uma pergunta, "por
   // diretoria", então um toggle só cobre os dois cartões de valor).
@@ -8476,9 +8492,13 @@ async function carregarObrasPortal(portalSlug) {
       <div style="flex:1;min-width:280px;display:flex;flex-direction:column;gap:16px">
         ${DIMENSOES_OBRAS.map((d) => `
         <div class="dash-chart-box">
-          <h4>${escapeHTML(d.rotulo)}</h4>
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">
+            <h4 style="margin-bottom:0">${escapeHTML(d.rotulo)}</h4>
+            <button type="button" class="dash-toggle-btn" id="${d.containerId}-agrupar-toggle" title="Selecionar categorias pra juntar num grupo personalizado, tipo o Power BI">AGRUPAR</button>
+          </div>
           ${d.hintId ? `<p class="dash-chart-hint" id="${d.hintId}"></p>` : ""}
           <div id="${d.containerId}"></div>
+          <div id="${d.containerId}-agrupar" class="dash-chart-hint" hidden></div>
         </div>`).join("")}
         <div class="dash-chart-box">
           <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:4px">
@@ -8518,10 +8538,95 @@ async function carregarObrasPortal(portalSlug) {
     document.getElementById(d.containerId).addEventListener("click", (ev) => {
       const alvoClicado = ev.target.closest("[data-cat]");
       if (!alvoClicado) return;
-      filtros[d.chave] = filtros[d.chave] === alvoClicado.dataset.cat ? "" : alvoClicado.dataset.cat;
+      const rotulo = alvoClicado.dataset.cat;
+      // Em modo AGRUPAR o clique seleciona pra juntar, em vez de filtrar —
+      // as duas ações usam o mesmo [data-cat] que a barra/tabela já desenha.
+      if (modoAgrupar[d.chave]) {
+        const selecao = selecaoAgrupar[d.chave];
+        if (selecao.has(rotulo)) selecao.delete(rotulo); else selecao.add(rotulo);
+        desenharAgrupamento(d);
+        return;
+      }
+      filtros[d.chave] = filtros[d.chave] === rotulo ? "" : rotulo;
       atualizar();
     });
+    document.getElementById(`${d.containerId}-agrupar-toggle`).addEventListener("click", () => {
+      modoAgrupar[d.chave] = !modoAgrupar[d.chave];
+      selecaoAgrupar[d.chave].clear();
+      desenharAgrupamento(d);
+    });
   });
+
+  // Resolve o rótulo "de exibição" de uma unidade nesta dimensão: se o valor
+  // bruto dela está dentro de algum grupo personalizado, mostra o NOME do
+  // grupo; senão, o valor bruto de sempre. bateFiltro e os agregadores usam
+  // isso no lugar de d.campo(u) direto — é o único ponto que precisa saber
+  // que grupos existem.
+  function valorEfetivoDimensao(d, u) {
+    const bruto = d.campo(u);
+    if (bruto == null) return bruto;
+    const grupo = gruposPorDimensao[d.chave].find((g) => g.membros.includes(bruto));
+    return grupo ? grupo.nome : bruto;
+  }
+
+  // Selecionar um rótulo que já É um grupo (pra juntar grupos entre si, ou
+  // ampliar um grupo existente) precisa herdar os membros originais dele, não
+  // virar um grupo-de-um-grupo.
+  function membrosDe(d, rotulo) {
+    const grupo = gruposPorDimensao[d.chave].find((g) => g.nome === rotulo);
+    return grupo ? grupo.membros : [rotulo];
+  }
+
+  function desenharAgrupamento(d) {
+    const caixa = document.getElementById(`${d.containerId}-agrupar`);
+    document.getElementById(`${d.containerId}-agrupar-toggle`).classList.toggle("active", modoAgrupar[d.chave]);
+    const grupos = gruposPorDimensao[d.chave];
+    const selecao = selecaoAgrupar[d.chave];
+    const partes = [];
+    if (grupos.length) {
+      partes.push(`<div class="filter-chips">${grupos.map((g, i) => `
+        <span class="filter-chip">Grupo "${escapeHTML(g.nome)}" (${g.membros.length})<button type="button" data-remover-grupo="${i}" title="Desfazer este grupo">${iconeInline("fechar", 10, -1)}</button></span>`).join("")}</div>`);
+    }
+    if (modoAgrupar[d.chave]) {
+      partes.push(selecao.size
+        ? `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:${grupos.length ? "8px" : "0"}">
+            <span>${selecao.size} selecionada${selecao.size === 1 ? "" : "s"}: ${[...selecao].map((r) => escapeHTML(r)).join(", ")}</span>
+            <input type="text" id="${d.containerId}-nome-grupo" placeholder="nome do grupo novo" style="width:170px">
+            <button type="button" class="dash-toggle-btn" data-criar-grupo="1">CRIAR GRUPO</button>
+            <button type="button" class="dash-toggle-btn" data-limpar-selecao="1">LIMPAR SELEÇÃO</button>
+          </div>`
+        : `<p style="margin-top:${grupos.length ? "8px" : "0"}">Clique em 2 ou mais categorias no gráfico acima pra juntar num grupo novo.</p>`);
+    }
+    caixa.innerHTML = partes.join("");
+    caixa.hidden = partes.length === 0;
+    caixa.querySelectorAll("[data-remover-grupo]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        grupos.splice(+btn.dataset.removerGrupo, 1);
+        salvarGrafico(`cpg-obras-grupos-${d.chave}`, grupos);
+        atualizar();
+      });
+    });
+    const btnCriar = caixa.querySelector("[data-criar-grupo]");
+    if (btnCriar) {
+      btnCriar.addEventListener("click", () => {
+        const inputNome = document.getElementById(`${d.containerId}-nome-grupo`);
+        const nome = inputNome.value.trim();
+        if (!nome) { inputNome.focus(); return; }
+        const membros = [...new Set([...selecao].flatMap((rotulo) => membrosDe(d, rotulo)))];
+        // Um grupo cujo nome foi selecionado de novo (pra ampliar/juntar com
+        // outro) é absorvido no novo em vez de sobrar duplicado.
+        const gruposRestantes = grupos.filter((g) => !selecao.has(g.nome));
+        gruposRestantes.push({ nome, membros });
+        gruposPorDimensao[d.chave] = gruposRestantes;
+        salvarGrafico(`cpg-obras-grupos-${d.chave}`, gruposRestantes);
+        selecaoAgrupar[d.chave].clear();
+        modoAgrupar[d.chave] = false;
+        atualizar();
+      });
+    }
+    const btnLimpar = caixa.querySelector("[data-limpar-selecao]");
+    if (btnLimpar) btnLimpar.addEventListener("click", () => { selecao.clear(); desenharAgrupamento(d); });
+  }
   // Os 2 cartões de valor também cruzam com a MESMA dimensão Diretoria
   // Regional (é a mesma pergunta, só outra métrica) — clicar neles
   // preenche o mesmo filtros.diretoriaRegional que o cartão de contagem.
@@ -8573,7 +8678,7 @@ async function carregarObrasPortal(portalSlug) {
   // "Concluída" faria a caixa de Status Construtivo desabar pra 1 barra só,
   // em vez de continuar mostrando as 5 com a escolhida em destaque).
   function bateFiltro(u, ignorar) {
-    return DIMENSOES_OBRAS.every((d) => d.chave === ignorar || !filtros[d.chave] || d.campo(u) === filtros[d.chave]);
+    return DIMENSOES_OBRAS.every((d) => d.chave === ignorar || !filtros[d.chave] || valorEfetivoDimensao(d, u) === filtros[d.chave]);
   }
 
   function atualizar() {
@@ -8611,7 +8716,7 @@ async function carregarObrasPortal(portalSlug) {
     // os das outras) — assim continua mostrando todas as opções dela, com
     // a escolhida em destaque, em vez de desabar pra 1 barra só.
     DIMENSOES_OBRAS.forEach((d) => {
-      const para = agruparUnidadesPorCampo(unidades.filter((u) => bateFiltro(u, d.chave)), d.campo);
+      const para = agruparUnidadesPorCampo(unidades.filter((u) => bateFiltro(u, d.chave)), (u) => valorEfetivoDimensao(d, u));
       if (d.hintId) document.getElementById(d.hintId).textContent = `${para.comValor} de ${para.total} unidades com ${d.hintSubstantivo}.`;
       document.getElementById(d.containerId).innerHTML = barraOuTabelaSVG(para.linhas, {
         tituloTooltip: (l) => `${l.label}: ${l.total} unidade(s)`,
@@ -8620,13 +8725,15 @@ async function carregarObrasPortal(portalSlug) {
         colunaValor: "UNIDADES",
       });
       adicionarControlesGrafico(document.getElementById(d.containerId));
+      desenharAgrupamento(d);
     });
 
     // Financeiro por Diretoria Regional — ignora só o próprio filtro de
     // diretoria (mesmo raciocínio acima), respeitando as outras 6.
     const unidadesParaDiretoria = unidades.filter((u) => bateFiltro(u, "diretoriaRegional"));
-    const paraValorObra = agruparValorObrasPorCampo(unidadesParaDiretoria, (u) => u.diretoriaRegional, (u) => u.valorDaObra, "(sem diretoria)");
-    const paraValorManutencao = agruparValorObrasPorCampo(unidadesParaDiretoria, (u) => u.diretoriaRegional, (u) => u.valorDaManutencao, "(sem diretoria)");
+    const dimDiretoria = DIMENSOES_OBRAS.find((d) => d.chave === "diretoriaRegional");
+    const paraValorObra = agruparValorObrasPorCampo(unidadesParaDiretoria, (u) => valorEfetivoDimensao(dimDiretoria, u), (u) => u.valorDaObra, "(sem diretoria)");
+    const paraValorManutencao = agruparValorObrasPorCampo(unidadesParaDiretoria, (u) => valorEfetivoDimensao(dimDiretoria, u), (u) => u.valorDaManutencao, "(sem diretoria)");
     const qtdComValorObraNoRecorte = unidadesParaDiretoria.filter((u) => u.valorDaObra != null).length;
     const qtdComValorManutencaoNoRecorte = unidadesParaDiretoria.filter((u) => u.valorDaManutencao != null).length;
     document.getElementById("obras-valor-obra-hint").textContent = `Valor da Obra — ${qtdComValorObraNoRecorte} de ${unidadesParaDiretoria.length} unidades com valor registrado.`;
