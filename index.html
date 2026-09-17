@@ -1581,6 +1581,7 @@ function corCategoria(i) { return TONS[i % TONS.length]; }
 // Se um dia surgir mais de um subportal por portal, é só empilhar aqui.
 const SUBPORTAIS = {
   orcamento: [{ tab: "contratos", rotulo: "CPG - CONTRATOS" }],
+  infraestrutura: [{ tab: "obras", rotulo: "PAINEL DE OBRAS" }],
 };
 
 // =====================================================================
@@ -8308,6 +8309,145 @@ function renderPorPessoasContratos(lista) {
   };
 }
 
+// ---------- Painel de Obras (sub-portal "infraestrutura") ----------
+// Pedido direto: "vamos construir com CSS/JS e tudo, como fez com o de
+// contratos... adicionamos tudo lá, criamos os gráficos visuais, cartões,
+// página e interatividade, filtros e slicer" — mesmo padrão de ponta a
+// ponta de Contratos (schema+seed+API+tela), não um embed de Power BI. O
+// `.pbip` (bi_obras) nunca vai ao ar — serviu só de referência pro schema
+// (fato_obra 1:1 com dim_unidade, medidas, relacionamento com município)
+// pra não inventar dado nenhum.
+//
+// Fase 1: KPIs numa coluna LATERAL (pedido direto dela, olhando o painel de
+// referência de Obras/Goiás — diferente do padrão horizontal de Contratos),
+// as distribuições com volume real de dado (status construtivo, tipo de
+// unidade, diretoria regional, departamento) e a lista completa pesquisável.
+// Perfil de unidade, financeiro por diretoria e o aviso sobre o
+// descasamento das medidas de Requalificação ficam pra Fase 2.
+function agruparUnidadesPorCampo(lista, campoFn, rotuloVazio) {
+  const comValor = lista.filter((u) => campoFn(u));
+  const linhas = agruparContagemPorCampo(comValor, campoFn, rotuloVazio);
+  return { linhas, comValor: comValor.length, total: lista.length };
+}
+
+function tabelaUnidadesHTML(lista) {
+  if (!lista.length) return `<p class="tela-intro">Nenhuma unidade encontrada.</p>`;
+  return `<table class="dash-tabela">
+    <thead><tr><th>UNIDADE</th><th>DEPARTAMENTO</th><th>DIRETORIA REGIONAL</th><th>MUNICÍPIO</th><th>STATUS DA OBRA</th></tr></thead>
+    <tbody>${lista.map((u) => `
+      <tr data-cat="${escapeAttr(u.nomeDaUnidade)}">
+        <td>${escapeHTML(u.nomeDaUnidade)}</td>
+        <td>${escapeHTML(u.departamento || "—")}</td>
+        <td>${escapeHTML(u.diretoriaRegional || "—")}</td>
+        <td>${escapeHTML(u.municipio?.municipio || "—")}</td>
+        <td>${escapeHTML(u.statusConstrutivo || "—")}</td>
+      </tr>`).join("")}</tbody>
+  </table>`;
+}
+
+async function carregarObrasPortal(portalSlug) {
+  const painel = document.getElementById("tab-obras");
+  painel.innerHTML = `<p class="tela-intro">Carregando o painel de obras...</p>`;
+
+  let resumo, unidades;
+  try {
+    [resumo, unidades] = await Promise.all([
+      apiFetch(`/api/portais/${portalSlug}/obras/resumo`),
+      apiFetch(`/api/portais/${portalSlug}/obras`),
+    ]);
+  } catch (erro) {
+    painel.innerHTML = `<p class="tela-intro">Não consegui carregar o painel de obras: ${escapeHTML(erro.message)}</p>`;
+    return;
+  }
+
+  const porStatusConstrutivo = agruparUnidadesPorCampo(unidades, (u) => u.statusConstrutivo);
+  const porTipoDeUnidade = agruparUnidadesPorCampo(unidades, (u) => u.tipoDeUnidade);
+  const porDiretoriaRegional = agruparUnidadesPorCampo(unidades, (u) => u.diretoriaRegional);
+  const porDepartamento = agruparUnidadesPorCampo(unidades, (u) => u.departamento);
+
+  painel.innerHTML = `
+    <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start">
+      <div id="obras-kpis" style="flex:0 0 220px;min-width:200px;display:flex;flex-direction:column;gap:12px"></div>
+      <div style="flex:1;min-width:280px;display:flex;flex-direction:column;gap:16px">
+        <div class="dash-chart-box">
+          <h4>Situação Construtiva</h4>
+          <p class="dash-chart-hint">${porStatusConstrutivo.comValor} de ${porStatusConstrutivo.total} unidades com status registrado.</p>
+          <div id="obras-status-construtivo"></div>
+        </div>
+        <div class="dash-charts" style="grid-template-columns:1fr 1fr">
+          <div class="dash-chart-box">
+            <h4>Tipo de Unidade</h4>
+            <div id="obras-tipo-unidade"></div>
+          </div>
+          <div class="dash-chart-box">
+            <h4>Diretoria Regional</h4>
+            <p class="dash-chart-hint">${porDiretoriaRegional.comValor} de ${porDiretoriaRegional.total} unidades com diretoria registrada.</p>
+            <div id="obras-diretoria-regional"></div>
+          </div>
+        </div>
+        <div class="dash-chart-box">
+          <h4>Departamento</h4>
+          <div id="obras-departamento"></div>
+        </div>
+        <div class="dash-chart-box">
+          <h4>Unidades</h4>
+          <div class="dash-filtro" style="margin-bottom:10px">
+            <input type="text" id="obras-busca" placeholder="Buscar por nome, departamento, município...">
+          </div>
+          <p class="dash-chart-hint" id="obras-busca-contagem">${unidades.length} unidade(s).</p>
+          <div class="tabela-rolavel" style="max-height:420px" id="obras-tabela-unidades"></div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  document.getElementById("obras-kpis").innerHTML = `
+    <div class="kpi-card"><div class="kpi-cabeca">${kpiIcone("predio")}<div class="kpi-label">Unidades</div></div><div class="kpi-value">${resumo.qtdUnidades.toLocaleString("pt-BR")}</div></div>
+    <div class="kpi-card"><div class="kpi-cabeca">${kpiIcone("moeda")}<div class="kpi-label">Valor Total da Obra</div></div><div class="kpi-value">R$ ${formatarMoedaCompacta(resumo.valorTotalObra)}</div><div class="kpi-valor-exato">${formatarMoedaBR(resumo.valorTotalObra)} — ${resumo.qtdComValorObra} de ${resumo.qtdUnidades} unidades</div></div>
+    <div class="kpi-card"><div class="kpi-cabeca">${kpiIcone("moeda")}<div class="kpi-label">Valor Total da Manutenção</div></div><div class="kpi-value">R$ ${formatarMoedaCompacta(resumo.valorTotalManutencao)}</div><div class="kpi-valor-exato">${formatarMoedaBR(resumo.valorTotalManutencao)} — ${resumo.qtdComValorManutencao} de ${resumo.qtdUnidades} unidades</div></div>
+    <div class="kpi-card"><div class="kpi-cabeca">${kpiIcone("obras")}<div class="kpi-label">Obras Em Construção</div></div><div class="kpi-value">${resumo.obrasEmConstrucao.toLocaleString("pt-BR")}</div></div>
+    <div class="kpi-card"><div class="kpi-cabeca">${kpiIcone("selo")}<div class="kpi-label">% Obras Concluídas</div></div><div class="kpi-value">${resumo.percentualConcluidas === null ? "—" : (resumo.percentualConcluidas * 100).toLocaleString("pt-BR", { maximumFractionDigits: 1 }) + "%"}</div><div class="kpi-valor-exato">${resumo.obrasConcluidas} de ${resumo.qtdComStatusConstrutivo} com status registrado</div></div>
+  `;
+
+  document.getElementById("obras-status-construtivo").innerHTML = barraOuTabelaSVG(porStatusConstrutivo.linhas, {
+    tituloTooltip: (l) => `${l.label}: ${l.total} unidade(s)`,
+    colunaRotulo: "STATUS CONSTRUTIVO",
+    colunaValor: "UNIDADES",
+  });
+  document.getElementById("obras-tipo-unidade").innerHTML = barraOuTabelaSVG(porTipoDeUnidade.linhas, {
+    tituloTooltip: (l) => `${l.label}: ${l.total} unidade(s)`,
+    colunaRotulo: "TIPO DE UNIDADE",
+    colunaValor: "UNIDADES",
+  });
+  document.getElementById("obras-diretoria-regional").innerHTML = barraOuTabelaSVG(porDiretoriaRegional.linhas, {
+    tituloTooltip: (l) => `${l.label}: ${l.total} unidade(s)`,
+    colunaRotulo: "DIRETORIA REGIONAL",
+    colunaValor: "UNIDADES",
+  });
+  document.getElementById("obras-departamento").innerHTML = barraOuTabelaSVG(porDepartamento.linhas, {
+    tituloTooltip: (l) => `${l.label}: ${l.total} unidade(s)`,
+    colunaRotulo: "DEPARTAMENTO",
+    colunaValor: "UNIDADES",
+  });
+  [
+    "obras-status-construtivo", "obras-tipo-unidade", "obras-diretoria-regional", "obras-departamento",
+  ].forEach((id) => adicionarControlesGrafico(document.getElementById(id)));
+
+  document.getElementById("obras-tabela-unidades").innerHTML = tabelaUnidadesHTML(unidades);
+
+  const buscaUnidades = document.getElementById("obras-busca");
+  buscaUnidades.addEventListener("input", () => {
+    const termo = normalizarBusca(buscaUnidades.value.trim());
+    const filtradas = termo
+      ? unidades.filter((u) => normalizarBusca([u.nomeDaUnidade, u.departamento, u.diretoriaRegional, u.municipio?.municipio, u.tipoDeUnidade].filter(Boolean).join(" ")).includes(termo))
+      : unidades;
+    document.getElementById("obras-tabela-unidades").innerHTML = tabelaUnidadesHTML(filtradas);
+    document.getElementById("obras-busca-contagem").textContent = termo
+      ? `${filtradas.length} de ${unidades.length} unidade(s) — "${buscaUnidades.value.trim()}"`
+      : `${unidades.length} unidade(s).`;
+  });
+}
+
 async function carregarContratosPortal(portalSlug) {
   const painel = document.getElementById("tab-contratos");
   painel.innerHTML = `<p class="tela-intro">Carregando contratos...</p>`;
@@ -8679,6 +8819,7 @@ async function abrirTela(id) {
     if (nome === "planilhas") carregarUploadsPortal(p.id);
     if (nome === "paineis") carregarPaineisPortal(p.id);
     if (nome === "contratos") carregarContratosPortal(p.id);
+    if (nome === "obras") carregarObrasPortal(p.id);
     // recarrega os destaques ao voltar pra Visão Geral: marcar um painel na
     // aba PAINÉIS precisa refletir aqui sem ter que sair e entrar no portal
     if (nome === "geral") carregarDestaques(p.id);
