@@ -8553,6 +8553,14 @@ function unidadeDetalheHTML(u) {
 // ao próprio desenho, não só ao chip.
 const DIMENSOES_OBRAS = [
   { chave: "statusConstrutivo", campo: (u) => u.statusConstrutivo, rotulo: "Status Construtivo", colunaRotulo: "STATUS CONSTRUTIVO", containerId: "obras-status-construtivo", hintId: "obras-status-construtivo-hint", hintSubstantivo: "status registrado" },
+  // Pedido direto: "faltou gráfico que mostra construção, obra e reforma".
+  // Existia na planilha-fonte desde a Fase 1 (ver seed-obras.js,
+  // NORMALIZACAO_TIPO_INTERVENCAO) mas nunca virou gráfico — só aparecia no
+  // perfil individual da unidade. É um campo SEPARADO de manutenção na
+  // própria planilha (obra/reforma/construção vs valorDaManutencao/
+  // dataUltimaManutencao são colunas diferentes, sem relação entre si) —
+  // por isso "tipo de obra" e "manutenção" não cabem no mesmo gráfico.
+  { chave: "tipoDeIntervencao", campo: (u) => u.tipoDeIntervencao, rotulo: "Tipo de Intervenção", colunaRotulo: "TIPO DE INTERVENÇÃO", containerId: "obras-tipo-intervencao", hintId: "obras-tipo-intervencao-hint", hintSubstantivo: "tipo de intervenção registrado" },
   { chave: "tipoDeUnidade", campo: (u) => u.tipoDeUnidade, rotulo: "Tipo de Unidade", colunaRotulo: "TIPO DE UNIDADE", containerId: "obras-tipo-unidade" },
   { chave: "diretoriaRegional", campo: (u) => u.diretoriaRegional, rotulo: "Diretoria Regional", colunaRotulo: "DIRETORIA REGIONAL", containerId: "obras-diretoria-regional", hintId: "obras-diretoria-regional-hint", hintSubstantivo: "diretoria registrada" },
   { chave: "departamento", campo: (u) => u.departamento, rotulo: "Departamento", colunaRotulo: "DEPARTAMENTO", containerId: "obras-departamento" },
@@ -8628,15 +8636,18 @@ async function carregarObrasPortal(portalSlug) {
               <button class="dash-toggle-btn${modoVisualFinanceiro === "treemap" ? " active" : ""}" data-modo-visual="treemap" title="Bloco = tamanho do valor">MAPA DE ÁRVORE</button>
             </div>
           </div>
-          <div class="dash-charts" style="grid-template-columns:1fr 1fr">
-            <div>
-              <p class="dash-chart-hint" id="obras-valor-obra-hint"></p>
-              <div id="obras-valor-obra"></div>
-            </div>
-            <div>
-              <p class="dash-chart-hint" id="obras-valor-manutencao-hint"></p>
-              <div id="obras-valor-manutencao"></div>
-            </div>
+          <p class="dash-chart-hint">Obra e manutenção são registros diferentes na planilha-fonte — nem toda unidade com manutenção tem valor de obra, e vice-versa — por isso cada uma tem seu próprio cartão abaixo.</p>
+        </div>
+        <div class="dash-charts" style="grid-template-columns:1fr 1fr">
+          <div class="dash-chart-box">
+            <h4>Obra</h4>
+            <p class="dash-chart-hint" id="obras-valor-obra-hint"></p>
+            <div id="obras-valor-obra"></div>
+          </div>
+          <div class="dash-chart-box">
+            <h4>Manutenção</h4>
+            <p class="dash-chart-hint" id="obras-valor-manutencao-hint"></p>
+            <div id="obras-valor-manutencao"></div>
           </div>
         </div>
         <div class="dash-chart-box">
@@ -8830,6 +8841,11 @@ async function carregarObrasPortal(portalSlug) {
     const obrasConcluidas = filtrada.filter((u) => u.statusConstrutivo === "Concluída").length;
     const obrasEmConstrucao = filtrada.filter((u) => u.statusConstrutivo === "Em construção").length;
     const percentualConcluidas = comStatus.length ? obrasConcluidas / comStatus.length : null;
+    // Pedido direto: obra e manutenção "parecem diferentes" — dar à
+    // manutenção seu próprio KPI (não só o valor somado, mas quantas
+    // unidades de fato têm manutenção registrada), espelhando o mesmo
+    // tratamento de honestidade de esparsidade que "% Obras Concluídas" já tem.
+    const percentualComManutencao = filtrada.length ? comValorManutencao.length / filtrada.length : null;
 
     document.getElementById("obras-kpis").innerHTML = `
       <div class="kpi-card"><div class="kpi-cabeca">${kpiIcone("predio")}<div class="kpi-label">Unidades</div></div><div class="kpi-value">${filtrada.length.toLocaleString("pt-BR")}</div></div>
@@ -8837,6 +8853,7 @@ async function carregarObrasPortal(portalSlug) {
       <div class="kpi-card"><div class="kpi-cabeca">${kpiIcone("moeda")}<div class="kpi-label">Valor Total da Manutenção</div></div><div class="kpi-value">R$ ${formatarMoedaCompacta(valorTotalManutencao)}</div><div class="kpi-valor-exato">${formatarMoedaBR(valorTotalManutencao)} — ${comValorManutencao.length} de ${filtrada.length} unidades</div></div>
       <div class="kpi-card"><div class="kpi-cabeca">${kpiIcone("obras")}<div class="kpi-label">Obras Em Construção</div></div><div class="kpi-value">${obrasEmConstrucao.toLocaleString("pt-BR")}</div></div>
       <div class="kpi-card"><div class="kpi-cabeca">${kpiIcone("selo")}<div class="kpi-label">% Obras Concluídas</div></div><div class="kpi-value">${percentualConcluidas === null ? "—" : (percentualConcluidas * 100).toLocaleString("pt-BR", { maximumFractionDigits: 1 }) + "%"}</div><div class="kpi-valor-exato">${obrasConcluidas} de ${comStatus.length} com status registrado</div></div>
+      <div class="kpi-card"><div class="kpi-cabeca">${kpiIcone("obras")}<div class="kpi-label">Unidades com Manutenção Registrada</div></div><div class="kpi-value">${percentualComManutencao === null ? "—" : (percentualComManutencao * 100).toLocaleString("pt-BR", { maximumFractionDigits: 1 }) + "%"}</div><div class="kpi-valor-exato">${comValorManutencao.length} de ${filtrada.length} unidades</div></div>
     `;
 
     // Cada dimensão é calculada IGNORANDO o próprio filtro (mas respeitando
@@ -8868,8 +8885,8 @@ async function carregarObrasPortal(portalSlug) {
     const paraValorManutencao = agruparValorObrasPorCampo(unidadesParaDiretoria, (u) => valorEfetivoDimensao(dimDiretoria, u), (u) => u.valorDaManutencao, "(sem diretoria)");
     const qtdComValorObraNoRecorte = unidadesParaDiretoria.filter((u) => u.valorDaObra != null).length;
     const qtdComValorManutencaoNoRecorte = unidadesParaDiretoria.filter((u) => u.valorDaManutencao != null).length;
-    document.getElementById("obras-valor-obra-hint").textContent = `Valor da Obra — ${qtdComValorObraNoRecorte} de ${unidadesParaDiretoria.length} unidades com valor registrado.`;
-    document.getElementById("obras-valor-manutencao-hint").textContent = `Valor da Manutenção — ${qtdComValorManutencaoNoRecorte} de ${unidadesParaDiretoria.length} unidades com valor registrado.`;
+    document.getElementById("obras-valor-obra-hint").textContent = `${qtdComValorObraNoRecorte} de ${unidadesParaDiretoria.length} unidades com valor de obra registrado.`;
+    document.getElementById("obras-valor-manutencao-hint").textContent = `${qtdComValorManutencaoNoRecorte} de ${unidadesParaDiretoria.length} unidades com valor de manutenção registrado.`;
     const opcoesVisualValor = {
       formatarValor: (v) => "R$ " + formatarMoedaCompacta(v),
       rotuloExtra: (l) => `(${l.qtd} unidade${l.qtd === 1 ? "" : "s"})`,
