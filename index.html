@@ -81,6 +81,18 @@ body{background:var(--paper);color:var(--carvao);font-family:'IBM Plex Sans',san
 .topbar{
   display:flex;align-items:center;justify-content:space-between;padding:16px 28px;
   border-bottom:3px solid var(--carvao);position:sticky;top:0;background:var(--paper);z-index:50;
+  flex-wrap:wrap;row-gap:10px;
+}
+/* Pedido direto: "responsividade para celular" — a barra do topo (logo +
+   ACESSOS + SUBIR PLANILHA + SAIR) não quebrava linha em tela estreita:
+   ficava com largura fixa maior que a tela, empurrando a página INTEIRA
+   pra rolagem horizontal. flex-wrap resolve o :topbar em si; .topbar-acoes
+   (o grupo de botões à direita) precisa da mesma regra, e em telas bem
+   estreitas os botões encolhem o padding/fonte pra caber mais um por linha. */
+.topbar-acoes{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+@media (max-width:520px){
+  .topbar{padding:12px 16px}
+  .topbar .voltar{padding:7px 10px;font-size:var(--fs-ui-sm)}
 }
 .topbar .brand{display:flex;align-items:center;gap:12px;cursor:pointer}
 .topbar .brand svg{width:28px;height:28px;color:var(--carvao)}
@@ -302,8 +314,22 @@ body{background:var(--paper);color:var(--carvao);font-family:'IBM Plex Sans',san
 .dash-filtro input[type="text"]:hover,.dash-filtro input[type="text"]:focus,.dash-filtro input[type="date"]:hover,.dash-filtro input[type="date"]:focus,.dash-filtro input[type="email"]:hover,.dash-filtro input[type="email"]:focus,.dash-filtro input[type="password"]:hover,.dash-filtro input[type="password"]:focus{border-color:var(--tinta)}
 
 .dash-charts{display:grid;grid-template-columns:1fr 1.05fr;gap:14px;margin-bottom:14px}
-@media (max-width:760px){.dash-charts{grid-template-columns:1fr}}
-.dash-chart-box{	background:var(--surface);padding:18px;border:1.5px solid var(--paper-line);border-radius:var(--radius-md);transition:border-color .3s ease,box-shadow .3s ease}
+/* Pedido direto: "responsividade para celular" — muitos gráficos definem
+   sua própria proporção de coluna com style="grid-template-columns:..."
+   inline (ex.: "1.1fr 1fr" pro Gerencial), que sempre vence a regra da
+   classe abaixo por especificidade — mesmo dentro de @media. Sem o
+   !important aqui, essa media query nunca chegava a valer, e pares de
+   gráfico ficavam lado a lado (cada um espremido, cortado) numa tela de
+   celular em vez de empilhar.  */
+@media (max-width:760px){.dash-charts{grid-template-columns:1fr !important}}
+/* min-width:0 é o que faz um item de grid/flex poder ENCOLHER abaixo da
+   largura natural do que tem dentro — sem isso (o padrão do CSS Grid é
+   min-width:auto), uma tabela larga dentro de um .dash-chart-box empurra
+   o próprio grid (.dash-charts) pra ficar mais largo que a tela, mesmo com
+   a coluna já em 1fr. Essa é a causa raiz por trás de boa parte da
+   "responsividade" quebrada no celular — o resto (grid-template-columns,
+   width:100% do .tabela-rolavel) sozinho não bastava sem isto aqui. */
+.dash-chart-box{	background:var(--surface);padding:18px;border:1.5px solid var(--paper-line);border-radius:var(--radius-md);transition:border-color .3s ease,box-shadow .3s ease;min-width:0}
 /* Pisca de leve quando um cartão "leva até aqui" em vez de filtrar algo —
    avisa que a rolagem parou no lugar certo, sem precisar de mais texto. */
 .destaque-temporario{border-color:var(--tinta);box-shadow:0 0 0 3px var(--tinta-glow)}
@@ -338,7 +364,11 @@ body{background:var(--paper);color:var(--carvao);font-family:'IBM Plex Sans',san
 /* Rolagem DENTRO da tabela (como no Power BI) — o cabeçalho fica fixo e só o
    corpo rola, em vez da tabela empurrar a página inteira pra baixo quando
    tem muita linha. */
-.tabela-rolavel{max-height:360px;overflow-y:auto;overflow-x:auto;border:1.5px solid var(--paper-line);border-radius:var(--radius-md)}
+/* width:100% é o que faz o overflow-x:auto valer de verdade — sem largura
+   travada no próprio elemento, um <div> só cresce pra caber a tabela
+   larga por dentro (empurra a PÁGINA inteira pra rolagem horizontal em
+   vez de só rolar a tabela por dentro da caixinha, que era o objetivo). */
+.tabela-rolavel{max-height:360px;overflow-y:auto;overflow-x:auto;border:1.5px solid var(--paper-line);border-radius:var(--radius-md);width:100%;box-sizing:border-box}
 .tabela-rolavel .dash-tabela{border:none}
 .tabela-rolavel thead th{position:sticky;top:0;z-index:1}
 .dash-tabela{width:100%;border-collapse:collapse;	background:var(--surface);border:1.5px solid var(--paper-line)}
@@ -652,10 +682,10 @@ select:focus-visible,input:focus-visible{
     <span id="brand-icon"></span>
     <span class="brand-text">POLÍCIA CIVIL DA BAHIA<b>DEPAF</b></span>
   </div>
-  <div style="display:flex;align-items:center;gap:10px">
+  <div class="topbar-acoes">
     <span id="usuario-badge" class="font-mono" style="font-size:var(--fs-ui-sm);color:#9AA3B2;display:none"></span>
-    <button class="voltar show" id="btn-abrir-usuarios" style="margin-right:8px;display:none">👤 ACESSOS</button>
-    <button class="voltar show" id="btn-abrir-upload" style="margin-right:8px;background:var(--tinta,#22D3EE);display:none">⬆ SUBIR PLANILHA</button>
+    <button class="voltar show" id="btn-abrir-usuarios" style="margin-right:8px;display:none"><span style="display:inline-flex;width:14px;height:14px;vertical-align:-3px;flex:none"><svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="square" stroke-linejoin="miter" xmlns="http://www.w3.org/2000/svg"><circle cx="32" cy="18" r="10" /><path d="M 12 56 A 20 20 0 0 1 52 56" /></svg></span> ACESSOS</button>
+    <button class="voltar show" id="btn-abrir-upload" style="margin-right:8px;background:var(--tinta,#22D3EE);display:none"><span style="display:inline-flex;width:14px;height:14px;vertical-align:-3px;flex:none"><svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="square" stroke-linejoin="miter" xmlns="http://www.w3.org/2000/svg"><polyline points="18,24 32,8 46,24" /><line x1="32" y1="8" x2="32" y2="42" /><line x1="12" y1="54" x2="52" y2="54" /></svg></span> SUBIR PLANILHA</button>
     <button class="voltar" id="btn-sair" style="display:none">SAIR</button>
     <button class="voltar" id="voltar-btn">← VOLTAR AO PORTAL</button>
   </div>
@@ -868,6 +898,21 @@ const ICONS = {
   // atendimento e repressão na região metropolitana — silhueta de
   // skyline, cobertura urbana densa (o oposto do pino único do DEPIN).
   unidade_depom: "<svg viewBox=\"0 0 64 64\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"3\" stroke-linecap=\"square\" stroke-linejoin=\"miter\" xmlns=\"http://www.w3.org/2000/svg\">\n  <line x1=\"6\" y1=\"56\" x2=\"58\" y2=\"56\" />\n  <rect x=\"8\" y=\"32\" width=\"10\" height=\"24\" />\n  <rect x=\"20\" y=\"16\" width=\"10\" height=\"40\" />\n  <rect x=\"32\" y=\"24\" width=\"10\" height=\"32\" />\n  <rect x=\"44\" y=\"38\" width=\"10\" height=\"18\" />\n</svg>",
+  // Pedido direto: "os ícones do site... no celular parece emojis, isso é
+  // muito amador" — caracteres soltos (⬇ ⬆ ⤢ ✕ ⓘ ⚠ 🔗 ★) caem na fonte de
+  // emoji colorida do sistema operacional em vez de renderizar como texto
+  // neutro; no PC às vezes passa despercebido, no celular (iOS/Android)
+  // fica um ícone cartunizado colorido no meio da paleta monocromática do
+  // resto do site. Estes substituem esses caracteres pelo mesmo vocabulário
+  // geométrico dos ícones de sempre.
+  download: "<svg viewBox=\"0 0 64 64\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"5\" stroke-linecap=\"square\" stroke-linejoin=\"miter\" xmlns=\"http://www.w3.org/2000/svg\"><polyline points=\"18,26 32,42 46,26\" /><line x1=\"32\" y1=\"42\" x2=\"32\" y2=\"8\" /><line x1=\"12\" y1=\"54\" x2=\"52\" y2=\"54\" /></svg>",
+  upload: "<svg viewBox=\"0 0 64 64\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"5\" stroke-linecap=\"square\" stroke-linejoin=\"miter\" xmlns=\"http://www.w3.org/2000/svg\"><polyline points=\"18,24 32,8 46,24\" /><line x1=\"32\" y1=\"8\" x2=\"32\" y2=\"42\" /><line x1=\"12\" y1=\"54\" x2=\"52\" y2=\"54\" /></svg>",
+  ampliar: "<svg viewBox=\"0 0 64 64\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"6\" stroke-linecap=\"square\" stroke-linejoin=\"miter\" xmlns=\"http://www.w3.org/2000/svg\"><polyline points=\"6,22 6,6 22,6\" /><polyline points=\"42,6 58,6 58,22\" /><polyline points=\"58,42 58,58 42,58\" /><polyline points=\"22,58 6,58 6,42\" /></svg>",
+  fechar: "<svg viewBox=\"0 0 64 64\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"6\" stroke-linecap=\"square\" stroke-linejoin=\"miter\" xmlns=\"http://www.w3.org/2000/svg\"><line x1=\"12\" y1=\"12\" x2=\"52\" y2=\"52\" /><line x1=\"52\" y1=\"12\" x2=\"12\" y2=\"52\" /></svg>",
+  informacao: "<svg viewBox=\"0 0 64 64\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"square\" stroke-linejoin=\"miter\" xmlns=\"http://www.w3.org/2000/svg\"><circle cx=\"32\" cy=\"32\" r=\"24\" /><line x1=\"32\" y1=\"28\" x2=\"32\" y2=\"44\" /><circle cx=\"32\" cy=\"18\" r=\"2.5\" fill=\"currentColor\" stroke=\"none\" /></svg>",
+  link: "<svg viewBox=\"0 0 64 64\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linejoin=\"miter\" xmlns=\"http://www.w3.org/2000/svg\"><rect x=\"6\" y=\"22\" width=\"24\" height=\"20\" transform=\"rotate(-28 18 32)\" /><rect x=\"34\" y=\"22\" width=\"24\" height=\"20\" transform=\"rotate(-28 46 32)\" /></svg>",
+  estrela_cheia: "<svg viewBox=\"0 0 64 64\" fill=\"currentColor\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linejoin=\"miter\" xmlns=\"http://www.w3.org/2000/svg\"><polygon points=\"32,6 38,23 57,24 42,35 47,53 32,43 17,53 22,35 7,24 26,23\" /></svg>",
+  estrela_vazia: "<svg viewBox=\"0 0 64 64\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"3\" stroke-linejoin=\"miter\" xmlns=\"http://www.w3.org/2000/svg\"><polygon points=\"32,6 38,23 57,24 42,35 47,53 32,43 17,53 22,35 7,24 26,23\" /></svg>",
 };
 
 function seloSVG(label = "DEPAF", sub = "PROTOCOLO") {
@@ -1399,7 +1444,7 @@ function pilhaDeToasts() {
 function mostrarToast(mensagem, tipo = "erro", duracaoMs = 7000) {
   const el = document.createElement("div");
   el.className = `toast ${tipo}`;
-  el.innerHTML = `<span>${escapeHTML(String(mensagem))}</span><button type="button" aria-label="Fechar aviso">✕</button>`;
+  el.innerHTML = `<span>${escapeHTML(String(mensagem))}</span><button type="button" aria-label="Fechar aviso">${iconeInline("fechar", 10, -1)}</button>`;
   const fechar = () => el.remove();
   el.querySelector("button").addEventListener("click", fechar);
   pilhaDeToasts().appendChild(el);
@@ -1684,35 +1729,47 @@ function mostrarAppLogado(usuario) {
 }
 
 async function aoReceberCredencialGoogle(response) {
-  document.getElementById("login-status").textContent = "Entrando...";
+  const status = document.getElementById("login-status");
+  status.textContent = "Entrando...";
+  // Ver o mesmo aviso em aoSubmeterLoginSenha — servidor gratuito que às
+  // vezes precisa "acordar" antes de responder.
+  const avisoDemora = setTimeout(() => {
+    status.textContent = "Ainda entrando... o servidor pode estar acordando (até 1 minuto na primeira vez do dia).";
+  }, 4000);
   try {
     const resultado = await apiFetch("/api/auth/google", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ credential: response.credential }),
     });
+    clearTimeout(avisoDemora);
     salvarSessao(resultado);
     mostrarAppLogado(resultado.usuario);
     await carregarPortais();
   } catch (erro) {
-    document.getElementById("login-status").textContent = "Não consegui entrar: " + erro.message;
+    clearTimeout(avisoDemora);
+    status.textContent = "Não consegui entrar: " + erro.message;
   }
 }
 
-document.getElementById("btn-sair").addEventListener("click", async () => {
-  // avisa o servidor pra revogar a sessão: sem isso, apagar o token no
-  // navegador não impedia que uma cópia dele continuasse valendo
-  try {
-    const sessao = obterSessao();
-    if (sessao) {
-      await fetch(`${API_CONFIG.BASE_URL}/api/auth/logout`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${sessao.token}` },
-      });
-    }
-  } catch { /* sair não pode falhar por causa da rede */ }
+document.getElementById("btn-sair").addEventListener("click", () => {
+  // Pedido direto: "botão sair demorando muito de sair" — antes, esperava
+  // (`await`) a resposta do servidor ANTES de trocar de tela; se o backend
+  // estivesse "dormindo" (plano gratuito do Render, acorda em ~30-50s na
+  // primeira chamada depois de ficar ocioso), o clique parecia travado por
+  // até 1 minuto. Sair da tela não depende de nada do servidor — troca a
+  // tela JÁ, e avisa o servidor pra revogar a sessão em segundo plano (sem
+  // `await`); se essa parte falhar, não tem problema, é só o token
+  // continuar "válido" no banco por mais alguns minutos até expirar sozinho.
+  const sessao = obterSessao();
   limparSessao();
   mostrarTelaLogin("");
+  if (sessao) {
+    fetch(`${API_CONFIG.BASE_URL}/api/auth/logout`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${sessao.token}` },
+    }).catch(() => { /* sair não pode falhar por causa da rede */ });
+  }
 });
 
 function iniciarApp() {
@@ -1750,6 +1807,14 @@ async function aoSubmeterLoginSenha(ev) {
   ev.preventDefault();
   const status = document.getElementById("login-senha-status");
   status.textContent = "Entrando...";
+  // Pedido direto: "às vezes quando faz login demora muito de aparecer" —
+  // o backend roda num plano gratuito que "dorme" depois de ficar ocioso;
+  // a primeira chamada depois disso demora até 1 minuto pra acordar ele.
+  // Sem avisar, parece que travou. Se passar de 4s, troca a mensagem —
+  // ainda está tentando, só está sendo honesta sobre o motivo da demora.
+  const avisoDemora = setTimeout(() => {
+    status.textContent = "Ainda entrando... o servidor pode estar acordando (até 1 minuto na primeira vez do dia).";
+  }, 4000);
   try {
     const resultado = await apiFetch("/api/auth/login-senha", {
       method: "POST",
@@ -1759,11 +1824,13 @@ async function aoSubmeterLoginSenha(ev) {
         senha: document.getElementById("login-senha-senha").value,
       }),
     });
+    clearTimeout(avisoDemora);
     salvarSessao(resultado);
     status.textContent = "";
     mostrarAppLogado(resultado.usuario);
     await carregarPortais();
   } catch (erro) {
+    clearTimeout(avisoDemora);
     status.textContent = erro.message;
   }
 }
@@ -1922,7 +1989,7 @@ function renderIndicadoresLeitura(indicadores) {
         <div class="rotulo">${escapeHTML(d.rotulo)}</div>
         ${aoVivo ? `<span class="tag" style="background:var(--oliva);color:var(--paper)">● AO VIVO</span>` : ""}
         ${aoVivo && d.periodoAoVivo ? `<span class="tag" title="${escapeAttr(d.periodoAoVivo.descricao)} — recalculado a cada leitura, então vira sozinho quando mudar o mês">🗓 ${escapeHTML(d.periodoAoVivo.rotulo)}</span>` : ""}
-        ${d.painelId && (d.painelIncompativel || d.painelIndisponivel) ? `<span class="tag tag-pendente" title="O painel ligado a este cartão não existe mais, ou não dá mais um número só (virou evolução/cruzamento)">⚠ PAINEL INDISPONÍVEL</span>` : ""}
+        ${d.painelId && (d.painelIncompativel || d.painelIndisponivel) ? `<span class="tag tag-pendente" title="O painel ligado a este cartão não existe mais, ou não dá mais um número só (virou evolução/cruzamento)">${iconeInline("alerta", 12, -2)} PAINEL INDISPONÍVEL</span>` : ""}
         ${!d.painelId && d.exemplo ? `<span class="tag tag-exemplo">EXEMPLO ILUSTRATIVO</span>` : ""}
         ${!d.painelId && d.pendente ? `<span class="tag tag-pendente">A PREENCHER</span>` : ""}
       </div>
@@ -1951,7 +2018,7 @@ function linhaIndicadorEdicao(d, paineisDisponiveis) {
         <select class="input-painel-ligado" style="${CAMPO_STYLE_MINI};margin-bottom:4px">${opcoesPaineisIndicador(paineisDisponiveis, d.painelId)}</select>
         <input type="text" class="input-valor" value="${escapeAttr(d.valor || "")}" placeholder="valor manual (se “— manual —”)" style="${CAMPO_STYLE_MINI}" ${temPainel ? "disabled" : ""}>
       </td>
-      <td><button class="btn-remover-linha" type="button" style="background:none;border:none;color:var(--terracota);cursor:pointer;font-size:var(--fs-corpo)">✕</button></td>
+      <td><button class="btn-remover-linha" type="button" style="background:none;border:none;color:var(--terracota);cursor:pointer;font-size:var(--fs-corpo)">${iconeInline("fechar", 10, -1)}</button></td>
     </tr>`;
 }
 
@@ -2016,7 +2083,7 @@ function templateProjetoEdicao(proj) {
         <input type="text" class="input-gestor" placeholder="Gestor de negócio" value="${escapeAttr(proj.gestor)}" style="${CAMPO_STYLE}">
         <input type="text" class="input-gerente" placeholder="Gerente de projeto" value="${escapeAttr(proj.gerente)}" style="${CAMPO_STYLE}">
       </div>
-      <button class="btn-remover-projeto" type="button" style="background:none;border:1px solid var(--terracota);color:var(--terracota);cursor:pointer;padding:4px 8px;font-family:'IBM Plex Mono',monospace;font-size:var(--fs-ui-sm)">✕ remover este projeto</button>
+      <button class="btn-remover-projeto" type="button" style="background:none;border:1px solid var(--terracota);color:var(--terracota);cursor:pointer;padding:4px 8px;font-family:'IBM Plex Mono',monospace;font-size:var(--fs-ui-sm)">${iconeInline("fechar", 10, -1)} remover este projeto</button>
     </div>
   `;
 }
@@ -2245,7 +2312,7 @@ async function visualizarUploadPortal(uploadId, portalSlug) {
       </div>
       ${renderQualidadeCarga(detalhe.qualidade, detalhe.linhas?.length)}
       <div style="text-align:right;margin:10px 0">
-        <button class="btn-exportar-xlsx" id="btn-baixar-planilha">⬇ BAIXAR PLANILHA</button>
+        <button class="btn-exportar-xlsx" id="btn-baixar-planilha">${iconeInline("download", 12, -2)} BAIXAR PLANILHA</button>
       </div>
       <div class="tab-panel" id="sub-graficos"></div>
       <div class="tab-panel" id="sub-tabela" hidden>${renderTabelaBruta(detalhe.linhas)}</div>
@@ -2879,8 +2946,8 @@ function renderPainel(resultado, selectedLabel = null, compacto = false, grafico
   if (tabela.length) TABELAS_PARA_BAIXAR.set(painel.id, { tabela, nome: painel.nome });
   const botaoTabela = tabela.length
     ? `<div style="text-align:right;margin:6px 0;display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap">
-         <button class="dash-toggle-btn" data-baixar-excel="${escapeAttr(painel.id)}" title="Planilha formatada, com os dados como Tabela do Excel e uma aba de contexto">⬇ EXCEL (.XLSX)</button>
-         <button class="dash-toggle-btn" data-baixar-tabela="${escapeAttr(painel.id)}" title="Texto puro, pra jogar em outro sistema">⬇ CSV</button>
+         <button class="dash-toggle-btn" data-baixar-excel="${escapeAttr(painel.id)}" title="Planilha formatada, com os dados como Tabela do Excel e uma aba de contexto">${iconeInline("download", 12, -2)} EXCEL (.XLSX)</button>
+         <button class="dash-toggle-btn" data-baixar-tabela="${escapeAttr(painel.id)}" title="Texto puro, pra jogar em outro sistema">${iconeInline("download", 12, -2)} CSV</button>
        </div>`
     : "";
 
@@ -2966,7 +3033,7 @@ function renderPainel(resultado, selectedLabel = null, compacto = false, grafico
       <tr data-cat="${escapeAttr(c.label)}" class="${classe}">
         <td>${escapeHTML(c.label)}</td>
         <td class="num">${c.valor === null ? "—" : c.valor + suf}</td>
-        <td class="num">${c.numerador.toLocaleString("pt-BR")} de ${c.denominador.toLocaleString("pt-BR")}${c.denominadorPequeno ? ' <span style="color:var(--mostarda)">⚠</span>' : ""}</td>
+        <td class="num">${c.numerador.toLocaleString("pt-BR")} de ${c.denominador.toLocaleString("pt-BR")}${c.denominadorPequeno ? ` <span style="color:var(--mostarda)">${iconeInline("alerta", 11, -1)}</span>` : ""}</td>
       </tr>`;
     }).join("")
       + `<tr style="border-top:2px solid var(--carvao);font-weight:700">
@@ -3295,7 +3362,7 @@ async function carregarDestaques(portalSlug) {
     const destaques = paineis.filter(pn => pn.destaque);
     if (!destaques.length) {
       alvo.innerHTML = podeEditarPortal(portalSlug)
-        ? `<p class="font-mono" style="font-size:var(--fs-ui-sm);color:#8B93A3;margin-bottom:16px">Nenhum painel em destaque. Na aba PAINÉIS, marque com ★ os que devem aparecer aqui na visão geral.</p>`
+        ? `<p class="font-mono" style="font-size:var(--fs-ui-sm);color:#8B93A3;margin-bottom:16px">Nenhum painel em destaque. Na aba PAINÉIS, marque com ${iconeInline("estrela_cheia", 11, -1)} os que devem aparecer aqui na visão geral.</p>`
         : "";
       return;
     }
@@ -3347,7 +3414,7 @@ async function carregarDestaques(portalSlug) {
         </div>`;
         }).join("") + `
       <div style="text-align:right;margin:4px 0 20px">
-        <button class="dash-toggle-btn" id="btn-excel-visao-geral" title="Uma pasta de trabalho com todos os painéis em destaque: uma aba por painel, mais capa e contexto">⬇ BAIXAR VISÃO GERAL (EXCEL)</button>
+        <button class="dash-toggle-btn" id="btn-excel-visao-geral" title="Uma pasta de trabalho com todos os painéis em destaque: uma aba por painel, mais capa e contexto">${iconeInline("download", 12, -2)} BAIXAR VISÃO GERAL (EXCEL)</button>
       </div>`;
 
     const btnExcelGeral = document.getElementById("btn-excel-visao-geral");
@@ -3395,7 +3462,7 @@ if (!podeEditarPortal(portalSlug)) return "";
           <td>${escapeHTML(v.uploadFato.nomeArquivo)}</td>
           <td>${escapeHTML(v.uploadDimensao.nomeArquivo)} <span style="opacity:.6">(${escapeHTML(v.apelido)})</span></td>
           <td>${escapeHTML(v.colunaFato)} = ${escapeHTML(v.colunaDimensao)}</td>
-          <td>${v.taxaCasamento}%${v.taxaCasamento < 100 ? " ⚠" : ""}</td>
+          <td>${v.taxaCasamento}%${v.taxaCasamento < 100 ? ` ${iconeInline("alerta", 11, -1)}` : ""}</td>
           <td><button class="dash-toggle-btn" data-apagar-vinculo="${escapeAttr(v.id)}" style="color:var(--terracota)">REMOVER</button></td>
         </tr>`).join("")}</tbody>
     </table>` : "";
@@ -3451,7 +3518,7 @@ if (!podeEditarPortal(portalSlug)) return "";
     <div class="dash-filtros" style="align-items:flex-end">
       <div class="dash-filtro">
         <label>A PARTIR DE QUAL PLANILHA</label>
-        <select id="sel-upload-painel">${uploadsOrdenados.map(u => `<option value="${escapeAttr(u.id)}">${idsComVinculo.has(u.id) ? "🔗 " : ""}${escapeHTML(u.nomeArquivo)}</option>`).join("")}</select>
+        <select id="sel-upload-painel">${uploadsOrdenados.map(u => `<option value="${escapeAttr(u.id)}"${idsComVinculo.has(u.id) ? ` title="Já tem painel vinculado"` : ""}>${idsComVinculo.has(u.id) ? "• " : ""}${escapeHTML(u.nomeArquivo)}</option>`).join("")}</select>
       </div>
       <button class="btn-exportar-xlsx" id="btn-ver-sugestoes">VER PAINÉIS DISPONÍVEIS</button>
     </div>
@@ -3907,7 +3974,7 @@ async function carregarPaineisPortal(portalSlug, opcoes = {}) {
           <div style="display:flex;gap:6px;align-items:center">
             ${podeEditar && pn.destaque ? `<input type="text" class="input-grupo-dashboard" data-grupo-painel="${pn.id}" value="${escapeAttr(pn.grupoDashboard || "")}" placeholder="reunir sob..." title="Painéis com o mesmo nome aqui aparecem juntos na Visão Geral, sob esse título" style="width:130px;background:var(--paper);color:var(--carvao);border:1px solid var(--paper-line);padding:4px 6px;font-family:'IBM Plex Mono',monospace;font-size:var(--fs-ui-sm)">` : ""}
             <button class="dash-toggle-btn" data-abrir="${pn.id}">VER</button>
-            ${podeEditar ? `<button class="dash-toggle-btn" data-destaque="${pn.id}" data-valor="${pn.destaque ? "0" : "1"}" title="Mostrar na Visão Geral" style="${pn.destaque ? "background:var(--mostarda);color:var(--paper)" : ""}">${pn.destaque ? "★ NA VISÃO GERAL" : "☆ DESTACAR"}</button>` : ""}
+            ${podeEditar ? `<button class="dash-toggle-btn" data-destaque="${pn.id}" data-valor="${pn.destaque ? "0" : "1"}" title="Mostrar na Visão Geral" style="${pn.destaque ? "background:var(--mostarda);color:var(--paper)" : ""}">${pn.destaque ? `${iconeInline("estrela_cheia", 11, -1)} NA VISÃO GERAL` : `${iconeInline("estrela_vazia", 11, -1)} DESTACAR`}</button>` : ""}
             ${podeEditar ? `<button class="btn-perigo" data-apagar="${pn.id}">REMOVER</button>` : ""}
           </div>
         </div>
@@ -4099,6 +4166,15 @@ function badgeRenovado(c) {
 // cor própria sem perder a cor de criticidade que a borda já mostra.
 function kpiIcone(chaveIcone, cor) {
   return `<div class="kpi-icone"${cor ? ` style="--kpi-cor:${cor}"` : ""}>${ICONS[chaveIcone]}</div>`;
+}
+
+// Ícone pequeno pra usar DENTRO de um texto/botão (ao lado de uma palavra),
+// diferente do kpiIcone (maior, dentro do círculo colorido do cabeçalho de
+// KPI) — herda a cor do texto ao redor (currentColor), sem círculo de fundo.
+// `tamanho` em px; `deslocar` ajusta o alinhamento vertical fino (alguns
+// ícones — ★, ⓘ — pedem um pixel a mais/menos pra centralizar no olho).
+function iconeInline(chaveIcone, tamanho = 14, deslocar = -3) {
+  return `<span style="display:inline-flex;width:${tamanho}px;height:${tamanho}px;vertical-align:${deslocar}px;flex:none">${ICONS[chaveIcone]}</span>`;
 }
 
 // Pedido direto: "cria ícones para cada área gestora e cada categoria... e
@@ -5099,7 +5175,7 @@ function tabelaContratosHTML(lista, opcoes = {}) {
           ? dirpinsDoContrato.filter((d) => d !== dirpinAtual)
           : (destacarCompartilhados && dirpinsDoContrato.length > 1 ? dirpinsDoContrato : []);
         const selosCompartilhado = outrasDirpins.length
-          ? ` <span class="badge-compartilhado" title="Esse contrato também atende a DIRPIN ${escapeAttr(outrasDirpins.join(" e "))}">🔗 ${dirpinAtual ? "também " : ""}${escapeHTML(outrasDirpins.join(", "))}</span>`
+          ? ` <span class="badge-compartilhado" title="Esse contrato também atende a DIRPIN ${escapeAttr(outrasDirpins.join(" e "))}">${iconeInline("link", 11, -1)} ${dirpinAtual ? "também " : ""}${escapeHTML(outrasDirpins.join(", "))}</span>`
           : "";
         return `
         <tr class="linha-contrato" data-contrato-id="${escapeAttr(c.id)}">
@@ -5170,7 +5246,7 @@ function renderGerencialContratos(lista, resumo) {
       <div class="dash-chart-box">
         <h4>Detalhamento por Setor Demandante</h4>
         <p class="dash-chart-hint">Clique numa linha ou numa barra pra isolar só aquele setor (a lista de contratos aparece logo abaixo dos cartões) — clique de novo (ou em "Todos" acima) pra voltar a ver tudo.</p>
-        <div style="text-align:right;margin-bottom:6px"><button type="button" class="dash-toggle-btn" id="ger-matriz-baixar" title="Baixar esta tabela como imagem">⬇ TABELA (PNG)</button></div>
+        <div style="text-align:right;margin-bottom:6px"><button type="button" class="dash-toggle-btn" id="ger-matriz-baixar" title="Baixar esta tabela como imagem">${iconeInline("download", 12, -2)} TABELA (PNG)</button></div>
         <div id="ger-matriz" class="tabela-rolavel"></div>
       </div>
       <div class="dash-chart-box">
@@ -5455,7 +5531,7 @@ function renderGerencialContratos(lista, resumo) {
       filtroCriticidadeBaixo && { rotulo: `criticidade: Baixo (>90 dias)`, limpar: () => selecionarCriticidadeBaixo() },
     ].filter(Boolean);
     document.getElementById("ger-chip-filtro").innerHTML = chipsAtivos.length
-      ? `<div class="filter-chips">${chipsAtivos.map((c, i) => `<span class="filter-chip">Isolando ${escapeHTML(c.rotulo)}<button type="button" data-chip-limpar="${i}" title="Remover este filtro">✕</button></span>`).join("")}</div>`
+      ? `<div class="filter-chips">${chipsAtivos.map((c, i) => `<span class="filter-chip">Isolando ${escapeHTML(c.rotulo)}<button type="button" data-chip-limpar="${i}" title="Remover este filtro">${iconeInline("fechar", 10, -1)}</button></span>`).join("")}</div>`
       : "";
     document.querySelectorAll("[data-chip-limpar]").forEach((btn) => {
       btn.addEventListener("click", () => chipsAtivos[+btn.dataset.chipLimpar].limpar());
@@ -5687,7 +5763,7 @@ function renderTaticoContratos(lista) {
     <h4 style="font-family:'Space Grotesk',sans-serif;font-size:var(--fs-subtitulo);margin-bottom:8px">Detalhamento dos Contratos</h4>
     <p class="font-mono" style="font-size:var(--fs-ui-sm);color:#8B93A3;margin-bottom:8px">Passe o mouse numa linha pra ver o detalhe rápido — clique pra abrir o panorama completo do contrato.</p>
     <div id="tat-chip-filtro"></div>
-    <div style="text-align:right;margin-bottom:6px"><button type="button" class="dash-toggle-btn" id="tat-tabela-baixar" title="Baixar esta tabela como imagem">⬇ TABELA (PNG)</button></div>
+    <div style="text-align:right;margin-bottom:6px"><button type="button" class="dash-toggle-btn" id="tat-tabela-baixar" title="Baixar esta tabela como imagem">${iconeInline("download", 12, -2)} TABELA (PNG)</button></div>
     <div id="tat-tabela" class="tabela-rolavel"></div>
   `;
 
@@ -5743,7 +5819,7 @@ function renderTaticoContratos(lista) {
       btn.classList.toggle("active", btn.dataset.modo === modoMes);
     });
     document.getElementById("tat-chip-filtro").innerHTML = filtroMes
-      ? `<div class="filter-chips"><span class="filter-chip">Isolando mês: ${escapeHTML(filtroMes)}<button type="button" data-limpar-mes title="Voltar a ver todos os meses">✕</button></span></div>`
+      ? `<div class="filter-chips"><span class="filter-chip">Isolando mês: ${escapeHTML(filtroMes)}<button type="button" data-limpar-mes title="Voltar a ver todos os meses">${iconeInline("fechar", 10, -1)}</button></span></div>`
       : "";
     const btnLimparMes = document.querySelector("[data-limpar-mes]");
     if (btnLimparMes) btnLimparMes.addEventListener("click", () => selecionarMes(filtroMes));
@@ -5838,7 +5914,7 @@ function renderOperacionalContratos(lista, portalSlug) {
     <div class="dash-charts" style="grid-template-columns:1.3fr 1fr">
       <div class="dash-chart-box">
         <h4>Gestor e Fiscal do Contrato</h4>
-        <div style="text-align:right;margin-bottom:6px"><button type="button" class="dash-toggle-btn" id="op-gestor-fiscal-baixar" title="Baixar esta tabela como imagem">⬇ TABELA (PNG)</button></div>
+        <div style="text-align:right;margin-bottom:6px"><button type="button" class="dash-toggle-btn" id="op-gestor-fiscal-baixar" title="Baixar esta tabela como imagem">${iconeInline("download", 12, -2)} TABELA (PNG)</button></div>
         <div id="op-gestor-fiscal" class="tabela-rolavel" style="max-height:220px"></div>
       </div>
       <div class="dash-chart-box" style="text-align:center">
@@ -5965,7 +6041,7 @@ function renderOperacionalContratos(lista, portalSlug) {
     const previewNovoValor = document.getElementById("renov-novo-valor-preview");
     function atualizarPreviewValor() {
       const n = parseValorBR(campoNovoValor.value);
-      previewNovoValor.textContent = campoNovoValor.value.trim() === "" ? "" : (n === null ? "⚠ não entendi esse valor" : `= ${formatarMoedaBR(n)}`);
+      previewNovoValor.innerHTML = campoNovoValor.value.trim() === "" ? "" : (n === null ? `${iconeInline("alerta", 12, -2)} não entendi esse valor` : `= ${formatarMoedaBR(n)}`);
     }
     campoNovoValor.addEventListener("input", atualizarPreviewValor);
     atualizarPreviewValor();
@@ -6166,7 +6242,7 @@ function dicaLeituraContratosHTML() {
         <p style="margin:0 0 6px"><b>Gantt</b> (linha do tempo, aba Tático): cada barra é um contrato, do início ao fim da vigência. A linha vertical marcada "HOJE" mostra onde estamos agora.</p>
         <p style="margin:0 0 6px"><b>Clique pra filtrar:</b> clique numa barra, bloco ou linha de qualquer tabela/gráfico pra isolar só aquilo em todo o painel — clique de novo (ou em "Todos") pra desfazer.</p>
         <p style="margin:0 0 6px"><b>Passe o mouse</b> numa linha de contrato (em qualquer tabela ou no Gantt) pra ver o detalhe completo — empresa, objeto, gestor, fiscal — num balão.</p>
-        <p style="margin:0"><b>⬇ PNG:</b> todo gráfico e tabela deste painel tem um botão pra baixar como imagem, pra colar numa apresentação ou relatório.</p>
+        <p style="margin:0"><b>${iconeInline("download", 12, -2)} PNG:</b> todo gráfico e tabela deste painel tem um botão pra baixar como imagem, pra colar numa apresentação ou relatório.</p>
       </div>
     </details>`;
 }
@@ -6220,25 +6296,25 @@ function renderResumoRapido(lista, resumo) {
     return `
       <div class="kpi-row">
         <div class="kpi-card kpi-clicavel" data-resumo-ir="gerencial-todos" title="Clique pra ver a lista completa" style="cursor:pointer">
-          <div class="kpi-cabeca">${kpiIcone("competencia_normas")}<div class="kpi-label">Qtd Contratos <span class="kpi-info" title="Todos os contratos cadastrados no sistema, em qualquer situação de vigência — inclusive os já vencidos.">ⓘ</span></div></div>
+          <div class="kpi-cabeca">${kpiIcone("competencia_normas")}<div class="kpi-label">Qtd Contratos <span class="kpi-info" title="Todos os contratos cadastrados no sistema, em qualquer situação de vigência — inclusive os já vencidos.">${iconeInline("informacao", 11, -1)}</span></div></div>
           <div class="kpi-value">${resumo.qtdContratos.toLocaleString("pt-BR")}</div>
         </div>
         <div class="kpi-card kpi-clicavel" data-resumo-status="NaoVencido" title="Clique pra ver quais são" style="--kpi-cor:var(--crit-baixo);cursor:pointer">
-          <div class="kpi-cabeca">${kpiIcone("relogio")}<div class="kpi-label">Não Vencidos <span class="kpi-info" title="Quantos ainda estão de fato em vigor — o total de cima menos os já vencidos. Pra responder 'quantos contratos essa unidade gere hoje', é este número, não o total bruto.">ⓘ</span></div></div>
+          <div class="kpi-cabeca">${kpiIcone("relogio")}<div class="kpi-label">Não Vencidos <span class="kpi-info" title="Quantos ainda estão de fato em vigor — o total de cima menos os já vencidos. Pra responder 'quantos contratos essa unidade gere hoje', é este número, não o total bruto.">${iconeInline("informacao", 11, -1)}</span></div></div>
           <div class="kpi-value">${resumo.qtdNaoVencidos.toLocaleString("pt-BR")}</div>
         </div>
         <div class="kpi-card kpi-clicavel" data-resumo-ir="gerencial-valor" title="Clique pra ver os maiores contratos" style="cursor:pointer">
-          <div class="kpi-cabeca">${kpiIcone("moeda")}<div class="kpi-label">Valor Atual Total <span class="kpi-info" title="Soma do Valor Global Atual de todos os contratos — já considerando as renovações marcadas manualmente, mesmo antes da planilha ser reimportada.">ⓘ</span></div></div>
+          <div class="kpi-cabeca">${kpiIcone("moeda")}<div class="kpi-label">Valor Atual Total <span class="kpi-info" title="Soma do Valor Global Atual de todos os contratos — já considerando as renovações marcadas manualmente, mesmo antes da planilha ser reimportada.">${iconeInline("informacao", 11, -1)}</span></div></div>
           <div class="kpi-value">R$ ${formatarEixo(resumo.valorGlobalAtualTotal)}</div>
           <div class="kpi-valor-exato">${formatarMoedaBR(resumo.valorGlobalAtualTotal)}</div>
           <div class="kpi-delta ${deltaResumoClasse}">${deltaResumoTexto}</div>
         </div>
         <div class="kpi-card kpi-clicavel" data-resumo-status="Vencido" title="Clique pra ver quais são" style="--kpi-cor:var(--crit-vencido);cursor:pointer">
-          <div class="kpi-cabeca">${kpiIcone("relogio")}<div class="kpi-label">Vencidos <span class="kpi-info" title="A data de vigência já passou e o contrato ainda não foi renovado/atualizado.">ⓘ</span></div></div>
+          <div class="kpi-cabeca">${kpiIcone("relogio")}<div class="kpi-label">Vencidos <span class="kpi-info" title="A data de vigência já passou e o contrato ainda não foi renovado/atualizado.">${iconeInline("informacao", 11, -1)}</span></div></div>
           <div class="kpi-value">${resumo.qtdVencidos.toLocaleString("pt-BR")}</div>
         </div>
         <div class="kpi-card kpi-clicavel" data-resumo-status="A Vencer" title="Clique pra ver quais são" style="--kpi-cor:var(--crit-alto);cursor:pointer">
-          <div class="kpi-cabeca">${kpiIcone("relogio")}<div class="kpi-label">A Vencer <span class="kpi-info" title="Vencem em até 90 dias a partir de hoje.">ⓘ</span></div></div>
+          <div class="kpi-cabeca">${kpiIcone("relogio")}<div class="kpi-label">A Vencer <span class="kpi-info" title="Vencem em até 90 dias a partir de hoje.">${iconeInline("informacao", 11, -1)}</span></div></div>
           <div class="kpi-value">${resumo.qtdAVencer.toLocaleString("pt-BR")}</div>
         </div>
       </div>
@@ -6377,7 +6453,7 @@ function renderAlertaVencimentoContratos(lista, porId, decisoesRenovacao = new M
 
   const blocoUrgente = total
     ? `<details class="alerta-vencimento" style="--alerta-cor:${cor};--alerta-cor-glow:${corGlowVar}" open>
-        <summary>⚠ ${total} contrato${total === 1 ? "" : "s"} merece${total === 1 ? "" : "m"} atenção <span class="conta">— ${escapeHTML(partes)}</span></summary>
+        <summary>${iconeInline("alerta", 13, -2)} ${total} contrato${total === 1 ? "" : "s"} merece${total === 1 ? "" : "m"} atenção <span class="conta">— ${escapeHTML(partes)}</span></summary>
         <div class="corpo">
           <p class="dash-chart-hint" style="margin:0 0 8px">Passe o mouse numa linha pra ver o detalhe rápido — clique pra abrir o panorama completo do contrato.</p>
           <div class="tabela-rolavel" style="max-height:280px" id="contratos-alerta-tabela"></div>
@@ -7221,7 +7297,7 @@ function renderPorDimensaoContratos(lista, cfg) {
         <div class="kpi-card kpi-clicavel" data-status-visao="A Contratar" title="Clique pra isolar" style="--kpi-cor:var(--crit-neutro);cursor:pointer;${filtroStatusVisao === "A Contratar" ? "outline:2px solid var(--crit-neutro);outline-offset:-2px" : ""}"><div class="kpi-cabeca">${kpiIcone("calendario")}<div class="kpi-label">A Contratar</div></div><div class="kpi-value">${qtdAContratar.toLocaleString("pt-BR")}</div></div>
         <div class="kpi-card"><div class="kpi-cabeca">${kpiIcone("moeda")}<div class="kpi-label">Valor Atual Total</div></div><div class="kpi-value">R$ ${formatarEixo(valorAtual)}</div><div class="kpi-valor-exato">${formatarMoedaBR(valorAtual)}</div></div>
       </div>
-      ${filtroStatusVisao ? `<div class="filter-chips"><span class="filter-chip">Isolando status: ${escapeHTML(filtroStatusVisao)}<button type="button" data-limpar-status-visao title="Voltar a ver todos">✕</button></span></div>` : ""}
+      ${filtroStatusVisao ? `<div class="filter-chips"><span class="filter-chip">Isolando status: ${escapeHTML(filtroStatusVisao)}<button type="button" data-limpar-status-visao title="Voltar a ver todos">${iconeInline("fechar", 10, -1)}</button></span></div>` : ""}
       <div class="dash-chart-box">
         <h4>Detalhamento dos Contratos${filtroStatusVisao ? ` — ${escapeHTML(filtroStatusVisao)}` : ""}</h4>
         <p class="dash-chart-hint">Passe o mouse numa linha pra ver o detalhe rápido — clique pra abrir o panorama completo do contrato.</p>
@@ -7324,7 +7400,7 @@ function renderPorDimensaoContratos(lista, cfg) {
     });
 
     el("mes-chip").innerHTML = filtroMes
-      ? `<div class="filter-chips"><span class="filter-chip">Isolando mês: ${escapeHTML(filtroMes)}<button type="button" data-limpar-mes-${p} title="Voltar a ver todos os meses">✕</button></span></div>`
+      ? `<div class="filter-chips"><span class="filter-chip">Isolando mês: ${escapeHTML(filtroMes)}<button type="button" data-limpar-mes-${p} title="Voltar a ver todos os meses">${iconeInline("fechar", 10, -1)}</button></span></div>`
       : "";
     const btnLimparMes = alvo.querySelector(`[data-limpar-mes-${p}]`);
     if (btnLimparMes) btnLimparMes.addEventListener("click", () => { filtroMes = ""; renderPrazos(listaFiltrada); });
@@ -7338,7 +7414,7 @@ function renderPorDimensaoContratos(lista, cfg) {
     if (filtroUrgenciaPrazo) {
       const contratosDaFaixa = listaFiltrada.filter(TESTE_URGENCIA[filtroUrgenciaPrazo]);
       el("prazos-tabela").innerHTML = `
-        <div class="filter-chips"><span class="filter-chip">Isolando ${escapeHTML(ROTULO_URGENCIA[filtroUrgenciaPrazo])}<button type="button" data-limpar-urgencia-${p} title="Voltar a ver todos">✕</button></span></div>
+        <div class="filter-chips"><span class="filter-chip">Isolando ${escapeHTML(ROTULO_URGENCIA[filtroUrgenciaPrazo])}<button type="button" data-limpar-urgencia-${p} title="Voltar a ver todos">${iconeInline("fechar", 10, -1)}</button></span></div>
         <div class="dash-chart-box">
           <h4>Contratos — ${escapeHTML(ROTULO_URGENCIA[filtroUrgenciaPrazo])}</h4>
           <p class="dash-chart-hint">Passe o mouse numa linha pra ver o detalhe rápido — clique pra abrir o panorama completo do contrato.</p>
@@ -7475,7 +7551,7 @@ function renderPorDimensaoContratos(lista, cfg) {
     ].filter(Boolean);
     if (chipsFinanceiro.length) {
       el("financeiro-tabela").innerHTML = `
-        <div class="filter-chips">${chipsFinanceiro.map((c, i) => `<span class="filter-chip">Isolando ${escapeHTML(c.rotulo)}<button type="button" data-chip-financeiro-${p}="${i}" title="Remover este filtro">✕</button></span>`).join("")}</div>
+        <div class="filter-chips">${chipsFinanceiro.map((c, i) => `<span class="filter-chip">Isolando ${escapeHTML(c.rotulo)}<button type="button" data-chip-financeiro-${p}="${i}" title="Remover este filtro">${iconeInline("fechar", 10, -1)}</button></span>`).join("")}</div>
         <div class="dash-chart-box">
           <h4>Contratos — ${escapeHTML(chipsFinanceiro.map((c) => c.rotulo).join(" · "))}</h4>
           <div class="tabela-rolavel" style="max-height:320px" id="${p}-financeiro-tabela-conteudo"></div>
@@ -8064,7 +8140,7 @@ function renderCartaoUsuario(u, portais, souEu) {
           <p class="font-mono" style="font-size:var(--fs-ui-sm);color:#8B93A3;margin:0;word-break:break-all">${escapeHTML(u.email)}</p>
         </div>
         <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
-          <button class="dash-toggle-btn" data-papel="${escapeAttr(u.id)}" data-valor="${u.papel === "admin" ? "membro" : "admin"}" ${souEu ? "disabled title='Você não pode alterar o próprio papel'" : ""} style="${u.papel === "admin" ? "background:var(--dourado);color:var(--paper)" : ""}">${u.papel === "admin" ? "★ ADMIN" : "☆ TORNAR ADMIN"}</button>
+          <button class="dash-toggle-btn" data-papel="${escapeAttr(u.id)}" data-valor="${u.papel === "admin" ? "membro" : "admin"}" ${souEu ? "disabled title='Você não pode alterar o próprio papel'" : ""} style="${u.papel === "admin" ? "background:var(--dourado);color:var(--paper)" : ""}">${u.papel === "admin" ? `${iconeInline("estrela_cheia", 11, -1)} ADMIN` : `${iconeInline("estrela_vazia", 11, -1)} TORNAR ADMIN`}</button>
           ${u.sessoesAtivas > 0 ? `<button class="dash-toggle-btn" data-encerrar="${escapeAttr(u.id)}" title="Derruba a sessão sem tirar o acesso — útil se ficou logado numa máquina compartilhada">ENCERRAR SESSÃO</button>` : ""}
           <button class="${u.ativo ? "btn-perigo" : "dash-toggle-btn"}" data-ativo="${escapeAttr(u.id)}" data-valor="${u.ativo ? "0" : "1"}" ${souEu ? "disabled title='Você não pode desativar a própria conta'" : ""}>${u.ativo ? "DESATIVAR" : "REATIVAR"}</button>
         </div>
@@ -8710,8 +8786,8 @@ function adicionarControlesGrafico(container) {
     const toolbar = document.createElement("div");
     toolbar.style.cssText = "position:absolute;top:2px;right:0;display:flex;gap:3px;opacity:.75";
     toolbar.innerHTML = `
-      <button type="button" title="Ampliar" style="background:var(--carvao);color:var(--paper);border:none;width:22px;height:22px;cursor:pointer;font-size:var(--fs-ui);line-height:1">⤢</button>
-      <button type="button" title="Baixar como imagem" style="background:var(--carvao);color:var(--paper);border:none;width:22px;height:22px;cursor:pointer;font-size:var(--fs-ui-sm);line-height:1">⬇</button>
+      <button type="button" title="Ampliar" style="background:var(--carvao);color:var(--paper);border:none;width:22px;height:22px;cursor:pointer;display:flex;align-items:center;justify-content:center">${iconeInline("ampliar", 12, 0)}</button>
+      <button type="button" title="Baixar como imagem" style="background:var(--carvao);color:var(--paper);border:none;width:22px;height:22px;cursor:pointer;display:flex;align-items:center;justify-content:center">${iconeInline("download", 13, 0)}</button>
     `;
     wrapper.appendChild(toolbar);
     const [btnAmpliar, btnBaixar] = toolbar.querySelectorAll("button");
