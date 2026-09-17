@@ -4906,6 +4906,30 @@ function agruparContratosPorPessoa(lista, papel) {
     .sort((a, b) => b.total - a.total);
 }
 
+// "Qual dupla gestor+fiscal aparece mais" (pedido direto) — pra cada
+// contrato, cruza TODO gestor com TODO fiscal dele: um contrato com 2
+// gestores e 1 fiscal gera 2 duplas reais, não é bug de contagem dupla (o
+// mesmo raciocínio de setor demandante multivalorado, já usado no resto do
+// sistema). Dedup por Set dentro do contrato evita contar 2x se a mesma
+// pessoa aparecer repetida com o mesmo papel.
+function agruparDuplasGestorFiscal(lista) {
+  const mapa = new Map(); // "gestor␟fiscal" -> { gestor, fiscal, ids: Set(contratoId) }
+  for (const c of lista) {
+    const gestores = [...new Set((c.pessoas || []).filter((p) => p.papel === "Gestor").map((p) => p.nomePessoa))];
+    const fiscais = [...new Set((c.pessoas || []).filter((p) => p.papel === "Fiscal").map((p) => p.nomePessoa))];
+    for (const g of gestores) {
+      for (const f of fiscais) {
+        const chave = g + "␟" + f;
+        if (!mapa.has(chave)) mapa.set(chave, { gestor: g, fiscal: f, ids: new Set() });
+        mapa.get(chave).ids.add(c.id);
+      }
+    }
+  }
+  return [...mapa.values()]
+    .map((v) => ({ label: `${v.gestor} + ${v.fiscal}`, gestor: v.gestor, fiscal: v.fiscal, total: v.ids.size }))
+    .sort((a, b) => b.total - a.total);
+}
+
 // Busca por palavra-chave "de tudo" — pedido de reunião: a pessoa às vezes
 // não lembra do número do contrato nem da empresa, mas lembra do objeto, de
 // um valor, de uma data, da área, do gestor, do fiscal... Monta um texto
@@ -6735,6 +6759,62 @@ function configPorDirpin() {
   };
 }
 
+// Pedido direto: "gerar uma aba pessoas junto com as outras existentes" —
+// Gestor (83) e Fiscal (118) já passam do mesmo teto de cardinalidade que
+// justificou virar tabela em vez de barra; mereciam um espaço próprio, não
+// só a sub-aba "Pessoas" que já existe dentro de cada perfil. `papelProprio`
+// é lido só por renderPessoas (a sub-aba interna) — esconde a caixa que
+// mostraria a própria pessoa em 100% dentro do perfil dela mesma, mantém as
+// outras duas (ex.: quais fiscais/analistas aparecem nos contratos de um
+// gestor — isso já é útil de graça). `complementar` = Setor Demandante,
+// igual Categoria/DIRPIN — a pergunta "a quais setores essa pessoa atende"
+// já sai de graça pela sub-aba Financeiro que a engine já constrói.
+function configPorGestor() {
+  return {
+    prefixo: "gestor",
+    papelProprio: "Gestor",
+    campoAgrupador: (c) => (c.pessoas || []).filter((pe) => pe.papel === "Gestor").map((pe) => pe.nomePessoa),
+    rotuloVazio: "(sem gestor)",
+    labelSelect: "SELECIONE O GESTOR",
+    opcaoPadrao: "— Escolha um gestor —",
+    labelBusca: "GESTOR",
+    labelBuscaPlural: "todos os gestores",
+    labelTrocar: "← TROCAR DE GESTOR",
+    dicaLanding: "Escolha um gestor (no campo acima, ou clicando num cartão abaixo, ou digitando na busca) pra ver o perfil completo dele — vencimentos, financeiro, e a quais setores/categorias ele costuma atender.",
+    complementar: { campoFn: (c) => setoresDemandantesDoContrato(c), rotuloVazio: "(sem unidade)", titulo: "Valor por Setor Demandante", prefixoAlvo: "area", tituloAba: "Por Setor Demandante" },
+  };
+}
+function configPorFiscal() {
+  return {
+    prefixo: "fiscal",
+    papelProprio: "Fiscal",
+    campoAgrupador: (c) => (c.pessoas || []).filter((pe) => pe.papel === "Fiscal").map((pe) => pe.nomePessoa),
+    rotuloVazio: "(sem fiscal)",
+    labelSelect: "SELECIONE O FISCAL",
+    opcaoPadrao: "— Escolha um fiscal —",
+    labelBusca: "FISCAL",
+    labelBuscaPlural: "todos os fiscais",
+    labelTrocar: "← TROCAR DE FISCAL",
+    dicaLanding: "Escolha um fiscal (no campo acima, ou clicando num cartão abaixo, ou digitando na busca) pra ver o perfil completo dele — vencimentos, financeiro, e a quais setores/categorias ele costuma atender.",
+    complementar: { campoFn: (c) => setoresDemandantesDoContrato(c), rotuloVazio: "(sem unidade)", titulo: "Valor por Setor Demandante", prefixoAlvo: "area", tituloAba: "Por Setor Demandante" },
+  };
+}
+function configPorAnalista() {
+  return {
+    prefixo: "analistapessoa",
+    papelProprio: "Analista",
+    campoAgrupador: (c) => c.analista,
+    rotuloVazio: "(sem analista)",
+    labelSelect: "SELECIONE O ANALISTA",
+    opcaoPadrao: "— Escolha um analista —",
+    labelBusca: "ANALISTA",
+    labelBuscaPlural: "todos os analistas",
+    labelTrocar: "← TROCAR DE ANALISTA",
+    dicaLanding: "Escolha um analista (no campo acima, ou clicando num cartão abaixo, ou digitando na busca) pra ver o perfil completo dele — vencimentos, financeiro, e a quais setores/categorias ele costuma atender.",
+    complementar: { campoFn: (c) => setoresDemandantesDoContrato(c), rotuloVazio: "(sem unidade)", titulo: "Valor por Setor Demandante", prefixoAlvo: "area", tituloAba: "Por Setor Demandante" },
+  };
+}
+
 // Contorno do estado da Bahia — malha oficial do IBGE (servicodados.ibge.gov.br/api/v2/malhas/29),
 // simplificada. Coordenadas em grau decimal direto (longitude = x; y = -latitude,
 // por causa do scale(0.0001,-0.0001) do próprio arquivo do IBGE) — plotar um ponto em
@@ -7779,53 +7859,54 @@ function renderPorDimensaoContratos(lista, cfg) {
     const qtdGestores = new Set(listaFiltrada.flatMap((c) => (c.pessoas || []).filter((pe) => pe.papel === "Gestor").map((pe) => pe.nomePessoa))).size;
     const qtdFiscais = new Set(listaFiltrada.flatMap((c) => (c.pessoas || []).filter((pe) => pe.papel === "Fiscal").map((pe) => pe.nomePessoa))).size;
     const semResponsavel = listaFiltrada.filter((c) => !c.analista && !(c.pessoas || []).length).length;
+    // Dentro do perfil de UMA pessoa (aba "Por Pessoas" — configPorGestor/
+    // Fiscal/Analista), a própria caixa mostraria ela mesma em 100% (ex.:
+    // perfil do gestor Fulana, caixa "Por Gestor" só teria "Fulana" ali) —
+    // trivial e confuso. cfg.papelProprio esconde só essa caixa; as outras
+    // duas continuam (quais fiscais/analistas aparecem nos contratos da
+    // Fulana já é informação nova, não repete o que a pessoa já escolheu).
+    const cartoesKpi = [
+      { tipo: "analista", rotulo: "Analistas", valor: qtdAnalistas },
+      { tipo: "gestor", rotulo: "Gestores", valor: qtdGestores },
+      { tipo: "fiscal", rotulo: "Fiscais", valor: qtdFiscais },
+    ].filter((k) => k.tipo !== (cfg.papelProprio || "").toLowerCase());
+    const caixas = [
+      { tipo: "analista", titulo: "Por Analista" },
+      { tipo: "gestor", titulo: "Por Gestor" },
+      { tipo: "fiscal", titulo: "Por Fiscal" },
+    ].filter((b) => b.tipo !== (cfg.papelProprio || "").toLowerCase());
+    // Sem papelProprio (Setor Demandante/DIRPIN/Categoria): as 3 caixas de
+    // sempre, mesmo layout de antes (2 numa linha, 1 sozinha embaixo). Com
+    // papelProprio (Pessoas): sobram só 2 — cabem lado a lado numa linha só.
+    const linhasGrid = caixas.length === 3 ? [caixas.slice(0, 2), caixas.slice(2)] : [caixas];
+    const gridsHTML = linhasGrid.map((linha) => `
+      <div class="dash-charts" style="grid-template-columns:repeat(${linha.length},1fr)">
+        ${linha.map((b) => `<div class="dash-chart-box"><h4>${b.titulo}</h4><div id="${p}-${b.tipo}"></div></div>`).join("")}
+      </div>`).join("");
     el("sub-pessoas").innerHTML = `
       <div class="kpi-row" style="margin-bottom:16px">
-        <div class="kpi-card kpi-clicavel" data-acao-pes="analista" title="Clique pra ver a distribuição" style="cursor:pointer"><div class="kpi-cabeca">${kpiIcone("pessoa")}<div class="kpi-label">Analistas</div></div><div class="kpi-value">${qtdAnalistas.toLocaleString("pt-BR")}</div></div>
-        <div class="kpi-card kpi-clicavel" data-acao-pes="gestor" title="Clique pra ver a distribuição" style="cursor:pointer"><div class="kpi-cabeca">${kpiIcone("pessoa")}<div class="kpi-label">Gestores</div></div><div class="kpi-value">${qtdGestores.toLocaleString("pt-BR")}</div></div>
-        <div class="kpi-card kpi-clicavel" data-acao-pes="fiscal" title="Clique pra ver a distribuição" style="cursor:pointer"><div class="kpi-cabeca">${kpiIcone("pessoa")}<div class="kpi-label">Fiscais</div></div><div class="kpi-value">${qtdFiscais.toLocaleString("pt-BR")}</div></div>
+        ${cartoesKpi.map((k) => `<div class="kpi-card kpi-clicavel" data-acao-pes="${k.tipo}" title="Clique pra ver a distribuição" style="cursor:pointer"><div class="kpi-cabeca">${kpiIcone("pessoa")}<div class="kpi-label">${k.rotulo}</div></div><div class="kpi-value">${k.valor.toLocaleString("pt-BR")}</div></div>`).join("")}
         <div class="kpi-card kpi-clicavel" data-sem-responsavel title="Clique pra ver quais são" style="${semResponsavel ? "--kpi-cor:var(--crit-alto);" : ""}cursor:pointer${filtroPessoa?.tipo === "sem-responsavel" ? ";outline:2px solid var(--crit-alto);outline-offset:-2px" : ""}"><div class="kpi-cabeca">${kpiIcone("alerta")}<div class="kpi-label">Sem Responsável Cadastrado</div></div><div class="kpi-value">${semResponsavel.toLocaleString("pt-BR")}</div></div>
       </div>
-      <div class="dash-charts" style="grid-template-columns:1fr 1fr">
-        <div class="dash-chart-box"><h4>Por Analista</h4><div id="${p}-analista"></div></div>
-        <div class="dash-chart-box"><h4>Por Gestor</h4><div id="${p}-gestor"></div></div>
-      </div>
-      <div class="dash-charts" style="grid-template-columns:1fr">
-        <div class="dash-chart-box"><h4>Por Fiscal</h4><div id="${p}-fiscal"></div></div>
-      </div>
+      ${gridsHTML}
       <p class="dash-chart-hint">Clique num nome pra ver os contratos sob responsabilidade dele.</p>
       <div id="${p}-pessoas-tabela"></div>
     `;
-    el("analista").innerHTML = barraOuTabelaSVG(
-      agruparContagemPorCampo(listaFiltrada, (c) => c.analista, "(sem analista)"),
-      {
+    const gruposPorTipo = {
+      analista: () => agruparContagemPorCampo(listaFiltrada, (c) => c.analista, "(sem analista)"),
+      gestor: () => agruparContratosPorPessoa(listaFiltrada, "Gestor"),
+      fiscal: () => agruparContratosPorPessoa(listaFiltrada, "Fiscal"),
+    };
+    const rotulosColuna = { analista: "ANALISTA", gestor: "GESTOR", fiscal: "FISCAL" };
+    caixas.forEach((b) => {
+      el(b.tipo).innerHTML = barraOuTabelaSVG(gruposPorTipo[b.tipo](), {
         tituloTooltip: (l) => `${l.label}: ${l.total} contrato(s)`,
-        selecionado: filtroPessoa?.tipo === "analista" ? filtroPessoa.nome : "",
-        colunaRotulo: "ANALISTA",
+        selecionado: filtroPessoa?.tipo === b.tipo ? filtroPessoa.nome : "",
+        colunaRotulo: rotulosColuna[b.tipo],
         colunaValor: "CONTRATOS",
-      }
-    );
-    el("gestor").innerHTML = barraOuTabelaSVG(
-      agruparContratosPorPessoa(listaFiltrada, "Gestor"),
-      {
-        tituloTooltip: (l) => `${l.label}: ${l.total} contrato(s)`,
-        selecionado: filtroPessoa?.tipo === "gestor" ? filtroPessoa.nome : "",
-        colunaRotulo: "GESTOR",
-        colunaValor: "CONTRATOS",
-      }
-    );
-    el("fiscal").innerHTML = barraOuTabelaSVG(
-      agruparContratosPorPessoa(listaFiltrada, "Fiscal"),
-      {
-        tituloTooltip: (l) => `${l.label}: ${l.total} contrato(s)`,
-        selecionado: filtroPessoa?.tipo === "fiscal" ? filtroPessoa.nome : "",
-        colunaRotulo: "FISCAL",
-        colunaValor: "CONTRATOS",
-      }
-    );
-    adicionarControlesGrafico(el("analista"));
-    adicionarControlesGrafico(el("gestor"));
-    adicionarControlesGrafico(el("fiscal"));
+      });
+      adicionarControlesGrafico(el(b.tipo));
+    });
 
     function ligarClique(sufixo, tipo) {
       el(sufixo).addEventListener("click", (ev) => {
@@ -7836,9 +7917,7 @@ function renderPorDimensaoContratos(lista, cfg) {
         renderPessoas(listaFiltrada);
       });
     }
-    ligarClique("analista", "analista");
-    ligarClique("gestor", "gestor");
-    ligarClique("fiscal", "fiscal");
+    caixas.forEach((b) => ligarClique(b.tipo, b.tipo));
 
     // Analistas/Gestores/Fiscais não têm um "subconjunto" próprio no
     // cartão (são contagem de gente única) — clicar rola até o gráfico
@@ -7924,6 +8003,172 @@ function renderPorDimensaoContratos(lista, cfg) {
 function renderPorAreaContratos(lista) { return renderPorDimensaoContratos(lista, configPorArea()); }
 function renderPorCategoriaContratos(lista) { return renderPorDimensaoContratos(lista, configPorCategoria()); }
 function renderPorDirpinContratos(lista) { return renderPorDimensaoContratos(lista, configPorDirpin()); }
+function renderPorGestorContratos(lista) { return renderPorDimensaoContratos(lista, configPorGestor()); }
+function renderPorFiscalContratos(lista) { return renderPorDimensaoContratos(lista, configPorFiscal()); }
+function renderPorAnalistaContratos(lista) { return renderPorDimensaoContratos(lista, configPorAnalista()); }
+
+// Pedido direto: "gerar uma aba pessoas junto com as outras existentes...
+// dentro dessa aba criarmos cartões e visuais outros rápidos: qual gestor
+// tem mais contrato, qual dupla aparece mais, a quais setores/categorias
+// eles normalmente se ligam". Landing própria (KPIs + duplas + Top 10, antes
+// de escolher um papel) por cima de 3 instâncias inteiras da engine
+// genérica (Gestor/Fiscal/Analista) montadas juntas e alternadas por um
+// toggle — mesma ideia de "monta tudo, esconde o que não tá ativo" que as 7
+// abas de nível superior já usam, só que um nível mais fundo. "A quais
+// setores/categorias se ligam" já sai de graça: cada configPorX aponta
+// complementar pra Valor por Setor Demandante, igual Categoria/DIRPIN.
+function renderPorPessoasContratos(lista) {
+  const alvo = document.getElementById("contratos-sub-porpessoas");
+  const porId = new Map(lista.map((c) => [c.id, c]));
+  const PAPEIS = [
+    { chave: "gestor", rotulo: "GESTOR", painel: "porgestor" },
+    { chave: "fiscal", rotulo: "FISCAL", painel: "porfiscal" },
+    { chave: "analista", rotulo: "ANALISTA", painel: "poranalistapessoa" },
+  ];
+  let papelAtivo = "gestor";
+  let duplaAberta = "";
+
+  const gestores = agruparContratosPorPessoa(lista, "Gestor");
+  const fiscais = agruparContratosPorPessoa(lista, "Fiscal");
+  const totalAnalistas = new Set(lista.map((c) => c.analista).filter(Boolean)).size;
+  const duplas = agruparDuplasGestorFiscal(lista);
+  const mapaDuplas = new Map(duplas.map((d) => [d.label, d]));
+  // Média de contratos por pessoa: soma de "quantos contratos cada um tem"
+  // dividida por quantas pessoas distintas existem (gestor + fiscal juntos,
+  // já que ambos representam a mesma pergunta — "carga de trabalho por
+  // responsável") — mesmo raciocínio do card "Média de Aditivos / Contrato"
+  // que já existe em Gerencial.
+  const pessoasComCarga = [...gestores, ...fiscais];
+  const mediaCarga = pessoasComCarga.length
+    ? pessoasComCarga.reduce((a, l) => a + l.total, 0) / pessoasComCarga.length
+    : 0;
+
+  alvo.innerHTML = `
+    <div class="kpi-row" style="margin-bottom:16px">
+      <div class="kpi-card"><div class="kpi-cabeca">${kpiIcone("competencia_normas")}<div class="kpi-label">Contratos</div></div><div class="kpi-value">${lista.length.toLocaleString("pt-BR")}</div></div>
+      <div class="kpi-card"><div class="kpi-cabeca">${kpiIcone("pessoa")}<div class="kpi-label">Gestores</div></div><div class="kpi-value">${gestores.length.toLocaleString("pt-BR")}</div></div>
+      <div class="kpi-card"><div class="kpi-cabeca">${kpiIcone("pessoa")}<div class="kpi-label">Fiscais</div></div><div class="kpi-value">${fiscais.length.toLocaleString("pt-BR")}</div></div>
+      <div class="kpi-card"><div class="kpi-cabeca">${kpiIcone("pessoa")}<div class="kpi-label">Analistas</div></div><div class="kpi-value">${totalAnalistas.toLocaleString("pt-BR")}</div></div>
+      <div class="kpi-card"><div class="kpi-cabeca">${kpiIcone("competencia_normas")}<div class="kpi-label">Média de Contratos / Pessoa</div></div><div class="kpi-value">${mediaCarga.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}</div></div>
+    </div>
+    <div class="dash-charts" style="grid-template-columns:1fr 1fr">
+      <div class="dash-chart-box">
+        <h4>Top 10 Gestores (Carga de Trabalho)</h4>
+        <p class="dash-chart-hint">Quem tem mais contrato sob responsabilidade agora — clique num nome pra abrir o perfil completo dele.</p>
+        <div id="porpessoas-top-gestores"></div>
+      </div>
+      <div class="dash-chart-box">
+        <h4>Top 10 Fiscais (Carga de Trabalho)</h4>
+        <p class="dash-chart-hint">Quem tem mais contrato sob responsabilidade agora — clique num nome pra abrir o perfil completo dele.</p>
+        <div id="porpessoas-top-fiscais"></div>
+      </div>
+    </div>
+    <div class="dash-charts" style="grid-template-columns:1fr">
+      <div class="dash-chart-box">
+        <h4>Duplas Gestor + Fiscal Mais Frequentes</h4>
+        <p class="dash-chart-hint">Quem costuma trabalhar junto — clique numa dupla pra ver os contratos que os dois dividem.</p>
+        <div id="porpessoas-duplas"></div>
+        <div id="porpessoas-dupla-tabela" style="margin-top:12px"></div>
+      </div>
+    </div>
+    <div class="dash-toggle" id="porpessoas-role-toggle" style="margin:18px 0 14px">
+      ${PAPEIS.map((r, i) => `<button class="dash-toggle-btn${i === 0 ? " active" : ""}" data-role-pessoas="${r.chave}">${r.rotulo}</button>`).join("")}
+    </div>
+    ${PAPEIS.map((r, i) => `<div class="tab-panel" id="contratos-sub-${r.painel}"${i === 0 ? "" : " hidden"}></div>`).join("")}
+  `;
+
+  document.getElementById("porpessoas-top-gestores").innerHTML = barraContagemHorizontalSVG(gestores.slice(0, 10), {
+    tituloTooltip: (l) => `${l.label}: ${l.total} contrato(s)`,
+    limite: 20,
+  });
+  document.getElementById("porpessoas-top-fiscais").innerHTML = barraContagemHorizontalSVG(fiscais.slice(0, 10), {
+    tituloTooltip: (l) => `${l.label}: ${l.total} contrato(s)`,
+    limite: 20,
+  });
+  document.getElementById("porpessoas-duplas").innerHTML = duplas.length
+    ? barraContagemHorizontalSVG(duplas.slice(0, 10), { tituloTooltip: (l) => `${l.label}: ${l.total} contrato(s)`, limite: 20 })
+    : `<p class="dash-chart-hint">Nenhum contrato com gestor E fiscal cadastrados ao mesmo tempo ainda.</p>`;
+  adicionarControlesGrafico(document.getElementById("porpessoas-top-gestores"));
+  adicionarControlesGrafico(document.getElementById("porpessoas-top-fiscais"));
+  adicionarControlesGrafico(document.getElementById("porpessoas-duplas"));
+
+  function desenharDuplaAberta() {
+    const caixa = document.getElementById("porpessoas-dupla-tabela");
+    if (!duplaAberta) { caixa.innerHTML = ""; return; }
+    const d = mapaDuplas.get(duplaAberta);
+    if (!d) { caixa.innerHTML = ""; return; }
+    const contratosDaDupla = lista.filter((c) =>
+      (c.pessoas || []).some((pe) => pe.papel === "Gestor" && pe.nomePessoa === d.gestor) &&
+      (c.pessoas || []).some((pe) => pe.papel === "Fiscal" && pe.nomePessoa === d.fiscal)
+    );
+    caixa.innerHTML = `
+      <div class="dash-chart-box">
+        <h4>Contratos — ${escapeHTML(d.gestor)} + ${escapeHTML(d.fiscal)}</h4>
+        <div class="tabela-rolavel" style="max-height:320px" id="porpessoas-dupla-tabela-conteudo"></div>
+      </div>`;
+    document.getElementById("porpessoas-dupla-tabela-conteudo").innerHTML = tabelaContratosHTML(contratosDaDupla, {});
+    ligarTooltipLinhas(document.getElementById("porpessoas-dupla-tabela-conteudo"), porId);
+  }
+
+  document.getElementById("porpessoas-duplas").addEventListener("click", (ev) => {
+    const alvoClicado = ev.target.closest("[data-cat]");
+    if (!alvoClicado) return;
+    duplaAberta = duplaAberta === alvoClicado.dataset.cat ? "" : alvoClicado.dataset.cat;
+    desenharDuplaAberta();
+  });
+
+  // Clicar num nome do Top 10 leva direto pro perfil completo dele (mesma
+  // ideia de "clique na fatia/barra abre o perfil" já usada na landing das
+  // outras abas "Por X") — troca o toggle de papel se precisar, e já
+  // seleciona a pessoa no <select> daquele perfil.
+  function ligarCliqueTop10(containerId, papel, idSelect) {
+    document.getElementById(containerId).addEventListener("click", (ev) => {
+      const alvoClicado = ev.target.closest("[data-cat]");
+      if (!alvoClicado) return;
+      const btnPapel = document.querySelector(`#porpessoas-role-toggle [data-role-pessoas="${papel}"]`);
+      if (btnPapel && !btnPapel.classList.contains("active")) btnPapel.click();
+      const sel = document.getElementById(idSelect);
+      if (sel) { sel.value = alvoClicado.dataset.cat; sel.dispatchEvent(new Event("change", { bubbles: true })); }
+    });
+  }
+  ligarCliqueTop10("porpessoas-top-gestores", "gestor", "gestor-select");
+  ligarCliqueTop10("porpessoas-top-fiscais", "fiscal", "fiscal-select");
+
+  const gestorHandle = renderPorGestorContratos(lista);
+  const fiscalHandle = renderPorFiscalContratos(lista);
+  const analistaHandle = renderPorAnalistaContratos(lista);
+  const RESETAR_PAPEL = {
+    gestor: () => gestorHandle?.resetar(),
+    fiscal: () => fiscalHandle?.resetar(),
+    analista: () => analistaHandle?.resetar(),
+  };
+
+  document.querySelectorAll("#porpessoas-role-toggle [data-role-pessoas]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const alvoPapel = btn.dataset.rolePessoas;
+      if (alvoPapel === papelAtivo) return;
+      RESETAR_PAPEL[papelAtivo]?.();
+      papelAtivo = alvoPapel;
+      document.querySelectorAll("#porpessoas-role-toggle [data-role-pessoas]").forEach((b) => b.classList.toggle("active", b === btn));
+      PAPEIS.forEach((r) => { document.getElementById(`contratos-sub-${r.painel}`).hidden = r.chave !== alvoPapel; });
+    });
+  });
+
+  return {
+    resetar() {
+      gestorHandle?.resetar();
+      fiscalHandle?.resetar();
+      analistaHandle?.resetar();
+      duplaAberta = "";
+      desenharDuplaAberta();
+      if (papelAtivo !== "gestor") {
+        papelAtivo = "gestor";
+        document.querySelectorAll("#porpessoas-role-toggle [data-role-pessoas]").forEach((b) => b.classList.toggle("active", b.dataset.rolePessoas === "gestor"));
+        PAPEIS.forEach((r) => { document.getElementById(`contratos-sub-${r.painel}`).hidden = r.chave !== "gestor"; });
+      }
+    },
+  };
+}
 
 async function carregarContratosPortal(portalSlug) {
   const painel = document.getElementById("tab-contratos");
@@ -8052,6 +8297,7 @@ async function carregarContratosPortal(portalSlug) {
       <button class="tab-btn" data-subtab-contratos="porarea">${ICONS.predio}POR SETOR DEMANDANTE</button>
       <button class="tab-btn" data-subtab-contratos="pordirpin">${ICONS.unidade_depin}POR DIRPIN</button>
       <button class="tab-btn" data-subtab-contratos="porcategoria">${ICONS.categoria_tag}POR CATEGORIA</button>
+      <button class="tab-btn" data-subtab-contratos="porpessoas">${ICONS.pessoa}POR PESSOAS</button>
       <button class="tab-btn" data-subtab-contratos="atualizados">${ICONS.atualizar}ATUALIZADOS RECENTEMENTE</button>
     </div>
     <div class="tab-panel" id="contratos-sub-gerencial"></div>
@@ -8060,10 +8306,11 @@ async function carregarContratosPortal(portalSlug) {
     <div class="tab-panel" id="contratos-sub-porarea" hidden></div>
     <div class="tab-panel" id="contratos-sub-pordirpin" hidden></div>
     <div class="tab-panel" id="contratos-sub-porcategoria" hidden></div>
+    <div class="tab-panel" id="contratos-sub-porpessoas" hidden></div>
     <div class="tab-panel" id="contratos-sub-atualizados" hidden></div>
   `;
 
-  const SUBABAS_CONTRATOS = ["gerencial", "tatico", "operacional", "porarea", "pordirpin", "porcategoria", "atualizados"];
+  const SUBABAS_CONTRATOS = ["gerencial", "tatico", "operacional", "porarea", "pordirpin", "porcategoria", "porpessoas", "atualizados"];
   // Pedido direto: "se eu isolo aí uma área aí depois ela fica marcada e
   // não volta ao normal... um desatento pode esquecer de desmarcar... eu
   // já vi em alguns serviços que em casos assim volta pro geral, em
@@ -8091,6 +8338,7 @@ async function carregarContratosPortal(portalSlug) {
     const porAreaHandle = renderPorAreaContratos(listaExibida);
     const porDirpinHandle = renderPorDirpinContratos(listaExibida);
     const porCategoriaHandle = renderPorCategoriaContratos(listaExibida);
+    const porPessoasHandle = renderPorPessoasContratos(listaExibida);
     renderAtualizadosRecentemente(listaExibida, decisoesRenovacao);
 
     RESETAR_SUBABA_CONTRATOS = {
@@ -8100,6 +8348,7 @@ async function carregarContratosPortal(portalSlug) {
       porarea: () => porAreaHandle?.resetar(),
       pordirpin: () => porDirpinHandle?.resetar(),
       porcategoria: () => porCategoriaHandle?.resetar(),
+      porpessoas: () => porPessoasHandle?.resetar(),
     };
     // Toda vez que a BASE muda (trocou de unidade gestora), volta pra
     // Gerencial — ficar num filtro isolado de uma unidade que nem está
