@@ -5373,6 +5373,47 @@ function ligarTooltipLinhas(container, porId) {
   });
 }
 
+// Resumo de UMA pessoa ao passar o mouse numa barra/linha dela — pedido
+// direto: "dica de ferramenta... exiba um tooltip com a lista resumida dos
+// contratos daquele profissional". Não é o panorama de UM contrato (isso já
+// é tooltipContratoHTML) — é "quais contratos são estes", capado em 5 pra
+// não virar uma lista flutuante infinita pra quem tem 15 contratos.
+function tooltipPessoaHTML(nome, papel, contratos) {
+  const topo = contratos.slice(0, 5);
+  const resto = contratos.length - topo.length;
+  return `
+    <h4>${escapeHTML(nome)}</h4>
+    <p class="obj">${escapeHTML(papel)} em ${contratos.length} contrato${contratos.length === 1 ? "" : "s"}</p>
+    <ul style="margin:6px 0 0;padding-left:16px;list-style:disc">
+      ${topo.map((c) => `<li>${escapeHTML(c.numeroContrato)} — ${escapeHTML(c.empresa)}</li>`).join("")}
+      ${resto > 0 ? `<li>+${resto} mais</li>` : ""}
+    </ul>`;
+}
+
+// Mesmo elemento flutuante de ligarTooltipLinhas (só um mouse, só um
+// tooltip de cada vez) — conteúdo diferente. Liga só hover, DE PROPÓSITO
+// sem clique: todo [data-cat] de barra/tabela de pessoa já tem seu próprio
+// clique (isolar/selecionar), isso aqui não pode roubar esse comportamento.
+function ligarTooltipPessoa(container, papel, resolverContratosDoNome) {
+  const tooltip = tooltipContratoEl();
+  container.querySelectorAll("[data-cat]").forEach((elCat) => {
+    const nome = elCat.dataset.cat;
+    elCat.addEventListener("mouseenter", () => {
+      tooltip.innerHTML = tooltipPessoaHTML(nome, papel, resolverContratosDoNome(nome));
+      tooltip.hidden = false;
+    });
+    elCat.addEventListener("mousemove", (ev) => {
+      const largura = 320, altura = tooltip.offsetHeight || 220;
+      let x = ev.clientX + 18, y = ev.clientY + 18;
+      if (x + largura > window.innerWidth) x = ev.clientX - largura - 18;
+      if (y + altura > window.innerHeight) y = Math.max(8, window.innerHeight - altura - 8);
+      tooltip.style.left = x + "px";
+      tooltip.style.top = y + "px";
+    });
+    elCat.addEventListener("mouseleave", () => { tooltip.hidden = true; });
+  });
+}
+
 // ---------- Gerencial: cartões de portfólio + matriz e barra por área ----------
 function renderGerencialContratos(lista, resumo) {
   const alvo = document.getElementById("contratos-sub-gerencial");
@@ -7898,6 +7939,12 @@ function renderPorDimensaoContratos(lista, cfg) {
       fiscal: () => agruparContratosPorPessoa(listaFiltrada, "Fiscal"),
     };
     const rotulosColuna = { analista: "ANALISTA", gestor: "GESTOR", fiscal: "FISCAL" };
+    const rotulosPapel = { analista: "Analista", gestor: "Gestor", fiscal: "Fiscal" };
+    const resolverContratosPorTipo = {
+      analista: (nome) => listaFiltrada.filter((c) => (c.analista || "(sem analista)") === nome),
+      gestor: (nome) => listaFiltrada.filter((c) => (c.pessoas || []).some((pe) => pe.papel === "Gestor" && pe.nomePessoa === nome)),
+      fiscal: (nome) => listaFiltrada.filter((c) => (c.pessoas || []).some((pe) => pe.papel === "Fiscal" && pe.nomePessoa === nome)),
+    };
     caixas.forEach((b) => {
       el(b.tipo).innerHTML = barraOuTabelaSVG(gruposPorTipo[b.tipo](), {
         tituloTooltip: (l) => `${l.label}: ${l.total} contrato(s)`,
@@ -7906,6 +7953,9 @@ function renderPorDimensaoContratos(lista, cfg) {
         colunaValor: "CONTRATOS",
       });
       adicionarControlesGrafico(el(b.tipo));
+      // De brinde (pedido direto de "Por Pessoas"): mesmo tooltip de lista
+      // de contratos, aqui também — custo quase zero, mesma função.
+      ligarTooltipPessoa(el(b.tipo), rotulosPapel[b.tipo], resolverContratosPorTipo[b.tipo]);
     });
 
     function ligarClique(sufixo, tipo) {
@@ -8091,6 +8141,13 @@ function renderPorPessoasContratos(lista) {
   adicionarControlesGrafico(document.getElementById("porpessoas-top-gestores"));
   adicionarControlesGrafico(document.getElementById("porpessoas-top-fiscais"));
   adicionarControlesGrafico(document.getElementById("porpessoas-duplas"));
+  // Pedido direto: "dica de ferramenta... resumo dos contratos daquele
+  // profissional" — passar o mouse num nome do Top 10 já mostra quais são,
+  // sem precisar clicar e trocar de tela pra descobrir.
+  ligarTooltipPessoa(document.getElementById("porpessoas-top-gestores"), "Gestor", (nome) =>
+    lista.filter((c) => (c.pessoas || []).some((pe) => pe.papel === "Gestor" && pe.nomePessoa === nome)));
+  ligarTooltipPessoa(document.getElementById("porpessoas-top-fiscais"), "Fiscal", (nome) =>
+    lista.filter((c) => (c.pessoas || []).some((pe) => pe.papel === "Fiscal" && pe.nomePessoa === nome)));
 
   function desenharDuplaAberta() {
     const caixa = document.getElementById("porpessoas-dupla-tabela");
