@@ -8318,16 +8318,34 @@ function renderPorPessoasContratos(lista) {
 // (fato_obra 1:1 com dim_unidade, medidas, relacionamento com município)
 // pra não inventar dado nenhum.
 //
-// Fase 1: KPIs numa coluna LATERAL (pedido direto dela, olhando o painel de
-// referência de Obras/Goiás — diferente do padrão horizontal de Contratos),
-// as distribuições com volume real de dado (status construtivo, tipo de
-// unidade, diretoria regional, departamento) e a lista completa pesquisável.
-// Perfil de unidade, financeiro por diretoria e o aviso sobre o
-// descasamento das medidas de Requalificação ficam pra Fase 2.
+// Fase 2/3 (2026-09-17): perfil de unidade (clique na tabela mestra),
+// financeiro por diretoria com treemap, mais 3 dimensões novas (Situação
+// Legal, Propriedade, Programa de Requalificação — esta com aviso sobre o
+// descasamento das medidas DAX do .pbip, que assumem 4 estados que a
+// planilha real ainda não tem, só Sim/Não). Mapa por município fica de
+// fora — precisaria de lat/long por município, que não está na
+// planilha-fonte (ver [[painel-obras-webapp]]).
 function agruparUnidadesPorCampo(lista, campoFn, rotuloVazio) {
   const comValor = lista.filter((u) => campoFn(u));
   const linhas = agruparContagemPorCampo(comValor, campoFn, rotuloVazio);
   return { linhas, comValor: comValor.length, total: lista.length };
+}
+
+// Mesma ideia de agruparValorPorCampo (Contratos), mas genérico no campo de
+// valor — lá é sempre c.valorGlobalAtual; aqui precisa servir tanto pra
+// valorDaObra quanto valorDaManutencao.
+function agruparValorObrasPorCampo(lista, campoFn, campoValorFn, rotuloVazio) {
+  const mapa = new Map();
+  for (const u of lista) {
+    const valor = campoValorFn(u);
+    if (valor == null) continue;
+    const chave = campoFn(u) || rotuloVazio;
+    if (!mapa.has(chave)) mapa.set(chave, { total: 0, qtd: 0 });
+    const g = mapa.get(chave);
+    g.total += valor;
+    g.qtd += 1;
+  }
+  return [...mapa.entries()].map(([label, g]) => ({ label, total: g.total, qtd: g.qtd })).sort((a, b) => b.total - a.total);
 }
 
 function tabelaUnidadesHTML(lista) {
@@ -8335,7 +8353,7 @@ function tabelaUnidadesHTML(lista) {
   return `<table class="dash-tabela">
     <thead><tr><th>UNIDADE</th><th>DEPARTAMENTO</th><th>DIRETORIA REGIONAL</th><th>MUNICÍPIO</th><th>STATUS DA OBRA</th></tr></thead>
     <tbody>${lista.map((u) => `
-      <tr data-cat="${escapeAttr(u.nomeDaUnidade)}">
+      <tr class="linha-unidade" data-unidade-id="${escapeAttr(u.id)}" style="cursor:pointer">
         <td>${escapeHTML(u.nomeDaUnidade)}</td>
         <td>${escapeHTML(u.departamento || "—")}</td>
         <td>${escapeHTML(u.diretoriaRegional || "—")}</td>
@@ -8344,6 +8362,87 @@ function tabelaUnidadesHTML(lista) {
       </tr>`).join("")}</tbody>
   </table>`;
 }
+
+// Perfil completo de uma unidade — pedido direto de Fase 2. Agrupado em
+// blocos temáticos (identificação/contato, situação da obra, manutenção,
+// vistoria) em vez de uma lista plana de 27 campos, pra ficar escaneável.
+// "—" honesto em todo campo não preenchido, mesmo padrão do resto do painel.
+function unidadeDetalheHTML(u) {
+  const campo = (v) => (v === null || v === undefined || v === "" ? "—" : escapeHTML(String(v)));
+  const bloco = (titulo, linhas) => `
+    <div style="margin-top:14px">
+      <div class="dash-chart-hint" style="border-left-color:var(--tinta);margin-bottom:8px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;font-size:var(--fs-ui-xs)">${escapeHTML(titulo)}</div>
+      <dl style="display:grid;grid-template-columns:auto 1fr;gap:5px 14px;font-size:var(--fs-ui-sm)">
+        ${linhas.map(([rotulo, valor]) => `<dt style="font-family:'IBM Plex Mono',monospace;color:#9AA3B2;text-transform:uppercase;letter-spacing:.05em;white-space:nowrap">${escapeHTML(rotulo)}</dt><dd style="color:var(--carvao)">${valor}</dd>`).join("")}
+      </dl>
+    </div>`;
+  return `
+    <div class="dash-chart-box">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+        <h4 style="margin-bottom:0">${escapeHTML(u.nomeDaUnidade)}</h4>
+        <button type="button" class="dash-toggle-btn" id="obras-fechar-detalhe">${iconeInline("fechar", 10, -1)} FECHAR</button>
+      </div>
+      ${bloco("Identificação e contato", [
+        ["Departamento", campo(u.departamento)],
+        ["Diretoria Regional", campo(u.diretoriaRegional)],
+        ["Coordenadoria PC", campo(u.coordenadoriaPc)],
+        ["Tipo de Unidade", campo(u.tipoDeUnidade)],
+        ["Responsável", campo(u.responsavel)],
+        ["Telefone (titular)", campo(u.telefoneTitular)],
+        ["Telefone (unidade)", campo(u.telefoneUnidade)],
+        ["E-mail", campo(u.email)],
+        ["Endereço", campo(u.endereco)],
+        ["Município", campo(u.municipio?.municipio)],
+        ["Território de Identidade", campo(u.municipio?.territorioDeIdentidade)],
+      ])}
+      ${bloco("Situação da obra", [
+        ["Propriedade", campo(u.propriedade)],
+        ["Situação Legal", campo(u.situacaoLegal)],
+        ["Órgão de Vinculação", campo(u.orgaoDeVinculacao)],
+        ["Tipo de Intervenção", campo(u.tipoDeIntervencao)],
+        ["Padrão Construtivo", campo(u.padraoConstrutivo)],
+        ["Status Construtivo", campo(u.statusConstrutivo)],
+        ["Status de Utilização", campo(u.statusDeUtilizacao)],
+        ["Data de Ocupação", u.dataOcupacao ? formatarDataBR(u.dataOcupacao) : "—"],
+        ["Data de Conclusão da Obra", u.dataConclusaoObra ? formatarDataBR(u.dataConclusaoObra) : "—"],
+        ["Valor da Obra", u.valorDaObra != null ? formatarMoedaBR(u.valorDaObra) : "— (não registrado)"],
+        ["Valor do Imóvel/Locação", u.valorDoImovelLocacao != null ? formatarMoedaBR(u.valorDoImovelLocacao) : "—"],
+        ["Nº SIMOV", campo(u.nSimov)],
+      ])}
+      ${bloco("Manutenção", [
+        ["Data da Última Manutenção", u.dataUltimaManutencao ? formatarDataBR(u.dataUltimaManutencao) : "—"],
+        ["Valor da Manutenção", u.valorDaManutencao != null ? formatarMoedaBR(u.valorDaManutencao) : "— (não registrado)"],
+        ["Informações da Manutenção/Reforma", campo(u.informacoesManutencaoReforma)],
+      ])}
+      ${bloco("Vistoria e programa de requalificação", [
+        ["Data da Última Vistoria", u.dataUltimaVistoria ? formatarDataBR(u.dataUltimaVistoria) : "—"],
+        ["Responsável pela Vistoria", campo(u.responsavelPelaVistoria)],
+        ["Relatório de Vistoria", u.linkRelatorioVistoria ? `<a href="${escapeAttr(u.linkRelatorioVistoria)}" target="_blank" rel="noopener">abrir link</a>` : "—"],
+        ["Programa de Requalificação", campo(u.programaDeRequalificacao)],
+        ["Etapa do Programa CEIRF", campo(u.etapaProgramaCeirf)],
+      ])}
+      ${u.observacoes ? bloco("Observações", [["Observações", campo(u.observacoes)]]) : ""}
+    </div>`;
+}
+
+// 7 dimensões cross-filtráveis — mesmo dado bruto de agrupamento (campo)
+// serve pro clique/filtro E pro desenho da barra/tabela. Generalizado num
+// array em vez de 7 blocos quase-idênticos repetidos (isso já ficaria
+// ilegível na 3ª dimensão, quanto mais na 7ª) — mesmo raciocínio dos
+// chipsAtivos de Gerencial, só que aplicado também à ligação de clique e
+// ao próprio desenho, não só ao chip.
+const DIMENSOES_OBRAS = [
+  { chave: "statusConstrutivo", campo: (u) => u.statusConstrutivo, rotulo: "Status Construtivo", colunaRotulo: "STATUS CONSTRUTIVO", containerId: "obras-status-construtivo", hintId: "obras-status-construtivo-hint", hintSubstantivo: "status registrado" },
+  { chave: "tipoDeUnidade", campo: (u) => u.tipoDeUnidade, rotulo: "Tipo de Unidade", colunaRotulo: "TIPO DE UNIDADE", containerId: "obras-tipo-unidade" },
+  { chave: "diretoriaRegional", campo: (u) => u.diretoriaRegional, rotulo: "Diretoria Regional", colunaRotulo: "DIRETORIA REGIONAL", containerId: "obras-diretoria-regional", hintId: "obras-diretoria-regional-hint", hintSubstantivo: "diretoria registrada" },
+  { chave: "departamento", campo: (u) => u.departamento, rotulo: "Departamento", colunaRotulo: "DEPARTAMENTO", containerId: "obras-departamento" },
+  { chave: "situacaoLegal", campo: (u) => u.situacaoLegal, rotulo: "Situação Legal", colunaRotulo: "SITUAÇÃO LEGAL", containerId: "obras-situacao-legal", hintId: "obras-situacao-legal-hint", hintSubstantivo: "situação legal registrada" },
+  { chave: "propriedade", campo: (u) => u.propriedade, rotulo: "Propriedade", colunaRotulo: "PROPRIEDADE", containerId: "obras-propriedade", hintId: "obras-propriedade-hint", hintSubstantivo: "propriedade registrada" },
+  // Achado ao conferir a planilha real: as medidas DAX do .pbip esperam 4
+  // estados ("Solicitado – Aprovado" etc.), mas a coluna real só tem
+  // Sim/Não hoje — usa o dado de verdade, avisa o descasamento no hint.
+  { chave: "programaDeRequalificacao", campo: (u) => u.programaDeRequalificacao, rotulo: "Programa de Requalificação", colunaRotulo: "PROGRAMA DE REQUALIFICAÇÃO", containerId: "obras-requalificacao", hintId: "obras-requalificacao-hint", hintSubstantivo: "programa registrado (Sim/Não — as medidas do .pbip assumem 4 estados que a planilha ainda não tem)" },
+];
 
 async function carregarObrasPortal(portalSlug) {
   const painel = document.getElementById("tab-obras");
@@ -8356,44 +8455,49 @@ async function carregarObrasPortal(portalSlug) {
     painel.innerHTML = `<p class="tela-intro">Não consegui carregar o painel de obras: ${escapeHTML(erro.message)}</p>`;
     return;
   }
+  const unidadePorId = new Map(unidades.map((u) => [u.id, u]));
 
   // Pedido direto: "os cartões e barras e linhas não estão clicáveis e
   // redirecionando pra filtrar... cliquei em obra aí refiltrou e mostrou
-  // novos valores pra aquele contexto, e também status construtivo" — o
-  // mesmo cross-filter que Gerencial (Contratos) já tem: clicar numa barra
-  // de UMA dimensão recalcula os KPIs e as OUTRAS dimensões pra aquele
-  // recorte. Resumo agora é só client-side (não usa mais /obras/resumo) —
-  // com filtro, o resumo tem que refletir o recorte atual, não o total
-  // fixo que a API mandaria.
-  let filtroStatusConstrutivo = "";
-  let filtroTipoDeUnidade = "";
-  let filtroDiretoriaRegional = "";
-  let filtroDepartamento = "";
+  // novos valores pra aquele contexto" — mesmo cross-filter que Gerencial
+  // (Contratos) já tem, agora nas 7 dimensões. `filtros` é um objeto
+  // {chave: valor} em vez de 7 variáveis soltas.
+  const filtros = {};
+  let unidadeSelecionadaId = "";
+  // Financeiro (Fase 2): mesmo toggle LISTA/TREEMAP de Contratos (eixo
+  // separado de "qual dimensão" — aqui só tem uma pergunta, "por
+  // diretoria", então um toggle só cobre os dois cartões de valor).
+  let modoVisualFinanceiro = lerGraficoSalvo("cpg-obras-financeiro-visual") || "lista";
 
   painel.innerHTML = `
     <div id="obras-chips"></div>
     <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start">
       <div id="obras-kpis" style="flex:0 0 220px;min-width:200px;display:flex;flex-direction:column;gap:12px"></div>
       <div style="flex:1;min-width:280px;display:flex;flex-direction:column;gap:16px">
+        ${DIMENSOES_OBRAS.map((d) => `
         <div class="dash-chart-box">
-          <h4>Situação Construtiva</h4>
-          <p class="dash-chart-hint" id="obras-status-construtivo-hint"></p>
-          <div id="obras-status-construtivo"></div>
-        </div>
-        <div class="dash-charts" style="grid-template-columns:1fr 1fr">
-          <div class="dash-chart-box">
-            <h4>Tipo de Unidade</h4>
-            <div id="obras-tipo-unidade"></div>
-          </div>
-          <div class="dash-chart-box">
-            <h4>Diretoria Regional</h4>
-            <p class="dash-chart-hint" id="obras-diretoria-regional-hint"></p>
-            <div id="obras-diretoria-regional"></div>
-          </div>
-        </div>
+          <h4>${escapeHTML(d.rotulo)}</h4>
+          ${d.hintId ? `<p class="dash-chart-hint" id="${d.hintId}"></p>` : ""}
+          <div id="${d.containerId}"></div>
+        </div>`).join("")}
         <div class="dash-chart-box">
-          <h4>Departamento</h4>
-          <div id="obras-departamento"></div>
+          <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:4px">
+            <h4 style="margin-bottom:0">Financeiro por Diretoria Regional</h4>
+            <div class="dash-toggle" id="obras-financeiro-visual-toggle">
+              <button class="dash-toggle-btn${modoVisualFinanceiro === "lista" ? " active" : ""}" data-modo-visual="lista">LISTA</button>
+              <button class="dash-toggle-btn${modoVisualFinanceiro === "treemap" ? " active" : ""}" data-modo-visual="treemap" title="Bloco = tamanho do valor">MAPA DE ÁRVORE</button>
+            </div>
+          </div>
+          <div class="dash-charts" style="grid-template-columns:1fr 1fr">
+            <div>
+              <p class="dash-chart-hint" id="obras-valor-obra-hint"></p>
+              <div id="obras-valor-obra"></div>
+            </div>
+            <div>
+              <p class="dash-chart-hint" id="obras-valor-manutencao-hint"></p>
+              <div id="obras-valor-manutencao"></div>
+            </div>
+          </div>
         </div>
         <div class="dash-chart-box">
           <h4>Unidades</h4>
@@ -8402,6 +8506,7 @@ async function carregarObrasPortal(portalSlug) {
           </div>
           <p class="dash-chart-hint" id="obras-busca-contagem"></p>
           <div class="tabela-rolavel" style="max-height:420px" id="obras-tabela-unidades"></div>
+          <div id="obras-detalhe" style="margin-top:14px"></div>
         </div>
       </div>
     </div>
@@ -8409,17 +8514,56 @@ async function carregarObrasPortal(portalSlug) {
 
   // Clique delegado UMA vez, nos containers estáveis (não recriados a cada
   // atualizar()) — mesmo padrão já usado em toda distribuição de Contratos.
-  function ligarCliqueDimensao(idContainer, selecionarFn) {
-    document.getElementById(idContainer).addEventListener("click", (ev) => {
+  DIMENSOES_OBRAS.forEach((d) => {
+    document.getElementById(d.containerId).addEventListener("click", (ev) => {
       const alvoClicado = ev.target.closest("[data-cat]");
       if (!alvoClicado) return;
-      selecionarFn(alvoClicado.dataset.cat);
+      filtros[d.chave] = filtros[d.chave] === alvoClicado.dataset.cat ? "" : alvoClicado.dataset.cat;
+      atualizar();
+    });
+  });
+  // Os 2 cartões de valor também cruzam com a MESMA dimensão Diretoria
+  // Regional (é a mesma pergunta, só outra métrica) — clicar neles
+  // preenche o mesmo filtros.diretoriaRegional que o cartão de contagem.
+  ["obras-valor-obra", "obras-valor-manutencao"].forEach((id) => {
+    document.getElementById(id).addEventListener("click", (ev) => {
+      const alvoClicado = ev.target.closest("[data-cat]");
+      if (!alvoClicado) return;
+      filtros.diretoriaRegional = filtros.diretoriaRegional === alvoClicado.dataset.cat ? "" : alvoClicado.dataset.cat;
+      atualizar();
+    });
+  });
+  document.getElementById("obras-financeiro-visual-toggle").addEventListener("click", (ev) => {
+    const btn = ev.target.closest("[data-modo-visual]");
+    if (!btn || btn.dataset.modoVisual === modoVisualFinanceiro) return;
+    modoVisualFinanceiro = btn.dataset.modoVisual;
+    salvarGrafico("cpg-obras-financeiro-visual", modoVisualFinanceiro);
+    atualizar();
+  });
+
+  // Pedido direto (Fase 2): clicar numa unidade da tabela mestra abre o
+  // perfil completo dela — mesmo raciocínio de "clique leva ao panorama
+  // completo" já usado em Contratos, só que aqui é um painel que abre
+  // embaixo da própria tabela (não uma aba separada, não tem Operacional
+  // aqui) em vez de um tooltip só de passagem.
+  document.getElementById("obras-tabela-unidades").addEventListener("click", (ev) => {
+    const linha = ev.target.closest(".linha-unidade");
+    if (!linha) return;
+    unidadeSelecionadaId = unidadeSelecionadaId === linha.dataset.unidadeId ? "" : linha.dataset.unidadeId;
+    desenharDetalhe();
+  });
+
+  function desenharDetalhe() {
+    const caixa = document.getElementById("obras-detalhe");
+    if (!unidadeSelecionadaId) { caixa.innerHTML = ""; return; }
+    const u = unidadePorId.get(unidadeSelecionadaId);
+    if (!u) { caixa.innerHTML = ""; return; }
+    caixa.innerHTML = unidadeDetalheHTML(u);
+    document.getElementById("obras-fechar-detalhe").addEventListener("click", () => {
+      unidadeSelecionadaId = "";
+      desenharDetalhe();
     });
   }
-  ligarCliqueDimensao("obras-status-construtivo", (valor) => { filtroStatusConstrutivo = filtroStatusConstrutivo === valor ? "" : valor; atualizar(); });
-  ligarCliqueDimensao("obras-tipo-unidade", (valor) => { filtroTipoDeUnidade = filtroTipoDeUnidade === valor ? "" : valor; atualizar(); });
-  ligarCliqueDimensao("obras-diretoria-regional", (valor) => { filtroDiretoriaRegional = filtroDiretoriaRegional === valor ? "" : valor; atualizar(); });
-  ligarCliqueDimensao("obras-departamento", (valor) => { filtroDepartamento = filtroDepartamento === valor ? "" : valor; atualizar(); });
 
   const buscaUnidades = document.getElementById("obras-busca");
   buscaUnidades.addEventListener("input", () => atualizar());
@@ -8429,21 +8573,15 @@ async function carregarObrasPortal(portalSlug) {
   // "Concluída" faria a caixa de Status Construtivo desabar pra 1 barra só,
   // em vez de continuar mostrando as 5 com a escolhida em destaque).
   function bateFiltro(u, ignorar) {
-    return (ignorar === "status" || !filtroStatusConstrutivo || u.statusConstrutivo === filtroStatusConstrutivo) &&
-      (ignorar === "tipo" || !filtroTipoDeUnidade || u.tipoDeUnidade === filtroTipoDeUnidade) &&
-      (ignorar === "diretoria" || !filtroDiretoriaRegional || u.diretoriaRegional === filtroDiretoriaRegional) &&
-      (ignorar === "departamento" || !filtroDepartamento || u.departamento === filtroDepartamento);
+    return DIMENSOES_OBRAS.every((d) => d.chave === ignorar || !filtros[d.chave] || d.campo(u) === filtros[d.chave]);
   }
 
   function atualizar() {
     const filtrada = unidades.filter((u) => bateFiltro(u, null));
 
-    const chipsAtivos = [
-      filtroStatusConstrutivo && { rotulo: `status construtivo: ${filtroStatusConstrutivo}`, limpar: () => { filtroStatusConstrutivo = ""; atualizar(); } },
-      filtroTipoDeUnidade && { rotulo: `tipo de unidade: ${filtroTipoDeUnidade}`, limpar: () => { filtroTipoDeUnidade = ""; atualizar(); } },
-      filtroDiretoriaRegional && { rotulo: `diretoria regional: ${filtroDiretoriaRegional}`, limpar: () => { filtroDiretoriaRegional = ""; atualizar(); } },
-      filtroDepartamento && { rotulo: `departamento: ${filtroDepartamento}`, limpar: () => { filtroDepartamento = ""; atualizar(); } },
-    ].filter(Boolean);
+    const chipsAtivos = DIMENSOES_OBRAS
+      .filter((d) => filtros[d.chave])
+      .map((d) => ({ rotulo: `${d.rotulo.toLowerCase()}: ${filtros[d.chave]}`, limpar: () => { filtros[d.chave] = ""; atualizar(); } }));
     document.getElementById("obras-chips").innerHTML = chipsAtivos.length
       ? `<div class="filter-chips">${chipsAtivos.map((c, i) => `<span class="filter-chip">Isolando ${escapeHTML(c.rotulo)}<button type="button" data-chip-limpar="${i}" title="Remover este filtro">${iconeInline("fechar", 10, -1)}</button></span>`).join("")}</div>`
       : "";
@@ -8472,41 +8610,43 @@ async function carregarObrasPortal(portalSlug) {
     // Cada dimensão é calculada IGNORANDO o próprio filtro (mas respeitando
     // os das outras) — assim continua mostrando todas as opções dela, com
     // a escolhida em destaque, em vez de desabar pra 1 barra só.
-    const paraStatus = agruparUnidadesPorCampo(unidades.filter((u) => bateFiltro(u, "status")), (u) => u.statusConstrutivo);
-    const paraTipo = agruparUnidadesPorCampo(unidades.filter((u) => bateFiltro(u, "tipo")), (u) => u.tipoDeUnidade);
-    const paraDiretoria = agruparUnidadesPorCampo(unidades.filter((u) => bateFiltro(u, "diretoria")), (u) => u.diretoriaRegional);
-    const paraDepartamento = agruparUnidadesPorCampo(unidades.filter((u) => bateFiltro(u, "departamento")), (u) => u.departamento);
-
-    document.getElementById("obras-status-construtivo-hint").textContent = `${paraStatus.comValor} de ${paraStatus.total} unidades com status registrado.`;
-    document.getElementById("obras-diretoria-regional-hint").textContent = `${paraDiretoria.comValor} de ${paraDiretoria.total} unidades com diretoria registrada.`;
-
-    document.getElementById("obras-status-construtivo").innerHTML = barraOuTabelaSVG(paraStatus.linhas, {
-      tituloTooltip: (l) => `${l.label}: ${l.total} unidade(s)`,
-      selecionado: filtroStatusConstrutivo,
-      colunaRotulo: "STATUS CONSTRUTIVO",
-      colunaValor: "UNIDADES",
+    DIMENSOES_OBRAS.forEach((d) => {
+      const para = agruparUnidadesPorCampo(unidades.filter((u) => bateFiltro(u, d.chave)), d.campo);
+      if (d.hintId) document.getElementById(d.hintId).textContent = `${para.comValor} de ${para.total} unidades com ${d.hintSubstantivo}.`;
+      document.getElementById(d.containerId).innerHTML = barraOuTabelaSVG(para.linhas, {
+        tituloTooltip: (l) => `${l.label}: ${l.total} unidade(s)`,
+        selecionado: filtros[d.chave] || "",
+        colunaRotulo: d.colunaRotulo,
+        colunaValor: "UNIDADES",
+      });
+      adicionarControlesGrafico(document.getElementById(d.containerId));
     });
-    document.getElementById("obras-tipo-unidade").innerHTML = barraOuTabelaSVG(paraTipo.linhas, {
-      tituloTooltip: (l) => `${l.label}: ${l.total} unidade(s)`,
-      selecionado: filtroTipoDeUnidade,
-      colunaRotulo: "TIPO DE UNIDADE",
-      colunaValor: "UNIDADES",
-    });
-    document.getElementById("obras-diretoria-regional").innerHTML = barraOuTabelaSVG(paraDiretoria.linhas, {
-      tituloTooltip: (l) => `${l.label}: ${l.total} unidade(s)`,
-      selecionado: filtroDiretoriaRegional,
+
+    // Financeiro por Diretoria Regional — ignora só o próprio filtro de
+    // diretoria (mesmo raciocínio acima), respeitando as outras 6.
+    const unidadesParaDiretoria = unidades.filter((u) => bateFiltro(u, "diretoriaRegional"));
+    const paraValorObra = agruparValorObrasPorCampo(unidadesParaDiretoria, (u) => u.diretoriaRegional, (u) => u.valorDaObra, "(sem diretoria)");
+    const paraValorManutencao = agruparValorObrasPorCampo(unidadesParaDiretoria, (u) => u.diretoriaRegional, (u) => u.valorDaManutencao, "(sem diretoria)");
+    const qtdComValorObraNoRecorte = unidadesParaDiretoria.filter((u) => u.valorDaObra != null).length;
+    const qtdComValorManutencaoNoRecorte = unidadesParaDiretoria.filter((u) => u.valorDaManutencao != null).length;
+    document.getElementById("obras-valor-obra-hint").textContent = `Valor da Obra — ${qtdComValorObraNoRecorte} de ${unidadesParaDiretoria.length} unidades com valor registrado.`;
+    document.getElementById("obras-valor-manutencao-hint").textContent = `Valor da Manutenção — ${qtdComValorManutencaoNoRecorte} de ${unidadesParaDiretoria.length} unidades com valor registrado.`;
+    const opcoesVisualValor = {
+      formatarValor: (v) => "R$ " + formatarMoedaCompacta(v),
+      rotuloExtra: (l) => `(${l.qtd} unidade${l.qtd === 1 ? "" : "s"})`,
+      selecionado: filtros.diretoriaRegional || "",
       colunaRotulo: "DIRETORIA REGIONAL",
-      colunaValor: "UNIDADES",
-    });
-    document.getElementById("obras-departamento").innerHTML = barraOuTabelaSVG(paraDepartamento.linhas, {
-      tituloTooltip: (l) => `${l.label}: ${l.total} unidade(s)`,
-      selecionado: filtroDepartamento,
-      colunaRotulo: "DEPARTAMENTO",
-      colunaValor: "UNIDADES",
-    });
-    [
-      "obras-status-construtivo", "obras-tipo-unidade", "obras-diretoria-regional", "obras-departamento",
-    ].forEach((id) => adicionarControlesGrafico(document.getElementById(id)));
+      colunaValor: "VALOR (R$)",
+      mostrarPercentual: true,
+    };
+    document.getElementById("obras-valor-obra").innerHTML = modoVisualFinanceiro === "treemap"
+      ? treemapValorSVG(paraValorObra)
+      : barraOuTabelaSVG(paraValorObra, opcoesVisualValor);
+    document.getElementById("obras-valor-manutencao").innerHTML = modoVisualFinanceiro === "treemap"
+      ? treemapValorSVG(paraValorManutencao)
+      : barraOuTabelaSVG(paraValorManutencao, opcoesVisualValor);
+    adicionarControlesGrafico(document.getElementById("obras-valor-obra"));
+    adicionarControlesGrafico(document.getElementById("obras-valor-manutencao"));
 
     // Busca de texto combina COM o cross-filter (recorte primeiro, texto
     // depois) — digitar um nome dentro de um recorte já isolado continua
@@ -8519,6 +8659,8 @@ async function carregarObrasPortal(portalSlug) {
     document.getElementById("obras-busca-contagem").textContent = termo
       ? `${filtradaComBusca.length} de ${filtrada.length} unidade(s) — "${buscaUnidades.value.trim()}"`
       : `${filtrada.length} de ${unidades.length} unidade(s).`;
+
+    desenharDetalhe();
   }
 
   atualizar();
