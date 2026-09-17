@@ -4482,6 +4482,45 @@ function treemapAreaCriticidadeSVG(linhasAreaOriginal) {
   return `<svg viewBox="0 0 ${w} ${h + alturaLegenda}" xmlns="http://www.w3.org/2000/svg">${corpo}${legenda}</svg>`;
 }
 
+// Pedido direto: "treemap... retângulos maiores representam as categorias
+// com maior volume financeiro, facilitando a identificação visual de onde
+// está concentrado o orçamento" — mesmo squarify() do treemap por
+// criticidade acima (já genérico, só sabe desenhar retângulo a partir de
+// número), mas colorido em tom único com intensidade proporcional ao valor
+// em vez da rampa de criticidade — não existe "pior criticidade" aqui,
+// isso é a mesma pergunta de magnitude que barraContagemHorizontalSVG já
+// responde com corUnica, só que em forma de mapa em vez de lista.
+function treemapValorSVG(linhas, opcoes = {}) {
+  const { formatarValor = (v) => "R$ " + formatarMoedaCompacta(v) } = opcoes;
+  const linhasOrd = [...linhas].sort((a, b) => b.total - a.total);
+  const w = 500, h = 280;
+  const valores = linhasOrd.map((l) => l.total);
+  const somaTotal = valores.reduce((a, b) => a + b, 0) || 1;
+  const maxValor = Math.max(...valores, 1);
+  const escala = (w * h) / somaTotal;
+  const rects = squarify(valores.map((v) => v * escala), 0, 0, w, h);
+
+  let corpo = "";
+  linhasOrd.forEach((l, i) => {
+    const r = rects[i];
+    if (!r) return;
+    // Piso de 0.3 — sem isso, o menor bloco da lista (sempre vai ter um)
+    // ficaria opacidade 0 e desaparataria visualmente, mesmo tendo área.
+    const intensidade = Math.max(0.3, l.total / maxValor);
+    const cabe = r.w > 46 && r.h > 22;
+    const maxChars = Math.max(6, Math.floor(r.w / 6));
+    const rotulo = l.label.length > maxChars ? l.label.slice(0, maxChars - 1) + "…" : l.label;
+    const pct = somaTotal ? Math.round((l.total / somaTotal) * 1000) / 10 : 0;
+    corpo += `<g data-cat="${escapeAttr(l.label)}" style="cursor:pointer">
+      <rect x="${r.x.toFixed(1)}" y="${r.y.toFixed(1)}" width="${Math.max(r.w - 1.5, 0.5).toFixed(1)}" height="${Math.max(r.h - 1.5, 0.5).toFixed(1)}" fill="${TONS[0]}" fill-opacity="${intensidade.toFixed(2)}" stroke="var(--paper)" stroke-width="1.5"><title>${escapeHTML(l.label)}: ${formatarValor(l.total)} (${pct}% do total)${l.qtd != null ? ` — ${l.qtd} contrato${l.qtd === 1 ? "" : "s"}` : ""}</title></rect>
+      ${cabe ? `<text x="${(r.x + 5).toFixed(1)}" y="${(r.y + 12).toFixed(1)}" font-family="monospace" font-size="8.5" font-weight="700" fill="var(--paper)" style="pointer-events:none">${escapeHTML(rotulo)}</text>` : ""}
+      ${cabe ? `<text x="${(r.x + 5).toFixed(1)}" y="${(r.y + r.h - 8).toFixed(1)}" font-family="monospace" font-size="9" font-weight="700" fill="var(--paper)" style="pointer-events:none">${escapeHTML(formatarValor(l.total))}</text>` : ""}
+    </g>`;
+  });
+
+  return `<svg viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg">${corpo}</svg>`;
+}
+
 // Abreviação exibida no cabeçalho de coluna do mapa de calor — os rótulos
 // completos de CRITICIDADE_VISUAL (com a faixa de dias entre parênteses) não
 // cabem na largura de uma coluna sem quebrar em várias linhas confusas.
@@ -7120,6 +7159,13 @@ function renderPorDimensaoContratos(lista, cfg) {
   let selecionada = "";
   let filtroComplementar = "";
   let modoComplementar = "padrao"; // "padrao" (dimensão complementar de cfg) | "analista"
+  // Eixo diferente do modoComplementar acima: aquele escolhe QUAL dimensão
+  // (setor/analista), este escolhe COMO desenhar a mesma dimensão (lista
+  // ordenável ou treemap — "retângulos maiores = onde o orçamento se
+  // concentra", pedido direto). Dois toggles separados de propósito —
+  // misturar os dois eixos num só de 4 botões confundiria "o quê" com
+  // "como".
+  let modoVisualComplementar = lerGraficoSalvo(`cpg-${p}-fin-visual`) || "lista";
   let filtroAditivos = null;
   let filtroPessoa = null; // { tipo: "analista"|"gestor"|"fiscal", nome }
   let filtroMes = "";
@@ -7150,6 +7196,10 @@ function renderPorDimensaoContratos(lista, cfg) {
   // uma pesa geograficamente ajuda). Mantém a rosca como opção — troca só o
   // padrão de qual das duas abre primeiro.
   let modoLandingComplementar = p === "categoria" ? (lerGraficoSalvo(`cpg-${p}-landing`) || "mapa") : "rosca";
+  // Eixo à parte do toggle acima (aquele escolhe geografia vs lista; este
+  // escolhe lista vs treemap DENTRO do modo lista) — mesmo raciocínio do
+  // toggle novo em Financeiro.
+  let modoVisualLanding = lerGraficoSalvo(`cpg-${p}-landing-visual`) || "lista";
 
   alvo.innerHTML = `
     <div class="dash-filtros">
@@ -7244,10 +7294,16 @@ function renderPorDimensaoContratos(lista, cfg) {
       <div class="dash-chart-box" style="margin-top:16px">
         <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
           <h4 style="margin:0">${escapeHTML(cfg.complementar.titulo)} (visão geral, ${escapeHTML(cfg.labelBuscaPlural)})</h4>
-          ${temUnidadeLanding ? `<div class="dash-toggle" id="${p}-toggle-landing">
-            <button class="dash-toggle-btn" data-modo="rosca" title="Quanto cada setor demandante representa do total">LISTA</button>
-            <button class="dash-toggle-btn" data-modo="mapa" title="Onde as unidades da DEPIN ficam no estado, somando todas as categorias">MAPA</button>
-          </div>` : ""}
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            ${temUnidadeLanding ? `<div class="dash-toggle" id="${p}-toggle-landing">
+              <button class="dash-toggle-btn" data-modo="rosca" title="Quanto cada setor demandante representa do total">LISTA</button>
+              <button class="dash-toggle-btn" data-modo="mapa" title="Onde as unidades da DEPIN ficam no estado, somando todas as categorias">MAPA</button>
+            </div>` : ""}
+            ${!(temUnidadeLanding && modoLandingComplementar === "mapa") ? `<div class="dash-toggle" id="${p}-landing-visual-toggle">
+              <button class="dash-toggle-btn${modoVisualLanding === "lista" ? " active" : ""}" data-modo-visual="lista" title="Tabela ordenável, com % do total">LISTA</button>
+              <button class="dash-toggle-btn${modoVisualLanding === "treemap" ? " active" : ""}" data-modo-visual="treemap" title="Bloco = tamanho do valor — onde o orçamento se concentra, de relance">MAPA DE ÁRVORE</button>
+            </div>` : ""}
+          </div>
         </div>
         <p class="dash-chart-hint">${temUnidadeLanding && modoLandingComplementar === "mapa"
           ? "Onde as unidades da DEPIN estão hoje, somando contratos de todas as categorias — clique num ponto pra abrir o perfil completo daquela unidade."
@@ -7294,16 +7350,17 @@ function renderPorDimensaoContratos(lista, cfg) {
         // Rosca virou barra/tabela: com 20-50 categorias reais (tipo de
         // objeto ou setor demandante, dependendo do perfil), uma fatia por
         // categoria já não se lê — mesmo limite de ~7-8 do resto do painel.
-        el("landing-complementar").innerHTML = barraOuTabelaSVG(
-          agruparValorPorCampo(lista, cfg.complementar.campoFn, cfg.complementar.rotuloVazio),
-          {
-            formatarValor: (v) => "R$ " + formatarMoedaCompacta(v),
-            rotuloExtra: (l) => `(${l.qtd} contrato${l.qtd === 1 ? "" : "s"})`,
-            colunaRotulo: cfg.complementar.titulo.replace(/^Valor por /, "").toUpperCase(),
-            colunaValor: "VALOR (R$)",
-            mostrarPercentual: true,
-          }
-        );
+        // Treemap é a 3ª forma (pedido direto), escolhida no 2º toggle.
+        const linhasLandingComplementar = agruparValorPorCampo(lista, cfg.complementar.campoFn, cfg.complementar.rotuloVazio);
+        el("landing-complementar").innerHTML = modoVisualLanding === "treemap"
+          ? treemapValorSVG(linhasLandingComplementar)
+          : barraOuTabelaSVG(linhasLandingComplementar, {
+              formatarValor: (v) => "R$ " + formatarMoedaCompacta(v),
+              rotuloExtra: (l) => `(${l.qtd} contrato${l.qtd === 1 ? "" : "s"})`,
+              colunaRotulo: cfg.complementar.titulo.replace(/^Valor por /, "").toUpperCase(),
+              colunaValor: "VALOR (R$)",
+              mostrarPercentual: true,
+            });
         adicionarControlesGrafico(el("landing-complementar"));
         el("landing-complementar").addEventListener("click", (ev) => {
           const alvoClicado = ev.target.closest("[data-cat]");
@@ -7325,6 +7382,16 @@ function renderPorDimensaoContratos(lista, cfg) {
         if (!btn || btn.dataset.modo === modoLandingComplementar) return;
         modoLandingComplementar = btn.dataset.modo;
         salvarGrafico(`cpg-${p}-landing`, modoLandingComplementar);
+        renderLanding();
+      });
+    }
+    const toggleVisualLanding = el("landing-visual-toggle");
+    if (toggleVisualLanding) {
+      toggleVisualLanding.addEventListener("click", (ev) => {
+        const btn = ev.target.closest("button[data-modo-visual]");
+        if (!btn || btn.dataset.modoVisual === modoVisualLanding) return;
+        modoVisualLanding = btn.dataset.modoVisual;
+        salvarGrafico(`cpg-${p}-landing-visual`, modoVisualLanding);
         renderLanding();
       });
     }
@@ -7782,9 +7849,15 @@ function renderPorDimensaoContratos(lista, cfg) {
         <div class="dash-chart-box">
           <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:12px">
             <h4 style="margin-bottom:0">${escapeHTML(dimensaoAtiva.titulo)}</h4>
-            <div class="dash-toggle" id="${p}-fin-toggle">
-              <button class="dash-toggle-btn${modoComplementar === "padrao" ? " active" : ""}" data-modo="padrao">${escapeHTML(rotuloModoPadrao)}</button>
-              <button class="dash-toggle-btn${modoComplementar === "analista" ? " active" : ""}" data-modo="analista">ANALISTA</button>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <div class="dash-toggle" id="${p}-fin-toggle">
+                <button class="dash-toggle-btn${modoComplementar === "padrao" ? " active" : ""}" data-modo="padrao">${escapeHTML(rotuloModoPadrao)}</button>
+                <button class="dash-toggle-btn${modoComplementar === "analista" ? " active" : ""}" data-modo="analista">ANALISTA</button>
+              </div>
+              <div class="dash-toggle" id="${p}-fin-visual-toggle">
+                <button class="dash-toggle-btn${modoVisualComplementar === "lista" ? " active" : ""}" data-modo-visual="lista" title="Tabela ordenável, com % do total">LISTA</button>
+                <button class="dash-toggle-btn${modoVisualComplementar === "treemap" ? " active" : ""}" data-modo-visual="treemap" title="Bloco = tamanho do valor — onde o orçamento se concentra, de relance">MAPA DE ÁRVORE</button>
+              </div>
             </div>
           </div>
           <div id="${p}-complementar"></div>
@@ -7821,18 +7894,19 @@ function renderPorDimensaoContratos(lista, cfg) {
 
     // Rosca virou barra/tabela pelo mesmo motivo do landing: Tipo de Objeto,
     // Setor Demandante e até Analista (11) já passam do teto de ~6-7 fatias
-    // legíveis numa rosca — ver barraOuTabelaSVG.
-    el("complementar").innerHTML = barraOuTabelaSVG(
-      agruparValorPorCampo(listaFiltrada, dimensaoAtiva.campoFn, dimensaoAtiva.rotuloVazio),
-      {
-        formatarValor: (v) => "R$ " + formatarMoedaCompacta(v),
-        rotuloExtra: (l) => `(${l.qtd} contrato${l.qtd === 1 ? "" : "s"})`,
-        selecionado: filtroComplementar,
-        colunaRotulo: dimensaoAtiva.titulo.replace(/^Valor por /, "").toUpperCase(),
-        colunaValor: "VALOR (R$)",
-        mostrarPercentual: true,
-      }
-    );
+    // legíveis numa rosca — ver barraOuTabelaSVG. Treemap é a 3ª opção
+    // (pedido direto) — mesmo dado, outra forma, escolhida no 2º toggle.
+    const linhasComplementar = agruparValorPorCampo(listaFiltrada, dimensaoAtiva.campoFn, dimensaoAtiva.rotuloVazio);
+    el("complementar").innerHTML = modoVisualComplementar === "treemap"
+      ? treemapValorSVG(linhasComplementar)
+      : barraOuTabelaSVG(linhasComplementar, {
+          formatarValor: (v) => "R$ " + formatarMoedaCompacta(v),
+          rotuloExtra: (l) => `(${l.qtd} contrato${l.qtd === 1 ? "" : "s"})`,
+          selecionado: filtroComplementar,
+          colunaRotulo: dimensaoAtiva.titulo.replace(/^Valor por /, "").toUpperCase(),
+          colunaValor: "VALOR (R$)",
+          mostrarPercentual: true,
+        });
     el("top-contratos").innerHTML = barraContagemHorizontalSVG(
       agruparTopContratosPorValor(filtrada, 10),
       // limite alto: já é um Top 10 curado, não deve dobrar em "outros".
@@ -7860,6 +7934,13 @@ function renderPorDimensaoContratos(lista, cfg) {
       if (!btn || btn.dataset.modo === modoComplementar) return;
       modoComplementar = btn.dataset.modo;
       filtroComplementar = ""; // troca de dimensão zera o filtro da dimensão anterior (senão fica comparando maçã com laranja)
+      renderFinanceiro(listaFiltrada);
+    });
+    el("fin-visual-toggle").addEventListener("click", (ev) => {
+      const btn = ev.target.closest("[data-modo-visual]");
+      if (!btn || btn.dataset.modoVisual === modoVisualComplementar) return;
+      modoVisualComplementar = btn.dataset.modoVisual;
+      salvarGrafico(`cpg-${p}-fin-visual`, modoVisualComplementar);
       renderFinanceiro(listaFiltrada);
     });
     el("aditivos").addEventListener("click", (ev) => {
