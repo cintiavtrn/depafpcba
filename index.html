@@ -5051,19 +5051,22 @@ function tabelaDistribuicaoHTML(linhas, opcoes = {}) {
 // "label" (texto); com 4 colunas numéricas diferentes (contratos, valor,
 // ticket, %) ela ordenaria errado. Usa ligarOrdenacaoTabela (abaixo),
 // dedicada, com extrator por coluna.
+// Pedido direto: "um contrato desses cair não é um evento médio" — ticket
+// médio sozinho não distingue um setor de contratos parecidos entre si de
+// um setor com 1 contrato gigante e vários pequenos (mesmo ticket médio,
+// risco bem diferente). Quando o MAIOR contrato do grupo já é uma fatia
+// grande do valor total (>=40%, e só com mais de 1 contrato — com 1 só a
+// razão é sempre 100%, não é achado nenhum), isso vira destaque — no
+// começo só na tabela (`tabelaMescladaHTML`), depois também no mapa
+// (`paraLinhasMapaCoorpin`/`mapaCoorpinSVG`) — top-level pra não duplicar
+// o mesmo "0.4" em dois lugares que precisam concordar.
+const LIMIAR_CONCENTRACAO = 0.4;
+
 function tabelaMescladaHTML(linhas, opcoes = {}) {
   const { colunaRotulo = "CATEGORIA", selecionado = "", idPrefixo = "tabela-mesclada", colunaExtra = null } = opcoes;
   const somaValor = linhas.reduce((a, l) => a + l.valor, 0);
   const maxValor = maxSeguro(linhas.map((l) => l.valor));
   const ordenadas = linhas.slice().sort((a, b) => b.valor - a.valor);
-  // Pedido direto: "um contrato desses cair não é um evento médio" — ticket
-  // médio sozinho não distingue um setor de contratos parecidos entre si de
-  // um setor com 1 contrato gigante e vários pequenos (mesmo ticket médio,
-  // risco bem diferente). Quando o MAIOR contrato do grupo já é uma fatia
-  // grande do valor total (>=40%, e só com mais de 1 contrato — com 1 só a
-  // razão é sempre 100%, não é achado nenhum), acrescenta um aviso inline
-  // — mesmo estilo `.kpi-delta` já usado pros deltas de valor do sistema.
-  const LIMIAR_CONCENTRACAO = 0.4;
   const corpo = ordenadas.map((l) => {
     const destacado = selecionado === l.label;
     const pct = somaValor ? Math.round((l.valor / somaValor) * 1000) / 10 : 0;
@@ -5188,26 +5191,38 @@ function agruparValorEnriquecidoPorCampo(lista, campoFn, rotuloVazio) {
   return [...mapa.entries()].map(([label, g]) => ({ label, qtd: g.qtd, valor: g.valor, total: g.valor, maiorContrato: g.maiorContrato, criticos: g.criticos }));
 }
 
-// Pedido direto: "o mapa poderia ser uma das opções de visualização de
-// setor demandante... já que são cidades e tem uma espacialidade boa pra
-// ver em mapa" — prepara a saída de agruparValorEnriquecidoPorCampo pro
-// formato que mapaCoorpinSVG espera (não muda mapaCoorpinSVG nem
-// legendaMapaUnidadeHTML, só adapta os dados na entrada). `total` vira a
-// CONTAGEM (não o valor) de propósito: o mapa já dimensiona bolha por
-// contagem em todo canto do sistema — manter esse significado evita um
-// segundo jeito de ler "bolha grande" só neste lugar. O valor em R$ entra
-// no tooltip via `rotuloTooltipExtra` (campo que mapaCoorpinSVG já lê).
+// Pedido direto (2ª rodada, depois de ver o mapa ao vivo): "o mapa poderia
+// ser uma das opções de visualização de setor demandante... valor total,
+// ticket médio, com destaque pra contratos que concentram maior parte da
+// fatia... não sei se destacando, aumentando bola... passar o mouse parece
+// uma solução mais básica" — ela queria o destaque VISÍVEL na bolha, não
+// só no tooltip. Prepara a saída de agruparValorEnriquecidoPorCampo pro
+// formato que mapaCoorpinSVG espera: `total` vira o VALOR (não a
+// contagem) — bolha grande = onde o orçamento está, a mesma pergunta que
+// a coluna "%" da tabela responde, só que pelo tamanho em vez de número;
+// `concentracaoAlta` (novo, lido por mapaCoorpinSVG pra desenhar o anel
+// tracejado) usa o MESMO limiar/fórmula que já gera o aviso "1 contrato =
+// X%" na tabela (`LIMIAR_CONCENTRACAO`) — mesmo achado, dois lugares.
+// Contagem/ticket médio continuam no tooltip (`rotuloTooltipExtra`), que
+// mapaCoorpinSVG já lia — não removido, só deixou de ser a ÚNICA forma de
+// ver o resto.
 function paraLinhasMapaCoorpin(linhas, lista) {
   const dirpinPorCoorpin = new Map();
   for (const u of lista.flatMap((c) => c.unidades || [])) {
     if (!dirpinPorCoorpin.has(u.nomeUnidade)) dirpinPorCoorpin.set(u.nomeUnidade, u.dirpin);
   }
-  return linhas.map((l) => ({
-    ...l,
-    total: l.qtd,
-    dirpin: dirpinPorCoorpin.get(l.label),
-    rotuloTooltipExtra: `${formatarMoedaBR(l.valor)}${l.criticos ? ` — ${l.criticos} crítico(s)/a vencer` : ""}`,
-  }));
+  return linhas.map((l) => {
+    const concentracao = l.qtd > 1 && l.valor ? (l.maiorContrato || 0) / l.valor : 0;
+    const concentracaoAlta = concentracao >= LIMIAR_CONCENTRACAO;
+    const ticket = l.qtd ? l.valor / l.qtd : 0;
+    return {
+      ...l,
+      total: l.valor,
+      dirpin: dirpinPorCoorpin.get(l.label),
+      concentracaoAlta,
+      rotuloTooltipExtra: `${l.qtd} contrato(s) · ticket médio ${formatarMoedaCompacta(ticket)}${l.criticos ? ` · ${l.criticos} crítico(s)/a vencer` : ""}${concentracaoAlta ? ` · 1 contrato é ${Math.round(concentracao * 100)}% do valor daqui` : ""}`,
+    };
+  });
 }
 
 // Pedido direto: "a área gestora do contrato é a unidade administrativa,
@@ -5873,10 +5888,10 @@ function renderGerencialContratos(lista, resumo) {
         responde uma pergunta de FORMATO (como a criticidade se distribui
         dentro de cada setor) que uma tabela não substitui. -->
         <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
-          <p class="dash-chart-hint" style="margin:0">Contratos, valor total, ticket médio e quantos estão vencidos ou a vencer, por setor demandante — clique numa linha pra isolar aquele setor.</p>
+          <p class="dash-chart-hint" style="margin:0" id="ger-setor-hint">Contratos, valor total, ticket médio e quantos estão vencidos ou a vencer, por setor demandante — clique numa linha pra isolar aquele setor.</p>
           <div class="dash-toggle" id="ger-setor-visual-toggle">
             <button class="dash-toggle-btn" data-modo-visual="lista" title="Tabela ordenável, com % do total">LISTA</button>
-            <button class="dash-toggle-btn" data-modo-visual="mapa" title="Onde cada unidade regional fica no estado">MAPA</button>
+            <button class="dash-toggle-btn" data-modo-visual="mapa" title="Bolha grande = mais valor; anel tracejado = 1 contrato concentra 40%+ do valor daquele setor">MAPA</button>
           </div>
         </div>
         <div id="ger-setor"></div>
@@ -6369,9 +6384,11 @@ function renderGerencialContratos(lista, resumo) {
       btn.classList.toggle("active", btn.dataset.modoVisual === modoVisualGerSetor);
     });
     if (modoVisualGerSetor === "mapa") {
-      document.getElementById("ger-setor").innerHTML = mapaCoorpinSVG(paraLinhasMapaCoorpin(linhasSetor, filtrada), { selecionado: filtroArea });
+      document.getElementById("ger-setor-hint").textContent = "Bolha grande = onde o valor se concentra; anel tracejado = 1 contrato sozinho concentra 40%+ do valor daquele setor — clique num ponto pra isolar.";
+      document.getElementById("ger-setor").innerHTML = mapaCoorpinSVG(paraLinhasMapaCoorpin(linhasSetor, filtrada), { selecionado: filtroArea, formatarTotal: (l) => formatarMoedaBR(l.valor) });
       document.getElementById("ger-setor-legenda").innerHTML = legendaMapaUnidadeHTML(paraLinhasMapaCoorpin(linhasSetor, filtrada), (u) => u.label === filtroArea);
     } else {
+      document.getElementById("ger-setor-hint").textContent = "Contratos, valor total, ticket médio e quantos estão vencidos ou a vencer, por setor demandante — clique numa linha pra isolar aquele setor.";
       document.getElementById("ger-setor-legenda").innerHTML = "";
       document.getElementById("ger-setor").innerHTML = tabelaMescladaHTML(linhasSetor, {
         colunaRotulo: "SETOR DEMANDANTE",
@@ -7571,7 +7588,12 @@ function mapaCoorpinSVG(linhas, opcoes = {}) {
   // o mapa ganha uma razão de existir que uma tabela não substitui" — em
   // vez de embutir essa lógica aqui dentro (a função continua só sabendo
   // desenhar pontos), quem chama decide a cor por ponto.
-  const { selecionado = "", destacarFn = null, corFn = null } = opcoes;
+  // formatarTotal (opcional): por padrão o número que dimensiona a bolha
+  // (`l.total`) é uma CONTAGEM ("X contrato(s)") — quem chama com `total`
+  // representando outra coisa (valor em R$, por exemplo, no mapa de Setor
+  // Demandante) passa seu próprio formatador pro tooltip não ler "5,8
+  // milhões contrato(s)".
+  const { selecionado = "", destacarFn = null, corFn = null, formatarTotal = (l) => `${l.total} contrato(s)` } = opcoes;
   const [vbX, vbY, vbW, vbH] = MAPA_BAHIA_VIEWBOX.split(" ").map(Number);
   // Pedido direto: "adicionar os contratos outros no mapa... talvez uma
   // bola maior" — mas uma bola literalmente proporcional (111 contratos
@@ -7601,7 +7623,20 @@ function mapaCoorpinSVG(linhas, opcoes = {}) {
     const numero = ehOutras ? "+" : parseInt(l.label, 10) || (l.dirpin ? "" : "S");
     pontos += `<g data-cat="${escapeAttr(l.label)}" style="cursor:pointer" opacity="${dim ? 0.35 : 1}">`;
     const corPonto = corFn ? corFn(l) : (CORES_DIRPIN[l.dirpin] || "var(--carvao)");
-    pontos += `<circle cx="${cx}" cy="${cy}" r="${raio.toFixed(3)}" fill="${corPonto}" stroke="var(--paper)" stroke-width="${destacado ? 0.03 : 0.015}"${ehOutras ? ` stroke-dasharray="${(raio * 0.25).toFixed(3)},${(raio * 0.15).toFixed(3)}"` : ""}><title>${escapeHTML(l.label)}${ehOutras ? "" : ` (DIRPIN ${escapeHTML(l.dirpin || "—")})`}: ${l.total} contrato(s)${l.rotuloTooltipExtra ? ` — ${escapeHTML(l.rotuloTooltipExtra)}` : ""}${ehOutras ? " — localização presumida (área central do estado, sem unidade regional cadastrada)" : ""}</title></circle>`;
+    const tituloTooltip = `<title>${escapeHTML(l.label)}${ehOutras ? "" : ` (DIRPIN ${escapeHTML(l.dirpin || "—")})`}: ${escapeHTML(formatarTotal(l))}${l.rotuloTooltipExtra ? ` — ${escapeHTML(l.rotuloTooltipExtra)}` : ""}${ehOutras ? " — localização presumida (área central do estado, sem unidade regional cadastrada)" : ""}</title>`;
+    // Pedido direto: "queria ver se dá pra fazer do outro modo, de
+    // destaque, ou se estou sonhando muito" — em vez de "1 contrato
+    // concentra X%" só aparecer passando o mouse, ganha um anel tracejado
+    // terracota (mesma cor/semântica do aviso "1 contrato = X%" da
+    // tabela, `.kpi-delta.down`) ao redor da bolha, visível de cara. Fica
+    // num círculo À PARTE (não no stroke do principal) pra não competir
+    // com o destaque de seleção (`destacado`), que já usa a borda do
+    // círculo principal.
+    if (l.concentracaoAlta) {
+      const raioAnel = raio * 1.4;
+      pontos += `<circle cx="${cx}" cy="${cy}" r="${raioAnel.toFixed(3)}" fill="none" stroke="var(--terracota)" stroke-width="${(raio * 0.11).toFixed(3)}" stroke-dasharray="${(raio * 0.22).toFixed(3)},${(raio * 0.14).toFixed(3)}">${tituloTooltip}</circle>`;
+    }
+    pontos += `<circle cx="${cx}" cy="${cy}" r="${raio.toFixed(3)}" fill="${corPonto}" stroke="var(--paper)" stroke-width="${destacado ? 0.03 : 0.015}"${ehOutras ? ` stroke-dasharray="${(raio * 0.25).toFixed(3)},${(raio * 0.15).toFixed(3)}"` : ""}>${tituloTooltip}</circle>`;
     pontos += `<text x="${cx}" y="${(cy + raio * 0.35).toFixed(3)}" text-anchor="middle" font-family="monospace" font-size="${(raio * 0.9).toFixed(3)}" font-weight="700" fill="var(--paper)" style="pointer-events:none">${numero}</text>`;
     pontos += `</g>`;
   }
@@ -7972,11 +8007,11 @@ function renderPorDimensaoContratos(lista, cfg) {
           <div class="dash-toggle" id="${p}-landing-visual-toggle">
             <button class="dash-toggle-btn${modoVisualLanding === "lista" ? " active" : ""}" data-modo-visual="lista" title="Tabela ordenável, com % do total">LISTA</button>
             <button class="dash-toggle-btn${modoVisualLanding === "treemap" ? " active" : ""}" data-modo-visual="treemap" title="Bloco = tamanho do valor — onde o orçamento se concentra, de relance">MAPA DE ÁRVORE</button>
-            ${podeMapaLanding ? `<button class="dash-toggle-btn${modoVisualLanding === "mapa" ? " active" : ""}" data-modo-visual="mapa" title="Onde cada unidade regional fica no estado, somando todas as ${escapeHTML(cfg.labelBuscaPlural)}">MAPA</button>` : ""}
+            ${podeMapaLanding ? `<button class="dash-toggle-btn${modoVisualLanding === "mapa" ? " active" : ""}" data-modo-visual="mapa" title="Bolha grande = mais valor; anel tracejado = 1 contrato concentra 40%+ do valor daquela unidade">MAPA</button>` : ""}
           </div>
         </div>
         <p class="dash-chart-hint">${modoVisualLanding === "mapa"
-          ? `Onde as unidades regionais estão hoje, somando contratos de todas as ${escapeHTML(cfg.labelBuscaPlural)} — clique num ponto pra abrir o perfil completo daquela unidade.`
+          ? `Onde as unidades regionais estão hoje, somando contratos de todas as ${escapeHTML(cfg.labelBuscaPlural)} — bolha grande é onde o valor se concentra, anel tracejado marca quando 1 contrato sozinho já é 40%+ do valor daquela unidade. Clique num ponto pra abrir o perfil completo dela.`
           : `Antes de escolher uma ${cfg.labelBusca.toLowerCase()}: como o total já se divide do outro lado. Clique numa linha pra abrir o perfil completo dela em "${escapeHTML(cfg.complementar.tituloAba)}".`}</p>
         <div id="${p}-landing-complementar"></div>
         <div id="${p}-landing-complementar-legenda"></div>
@@ -8013,7 +8048,7 @@ function renderPorDimensaoContratos(lista, cfg) {
     function desenharComplementar() {
       const linhasLandingComplementar = agruparValorEnriquecidoPorCampo(lista, cfg.complementar.campoFn, cfg.complementar.rotuloVazio);
       if (modoVisualLanding === "mapa") {
-        el("landing-complementar").innerHTML = mapaCoorpinSVG(paraLinhasMapaCoorpin(linhasLandingComplementar, lista), {});
+        el("landing-complementar").innerHTML = mapaCoorpinSVG(paraLinhasMapaCoorpin(linhasLandingComplementar, lista), { formatarTotal: (l) => formatarMoedaBR(l.valor) });
         el("landing-complementar-legenda").innerHTML = legendaMapaUnidadeHTML(paraLinhasMapaCoorpin(linhasLandingComplementar, lista));
       } else {
         el("landing-complementar-legenda").innerHTML = "";
@@ -8601,10 +8636,11 @@ function renderPorDimensaoContratos(lista, cfg) {
               <div class="dash-toggle" id="${p}-fin-visual-toggle">
                 <button class="dash-toggle-btn${modoVisualComplementar === "lista" ? " active" : ""}" data-modo-visual="lista" title="Tabela ordenável, com % do total">LISTA</button>
                 <button class="dash-toggle-btn${modoVisualComplementar === "treemap" ? " active" : ""}" data-modo-visual="treemap" title="Bloco = tamanho do valor — onde o orçamento se concentra, de relance">MAPA DE ÁRVORE</button>
-                ${podeMapa ? `<button class="dash-toggle-btn${modoVisualComplementar === "mapa" ? " active" : ""}" data-modo-visual="mapa" title="Onde cada unidade regional fica no estado">MAPA</button>` : ""}
+                ${podeMapa ? `<button class="dash-toggle-btn${modoVisualComplementar === "mapa" ? " active" : ""}" data-modo-visual="mapa" title="Bolha grande = mais valor; anel tracejado = 1 contrato concentra 40%+ do valor daquela unidade">MAPA</button>` : ""}
               </div>
             </div>
           </div>
+          ${modoVisualComplementar === "mapa" ? `<p class="dash-chart-hint">Bolha grande é onde o valor se concentra; anel tracejado marca quando 1 contrato sozinho já é 40%+ do valor daquela unidade. Clique num ponto pra isolar.</p>` : ""}
           <div id="${p}-complementar"></div>
           <div id="${p}-complementar-legenda"></div>
         </div>
@@ -8652,7 +8688,7 @@ function renderPorDimensaoContratos(lista, cfg) {
     el("complementar").innerHTML = modoVisualComplementar === "treemap"
       ? treemapValorSVG(linhasComplementar)
       : modoVisualComplementar === "mapa"
-      ? mapaCoorpinSVG(paraLinhasMapaCoorpin(linhasComplementar, listaFiltrada), { selecionado: filtroComplementar })
+      ? mapaCoorpinSVG(paraLinhasMapaCoorpin(linhasComplementar, listaFiltrada), { selecionado: filtroComplementar, formatarTotal: (l) => formatarMoedaBR(l.valor) })
       : tabelaMescladaHTML(linhasComplementar, {
           selecionado: filtroComplementar,
           colunaRotulo: dimensaoAtiva.titulo.replace(/^Valor por /, "").toUpperCase(),
