@@ -7068,9 +7068,16 @@ function renderAlertaVencimentoContratos(lista, porId, decisoesRenovacao = new M
 
   const ordenados = [...vencidos, ...aVencer].sort((a, b) => (a.diasParaVencer ?? 1e9) - (b.diasParaVencer ?? 1e9));
 
+  // Pedido direto: "quanto dinheiro isso representa? ... a pergunta que a
+  // liderança mais precisa fazer não tem resposta em lugar nenhum do
+  // painel" — a contagem sozinha não distingue "54 contratos pequenos" de
+  // "54 contratos com um Serviço Aéreo de R$16mi no meio". Soma o valor
+  // atual de quem está vencido/a vencer e escreve junto do total, na
+  // MESMA linha que já é a primeira coisa que a pessoa vê na tela.
+  const valorEmRisco = ordenados.reduce((a, c) => a + (c.valorGlobalAtual || 0), 0);
   const blocoUrgente = total
     ? `<details class="alerta-vencimento" style="--alerta-cor:${cor};--alerta-cor-glow:${corGlowVar}" open>
-        <summary>${iconeInline("alerta", 13, -2)} ${total} contrato${total === 1 ? "" : "s"} merece${total === 1 ? "" : "m"} atenção <span class="conta">— ${escapeHTML(partes)}</span></summary>
+        <summary>${iconeInline("alerta", 13, -2)} ${total} contrato${total === 1 ? "" : "s"} merece${total === 1 ? "" : "m"} atenção — <span title="${escapeAttr(formatarMoedaBR(valorEmRisco))}">R$ ${escapeHTML(formatarMoedaCompacta(valorEmRisco))} em risco</span> <span class="conta">— ${escapeHTML(partes)}</span></summary>
         <div class="corpo">
           <p class="dash-chart-hint" style="margin:0 0 8px">Passe o mouse numa linha pra ver o detalhe rápido — clique pra abrir o panorama completo do contrato.</p>
           <div class="tabela-rolavel" style="max-height:280px" id="contratos-alerta-tabela"></div>
