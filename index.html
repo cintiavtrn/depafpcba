@@ -8500,7 +8500,10 @@ function renderPorPessoasContratos(lista) {
     <div class="dash-charts" style="grid-template-columns:1fr">
       <div class="dash-chart-box">
         <h4>Duplas Gestor + Fiscal Mais Frequentes</h4>
-        <p class="dash-chart-hint">Quem costuma trabalhar junto — clique numa dupla pra ver os contratos que os dois dividem.</p>
+        <!-- Pedido direto (crítica externa que ela trouxe): "que decisão
+        isso habilita?" — decidiu manter o cartão, mas com o "pra quê"
+        explícito, em vez de deixar a pessoa adivinhar. -->
+        <p class="dash-chart-hint">Quando a MESMA dupla concentra muitos contratos, ela decide sozinha (gestão + fiscalização) numa fatia grande do portfólio — útil pra enxergar concentração de responsabilidade antes de distribuir carga nova ou revisar quem acompanha o quê. Clique numa dupla pra ver os contratos que os dois dividem.</p>
         <div id="porpessoas-duplas"></div>
         <div id="porpessoas-dupla-tabela" style="margin-top:12px"></div>
       </div>
