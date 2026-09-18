@@ -9648,12 +9648,39 @@ async function carregarObrasPortal(portalSlug) {
     });
 
     const total = filtrada.reduce((a, r) => a + (r.valorGlobal || 0), 0);
-    const entregue = filtrada.filter((r) => r.grupoStatus === "Entregue").reduce((a, r) => a + (r.valorGlobal || 0), 0);
+    const entreguesRows = filtrada.filter((r) => r.grupoStatus === "Entregue");
+    const entregue = entreguesRows.reduce((a, r) => a + (r.valorGlobal || 0), 0);
     const pendente = total - entregue;
+    // Pedido direto dela, depois de perguntar o que "Entregue" queria dizer:
+    // "Entregue" no grupo_status da planilha-fonte junta 2 estados bem
+    // diferentes na prática — Concluída (obra pronta) e Inaugurada (já em
+    // uso; a cerimônia depende da agenda do governador, então uma obra pode
+    // ficar "Concluída" por um tempo antes de virar "Inaugurada"). Em vez de
+    // só o % somado, uma barrinha de 2 segmentos revela essa composição sem
+    // esconder o número resumido.
+    const concluidaRows = entreguesRows.filter((r) => normalizarStatusCeirf(r.status) === "Concluída");
+    const inauguradaRows = entreguesRows.filter((r) => normalizarStatusCeirf(r.status) === "Inaugurada");
+    const concluidaValor = concluidaRows.reduce((a, r) => a + (r.valorGlobal || 0), 0);
+    const inauguradaValor = inauguradaRows.reduce((a, r) => a + (r.valorGlobal || 0), 0);
+    const pctConcluidaDentro = entregue ? (concluidaValor / entregue * 100) : 0;
+    const pctInauguradaDentro = entregue ? (inauguradaValor / entregue * 100) : 0;
     document.getElementById("ceirf-kpis").innerHTML = `
       <div class="kpi-card"><div class="kpi-cabeca">${kpiIcone("moeda")}<div class="kpi-label">Valor Global Total</div></div><div class="kpi-value">R$ ${formatarMoedaCompacta(total)}</div><div class="kpi-valor-exato">${formatarMoedaBR(total)}</div></div>
       <div class="kpi-card"><div class="kpi-cabeca">${kpiIcone("obras")}<div class="kpi-label">Intervenções</div></div><div class="kpi-value">${filtrada.length.toLocaleString("pt-BR")}</div></div>
-      <div class="kpi-card"><div class="kpi-cabeca">${kpiIcone("selo")}<div class="kpi-label">Entregue em Valor</div></div><div class="kpi-value">${total ? (entregue / total * 100).toLocaleString("pt-BR", { maximumFractionDigits: 1 }) : "—"}%</div></div>
+      <div class="kpi-card">
+        <div class="kpi-cabeca">${kpiIcone("selo")}<div class="kpi-label">Entregue em Valor</div></div>
+        <div class="kpi-value">${total ? (entregue / total * 100).toLocaleString("pt-BR", { maximumFractionDigits: 1 }) : "—"}%</div>
+        <div class="kpi-valor-exato">${formatarMoedaBR(entregue)} — Concluída + Inaugurada</div>
+        ${entregue ? `
+        <div style="display:flex;height:8px;border-radius:4px;overflow:hidden;margin-top:10px;background:var(--paper-line)" title="Concluída: ${formatarMoedaBR(concluidaValor)} (${concluidaRows.length}) · Inaugurada: ${formatarMoedaBR(inauguradaValor)} (${inauguradaRows.length})">
+          <div style="width:${pctConcluidaDentro}%;background:color-mix(in srgb, var(--oliva) 55%, var(--paper))"></div>
+          <div style="width:${pctInauguradaDentro}%;background:var(--oliva)"></div>
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:6px;font-family:'IBM Plex Mono',monospace;font-size:var(--fs-ui-xs);color:#9AA3B2">
+          <span><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:color-mix(in srgb, var(--oliva) 55%, var(--paper));margin-right:4px"></span>Concluída ${concluidaRows.length}</span>
+          <span><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:var(--oliva);margin-right:4px"></span>Inaugurada ${inauguradaRows.length}</span>
+        </div>` : ""}
+      </div>
       <div class="kpi-card"><div class="kpi-cabeca">${kpiIcone("moeda")}<div class="kpi-label">Valor Pendente</div></div><div class="kpi-value">R$ ${formatarMoedaCompacta(pendente)}</div></div>
     `;
 
