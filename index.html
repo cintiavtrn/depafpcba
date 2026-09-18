@@ -8591,22 +8591,33 @@ const DIMENSOES_OBRAS = [
 // pergunta que essas duas bases respondem melhor ("quanto", não "quantas").
 // Motor mais simples que DIMENSOES_OBRAS (sem AGRUPAR, sem tooltip de
 // unidades) de propósito — já são 2 seções grandes a mais na mesma tela.
+// Pedido direto, olhando um painel de referência (Chart.js) que ela mesma
+// montou: "esse jeito de fazer gráfico sempre do mesmo jeito não dá... a
+// única diferença é que os cartões devem vir ao lado". `tipo:"rosca"` marca
+// as dimensões que viram rosca (pieChartSVG, já existente e reaproveitado
+// do gerador de indicadores genérico) em vez de barra — status e proporção
+// binária leem melhor em rosca; ranking/categoria continua em barra. Região
+// SAIU daqui — virou seletor por botão (seg), não mais uma barra pra clicar.
 const DIMENSOES_CEIRF = [
-  { chave: "status", campo: (r) => r.status, rotulo: "Status", colunaRotulo: "STATUS", containerId: "ceirf-status" },
+  { chave: "status", campo: (r) => r.status, rotulo: "Status", colunaRotulo: "STATUS", containerId: "ceirf-status", tipo: "rosca" },
   { chave: "tipoIntervencao", campo: (r) => r.tipoIntervencao, rotulo: "Obra ou Reforma", colunaRotulo: "TIPO DE INTERVENÇÃO", containerId: "ceirf-tipo" },
   { chave: "etapa", campo: (r) => r.etapa, rotulo: "Etapa do Programa", colunaRotulo: "ETAPA", containerId: "ceirf-etapa" },
   { chave: "padraoUnidade", campo: (r) => r.padraoUnidade, rotulo: "Padrão da Unidade", colunaRotulo: "PADRÃO DA UNIDADE", containerId: "ceirf-padrao" },
   { chave: "municipio", campo: (r) => r.municipio, rotulo: "Município", colunaRotulo: "MUNICÍPIO", containerId: "ceirf-municipio" },
 ];
 const DIMENSOES_MANUTENCAO = [
-  { chave: "grupoStatus", campo: (r) => r.grupoStatus, rotulo: "Status", colunaRotulo: "STATUS", containerId: "manut-status" },
+  { chave: "grupoStatus", campo: (r) => r.grupoStatus, rotulo: "Status", colunaRotulo: "STATUS", containerId: "manut-status", tipo: "rosca" },
   { chave: "categoriaUnidade", campo: (r) => r.categoriaUnidade, rotulo: "Categoria de Unidade", colunaRotulo: "CATEGORIA DE UNIDADE", containerId: "manut-categoria" },
-  { chave: "tipoOs", campo: (r) => r.tipoOs, rotulo: "Tipo de OS", colunaRotulo: "TIPO DE OS", containerId: "manut-tipo-os" },
+  { chave: "tipoOs", campo: (r) => r.tipoOs, rotulo: "Complementar ou Principal", colunaRotulo: "TIPO DE OS", containerId: "manut-tipo-os", tipo: "rosca" },
   // Achado da própria transcrição dela: quase toda OS fica logo abaixo de
   // R$330 mil — um teto prático de contratação, não coincidência.
-  { chave: "faixaValor", campo: (r) => r.faixaValor, rotulo: "Faixa de Valor (o teto prático de R$ 330 mil)", colunaRotulo: "FAIXA DE VALOR", containerId: "manut-faixa" },
-  { chave: "regiao", campo: (r) => r.regiao, rotulo: "Região", colunaRotulo: "REGIÃO", containerId: "manut-regiao" },
-  { chave: "anoMes", campo: (r) => r.anoMes, rotulo: "Mês de Emissão da OS", colunaRotulo: "MÊS", containerId: "manut-mes" },
+  // Coluna vertical (simpleBarChartSVG, já existente) — a pergunta aqui é
+  // ordinal ("quantas OS em cada faixa", faixas em ordem fixa crescente de
+  // valor), não ranking por tamanho, então lê melhor de pé do que deitada.
+  { chave: "faixaValor", campo: (r) => r.faixaValor, rotulo: "Faixa de Valor (o teto prático de R$ 330 mil)", colunaRotulo: "FAIXA DE VALOR", containerId: "manut-faixa", tipo: "coluna" },
+  // Linha acumulada (simpleLineChartSVG, já existente) — "evolução" é
+  // pergunta de tendência no tempo, não de comparação entre categorias.
+  { chave: "anoMes", campo: (r) => r.anoMes, rotulo: "Evolução das Emissões (acumulado por mês)", colunaRotulo: "MÊS", containerId: "manut-mes", tipo: "linha" },
 ];
 
 // Cross-filter genérico por N dimensões agregando por valor — reaproveitado
@@ -8614,11 +8625,16 @@ const DIMENSOES_MANUTENCAO = [
 // instância tem seu PRÓPRIO objeto de filtros — as duas seções não se
 // cruzam entre si nem com as 7 dimensões de UnidadePolicial (são bases
 // independentes, sem chave de unidade comum pra juntar com segurança).
-function criarMotorDimensoesPorValor(linhasTodas, dimensoes) {
-  const filtros = {};
+// campoRegiao: a Região virou SELETOR por botão (seg), não mais uma barra
+// clicável — mas continua entrando no mesmo bateFiltro/cross-filter, só que
+// com chave fixa "regiao" em vez de mais uma entrada em `dimensoes`.
+function criarMotorDimensoesPorValor(linhasTodas, dimensoes, campoRegiao) {
+  const filtros = { regiao: "" };
   dimensoes.forEach((d) => { filtros[d.chave] = ""; });
   function bateFiltro(r, ignorar) {
-    return dimensoes.every((d) => d.chave === ignorar || !filtros[d.chave] || (d.campo(r) || "(não informado)") === filtros[d.chave]);
+    const bateDimensoes = dimensoes.every((d) => d.chave === ignorar || !filtros[d.chave] || (d.campo(r) || "(não informado)") === filtros[d.chave]);
+    const bateRegiao = ignorar === "regiao" || !filtros.regiao || campoRegiao(r) === filtros.regiao;
+    return bateDimensoes && bateRegiao;
   }
   return { filtros, bateFiltro, filtrar: () => linhasTodas.filter((r) => bateFiltro(r, null)) };
 }
@@ -8644,8 +8660,8 @@ async function carregarObrasPortal(portalSlug) {
   // colocar é esse de estrito e funcional porque só estamos usando o
   // ampliado (o certo)". Sem toggle, sem opção de trocar de escopo.
   const ceirfAmpliado = ceirfTodas.filter((r) => r.escopoPcAmpliado);
-  const motorCeirf = criarMotorDimensoesPorValor(ceirfAmpliado, DIMENSOES_CEIRF);
-  const motorManutencao = criarMotorDimensoesPorValor(manutencaoTodas, DIMENSOES_MANUTENCAO);
+  const motorCeirf = criarMotorDimensoesPorValor(ceirfAmpliado, DIMENSOES_CEIRF, (r) => r.regiaoSalvadorRms);
+  const motorManutencao = criarMotorDimensoesPorValor(manutencaoTodas, DIMENSOES_MANUTENCAO, (r) => r.regiao);
 
   // Pedido direto: "os cartões e barras e linhas não estão clicáveis e
   // redirecionando pra filtrar... cliquei em obra aí refiltrou e mostrou
@@ -8675,7 +8691,24 @@ async function carregarObrasPortal(portalSlug) {
   // diretoria", então um toggle só cobre os dois cartões de valor).
   let modoVisualFinanceiro = lerGraficoSalvo("cpg-obras-financeiro-visual") || "lista";
 
+  // Pedido direto: "no todo da página já deve abrir com opção de selecionar
+  // manutenção ou o outro e só aí aparecer as coisas e não ter que rolar pra
+  // achar" — as 2 seções novas empilhadas embaixo de 9 gráficos + Financeiro
+  // obrigavam rolar a página inteira pra chegar nelas. Mesmo padrão de aba já
+  // usado no resto do sistema (.tab-btn/.tab-panel), só que ANINHADO dentro
+  // da própria aba "Painel de Obras" — não precisa buscar dado de novo, é só
+  // mostrar/esconder o que já foi carregado.
+  const SUBABAS_OBRAS = [
+    { chave: "geral", rotulo: "VISÃO GERAL" },
+    { chave: "manutencao", rotulo: "MANUTENÇÃO PC" },
+    { chave: "ceirf", rotulo: "INTERVENÇÕES CEIRF" },
+  ];
+
   painel.innerHTML = `
+    <div class="tabs" id="obras-subtabs" style="margin-bottom:14px">
+      ${SUBABAS_OBRAS.map((s, i) => `<button type="button" class="tab-btn${i === 0 ? " active" : ""}" data-subtab-obras="${s.chave}">${s.rotulo}</button>`).join("")}
+    </div>
+    <div id="obras-sub-geral">
     <div id="obras-chips"></div>
     <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start">
       <div id="obras-kpis" style="flex:0 0 220px;min-width:200px;display:flex;flex-direction:column;gap:12px"></div>
@@ -8714,34 +8747,6 @@ async function carregarObrasPortal(portalSlug) {
           </div>
         </div>
 
-        <div style="margin-top:6px;padding-top:14px;border-top:2px solid var(--tinta)">
-          <h3 style="margin:0 0 4px;text-transform:uppercase;letter-spacing:.05em;font-size:1.05rem">Intervenções CEIRF — Escopo Ampliado</h3>
-          <p class="dash-chart-hint">Base própria (334 intervenções do Controle CEIRF, todas as forças, transcrição completa e conferida contra o PDF oficial) — não usa as unidades de cima, é outro grão (1 linha por intervenção). Escopo Ampliado: PC + EBAL, JOMAFA e DISEP Senhor do Bomfim (unidades integradas/ambíguas).</p>
-        </div>
-        <div id="ceirf-kpis" class="kpi-row"></div>
-        <div id="ceirf-chips"></div>
-        <div class="dash-charts" style="grid-template-columns:1fr 1fr">
-          ${DIMENSOES_CEIRF.map((d) => `
-          <div class="dash-chart-box">
-            <h4>${escapeHTML(d.rotulo)}</h4>
-            <div id="${d.containerId}"></div>
-          </div>`).join("")}
-        </div>
-
-        <div style="margin-top:6px;padding-top:14px;border-top:2px solid var(--tinta)">
-          <h3 style="margin:0 0 4px;text-transform:uppercase;letter-spacing:.05em;font-size:1.05rem">Manutenção PC</h3>
-          <p class="dash-chart-hint">Base própria (115 ordens de serviço de manutenção predial, transcrição completa — Salvador/RMS + Interior) — universo completo, diferente do "Manutenção" parcial lá em cima (aquele é só a fatia vinculada a uma unidade específica).</p>
-        </div>
-        <div id="manut-kpis" class="kpi-row"></div>
-        <div id="manut-chips"></div>
-        <div class="dash-charts" style="grid-template-columns:1fr 1fr">
-          ${DIMENSOES_MANUTENCAO.map((d) => `
-          <div class="dash-chart-box">
-            <h4>${escapeHTML(d.rotulo)}</h4>
-            <div id="${d.containerId}"></div>
-          </div>`).join("")}
-        </div>
-
         <div class="dash-chart-box">
           <h4>Unidades</h4>
           <div class="dash-filtro" style="margin-bottom:10px">
@@ -8753,7 +8758,65 @@ async function carregarObrasPortal(portalSlug) {
         </div>
       </div>
     </div>
+    </div>
+
+    <div id="obras-sub-manutencao" hidden>
+      <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:8px">
+        <div>
+          <h3 style="margin:0 0 4px;text-transform:uppercase;letter-spacing:.05em;font-size:1.05rem">Manutenção PC</h3>
+          <p class="dash-chart-hint" style="margin:0">Base própria (115 ordens de serviço de manutenção predial, transcrição completa — Salvador/RMS + Interior) — universo completo, diferente do "Manutenção" parcial da Visão Geral (aquele é só a fatia vinculada a uma unidade específica).</p>
+        </div>
+        <div class="dash-toggle" id="manut-regiao-seg">
+          <button class="dash-toggle-btn active" data-val="">TODAS</button>
+          <button class="dash-toggle-btn" data-val="SALVADOR E RMS">SALVADOR E RMS</button>
+          <button class="dash-toggle-btn" data-val="INTERIOR">INTERIOR</button>
+        </div>
+      </div>
+      <div id="manut-chips"></div>
+      <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start">
+        <div id="manut-kpis" style="flex:0 0 220px;min-width:200px;display:flex;flex-direction:column;gap:12px"></div>
+        <div class="dash-charts" style="flex:1;min-width:280px;grid-template-columns:1fr 1fr">
+          ${DIMENSOES_MANUTENCAO.map((d) => `
+          <div class="dash-chart-box">
+            <h4>${escapeHTML(d.rotulo)}</h4>
+            <div id="${d.containerId}"></div>
+          </div>`).join("")}
+        </div>
+      </div>
+    </div>
+
+    <div id="obras-sub-ceirf" hidden>
+      <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:8px">
+        <div>
+          <h3 style="margin:0 0 4px;text-transform:uppercase;letter-spacing:.05em;font-size:1.05rem">Intervenções CEIRF — Escopo Ampliado</h3>
+          <p class="dash-chart-hint" style="margin:0">Base própria (334 intervenções do Controle CEIRF, todas as forças, transcrição completa e conferida contra o PDF oficial) — não usa as unidades da Visão Geral, é outro grão (1 linha por intervenção). Escopo Ampliado: PC + EBAL, JOMAFA e DISEP Senhor do Bomfim (unidades integradas/ambíguas).</p>
+        </div>
+        <div class="dash-toggle" id="ceirf-regiao-seg">
+          <button class="dash-toggle-btn active" data-val="">TODAS</button>
+          <button class="dash-toggle-btn" data-val="Salvador e RMS">SALVADOR E RMS</button>
+          <button class="dash-toggle-btn" data-val="Interior">INTERIOR</button>
+        </div>
+      </div>
+      <div id="ceirf-chips"></div>
+      <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start">
+        <div id="ceirf-kpis" style="flex:0 0 220px;min-width:200px;display:flex;flex-direction:column;gap:12px"></div>
+        <div class="dash-charts" style="flex:1;min-width:280px;grid-template-columns:1fr 1fr">
+          ${DIMENSOES_CEIRF.map((d) => `
+          <div class="dash-chart-box">
+            <h4>${escapeHTML(d.rotulo)}</h4>
+            <div id="${d.containerId}"></div>
+          </div>`).join("")}
+        </div>
+      </div>
+    </div>
   `;
+
+  document.getElementById("obras-subtabs").addEventListener("click", (ev) => {
+    const btn = ev.target.closest("[data-subtab-obras]");
+    if (!btn) return;
+    document.querySelectorAll("#obras-subtabs .tab-btn").forEach((b) => b.classList.toggle("active", b === btn));
+    SUBABAS_OBRAS.forEach((s) => { document.getElementById(`obras-sub-${s.chave}`).hidden = s.chave !== btn.dataset.subtabObras; });
+  });
 
   // Clique delegado UMA vez, nos containers estáveis (não recriados a cada
   // atualizar()) — mesmo padrão já usado em toda distribuição de Contratos.
@@ -8799,11 +8862,35 @@ async function carregarObrasPortal(portalSlug) {
     });
   });
 
+  // Região virou seletor por botão (seg), pedido direto — troca o filtro e
+  // move o "active" na hora (mesmo raciocínio do toggle LISTA/MAPA DE ÁRVORE).
+  document.getElementById("ceirf-regiao-seg").addEventListener("click", (ev) => {
+    const btn = ev.target.closest("[data-val]");
+    if (!btn) return;
+    motorCeirf.filtros.regiao = btn.dataset.val;
+    document.querySelectorAll("#ceirf-regiao-seg [data-val]").forEach((b) => b.classList.toggle("active", b === btn));
+    atualizarCeirf();
+  });
+  document.getElementById("manut-regiao-seg").addEventListener("click", (ev) => {
+    const btn = ev.target.closest("[data-val]");
+    if (!btn) return;
+    motorManutencao.filtros.regiao = btn.dataset.val;
+    document.querySelectorAll("#manut-regiao-seg [data-val]").forEach((b) => b.classList.toggle("active", b === btn));
+    atualizarManutencao();
+  });
+
   function atualizarCeirf() {
     const filtrada = motorCeirf.filtrar();
     const chipsAtivos = DIMENSOES_CEIRF
       .filter((d) => motorCeirf.filtros[d.chave])
       .map((d) => ({ rotulo: `${d.rotulo.toLowerCase()}: ${motorCeirf.filtros[d.chave]}`, limpar: () => { motorCeirf.filtros[d.chave] = ""; atualizarCeirf(); } }));
+    if (motorCeirf.filtros.regiao) {
+      chipsAtivos.push({ rotulo: `região: ${motorCeirf.filtros.regiao}`, limpar: () => {
+        motorCeirf.filtros.regiao = "";
+        document.querySelectorAll("#ceirf-regiao-seg [data-val]").forEach((b) => b.classList.toggle("active", b.dataset.val === ""));
+        atualizarCeirf();
+      } });
+    }
     document.getElementById("ceirf-chips").innerHTML = chipsAtivos.length
       ? `<div class="filter-chips">${chipsAtivos.map((c, i) => `<span class="filter-chip">Isolando ${escapeHTML(c.rotulo)}<button type="button" data-chip-limpar="${i}" title="Remover este filtro">${iconeInline("fechar", 10, -1)}</button></span>`).join("")}</div>`
       : "";
@@ -8824,15 +8911,24 @@ async function carregarObrasPortal(portalSlug) {
     DIMENSOES_CEIRF.forEach((d) => {
       const linhasRecorte = ceirfAmpliado.filter((r) => motorCeirf.bateFiltro(r, d.chave));
       const linhas = agruparValorObrasPorCampo(linhasRecorte, (r) => d.campo(r), (r) => r.valorGlobal, "(não informado)");
-      document.getElementById(d.containerId).innerHTML = barraOuTabelaSVG(linhas, {
-        formatarValor: (v) => "R$ " + formatarMoedaCompacta(v),
-        rotuloExtra: (l) => `(${l.qtd})`,
-        selecionado: motorCeirf.filtros[d.chave] || "",
-        colunaRotulo: d.colunaRotulo,
-        colunaValor: "VALOR (R$)",
-        mostrarPercentual: true,
-      });
-      adicionarControlesGrafico(document.getElementById(d.containerId));
+      const container = document.getElementById(d.containerId);
+      if (d.tipo === "rosca") {
+        container.innerHTML = pieChartSVG(
+          linhas.map((l) => ({ label: l.label, valor: l.total })),
+          motorCeirf.filtros[d.chave] || "",
+          { formatarValor: (v) => "R$ " + formatarMoedaCompacta(v) }
+        );
+      } else {
+        container.innerHTML = barraOuTabelaSVG(linhas, {
+          formatarValor: (v) => "R$ " + formatarMoedaCompacta(v),
+          rotuloExtra: (l) => `(${l.qtd})`,
+          selecionado: motorCeirf.filtros[d.chave] || "",
+          colunaRotulo: d.colunaRotulo,
+          colunaValor: "VALOR (R$)",
+          mostrarPercentual: true,
+        });
+      }
+      adicionarControlesGrafico(container);
     });
   }
 
@@ -8841,6 +8937,13 @@ async function carregarObrasPortal(portalSlug) {
     const chipsAtivos = DIMENSOES_MANUTENCAO
       .filter((d) => motorManutencao.filtros[d.chave])
       .map((d) => ({ rotulo: `${d.rotulo.toLowerCase()}: ${motorManutencao.filtros[d.chave]}`, limpar: () => { motorManutencao.filtros[d.chave] = ""; atualizarManutencao(); } }));
+    if (motorManutencao.filtros.regiao) {
+      chipsAtivos.push({ rotulo: `região: ${motorManutencao.filtros.regiao}`, limpar: () => {
+        motorManutencao.filtros.regiao = "";
+        document.querySelectorAll("#manut-regiao-seg [data-val]").forEach((b) => b.classList.toggle("active", b.dataset.val === ""));
+        atualizarManutencao();
+      } });
+    }
     document.getElementById("manut-chips").innerHTML = chipsAtivos.length
       ? `<div class="filter-chips">${chipsAtivos.map((c, i) => `<span class="filter-chip">Isolando ${escapeHTML(c.rotulo)}<button type="button" data-chip-limpar="${i}" title="Remover este filtro">${iconeInline("fechar", 10, -1)}</button></span>`).join("")}</div>`
       : "";
@@ -8860,16 +8963,40 @@ async function carregarObrasPortal(portalSlug) {
 
     DIMENSOES_MANUTENCAO.forEach((d) => {
       const linhasRecorte = manutencaoTodas.filter((r) => motorManutencao.bateFiltro(r, d.chave));
-      const linhas = agruparValorObrasPorCampo(linhasRecorte, (r) => d.campo(r), (r) => r.valorOrcado, "(não informado)");
-      document.getElementById(d.containerId).innerHTML = barraOuTabelaSVG(linhas, {
-        formatarValor: (v) => "R$ " + formatarMoedaCompacta(v),
-        rotuloExtra: (l) => `(${l.qtd})`,
-        selecionado: motorManutencao.filtros[d.chave] || "",
-        colunaRotulo: d.colunaRotulo,
-        colunaValor: "VALOR (R$)",
-        mostrarPercentual: true,
-      });
-      adicionarControlesGrafico(document.getElementById(d.containerId));
+      const container = document.getElementById(d.containerId);
+      if (d.tipo === "coluna") {
+        // Faixa de Valor tem ORDEM PRÓPRIA (1. até 50 mil → 6. acima de 330
+        // mil) — não faz sentido ordenar por tamanho como o resto; o rótulo
+        // já vem com o prefixo numérico, então ordenar por texto já resolve.
+        const linhas = agruparValorObrasPorCampo(linhasRecorte, (r) => d.campo(r), (r) => r.valorOrcado, "(não informado)");
+        const porFaixa = [...linhas].sort((a, b) => a.label.localeCompare(b.label));
+        container.innerHTML = simpleBarChartSVG(porFaixa.map((l) => ({ label: l.label.replace(/^\d+\.\s*/, ""), valor: l.qtd })), "var(--tinta)");
+      } else if (d.tipo === "linha") {
+        const porMes = agruparValorObrasPorCampo(linhasRecorte, (r) => d.campo(r), (r) => r.valorOrcado, "(sem mês)")
+          .filter((l) => l.label !== "(sem mês)")
+          .sort((a, b) => a.label.localeCompare(b.label));
+        let acumulado = 0;
+        const pontos = porMes.map((m) => { acumulado += m.total; return { label: m.label, valor: acumulado, incremento: m.total }; });
+        container.innerHTML = pontos.length ? simpleLineChartSVG(pontos, "var(--tinta)") : `<p class="dash-chart-hint">Sem datas legíveis neste recorte.</p>`;
+      } else if (d.tipo === "rosca") {
+        const linhas = agruparValorObrasPorCampo(linhasRecorte, (r) => d.campo(r), (r) => r.valorOrcado, "(não informado)");
+        container.innerHTML = pieChartSVG(
+          linhas.map((l) => ({ label: l.label, valor: l.total })),
+          motorManutencao.filtros[d.chave] || "",
+          { formatarValor: (v) => "R$ " + formatarMoedaCompacta(v) }
+        );
+      } else {
+        const linhas = agruparValorObrasPorCampo(linhasRecorte, (r) => d.campo(r), (r) => r.valorOrcado, "(não informado)");
+        container.innerHTML = barraOuTabelaSVG(linhas, {
+          formatarValor: (v) => "R$ " + formatarMoedaCompacta(v),
+          rotuloExtra: (l) => `(${l.qtd})`,
+          selecionado: motorManutencao.filtros[d.chave] || "",
+          colunaRotulo: d.colunaRotulo,
+          colunaValor: "VALOR (R$)",
+          mostrarPercentual: true,
+        });
+      }
+      adicionarControlesGrafico(container);
     });
   }
 
