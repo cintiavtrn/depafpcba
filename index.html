@@ -6421,6 +6421,21 @@ function renderTaticoContratos(lista) {
       </div></div>
       <div id="tat-grafico-mes"></div>
     </div>
+    <!-- Pedido direto (crítica externa que ela trouxe, decisão via pergunta
+    direta: "duplicar nos dois" em vez de mover): "num Gerencial/Tático/
+    Operacional clássico, gestão de equipe é pergunta de Tático, não
+    Gerencial — quem precisa agir essa semana, não quem tem mais volume".
+    Versão resumida (Top 5, não 10) aqui no Tático, ao lado do resto que já
+    é sobre prazo/urgência; a versão completa (Top 10 + Duplas +
+    comparação com carga de trabalho) continua em Por Pessoas. -->
+    <div class="dash-chart-box" style="margin-bottom:16px">
+      <h4>Quem Precisa Agir</h4>
+      <p class="dash-chart-hint">Gestores e fiscais com mais contrato vencido ou vencendo em até 90 dias sob responsabilidade agora — clique num nome pra abrir o perfil completo (Top 10, Duplas e comparação com carga de trabalho total ficam na aba "Por Pessoas").</p>
+      <div class="dash-charts" style="grid-template-columns:1fr 1fr">
+        <div><h4 style="font-size:var(--fs-ui-sm);margin-bottom:6px">Gestores</h4><div id="tat-risco-gestores"></div></div>
+        <div><h4 style="font-size:var(--fs-ui-sm);margin-bottom:6px">Fiscais</h4><div id="tat-risco-fiscais"></div></div>
+      </div>
+    </div>
     <h4 style="font-family:'Space Grotesk',sans-serif;font-size:var(--fs-subtitulo);margin-bottom:8px">Detalhamento dos Contratos</h4>
     <p class="font-mono" style="font-size:var(--fs-ui-sm);color:#8B93A3;margin-bottom:8px">Passe o mouse numa linha pra ver o detalhe rápido — clique pra abrir o panorama completo do contrato.</p>
     <div id="tat-chip-filtro"></div>
@@ -6429,6 +6444,39 @@ function renderTaticoContratos(lista) {
   `;
 
   ligarBuscaContratos(lista, porId, "tat-busca", "tat-busca-resultado");
+
+  // "Quem Precisa Agir" — estático (mesma convenção de tat-resumo acima:
+  // lista INTEIRA, não a filtrada pelo toggle de criticidade/tipo — é um
+  // resumo de topo, não outro filtro pra aprender). Top 5, não 10 (versão
+  // resumida — a completa mora em Por Pessoas).
+  const contratosEmRiscoTat = lista.filter((c) => c.statusVigencia === "Vencido" || c.statusVigencia === "A Vencer");
+  const gestoresRiscoTat = agruparContratosPorPessoa(contratosEmRiscoTat, "Gestor").slice(0, 5);
+  const fiscaisRiscoTat = agruparContratosPorPessoa(contratosEmRiscoTat, "Fiscal").slice(0, 5);
+  document.getElementById("tat-risco-gestores").innerHTML = gestoresRiscoTat.length
+    ? barraContagemHorizontalSVG(gestoresRiscoTat, { tituloTooltip: (l) => `${l.label}: ${l.total} contrato(s) em risco`, limite: 20 })
+    : `<p class="dash-chart-hint">Nenhum gestor com contrato em risco no momento.</p>`;
+  document.getElementById("tat-risco-fiscais").innerHTML = fiscaisRiscoTat.length
+    ? barraContagemHorizontalSVG(fiscaisRiscoTat, { tituloTooltip: (l) => `${l.label}: ${l.total} contrato(s) em risco`, limite: 20 })
+    : `<p class="dash-chart-hint">Nenhum fiscal com contrato em risco no momento.</p>`;
+  adicionarControlesGrafico(document.getElementById("tat-risco-gestores"));
+  adicionarControlesGrafico(document.getElementById("tat-risco-fiscais"));
+  // Clique leva pro perfil completo em "Por Pessoas" — mesmo padrão de
+  // clique-abre-perfil usado em todo canto do sistema (Por Pessoas já
+  // monta o DOM inteiro no carregamento, só fica escondido até essa aba
+  // ser aberta).
+  function irParaPessoaViaTatico(containerId, papel, idSelect) {
+    document.getElementById(containerId).addEventListener("click", (ev) => {
+      const alvoClicado = ev.target.closest("[data-cat]");
+      if (!alvoClicado) return;
+      document.querySelector('[data-subtab-contratos="porpessoas"]')?.click();
+      const btnPapel = document.querySelector(`#porpessoas-role-toggle [data-role-pessoas="${papel}"]`);
+      if (btnPapel && !btnPapel.classList.contains("active")) btnPapel.click();
+      const sel = document.getElementById(idSelect);
+      if (sel) { sel.value = alvoClicado.dataset.cat; sel.dispatchEvent(new Event("change", { bubbles: true })); }
+    });
+  }
+  irParaPessoaViaTatico("tat-risco-gestores", "gestor", "gestor-select");
+  irParaPessoaViaTatico("tat-risco-fiscais", "fiscal", "fiscal-select");
 
   // O Controle de Prazos (e o slicer de Tipo) filtram tudo, inclusive o
   // próprio gráfico
