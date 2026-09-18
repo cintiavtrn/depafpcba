@@ -4759,18 +4759,29 @@ function agruparTopContratosPorValor(lista, n = 10) {
 // sem isso um fornecedor com 3 contratos médios ficaria escondido atrás de
 // um só contrato grande de outra empresa, quando na prática ele é quem mais
 // fatura com a casa.
+// Pedido direto (crítica externa que ela trouxe): "cada tabela que mostra
+// empresa é local a um recorte só — ninguém soma quanto uma mesma empresa
+// detém no total do portfólio, através de todos os setores. Se ela também
+// tiver contrato em DGTI, CORE/SAER e mais três setores, a exposição real
+// é a soma de tudo isso, e hoje é invisível porque está espalhada." Este
+// Top 10 já soma o VALOR através de todo `lista` (não é local a um setor),
+// mas não mostrava a segunda metade da resposta — em quantos setores
+// diferentes essa exposição está espalhada. `setores` rastreia isso sem
+// precisar de uma dimensão nova (aba própria de Fornecedor) pra responder
+// a pergunta que ela trouxe.
 function agruparTopFornecedoresPorValor(lista, n = 10) {
   const mapa = new Map();
   for (const c of lista) {
     if (c.valorGlobalAtual == null) continue;
     const chave = c.empresa || "(empresa não identificada)";
-    if (!mapa.has(chave)) mapa.set(chave, { total: 0, qtd: 0 });
+    if (!mapa.has(chave)) mapa.set(chave, { total: 0, qtd: 0, setores: new Set() });
     const g = mapa.get(chave);
     g.total += c.valorGlobalAtual;
     g.qtd += 1;
+    for (const setor of setoresDemandantesDoContrato(c)) g.setores.add(setor);
   }
   return [...mapa.entries()]
-    .map(([label, g]) => ({ label, total: g.total, qtd: g.qtd }))
+    .map(([label, g]) => ({ label, total: g.total, qtd: g.qtd, qtdSetores: g.setores.size }))
     .sort((a, b) => b.total - a.total)
     .slice(0, n);
 }
@@ -5573,8 +5584,16 @@ function abrirContratoNoOperacional(contratoId) {
 function tabelaContratosHTML(lista, opcoes = {}) {
   const { comSei = false, dirpinAtual = null, destacarCompartilhados = false } = opcoes;
   if (!lista.length) return `<p class="tela-intro">Nenhum contrato nessa faixa.</p>`;
+  // Pedido direto (crítica externa que ela trouxe): "essa tabela cruza
+  // risco (criticidade) com prazo (dias pra vencer) — bom — mas falta a
+  // terceira variável que sempre importa junto: quanto vale. Sem isso não
+  // dá pra saber, olhando a linha, se um contrato crítico é urgente-e-caro
+  // ou urgente-e-irrelevante." Coluna sempre presente — esta é A tabela de
+  // contrato compartilhada por toda tela do sistema (alerta, tabelas por
+  // status/prazo/financeiro/pessoas, "Detalhamento dos Contratos" de cada
+  // setor/categoria/DIRPIN), não só uma tela isolada.
   return `<table class="dash-tabela">
-      <thead><tr><th>Nº CONTRATO</th><th>SETOR DEMANDANTE</th><th>EMPRESA</th><th>DIAS PARA VENCER</th><th>CRITICIDADE</th>${comSei ? "<th>SEI DOS ADITIVOS</th>" : ""}</tr></thead>
+      <thead><tr><th>Nº CONTRATO</th><th>SETOR DEMANDANTE</th><th>EMPRESA</th><th>DIAS PARA VENCER</th><th>CRITICIDADE</th><th>VALOR ATUAL</th>${comSei ? "<th>SEI DOS ADITIVOS</th>" : ""}</tr></thead>
       <tbody>${lista.map((c) => {
         // Pedido direto: "pensei que vc fosse na hora que filtra por
         // dirpin dizer algo como esse contrato está compartilhado com x"
@@ -5592,7 +5611,7 @@ function tabelaContratosHTML(lista, opcoes = {}) {
           : "";
         return `
         <tr class="linha-contrato" data-contrato-id="${escapeAttr(c.id)}">
-          <td>${escapeHTML(c.numeroContrato)}${badgeRenovado(c)}${selosCompartilhado}</td><td>${escapeHTML(setorDemandanteExibicao(c) || "—")}</td><td>${escapeHTML(c.empresa)}</td><td class="num">${formatarDiasBR(c.diasParaVencer)}</td><td>${pillCriticidade(c.criticidade)}</td>${comSei ? `<td>${(c.aditivos || []).map((a) => `${a.numeroAditivo}º: ${escapeHTML(a.processoSeiAditivo || "—")}`).join("<br>") || "—"}</td>` : ""}
+          <td>${escapeHTML(c.numeroContrato)}${badgeRenovado(c)}${selosCompartilhado}</td><td>${escapeHTML(setorDemandanteExibicao(c) || "—")}</td><td>${escapeHTML(c.empresa)}</td><td class="num">${formatarDiasBR(c.diasParaVencer)}</td><td>${pillCriticidade(c.criticidade)}</td><td class="num">R$ ${escapeHTML(formatarMoedaCompacta(c.valorGlobalAtual || 0))}</td>${comSei ? `<td>${(c.aditivos || []).map((a) => `${a.numeroAditivo}º: ${escapeHTML(a.processoSeiAditivo || "—")}`).join("<br>") || "—"}</td>` : ""}
         </tr>`;
       }).join("")}</tbody>
     </table>`;
@@ -5771,6 +5790,7 @@ function renderGerencialContratos(lista, resumo) {
         <h4>Distribuição de Contratos por Nº de Aditivos</h4>
         <p class="dash-chart-hint">Quantos contratos têm 0, 1, 2... aditivos. Não é uma linha do tempo — pra isso precisaria da data de CADA aditivo, que a planilha ainda não traz. Clique numa barra pra ver quais contratos são e o número do SEI de cada aditivo.</p>
         <div id="ger-aditivos"></div>
+        <p class="dash-chart-hint" id="ger-aditivos-insight" style="margin-top:8px"></p>
       </div>
     </div>
     <div class="dash-charts" style="grid-template-columns:1fr 1fr">
@@ -6088,6 +6108,14 @@ function renderGerencialContratos(lista, resumo) {
     const pctBaixo = filtrada.length ? (qtdBaixo / filtrada.length) * 100 : 0;
     const qtdTotalAditivos = filtrada.reduce((a, c) => a + (c.qtdAditivos || 0), 0);
     const mediaAditivos = filtrada.length ? qtdTotalAditivos / filtrada.length : 0;
+    // Pedido direto (crítica externa que ela trouxe): "a média esconde a
+    // cauda... contrato com 3+ aditivos normalmente sinaliza repactuação
+    // recorrente ou instabilidade de escopo — é sinal de atenção, não
+    // detalhe estatístico". A distribuição completa já existe
+    // (agruparPorQtdAditivos, clicável a partir daqui) — isso só destaca UM
+    // corte dela como subtexto, sem duplicar o gráfico.
+    const qtd3MaisAditivos = filtrada.filter((c) => (c.qtdAditivos || 0) >= 3).length;
+    const valorAContratar = filtrada.filter((c) => c.statusVigencia === "A Contratar").reduce((a, c) => a + (c.valorGlobalAtual || 0), 0);
     const comGarantiaInformada = filtrada.filter((c) => c.garantiaExigida != null && c.garantiaExigida !== "");
     const comGarantiaSim = comGarantiaInformada.filter((c) => c.garantiaExigida === "Sim");
     const pctGarantia = comGarantiaInformada.length ? (comGarantiaSim.length / comGarantiaInformada.length) * 100 : null;
@@ -6200,20 +6228,29 @@ function renderGerencialContratos(lista, resumo) {
     // repetindo as mesmas 22 categorias. Agrega contagem E valor no mesmo
     // laço (não reaproveita agruparContagemPorCampo/agruparValorPorCampo
     // separados) porque as duas precisam bater na MESMA linha.
+    // Pedido direto (crítica externa que ela trouxe): "será que 'Serviços
+    // Auxiliares' tem ciclo de renovação mais curto e por isso concentra
+    // mais vencimento que 'Imóveis'? Isso não é sobre onde está o
+    // dinheiro — é sobre onde está o trabalho recorrente de renovação."
+    // Mesma coluna e mesma definição (Vencido/A Vencer) já usada em Setor
+    // Demandante, agora também por tipo de objeto.
     const porTipo = new Map();
     for (const c of filtrada) {
       const chave = valorEfetivoTipo(c);
-      if (!porTipo.has(chave)) porTipo.set(chave, { qtd: 0, valor: 0, maiorContrato: 0 });
+      const critico = c.statusVigencia === "Vencido" || c.statusVigencia === "A Vencer";
+      if (!porTipo.has(chave)) porTipo.set(chave, { qtd: 0, valor: 0, maiorContrato: 0, criticos: 0 });
       const g = porTipo.get(chave);
       g.qtd += 1;
       g.valor += c.valorGlobalAtual || 0;
       g.maiorContrato = Math.max(g.maiorContrato, c.valorGlobalAtual || 0);
+      if (critico) g.criticos += 1;
     }
-    const linhasTipo = [...porTipo.entries()].map(([label, g]) => ({ label, qtd: g.qtd, valor: g.valor, maiorContrato: g.maiorContrato }));
+    const linhasTipo = [...porTipo.entries()].map(([label, g]) => ({ label, qtd: g.qtd, valor: g.valor, maiorContrato: g.maiorContrato, criticos: g.criticos }));
     document.getElementById("ger-tipo").innerHTML = tabelaMescladaHTML(linhasTipo, {
       colunaRotulo: "TIPO DE OBJETO",
       selecionado: filtroTipo,
       idPrefixo: "tabela-tipo-objeto",
+      colunaExtra: { titulo: "CRÍTICOS/A VENCER", campo: "criticos" },
     });
     ligarOrdenacaoTabelaPropria(document.getElementById("ger-tipo"));
     desenharAgrupamentoTipo();
@@ -6230,6 +6267,25 @@ function renderGerencialContratos(lista, resumo) {
       agruparPorQtdAditivos(filtrada),
       { tituloTooltip: (l) => `${l.label}: ${l.total} contrato(s)` }
     );
+    // Pedido direto (crítica externa que ela trouxe): "os contratos que
+    // mais se repactuam são os mesmos que estão em risco agora, ou os de
+    // maior valor? Se sim, isso é um padrão de gestão de contrato, não um
+    // acaso." Compara a taxa de vencido/a vencer entre quem tem 3+
+    // aditivos e o portfólio geral — insight de texto, não gráfico novo
+    // (mesma ideia do "achado" que a crítica sugeriu pra Tipo de Objeto).
+    const comMuitosAditivos = filtrada.filter((c) => (c.qtdAditivos || 0) >= 3);
+    const emRiscoDentre = (grupo) => grupo.filter((c) => c.statusVigencia === "Vencido" || c.statusVigencia === "A Vencer").length;
+    const pctRiscoGeral = filtrada.length ? (emRiscoDentre(filtrada) / filtrada.length) * 100 : 0;
+    const insightAditivos = document.getElementById("ger-aditivos-insight");
+    if (comMuitosAditivos.length) {
+      const pctRiscoMuitosAditivos = (emRiscoDentre(comMuitosAditivos) / comMuitosAditivos.length) * 100;
+      const diferenca = pctRiscoMuitosAditivos - pctRiscoGeral;
+      insightAditivos.innerHTML = Math.abs(diferenca) >= 5
+        ? `${iconeInline("informacao", 11, -1)} ${comMuitosAditivos.length} contrato${comMuitosAditivos.length === 1 ? "" : "s"} com 3+ aditivos: ${pctRiscoMuitosAditivos.toLocaleString("pt-BR", { maximumFractionDigits: 0 })}% ${comMuitosAditivos.length === 1 ? "está" : "estão"} vencido ou a vencer, contra ${pctRiscoGeral.toLocaleString("pt-BR", { maximumFractionDigits: 0 })}% no portfólio geral — repactuação recorrente parece andar junto de risco de vencimento aqui.`
+        : `${comMuitosAditivos.length} contrato${comMuitosAditivos.length === 1 ? "" : "s"} com 3+ aditivos: taxa de vencido/a vencer parecida com o portfólio geral (${pctRiscoMuitosAditivos.toLocaleString("pt-BR", { maximumFractionDigits: 0 })}% × ${pctRiscoGeral.toLocaleString("pt-BR", { maximumFractionDigits: 0 })}%) — sem sinal de correlação aqui.`;
+    } else {
+      insightAditivos.innerHTML = "";
+    }
     document.getElementById("ger-gestor").innerHTML = barraOuTabelaSVG(
       agruparContratosPorPessoa(filtrada, "Gestor"),
       {
@@ -6260,7 +6316,12 @@ function renderGerencialContratos(lista, resumo) {
       agruparTopFornecedoresPorValor(filtrada, 10),
       {
         formatarValor: (v) => "R$ " + formatarMoedaCompacta(v),
-        tituloTooltip: (l) => `${l.label}: ${formatarMoedaBR(l.total)} (${l.qtd} contrato${l.qtd > 1 ? "s" : ""})`,
+        // Pedido direto (crítica externa): "se ela também tiver contrato em
+        // DGTI, CORE/SAER e mais três setores, a exposição real é a soma de
+        // tudo isso" — quando a mesma empresa atende mais de 1 setor,
+        // escreve isso junto do rótulo já visível, sem precisar clicar.
+        rotuloExtra: (l) => `(${l.qtd} contrato${l.qtd > 1 ? "s" : ""}${l.qtdSetores > 1 ? ` em ${l.qtdSetores} setores` : ""})`,
+        tituloTooltip: (l) => `${l.label}: ${formatarMoedaBR(l.total)} — ${l.qtd} contrato${l.qtd > 1 ? "s" : ""}${l.qtdSetores > 1 ? `, espalhados por ${l.qtdSetores} setores demandantes diferentes` : ""}`,
         selecionado: filtroFornecedor,
         limite: 20,
       }
@@ -6279,14 +6340,20 @@ function renderGerencialContratos(lista, resumo) {
     // acompanhamento — ficam como um segundo bloco, separado dos cartões
     // fiéis ao original, pra não confundir "isto é o modelo de referência"
     // com "isto é um extra que a gente achou que ajudava".
+    // Pedido direto (crítica externa): "Unidades Beneficiadas: —" não era
+    // um cartão com zero, era um cartão SEM RESPOSTA — mesma causa raiz do
+    // card "Fora da DEPIN" já resolvido: hoje só a DEPIN cadastra essa
+    // informação, então fora dela o cartão prometia um dado que nunca ia
+    // chegar. Some da tela (em vez de "—") quando não há nenhuma unidade
+    // cadastrada na seleção atual; o listener de clique já existe delegado
+    // em #ger-rodape, não precisa religar aqui.
     document.getElementById("ger-rodape").innerHTML = `
       <div class="kpi-card kpi-clicavel" data-criticidade="Baixo" title="Clique pra ver quais são" style="--kpi-cor:var(--crit-baixo);cursor:pointer;${filtroCriticidadeBaixo ? "outline:2px solid var(--crit-baixo);outline-offset:-2px" : ""}"><div class="kpi-cabeca">${kpiIcone("relogio")}<div class="kpi-label">% Contratos Baixo</div></div><div class="kpi-value">${pctBaixo.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}%</div></div>
-      <div class="kpi-card kpi-clicavel" data-status="A Contratar" title="Clique pra ver quais são" style="--kpi-cor:var(--crit-neutro);cursor:pointer;${filtroStatusKpi === "A Contratar" ? "outline:2px solid var(--crit-neutro);outline-offset:-2px" : ""}"><div class="kpi-cabeca">${kpiIcone("calendario")}<div class="kpi-label">Qtd A Contratar</div></div><div class="kpi-value">${qtdAContratar.toLocaleString("pt-BR")}</div></div>
+      <div class="kpi-card kpi-clicavel" data-status="A Contratar" title="Clique pra ver quais são" style="--kpi-cor:var(--crit-neutro);cursor:pointer;${filtroStatusKpi === "A Contratar" ? "outline:2px solid var(--crit-neutro);outline-offset:-2px" : ""}"><div class="kpi-cabeca">${kpiIcone("calendario")}<div class="kpi-label">Qtd A Contratar</div></div><div class="kpi-value">${qtdAContratar.toLocaleString("pt-BR")}</div>${valorAContratar ? `<div class="kpi-valor-exato">R$ ${escapeHTML(formatarMoedaCompacta(valorAContratar))} estimado${qtdAContratar === 1 ? "" : "s"}</div>` : ""}</div>
       <div class="kpi-card kpi-clicavel" data-acao="aditivos" title="Clique pra ver a distribuição" style="cursor:pointer"><div class="kpi-cabeca">${kpiIcone("aditivo")}<div class="kpi-label">Qtd Total de Aditivos</div></div><div class="kpi-value">${qtdTotalAditivos.toLocaleString("pt-BR")}</div></div>
-      <div class="kpi-card kpi-clicavel" data-acao="aditivos" title="Clique pra ver a distribuição" style="cursor:pointer"><div class="kpi-cabeca">${kpiIcone("aditivo")}<div class="kpi-label">Média de Aditivos / Contrato</div></div><div class="kpi-value">${mediaAditivos.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}</div></div>
-      <div class="kpi-card kpi-clicavel" data-garantia="Sim" title="Clique pra ver quais são" style="cursor:pointer;${filtroGarantia ? "outline:2px solid var(--carvao);outline-offset:-2px" : ""}"><div class="kpi-cabeca">${kpiIcone("escudo")}<div class="kpi-label">% com Garantia Exigida</div></div><div class="kpi-value">${pctGarantia === null ? "—" : pctGarantia.toLocaleString("pt-BR", { maximumFractionDigits: 1 }) + "%"}</div></div>
-      <div class="kpi-card kpi-clicavel" data-garantia="Sim" title="Clique pra ver quais são" style="cursor:pointer;${filtroGarantia ? "outline:2px solid var(--carvao);outline-offset:-2px" : ""}"><div class="kpi-cabeca">${kpiIcone("escudo")}<div class="kpi-label">Contratos Garantia Exigida</div></div><div class="kpi-value">${qtdGarantiaExigida.toLocaleString("pt-BR")}</div></div>
-      <div class="kpi-card${qtdUnidadesBeneficiadas ? " kpi-clicavel" : ""}" ${qtdUnidadesBeneficiadas ? 'data-acao="unidades-beneficiadas"' : ""} title="${qtdUnidadesBeneficiadas ? "Clique pra ver o detalhe por unidade — " : ""}hoje só contratos da DEPIN têm essa informação" style="${qtdUnidadesBeneficiadas ? "cursor:pointer" : ""}"><div class="kpi-cabeca">${kpiIcone("predio")}<div class="kpi-label">Unidades Beneficiadas</div></div><div class="kpi-value">${qtdUnidadesBeneficiadas ? qtdUnidadesBeneficiadas.toLocaleString("pt-BR") : "—"}</div></div>
+      <div class="kpi-card kpi-clicavel" data-acao="aditivos" title="Clique pra ver a distribuição" style="cursor:pointer"><div class="kpi-cabeca">${kpiIcone("aditivo")}<div class="kpi-label">Média de Aditivos / Contrato</div></div><div class="kpi-value">${mediaAditivos.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}</div><div class="kpi-valor-exato">${qtd3MaisAditivos.toLocaleString("pt-BR")} contrato${qtd3MaisAditivos === 1 ? "" : "s"} com 3+ aditivos</div></div>
+      <div class="kpi-card kpi-clicavel" data-garantia="Sim" title="Clique pra ver quais são" style="cursor:pointer;${filtroGarantia ? "outline:2px solid var(--carvao);outline-offset:-2px" : ""}"><div class="kpi-cabeca">${kpiIcone("escudo")}<div class="kpi-label">Contratos com Garantia Exigida</div></div><div class="kpi-value">${qtdGarantiaExigida.toLocaleString("pt-BR")}</div><div class="kpi-valor-exato">${pctGarantia === null ? "sem dado suficiente pra %" : pctGarantia.toLocaleString("pt-BR", { maximumFractionDigits: 1 }) + "% dos contratos"}</div></div>
+      ${qtdUnidadesBeneficiadas ? `<div class="kpi-card kpi-clicavel" data-acao="unidades-beneficiadas" title="Clique pra ver o detalhe por unidade" style="cursor:pointer"><div class="kpi-cabeca">${kpiIcone("predio")}<div class="kpi-label">Unidades Beneficiadas</div></div><div class="kpi-value">${qtdUnidadesBeneficiadas.toLocaleString("pt-BR")}</div></div>` : ""}
       <div class="kpi-card kpi-clicavel" data-status="NaoVencido" title="Clique pra ver quais são — tira só os vencidos, mantém A Vencer e Vigente" style="--kpi-cor:var(--crit-baixo);cursor:pointer;${filtroStatusKpi === "NaoVencido" ? "outline:2px solid var(--crit-baixo);outline-offset:-2px" : ""}"><div class="kpi-cabeca">${kpiIcone("relogio")}<div class="kpi-label">Qtd Contratos Não Vencidos</div></div><div class="kpi-value">${qtdNaoVencidos.toLocaleString("pt-BR")}</div></div>
       <div class="kpi-card kpi-clicavel" data-status="NaoVencido" title="Clique pra ver quais são — soma só quem não tá vencido, pra não inflar o total com contrato que já passou da data" style="--kpi-cor:var(--crit-baixo);cursor:pointer;${filtroStatusKpi === "NaoVencido" ? "outline:2px solid var(--crit-baixo);outline-offset:-2px" : ""}"><div class="kpi-cabeca">${kpiIcone("moeda")}<div class="kpi-label">Valor Atual (Não Vencidos)</div></div><div class="kpi-value">R$ ${formatarMoedaCompacta(valorAtualNaoVencidos)}</div><div class="kpi-valor-exato">${formatarMoedaBR(valorAtualNaoVencidos)}</div></div>`;
   }
@@ -7292,7 +7359,13 @@ function mapaCoorpinSVG(linhas, opcoes = {}) {
   // destacar no mapa, só isso, assim como na barra" — `selecionado`
   // sozinho só sabe marcar UMA COORPIN; `destacarFn` (opcional) decide
   // por linha, então também cobre "toda uma DIRPIN inteira" de uma vez.
-  const { selecionado = "", destacarFn = null } = opcoes;
+  // corFn (opcional): decide a cor de cada ponto — por padrão, cor por
+  // DIRPIN (CORES_DIRPIN). Pedido direto (crítica externa que ela trouxe):
+  // "onde a criticidade se concentra geograficamente é a primeira vez que
+  // o mapa ganha uma razão de existir que uma tabela não substitui" — em
+  // vez de embutir essa lógica aqui dentro (a função continua só sabendo
+  // desenhar pontos), quem chama decide a cor por ponto.
+  const { selecionado = "", destacarFn = null, corFn = null } = opcoes;
   const [vbX, vbY, vbW, vbH] = MAPA_BAHIA_VIEWBOX.split(" ").map(Number);
   // Pedido direto: "adicionar os contratos outros no mapa... talvez uma
   // bola maior" — mas uma bola literalmente proporcional (111 contratos
@@ -7321,7 +7394,8 @@ function mapaCoorpinSVG(linhas, opcoes = {}) {
     // que é um agregado, não uma unidade única.
     const numero = ehOutras ? "+" : parseInt(l.label, 10) || (l.dirpin ? "" : "S");
     pontos += `<g data-cat="${escapeAttr(l.label)}" style="cursor:pointer" opacity="${dim ? 0.35 : 1}">`;
-    pontos += `<circle cx="${cx}" cy="${cy}" r="${raio.toFixed(3)}" fill="${CORES_DIRPIN[l.dirpin] || "var(--carvao)"}" stroke="var(--paper)" stroke-width="${destacado ? 0.03 : 0.015}"${ehOutras ? ` stroke-dasharray="${(raio * 0.25).toFixed(3)},${(raio * 0.15).toFixed(3)}"` : ""}><title>${escapeHTML(l.label)}${ehOutras ? "" : ` (DIRPIN ${escapeHTML(l.dirpin || "—")})`}: ${l.total} contrato(s)${ehOutras ? " — localização presumida (área central do estado, sem unidade regional cadastrada)" : ""}</title></circle>`;
+    const corPonto = corFn ? corFn(l) : (CORES_DIRPIN[l.dirpin] || "var(--carvao)");
+    pontos += `<circle cx="${cx}" cy="${cy}" r="${raio.toFixed(3)}" fill="${corPonto}" stroke="var(--paper)" stroke-width="${destacado ? 0.03 : 0.015}"${ehOutras ? ` stroke-dasharray="${(raio * 0.25).toFixed(3)},${(raio * 0.15).toFixed(3)}"` : ""}><title>${escapeHTML(l.label)}${ehOutras ? "" : ` (DIRPIN ${escapeHTML(l.dirpin || "—")})`}: ${l.total} contrato(s)${l.rotuloTooltipExtra ? ` — ${escapeHTML(l.rotuloTooltipExtra)}` : ""}${ehOutras ? " — localização presumida (área central do estado, sem unidade regional cadastrada)" : ""}</title></circle>`;
     pontos += `<text x="${cx}" y="${(cy + raio * 0.35).toFixed(3)}" text-anchor="middle" font-family="monospace" font-size="${(raio * 0.9).toFixed(3)}" font-weight="700" fill="var(--paper)" style="pointer-events:none">${numero}</text>`;
     pontos += `</g>`;
   }
@@ -7433,6 +7507,27 @@ function agruparPorUnidade(todasUnidades) {
     .sort((a, b) => (parseInt(a.label, 10) || 0) - (parseInt(b.label, 10) || 0));
 }
 
+// Pedido direto (crítica externa que ela trouxe): "onde a criticidade se
+// concentra geograficamente é a primeira vez que o mapa ganha uma razão de
+// existir que uma tabela não substitui". Diferente de agruparPorUnidade
+// (que só CONTA, a partir da lista achatada de unidades), esta função
+// precisa da criticidade de cada CONTRATO — por isso recebe a lista de
+// contratos, não a lista achatada. Pra cada COORPIN, guarda a PIOR
+// criticidade entre os contratos que ela atende (menor criticidadeOrdem =
+// pior, mesma convenção usada no Gantt/matriz de sempre).
+function agruparCriticidadePorUnidade(listaFiltrada) {
+  const porUnidade = new Map(); // nomeUnidade -> { piorOrdem, piorLabel }
+  for (const c of listaFiltrada) {
+    for (const u of c.unidades || []) {
+      const atual = porUnidade.get(u.nomeUnidade);
+      if (!atual || c.criticidadeOrdem < atual.piorOrdem) {
+        porUnidade.set(u.nomeUnidade, { piorOrdem: c.criticidadeOrdem, piorLabel: c.criticidade });
+      }
+    }
+  }
+  return porUnidade;
+}
+
 // Mesma legenda (cor por DIRPIN + número por COORPIN, Sede em grupo próprio)
 // usada no mapa de dentro do perfil — extraída pra reaproveitar na landing.
 function legendaMapaUnidadeHTML(linhasUnidade, destacarUnidadeFn = () => false) {
@@ -7452,6 +7547,35 @@ function legendaMapaUnidadeHTML(linhasUnidade, destacarUnidadeFn = () => false) 
           </div>
           <div style="color:#8B93A3;font-family:'IBM Plex Mono',monospace">
             ${unidades.map((u) => `<span class="legenda-unidade-item" data-cat="${escapeAttr(u.label)}" style="cursor:pointer;${destacarUnidadeFn(u) ? "text-decoration:underline;color:var(--carvao)" : ""}">${escapeHTML(u.label)}</span>`).join(" · ")}
+          </div>
+        </div>
+      `).join("")}
+    </div>`;
+}
+
+// Mesma ideia de legendaMapaUnidadeHTML, mas agrupando por criticidade em
+// vez de DIRPIN — usada no modo CRITICIDADE do mapa de COORPIN. `linhas`
+// já vem com `.piorLabel` preenchido (ver modoGraficoUnidade === "criticidade"
+// em renderFiltroUnidade).
+function legendaMapaCriticidadeHTML(linhas, destacarUnidadeFn = () => false) {
+  const porCriticidadeLegenda = new Map();
+  for (const l of linhas) {
+    const chave = l.piorLabel || "Sem contrato com unidade cadastrada";
+    if (!porCriticidadeLegenda.has(chave)) porCriticidadeLegenda.set(chave, []);
+    porCriticidadeLegenda.get(chave).push(l);
+  }
+  const ordem = CRITICIDADE_VISUAL.map((cv) => cv.label);
+  const chavesOrdenadas = [...porCriticidadeLegenda.keys()].sort((a, b) => ordem.indexOf(a) - ordem.indexOf(b));
+  return `
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;margin-top:12px;font-size:var(--fs-ui-sm)">
+      ${chavesOrdenadas.map((chave) => `
+        <div>
+          <div style="display:flex;align-items:center;gap:6px;font-weight:700;margin-bottom:3px">
+            <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${(CRITICIDADE_VISUAL.find((cv) => cv.label === chave) || {}).cor || "var(--carvao)"}"></span>
+            ${escapeHTML(chave)} <span style="font-weight:400;color:#8B93A3">(pior contrato de cada COORPIN)</span>
+          </div>
+          <div style="color:#8B93A3;font-family:'IBM Plex Mono',monospace">
+            ${porCriticidadeLegenda.get(chave).map((u) => `<span class="legenda-unidade-item" data-cat="${escapeAttr(u.label)}" style="cursor:pointer;${destacarUnidadeFn(u) ? "text-decoration:underline;color:var(--carvao)" : ""}">${escapeHTML(u.label)}</span>`).join(" · ")}
           </div>
         </div>
       `).join("")}
@@ -7845,6 +7969,12 @@ function renderPorDimensaoContratos(lista, cfg) {
         <div class="linha-troca-grafico"><div class="dash-toggle" id="${p}-toggle-grafico-unidade">
           <button class="dash-toggle-btn" data-modo="barras" title="Lista as 26, ordenada por número — melhor pra achar uma específica ou comparar valores">BARRAS</button>
           <button class="dash-toggle-btn" data-modo="mapa" title="Mostra onde cada sede fica no estado — melhor pra enxergar a distribuição geográfica (mapa de PONTOS: cidade-sede de cada COORPIN, ainda não o território que cada uma cobre)">MAPA</button>
+          <!-- Pedido direto (crítica externa que ela trouxe): "onde a
+          criticidade se concentra geograficamente é a primeira vez que o
+          mapa ganha uma razão de existir que uma tabela não substitui" —
+          mesmo mapa de pontos, cor = pior criticidade da COORPIN em vez de
+          DIRPIN. -->
+          <button class="dash-toggle-btn" data-modo="criticidade" title="Mesmo mapa de pontos, mas a cor mostra a PIOR criticidade entre os contratos de cada COORPIN — pra enxergar onde o risco se concentra geograficamente">CRITICIDADE</button>
           ${contratosSalvador.length ? `<button class="dash-toggle-btn" data-modo="salvador" title="Zoom só em Salvador — ${contratosSalvador.length} contrato(s) sem unidade do interior (Sede da DEPIN + outras áreas), um por bolinha">SALVADOR</button>` : ""}
         </div></div>
         <div id="${p}-grafico-unidade"></div>
@@ -7897,6 +8027,16 @@ function renderPorDimensaoContratos(lista, cfg) {
     if (contratosSemUnidade.length && !dirpinEfetivo) {
       linhasUnidade.push({ label: OUTRAS_AREAS_LABEL, total: contratosSemUnidade.length, dirpin: CHAVE_OUTRAS_AREAS });
     }
+    // Modo CRITICIDADE: cada linha ganha a PIOR criticidade entre os
+    // contratos que aquela COORPIN atende (computada em cima de
+    // `listaFiltrada`, não da lista achatada de unidades — só o contrato
+    // sabe sua própria criticidade).
+    const criticidadePorUnidadeMapa = agruparCriticidadePorUnidade(listaFiltrada);
+    for (const l of linhasUnidade) {
+      const pior = criticidadePorUnidadeMapa.get(l.label);
+      if (pior) { l.piorOrdem = pior.piorOrdem; l.piorLabel = pior.piorLabel; }
+    }
+    const corPorCriticidadeFn = (l) => (CRITICIDADE_VISUAL.find((cv) => cv.label === l.piorLabel) || {}).cor || "var(--carvao)";
     // Pedido direto: "quando filtramos por região da DIRPIN tem que
     // destacar no mapa, só isso, assim como na barra" — com uma COORPIN
     // escolhida, destaca só ELA; com só a DIRPIN escolhida (sem COORPIN
@@ -7926,6 +8066,8 @@ function renderPorDimensaoContratos(lista, cfg) {
     } else {
       el("grafico-unidade").innerHTML = modoGraficoUnidade === "mapa"
         ? mapaCoorpinSVG(linhasUnidade, { destacarFn: destacarUnidadeFn })
+        : modoGraficoUnidade === "criticidade"
+        ? mapaCoorpinSVG(linhasUnidade, { destacarFn: destacarUnidadeFn, corFn: corPorCriticidadeFn })
         // Sem DIRPIN escolhida (Todos), passa de 20 unidades e vira tabela;
         // escolhendo uma DIRPIN, sobra meia dúzia de COORPINs e continua
         // barra — a mesma regra do resto do painel, só que essa lista muda
@@ -7953,12 +8095,14 @@ function renderPorDimensaoContratos(lista, cfg) {
       // é qual COORPIN" — em vez de duas legendas soltas repetindo a mesma
       // lista. Só aparece no modo mapa: nas barras, o nome já está escrito
       // ao lado de cada uma, não precisa de legenda pra decifrar nada.
-      if (modoGraficoUnidade === "mapa") {
+      if (modoGraficoUnidade === "mapa" || modoGraficoUnidade === "criticidade") {
         // Pedido direto: "tinha contrato que tava só como sede?... precisa
         // incluir no filtro de unidade regional" — Sede não é uma DIRPIN,
         // então tem grupo próprio na legenda em vez de aparecer como
         // "DIRPIN —" (não faz sentido) ou ficar escondida num grupo alheio.
-        el("legenda-mapa-unidade").innerHTML = legendaMapaUnidadeHTML(linhasUnidade, destacarUnidadeFn);
+        el("legenda-mapa-unidade").innerHTML = modoGraficoUnidade === "criticidade"
+          ? legendaMapaCriticidadeHTML(linhasUnidade, destacarUnidadeFn)
+          : legendaMapaUnidadeHTML(linhasUnidade, destacarUnidadeFn);
         el("legenda-mapa-unidade").addEventListener("click", (ev) => {
           const item = ev.target.closest("[data-cat]");
           if (!item) return;
@@ -8513,6 +8657,15 @@ function renderPorPessoasContratos(lista) {
   const mediaGestor = mediaPorPapel(gestores);
   const mediaFiscal = mediaPorPapel(fiscais);
   const mediaAnalista = mediaPorPapel(analistas);
+  // Pedido direto (crítica externa que ela trouxe): "o ranking de carga
+  // hoje responde 'quem trabalha mais', quando a pergunta operacional real
+  // é 'quem precisa agir essa semana' — que pode ser uma pessoa com só 6
+  // contratos, mas 4 deles vencendo em 30 dias". Mesma agregação de
+  // sempre, só que rodada em cima de uma lista pré-filtrada pra
+  // vencido/a vencer, não no portfólio inteiro.
+  const contratosEmRisco = lista.filter((c) => c.statusVigencia === "Vencido" || c.statusVigencia === "A Vencer");
+  const gestoresRisco = agruparContratosPorPessoa(contratosEmRisco, "Gestor");
+  const fiscaisRisco = agruparContratosPorPessoa(contratosEmRisco, "Fiscal");
 
   alvo.innerHTML = `
     <div class="kpi-row" style="margin-bottom:16px">
@@ -8531,6 +8684,22 @@ function renderPorPessoasContratos(lista) {
         <h4>Top 10 Fiscais (Carga de Trabalho)</h4>
         <p class="dash-chart-hint">Quem tem mais contrato sob responsabilidade agora — clique num nome pra abrir o perfil completo dele.</p>
         <div id="porpessoas-top-fiscais"></div>
+      </div>
+    </div>
+    <div class="dash-charts" style="grid-template-columns:1fr 1fr">
+      <div class="dash-chart-box">
+        <h4>Top 10 Gestores (Contratos em Risco)</h4>
+        <!-- Pedido direto (crítica externa): carga de trabalho (acima)
+        responde "quem trabalha mais" — isto responde "quem precisa agir
+        essa semana", pergunta diferente (pode ser gente com poucos
+        contratos, mas vários vencendo). -->
+        <p class="dash-chart-hint">Quem tem mais contrato vencido ou vencendo em até 90 dias sob responsabilidade agora — clique num nome pra abrir o perfil completo dele.</p>
+        <div id="porpessoas-risco-gestores"></div>
+      </div>
+      <div class="dash-chart-box">
+        <h4>Top 10 Fiscais (Contratos em Risco)</h4>
+        <p class="dash-chart-hint">Mesma pergunta, do lado da fiscalização — clique num nome pra abrir o perfil completo dele.</p>
+        <div id="porpessoas-risco-fiscais"></div>
       </div>
     </div>
     <div class="dash-charts" style="grid-template-columns:1fr">
@@ -8563,11 +8732,19 @@ function renderPorPessoasContratos(lista) {
     limite: 20,
     linhaReferencia: { valor: mediaFiscal, rotulo: `MÉDIA: ${mediaFiscal.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}` },
   });
+  document.getElementById("porpessoas-risco-gestores").innerHTML = gestoresRisco.length
+    ? barraContagemHorizontalSVG(gestoresRisco.slice(0, 10), { tituloTooltip: (l) => `${l.label}: ${l.total} contrato(s) em risco`, limite: 20 })
+    : `<p class="dash-chart-hint">Nenhum gestor com contrato vencido ou vencendo em até 90 dias no momento.</p>`;
+  document.getElementById("porpessoas-risco-fiscais").innerHTML = fiscaisRisco.length
+    ? barraContagemHorizontalSVG(fiscaisRisco.slice(0, 10), { tituloTooltip: (l) => `${l.label}: ${l.total} contrato(s) em risco`, limite: 20 })
+    : `<p class="dash-chart-hint">Nenhum fiscal com contrato vencido ou vencendo em até 90 dias no momento.</p>`;
   document.getElementById("porpessoas-duplas").innerHTML = duplas.length
     ? barraContagemHorizontalSVG(duplas.slice(0, 10), { tituloTooltip: (l) => `${l.label}: ${l.total} contrato(s)`, limite: 20 })
     : `<p class="dash-chart-hint">Nenhum contrato com gestor E fiscal cadastrados ao mesmo tempo ainda.</p>`;
   adicionarControlesGrafico(document.getElementById("porpessoas-top-gestores"));
   adicionarControlesGrafico(document.getElementById("porpessoas-top-fiscais"));
+  adicionarControlesGrafico(document.getElementById("porpessoas-risco-gestores"));
+  adicionarControlesGrafico(document.getElementById("porpessoas-risco-fiscais"));
   adicionarControlesGrafico(document.getElementById("porpessoas-duplas"));
   // Pedido direto: "dica de ferramenta... resumo dos contratos daquele
   // profissional" — passar o mouse num nome do Top 10 já mostra quais são,
@@ -8575,6 +8752,10 @@ function renderPorPessoasContratos(lista) {
   ligarTooltipPessoa(document.getElementById("porpessoas-top-gestores"), "Gestor", (nome) =>
     lista.filter((c) => (c.pessoas || []).some((pe) => pe.papel === "Gestor" && pe.nomePessoa === nome)));
   ligarTooltipPessoa(document.getElementById("porpessoas-top-fiscais"), "Fiscal", (nome) =>
+    lista.filter((c) => (c.pessoas || []).some((pe) => pe.papel === "Fiscal" && pe.nomePessoa === nome)));
+  ligarTooltipPessoa(document.getElementById("porpessoas-risco-gestores"), "Gestor", (nome) =>
+    lista.filter((c) => (c.pessoas || []).some((pe) => pe.papel === "Gestor" && pe.nomePessoa === nome)));
+  ligarTooltipPessoa(document.getElementById("porpessoas-risco-fiscais"), "Fiscal", (nome) =>
     lista.filter((c) => (c.pessoas || []).some((pe) => pe.papel === "Fiscal" && pe.nomePessoa === nome)));
 
   function desenharDuplaAberta() {
@@ -8618,6 +8799,8 @@ function renderPorPessoasContratos(lista) {
   }
   ligarCliqueTop10("porpessoas-top-gestores", "gestor", "gestor-select");
   ligarCliqueTop10("porpessoas-top-fiscais", "fiscal", "fiscal-select");
+  ligarCliqueTop10("porpessoas-risco-gestores", "gestor", "gestor-select");
+  ligarCliqueTop10("porpessoas-risco-fiscais", "fiscal", "fiscal-select");
 
   const gestorHandle = renderPorGestorContratos(lista);
   const fiscalHandle = renderPorFiscalContratos(lista);
