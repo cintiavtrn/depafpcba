@@ -1265,6 +1265,103 @@ function barRankingChartSVG(categorias, selectedLabel) {
   return `<svg viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg">${linhas}</svg>`;
 }
 
+// Barra horizontal com EIXO DE VERDADE embaixo (grade + valores em R$/número,
+// não só o texto ao lado de cada barra) — pedido direto, comparando com um
+// painel de referência: "era a barra mesmo... só que aparecesse os valores
+// embaixo". Continua clicável (data-cat), diferente dos gráficos de coluna/
+// linha abaixo, porque aqui a pergunta ainda é ranking (isolar 1 categoria
+// faz sentido).
+function barraHorizontalComEixoSVG(categorias, opcoes = {}) {
+  // formatarValor: número completo (tooltip). formatarEixoTick: versão
+  // curta pro rótulo do eixo — "R$ 243,4 milhões" por extenso não cabe
+  // repetido a cada marca de grade sem colidir; formatarEixo (mesma que
+  // simpleBarChartSVG/simpleLineChartSVG já usam) resolve isso.
+  const { formatarValor = (v) => "R$ " + formatarMoedaCompacta(v), formatarEixoTick = (v) => "R$ " + formatarEixo(v), cor = "var(--tinta)", selecionado = "" } = opcoes;
+  const MAX_ROTULO = 22;
+  const padL = 150, padR = 14, padT = 4, alturaEixoX = 24;
+  const larguraPlot = 280;
+  const rowH = 26;
+  const w = padL + larguraPlot + padR;
+  const baseY = padT + categorias.length * rowH;
+  const h = baseY + alturaEixoX;
+  const maxV = maxSeguro(categorias.map((c) => c.valor));
+
+  // 3 marcas (não 5) — rótulo por extenso de dinheiro é largo, 5 marcas
+  // coladas numa faixa de 280px colidem entre si.
+  let grade = "", eixoX = "";
+  [0, 0.5, 1].forEach((f) => {
+    const x = padL + larguraPlot * f;
+    grade += `<line x1="${x.toFixed(1)}" y1="${padT}" x2="${x.toFixed(1)}" y2="${baseY.toFixed(1)}" stroke="var(--paper-line)" stroke-width="1" stroke-dasharray="${f === 0 ? "0" : "2 4"}" />`;
+    eixoX += `<text x="${x.toFixed(1)}" y="${(baseY + 14).toFixed(1)}" text-anchor="${f === 0 ? "start" : f === 1 ? "end" : "middle"}" font-family="monospace" font-size="8" fill="var(--carvao)" fill-opacity="0.55">${formatarEixoTick(maxV * f)}</text>`;
+  });
+
+  let barras = "";
+  categorias.forEach((c, i) => {
+    const y = padT + i * rowH;
+    const dim = selecionado && selecionado !== c.label;
+    const largura = maxV ? larguraPlot * (c.valor / maxV) : 0;
+    const rotulo = textoSVG(c.label, padL - 8, y + rowH / 2, { maxChars: MAX_ROTULO, anchor: "end", fontSize: 9, alturaLinha: 11, peso: selecionado === c.label ? 700 : 400 });
+    barras += `<g data-cat="${escapeAttr(c.label)}" style="cursor:pointer" opacity="${dim ? 0.4 : 1}">
+      <rect class="area-hit" x="0" y="${y.toFixed(1)}" width="${w}" height="${rowH}" fill="transparent" />
+      ${rotulo}
+      <rect x="${padL}" y="${(y + 4).toFixed(1)}" width="${Math.max(largura, 1.5).toFixed(1)}" height="${(rowH - 8).toFixed(1)}" fill="${cor}"><title>${escapeHTML(c.label)}: ${formatarValor(c.valor)}</title></rect>
+    </g>`;
+  });
+  return `<svg viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg">${grade}${barras}${eixoX}</svg>`;
+}
+
+// Coluna empilhada genérica — eixo Y de valor com grade (igual
+// simpleBarChartSVG) e cada coluna dividida em segmentos coloridos por uma
+// SUBcategoria. Versão sem paleta fixa de colunaCriticidadeEmpilhadaSVG (que
+// já existia, mas amarrada em CRITICIDADE_VISUAL) — aqui as cores vêm de
+// fora, pra caber qualquer conjunto de segmentos (Entregue/Pendente/
+// Suprimida, ou outro no futuro).
+function colunaEmpilhadaSVG(grupos, segmentos, opcoes = {}) {
+  const { formatarValor = (v) => "R$ " + formatarMoedaCompacta(v), selecionado = "" } = opcoes;
+  const w = 460, padL = 42, padR = 10, padT = 10;
+  const alturaPlot = 190, alturaRotulos = 22;
+  const alturaLegenda = 18;
+  const h = padT + alturaPlot + alturaRotulos + alturaLegenda;
+  const baseY = padT + alturaPlot;
+  const n = grupos.length || 1;
+  const bw = (w - padL - padR) / n;
+  const barW = Math.min(bw * 0.6, 44);
+  const totais = grupos.map((g) => segmentos.reduce((a, s) => a + (g.valores[s.label] || 0), 0));
+  const maxTotal = maxSeguro(totais);
+
+  let grade = "", eixoY = "";
+  [0, 0.25, 0.5, 0.75, 1].forEach((f) => {
+    const y = baseY - alturaPlot * f;
+    grade += `<line x1="${padL}" y1="${y.toFixed(1)}" x2="${(w - padR).toFixed(1)}" y2="${y.toFixed(1)}" stroke="var(--paper-line)" stroke-width="1" stroke-dasharray="${f === 0 ? "0" : "2 4"}" />`;
+    eixoY += `<text x="${(padL - 6).toFixed(1)}" y="${(y + 3).toFixed(1)}" text-anchor="end" font-family="monospace" font-size="8" fill="var(--carvao)" fill-opacity="0.55">${formatarValor(maxTotal * f)}</text>`;
+  });
+
+  let colunas = "", rotulos = "";
+  grupos.forEach((g, i) => {
+    const cx = padL + bw * i + bw / 2;
+    const dim = selecionado && selecionado !== g.label;
+    let coluna = `<rect class="area-hit" x="${(cx - bw / 2).toFixed(1)}" y="${padT}" width="${bw.toFixed(1)}" height="${alturaPlot}" fill="transparent" />`;
+    let y = baseY;
+    segmentos.forEach((s) => {
+      const v = g.valores[s.label] || 0;
+      if (!v) return;
+      const alt = maxTotal ? alturaPlot * (v / maxTotal) : 0;
+      coluna += `<rect x="${(cx - barW / 2).toFixed(1)}" y="${(y - alt).toFixed(1)}" width="${barW.toFixed(1)}" height="${alt.toFixed(1)}" fill="${s.cor}"><title>${escapeHTML(g.label)} — ${escapeHTML(s.label)}: ${formatarValor(v)}</title></rect>`;
+      y -= alt;
+    });
+    colunas += `<g data-cat="${escapeAttr(g.label)}" style="cursor:pointer" opacity="${dim ? 0.4 : 1}">${coluna}</g>`;
+    rotulos += `<text x="${cx.toFixed(1)}" y="${(baseY + 14).toFixed(1)}" text-anchor="middle" font-family="monospace" font-size="8.5" fill="var(--carvao)" fill-opacity="${dim ? 0.5 : 0.85}" font-weight="${selecionado === g.label ? 700 : 400}">${escapeHTML(g.label)}</text>`;
+  });
+
+  const yLeg = baseY + alturaRotulos + 10;
+  const legenda = segmentos.map((s, k) => {
+    const lx = padL + k * 110;
+    return `<rect x="${lx.toFixed(1)}" y="${(yLeg - 7).toFixed(1)}" width="8" height="8" fill="${s.cor}" /><text x="${(lx + 12).toFixed(1)}" y="${yLeg.toFixed(1)}" font-family="monospace" font-size="8" fill="var(--carvao)">${escapeHTML(s.label)}</text>`;
+  }).join("");
+
+  return `<svg viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg">${grade}${eixoY}${colunas}${rotulos}${legenda}</svg>`;
+}
+
 // =====================================================================
 // 2. DADOS DO PORTAL — agora vêm da API, não ficam mais escritos aqui.
 // Troque GOOGLE_CLIENT_ID pelo Client ID do Google Auth Platform (Clients
@@ -8600,14 +8697,20 @@ const DIMENSOES_OBRAS = [
 // SAIU daqui — virou seletor por botão (seg), não mais uma barra pra clicar.
 const DIMENSOES_CEIRF = [
   { chave: "status", campo: (r) => r.status, rotulo: "Status", colunaRotulo: "STATUS", containerId: "ceirf-status", tipo: "rosca" },
-  { chave: "tipoIntervencao", campo: (r) => r.tipoIntervencao, rotulo: "Obra ou Reforma", colunaRotulo: "TIPO DE INTERVENÇÃO", containerId: "ceirf-tipo" },
-  { chave: "etapa", campo: (r) => r.etapa, rotulo: "Etapa do Programa", colunaRotulo: "ETAPA", containerId: "ceirf-etapa" },
-  { chave: "padraoUnidade", campo: (r) => r.padraoUnidade, rotulo: "Padrão da Unidade", colunaRotulo: "PADRÃO DA UNIDADE", containerId: "ceirf-padrao" },
-  { chave: "municipio", campo: (r) => r.municipio, rotulo: "Município", colunaRotulo: "MUNICÍPIO", containerId: "ceirf-municipio" },
+  { chave: "tipoIntervencao", campo: (r) => r.tipoIntervencao, rotulo: "Obra ou Reforma", colunaRotulo: "TIPO DE INTERVENÇÃO", containerId: "ceirf-tipo", tipo: "barraEixo", cor: "var(--terracota)" },
+  // Coluna empilhada (colunaEmpilhadaSVG, nova) — "o gradiente por etapa"
+  // pedido direto, com eixo Y de valor e as 3 cores próprias (não o azul/
+  // dourado/rosa do painel de referência: oliva=entregue, mostarda=
+  // pendente, terracota=suprimida — mesmo raciocínio semântico, cores da casa).
+  { chave: "etapa", campo: (r) => r.etapa, rotulo: "Etapa do Programa (gradiente entregue × pendente)", colunaRotulo: "ETAPA", containerId: "ceirf-etapa", tipo: "empilhado" },
+  { chave: "padraoUnidade", campo: (r) => r.padraoUnidade, rotulo: "Padrão da Unidade", colunaRotulo: "PADRÃO DA UNIDADE", containerId: "ceirf-padrao", tipo: "barraEixo", cor: "var(--dourado)" },
+  // Top 8 (a lista real tem 162 municípios — sem corte a barra vira uma
+  // escada infinita, ilegível).
+  { chave: "municipio", campo: (r) => r.municipio, rotulo: "Município (8 com maior valor)", colunaRotulo: "MUNICÍPIO", containerId: "ceirf-municipio", tipo: "barraEixo", cor: "var(--tinta)", limite: 8 },
 ];
 const DIMENSOES_MANUTENCAO = [
   { chave: "grupoStatus", campo: (r) => r.grupoStatus, rotulo: "Status", colunaRotulo: "STATUS", containerId: "manut-status", tipo: "rosca" },
-  { chave: "categoriaUnidade", campo: (r) => r.categoriaUnidade, rotulo: "Categoria de Unidade", colunaRotulo: "CATEGORIA DE UNIDADE", containerId: "manut-categoria" },
+  { chave: "categoriaUnidade", campo: (r) => r.categoriaUnidade, rotulo: "Categoria de Unidade", colunaRotulo: "CATEGORIA DE UNIDADE", containerId: "manut-categoria", tipo: "barraEixo", cor: "var(--tinta)" },
   { chave: "tipoOs", campo: (r) => r.tipoOs, rotulo: "Complementar ou Principal", colunaRotulo: "TIPO DE OS", containerId: "manut-tipo-os", tipo: "rosca" },
   // Achado da própria transcrição dela: quase toda OS fica logo abaixo de
   // R$330 mil — um teto prático de contratação, não coincidência.
@@ -8908,17 +9011,47 @@ async function carregarObrasPortal(portalSlug) {
       <div class="kpi-card"><div class="kpi-cabeca">${kpiIcone("moeda")}<div class="kpi-label">Valor Pendente</div></div><div class="kpi-value">R$ ${formatarMoedaCompacta(pendente)}</div></div>
     `;
 
+    // Etapa/Pendente/Entregue/Suprimida — mesmas cores em todo canto que usa
+    // esse conceito (semântica: verde=bom/entregue, âmbar=em curso,
+    // terracota=ruim/suprimida), definidas uma vez só.
+    const SEGMENTOS_ENTREGA_CEIRF = [
+      { label: "Entregue", cor: "var(--oliva)" },
+      { label: "Pendente", cor: "var(--mostarda)" },
+      { label: "Suprimida", cor: "var(--terracota)" },
+    ];
+    const ETAPA_ORDEM = ["I", "II", "III", "IV", "V", "SEM ETAPA"];
+
     DIMENSOES_CEIRF.forEach((d) => {
       const linhasRecorte = ceirfAmpliado.filter((r) => motorCeirf.bateFiltro(r, d.chave));
-      const linhas = agruparValorObrasPorCampo(linhasRecorte, (r) => d.campo(r), (r) => r.valorGlobal, "(não informado)");
       const container = document.getElementById(d.containerId);
-      if (d.tipo === "rosca") {
+      if (d.tipo === "empilhado") {
+        const grupos = ETAPA_ORDEM.map((et) => {
+          const doGrupo = linhasRecorte.filter((r) => (r.etapa || "SEM ETAPA") === et);
+          const valores = {};
+          SEGMENTOS_ENTREGA_CEIRF.forEach((s) => {
+            valores[s.label] = doGrupo.filter((r) => r.grupoStatus === s.label).reduce((a, r) => a + (r.valorGlobal || 0), 0);
+          });
+          return { label: et, valores };
+        }).filter((g) => Object.values(g.valores).some((v) => v > 0));
+        container.innerHTML = colunaEmpilhadaSVG(grupos, SEGMENTOS_ENTREGA_CEIRF, {
+          formatarValor: (v) => "R$ " + formatarMoedaCompacta(v),
+          selecionado: motorCeirf.filtros[d.chave] || "",
+        });
+      } else if (d.tipo === "rosca") {
+        const linhas = agruparValorObrasPorCampo(linhasRecorte, (r) => d.campo(r), (r) => r.valorGlobal, "(não informado)");
         container.innerHTML = pieChartSVG(
           linhas.map((l) => ({ label: l.label, valor: l.total })),
           motorCeirf.filtros[d.chave] || "",
           { formatarValor: (v) => "R$ " + formatarMoedaCompacta(v) }
         );
+      } else if (d.tipo === "barraEixo") {
+        const linhas = agruparValorObrasPorCampo(linhasRecorte, (r) => d.campo(r), (r) => r.valorGlobal, "(não informado)");
+        container.innerHTML = barraHorizontalComEixoSVG(
+          linhas.slice(0, d.limite || linhas.length).map((l) => ({ label: l.label, valor: l.total })),
+          { formatarValor: (v) => "R$ " + formatarMoedaCompacta(v), cor: d.cor, selecionado: motorCeirf.filtros[d.chave] || "" }
+        );
       } else {
+        const linhas = agruparValorObrasPorCampo(linhasRecorte, (r) => d.campo(r), (r) => r.valorGlobal, "(não informado)");
         container.innerHTML = barraOuTabelaSVG(linhas, {
           formatarValor: (v) => "R$ " + formatarMoedaCompacta(v),
           rotuloExtra: (l) => `(${l.qtd})`,
@@ -8984,6 +9117,12 @@ async function carregarObrasPortal(portalSlug) {
           linhas.map((l) => ({ label: l.label, valor: l.total })),
           motorManutencao.filtros[d.chave] || "",
           { formatarValor: (v) => "R$ " + formatarMoedaCompacta(v) }
+        );
+      } else if (d.tipo === "barraEixo") {
+        const linhas = agruparValorObrasPorCampo(linhasRecorte, (r) => d.campo(r), (r) => r.valorOrcado, "(não informado)");
+        container.innerHTML = barraHorizontalComEixoSVG(
+          linhas.slice(0, d.limite || linhas.length).map((l) => ({ label: l.label, valor: l.total })),
+          { formatarValor: (v) => "R$ " + formatarMoedaCompacta(v), cor: d.cor, selecionado: motorManutencao.filtros[d.chave] || "" }
         );
       } else {
         const linhas = agruparValorObrasPorCampo(linhasRecorte, (r) => d.campo(r), (r) => r.valorOrcado, "(não informado)");
