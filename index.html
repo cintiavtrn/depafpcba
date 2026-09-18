@@ -4986,6 +4986,82 @@ function tabelaDistribuicaoHTML(linhas, opcoes = {}) {
     <p class="dash-chart-hint" data-hint-contagem>${linhas.length} categorias — clique no cabeçalho pra ordenar, ou digite acima pra buscar.</p>`;
 }
 
+// Tabela mesclada — contratos, valor e ticket médio juntos, uma linha por
+// categoria — em vez de 2 tabelas repetindo as mesmas categorias (uma só
+// contagem, outra só valor). Pedido direto (crítica externa que ela
+// trouxe): "Tipo de Objeto: uma tabela com contratos, valor e valor médio
+// juntos" em vez de "a mesma pergunta respondida 3 vezes, nunca junto".
+// NÃO reaproveita a classe "tabela-distribuicao" nem "sortable" de
+// tabelaDistribuicaoHTML de propósito — a ordenação genérica ligada em
+// adicionarControlesGrafico só sabe comparar "total" (numérico) ou
+// "label" (texto); com 4 colunas numéricas diferentes (contratos, valor,
+// ticket, %) ela ordenaria errado. Usa ligarOrdenacaoTabela (abaixo),
+// dedicada, com extrator por coluna.
+function tabelaMescladaHTML(linhas, opcoes = {}) {
+  const { colunaRotulo = "CATEGORIA", selecionado = "", idPrefixo = "tabela-mesclada" } = opcoes;
+  const somaValor = linhas.reduce((a, l) => a + l.valor, 0);
+  const maxValor = maxSeguro(linhas.map((l) => l.valor));
+  const ordenadas = linhas.slice().sort((a, b) => b.valor - a.valor);
+  const corpo = ordenadas.map((l) => {
+    const destacado = selecionado === l.label;
+    const pct = somaValor ? Math.round((l.valor / somaValor) * 1000) / 10 : 0;
+    const ticket = l.qtd ? l.valor / l.qtd : 0;
+    return `<tr data-cat="${escapeAttr(l.label)}" data-busca="${escapeAttr(normalizarBusca(l.label))}" data-qtd="${l.qtd}" data-valor="${l.valor}" data-ticket="${ticket}" data-pct="${pct}" class="${destacado ? "selecionada" : ""}">
+      <td>${escapeHTML(l.label)}</td>
+      <td class="num">${l.qtd.toLocaleString("pt-BR")}</td>
+      <td class="num"><span class="barra-embutida"><span class="barra-embutida-fill" style="width:${maxValor ? (l.valor / maxValor) * 100 : 0}%"></span></span>R$ ${escapeHTML(formatarMoedaCompacta(l.valor))}</td>
+      <td class="num">R$ ${escapeHTML(formatarMoedaCompacta(ticket))}</td>
+      <td class="num">${pct.toLocaleString("pt-BR")}%</td>
+    </tr>`;
+  }).join("");
+  const idTabela = `${idPrefixo}-${Math.random().toString(36).slice(2, 9)}`;
+  return `
+    <div class="dash-filtro" style="margin-bottom:10px">
+      <input type="text" class="tabela-distribuicao-busca" data-alvo="${idTabela}" placeholder="Buscar ${escapeAttr(colunaRotulo.toLowerCase())}...">
+    </div>
+    <div class="tabela-rolavel" style="max-height:380px">
+      <table class="dash-tabela" id="${idTabela}" data-ordenacao-propria="1">
+        <thead><tr>
+          <th class="sortable-propria" data-campo="label">${escapeHTML(colunaRotulo)}</th>
+          <th class="sortable-propria num" data-campo="qtd">CONTRATOS</th>
+          <th class="sortable-propria sort-desc num" data-campo="valor">VALOR TOTAL</th>
+          <th class="sortable-propria num" data-campo="ticket">TICKET MÉDIO</th>
+          <th class="sortable-propria num" data-campo="pct">%</th>
+        </tr></thead>
+        <tbody>${corpo}</tbody>
+      </table>
+    </div>
+    <p class="dash-chart-hint" data-hint-contagem>${linhas.length} categorias — clique no cabeçalho pra ordenar, ou digite acima pra buscar.</p>`;
+}
+
+// Ordenação dedicada pra tabelaMescladaHTML — mesmo UX de clique-no-
+// cabeçalho de tabelaDistribuicaoHTML, mas sabe comparar QUALQUER coluna
+// numérica (não só "total"), lendo o valor bruto do próprio data-* da
+// linha em vez de reparsear o texto formatado.
+function ligarOrdenacaoTabelaPropria(container) {
+  container.querySelectorAll("table[data-ordenacao-propria] th.sortable-propria").forEach((th) => {
+    if (th.dataset.ordenacaoLigada) return;
+    th.dataset.ordenacaoLigada = "1";
+    th.addEventListener("click", () => {
+      const tabela = th.closest("table");
+      const tbody = tabela.querySelector("tbody");
+      const campo = th.dataset.campo;
+      const atual = th.classList.contains("sort-asc") ? "asc" : th.classList.contains("sort-desc") ? "desc" : null;
+      const novo = atual === "desc" ? "asc" : atual === "asc" ? "desc" : campo === "label" ? "asc" : "desc";
+      tabela.querySelectorAll("th.sortable-propria").forEach((o) => o.classList.remove("sort-asc", "sort-desc"));
+      th.classList.add(novo === "asc" ? "sort-asc" : "sort-desc");
+      const linhas = [...tbody.querySelectorAll("tr")];
+      linhas.sort((a, b) => {
+        const cmp = campo === "label"
+          ? a.dataset.cat.localeCompare(b.dataset.cat, "pt-BR")
+          : Number(a.dataset[campo]) - Number(b.dataset[campo]);
+        return novo === "desc" ? -cmp : cmp;
+      });
+      linhas.forEach((tr) => tbody.appendChild(tr));
+    });
+  });
+}
+
 // Mesma ideia de agruparContagemPorCampo, mas SOMANDO valor em vez de contar
 // contrato — pedido direto de reunião: "quanto eu gasto em Tecnologia? Em
 // Transporte?" não dá pra responder com uma contagem, precisa do R$. Serve
@@ -5660,20 +5736,20 @@ function renderGerencialContratos(lista, resumo) {
         <div id="ger-valor-area"></div>
       </div>
     </div>
-    <div class="dash-charts" style="grid-template-columns:1fr 1fr">
+    <div class="dash-charts" style="grid-template-columns:1fr">
       <div class="dash-chart-box">
         <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">
-          <h4 style="margin-bottom:0">Contratos por Tipo de Objeto</h4>
+          <h4 style="margin-bottom:0">Tipo de Objeto</h4>
           <button type="button" class="dash-toggle-btn" id="ger-tipo-agrupar-toggle" title="Selecionar categorias pra juntar num grupo personalizado, tipo o Power BI">AGRUPAR</button>
         </div>
-        <p class="dash-chart-hint">Qual tipo de objeto reina mais no portfólio, em QUANTIDADE. Clique numa barra pra isolar aquele tipo.</p>
+        <!-- Pedido direto (crítica externa que ela trouxe): "uma tabela por
+        dimensão, não duas... contratos, valor e valor médio juntos" — antes
+        eram 2 tabelas lado a lado com as MESMAS 22 categorias, uma por
+        quantidade, outra por valor. O ticket médio (valor ÷ contratos) nem
+        aparecia em nenhuma das duas, e é o dado mais informativo dos três. -->
+        <p class="dash-chart-hint">Contratos, valor total e ticket médio por tipo de objeto — clique numa linha pra isolar aquele tipo.</p>
         <div id="ger-tipo"></div>
         <div id="ger-tipo-agrupar" class="dash-chart-hint" hidden></div>
-      </div>
-      <div class="dash-chart-box">
-        <h4>Valor por Tipo de Objeto</h4>
-        <p class="dash-chart-hint">A mesma pergunta em R$ — ex.: quantos milhões se gasta em TIC. Clique numa barra pra isolar aquele tipo.</p>
-        <div id="ger-valor-tipo"></div>
       </div>
     </div>
     <div class="dash-charts" style="grid-template-columns:1fr 1fr">
@@ -5879,7 +5955,6 @@ function renderGerencialContratos(lista, resumo) {
     selecionarTipo(alvoClicado.dataset.cat);
   }
   document.getElementById("ger-tipo").addEventListener("click", cliqueTipoOuAgrupar);
-  document.getElementById("ger-valor-tipo").addEventListener("click", cliqueTipoOuAgrupar);
   document.getElementById("ger-tipo-agrupar-toggle").addEventListener("click", () => {
     modoAgruparTipo = !modoAgruparTipo;
     selecaoAgruparTipo.clear();
@@ -6093,28 +6168,26 @@ function renderGerencialContratos(lista, resumo) {
         mostrarPercentual: true,
       }
     );
-    document.getElementById("ger-tipo").innerHTML = barraOuTabelaSVG(agruparContagemPorCampo(filtrada, valorEfetivoTipo, "(sem tipo)"), {
-      tituloTooltip: (l) => `${l.label}: ${l.total} contrato(s)`,
-      selecionado: filtroTipo,
+    // Pedido direto (crítica externa que ela trouxe): "Tipo de Objeto: uma
+    // tabela com contratos, valor e valor médio juntos" em vez de 2 tabelas
+    // repetindo as mesmas 22 categorias. Agrega contagem E valor no mesmo
+    // laço (não reaproveita agruparContagemPorCampo/agruparValorPorCampo
+    // separados) porque as duas precisam bater na MESMA linha.
+    const porTipo = new Map();
+    for (const c of filtrada) {
+      const chave = valorEfetivoTipo(c);
+      if (!porTipo.has(chave)) porTipo.set(chave, { qtd: 0, valor: 0 });
+      const g = porTipo.get(chave);
+      g.qtd += 1;
+      g.valor += c.valorGlobalAtual || 0;
+    }
+    const linhasTipo = [...porTipo.entries()].map(([label, g]) => ({ label, qtd: g.qtd, valor: g.valor }));
+    document.getElementById("ger-tipo").innerHTML = tabelaMescladaHTML(linhasTipo, {
       colunaRotulo: "TIPO DE OBJETO",
-      colunaValor: "CONTRATOS",
+      selecionado: filtroTipo,
+      idPrefixo: "tabela-tipo-objeto",
     });
-    // Rosca virou tabela: com os tipos de objeto reais de hoje (22
-    // distintos), uma fatia de rosca por tipo já passa de 3x o teto de ~6-7
-    // segmentos em que o olho ainda compara ângulo — a mesma degradação que
-    // "muita barra" tinha, só que em forma de pizza. % do total substitui a
-    // leitura de "fatia" que a rosca dava.
-    document.getElementById("ger-valor-tipo").innerHTML = barraOuTabelaSVG(
-      agruparValorPorCampo(filtrada, valorEfetivoTipo, "(sem tipo)"),
-      {
-        formatarValor: (v) => "R$ " + formatarMoedaCompacta(v),
-        rotuloExtra: (l) => `(${l.qtd} contrato${l.qtd === 1 ? "" : "s"})`,
-        selecionado: filtroTipo,
-        colunaRotulo: "TIPO DE OBJETO",
-        colunaValor: "VALOR (R$)",
-        mostrarPercentual: true,
-      }
-    );
+    ligarOrdenacaoTabelaPropria(document.getElementById("ger-tipo"));
     desenharAgrupamentoTipo();
     document.getElementById("ger-analista").innerHTML = barraOuTabelaSVG(
       agruparContagemPorCampo(filtrada, (c) => c.analista, "(sem analista)"),
@@ -6167,7 +6240,6 @@ function renderGerencialContratos(lista, resumo) {
     adicionarControlesGrafico(document.getElementById("ger-barra"));
     adicionarControlesGrafico(document.getElementById("ger-valor-area"));
     adicionarControlesGrafico(document.getElementById("ger-tipo"));
-    adicionarControlesGrafico(document.getElementById("ger-valor-tipo"));
     adicionarControlesGrafico(document.getElementById("ger-analista"));
     adicionarControlesGrafico(document.getElementById("ger-aditivos"));
     adicionarControlesGrafico(document.getElementById("ger-gestor"));
@@ -9533,8 +9605,12 @@ async function carregarContratosPortal(portalSlug) {
         </div>
       </div>
     </div>` : ""}
-    <div id="contratos-resumo-rapido"></div>
+    <!-- Pedido direto: "risco de vencimento é a razão de existir do
+    dashboard; valor gasto é contexto. A ordem hoje inverte isso" — alerta
+    de vencimento agora vem ANTES do Resumo Rápido (onde mais se gasta),
+    não depois. -->
     <div id="contratos-alerta"></div>
+    <div id="contratos-resumo-rapido"></div>
     ${dicaLeituraContratosHTML()}
     <div class="tabs" style="margin-bottom:0">
       <button class="tab-btn active" data-subtab-contratos="gerencial">${ICONS.painel_dashboard}GERENCIAL</button>
