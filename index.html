@@ -5188,6 +5188,28 @@ function agruparValorEnriquecidoPorCampo(lista, campoFn, rotuloVazio) {
   return [...mapa.entries()].map(([label, g]) => ({ label, qtd: g.qtd, valor: g.valor, total: g.valor, maiorContrato: g.maiorContrato, criticos: g.criticos }));
 }
 
+// Pedido direto: "o mapa poderia ser uma das opções de visualização de
+// setor demandante... já que são cidades e tem uma espacialidade boa pra
+// ver em mapa" — prepara a saída de agruparValorEnriquecidoPorCampo pro
+// formato que mapaCoorpinSVG espera (não muda mapaCoorpinSVG nem
+// legendaMapaUnidadeHTML, só adapta os dados na entrada). `total` vira a
+// CONTAGEM (não o valor) de propósito: o mapa já dimensiona bolha por
+// contagem em todo canto do sistema — manter esse significado evita um
+// segundo jeito de ler "bolha grande" só neste lugar. O valor em R$ entra
+// no tooltip via `rotuloTooltipExtra` (campo que mapaCoorpinSVG já lê).
+function paraLinhasMapaCoorpin(linhas, lista) {
+  const dirpinPorCoorpin = new Map();
+  for (const u of lista.flatMap((c) => c.unidades || [])) {
+    if (!dirpinPorCoorpin.has(u.nomeUnidade)) dirpinPorCoorpin.set(u.nomeUnidade, u.dirpin);
+  }
+  return linhas.map((l) => ({
+    ...l,
+    total: l.qtd,
+    dirpin: dirpinPorCoorpin.get(l.label),
+    rotuloTooltipExtra: `${formatarMoedaBR(l.valor)}${l.criticos ? ` — ${l.criticos} crítico(s)/a vencer` : ""}`,
+  }));
+}
+
 // Pedido direto: "a área gestora do contrato é a unidade administrativa,
 // setor ou departamento... responsável por coordenar, acompanhar,
 // fiscalizar... existe mais de um entendimento possível... eu entendo que
@@ -5787,6 +5809,12 @@ function renderGerencialContratos(lista, resumo) {
   const areasDisponiveis = [...new Set(lista.flatMap(setoresDemandantesDoContrato))].sort(compararSetorDemandante);
   let filtroArea = "";
   let filtroTipo = "";
+  // Pedido direto: "o mapa poderia ser uma das opções de visualização de
+  // setor demandante dentro da DIRPIN" — aqui é onde o sub-filtro de DIRPIN
+  // (`filtroDirpinTopo`, fora desta função) já estreita `filtrada` pra uma
+  // região só antes deste widget rodar, então o mapa aqui naturalmente
+  // mostra só as COORPINs daquela DIRPIN quando o sub-filtro está ativo.
+  let modoVisualGerSetor = lerGraficoSalvo("cpg-ger-setor-visual") || "lista";
   // Grupos de análise personalizados — mesmo mecanismo do Painel de Obras
   // (ver DIMENSOES_OBRAS/valorEfetivoDimensao), pedido dela depois de ver
   // funcionando lá: "adicione lá em contratos... gostei muito". Começa só em
@@ -5844,8 +5872,15 @@ function renderGerencialContratos(lista, resumo) {
         (barra/mapa/mapa de calor, logo abaixo) separado de propósito — ele
         responde uma pergunta de FORMATO (como a criticidade se distribui
         dentro de cada setor) que uma tabela não substitui. -->
-        <p class="dash-chart-hint">Contratos, valor total, ticket médio e quantos estão vencidos ou a vencer, por setor demandante — clique numa linha pra isolar aquele setor.</p>
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+          <p class="dash-chart-hint" style="margin:0">Contratos, valor total, ticket médio e quantos estão vencidos ou a vencer, por setor demandante — clique numa linha pra isolar aquele setor.</p>
+          <div class="dash-toggle" id="ger-setor-visual-toggle">
+            <button class="dash-toggle-btn" data-modo-visual="lista" title="Tabela ordenável, com % do total">LISTA</button>
+            <button class="dash-toggle-btn" data-modo-visual="mapa" title="Onde cada unidade regional fica no estado">MAPA</button>
+          </div>
+        </div>
         <div id="ger-setor"></div>
+        <div id="ger-setor-legenda"></div>
       </div>
     </div>
     <div class="dash-charts" style="grid-template-columns:1fr">
@@ -6063,6 +6098,17 @@ function renderGerencialContratos(lista, resumo) {
   document.getElementById("ger-setor").addEventListener("click", (ev) => {
     const alvoClicado = ev.target.closest("[data-cat]");
     if (alvoClicado) selecionarArea(alvoClicado.dataset.cat);
+  });
+  document.getElementById("ger-setor-legenda").addEventListener("click", (ev) => {
+    const alvoClicado = ev.target.closest("[data-cat]");
+    if (alvoClicado) selecionarArea(alvoClicado.dataset.cat);
+  });
+  document.getElementById("ger-setor-visual-toggle").addEventListener("click", (ev) => {
+    const btn = ev.target.closest("[data-modo-visual]");
+    if (!btn || btn.dataset.modoVisual === modoVisualGerSetor) return;
+    modoVisualGerSetor = btn.dataset.modoVisual;
+    salvarGrafico("cpg-ger-setor-visual", modoVisualGerSetor);
+    atualizar();
   });
   document.getElementById("ger-barra").addEventListener("click", (ev) => {
     const alvoClicado = ev.target.closest("[data-cat]");
@@ -6313,13 +6359,28 @@ function renderGerencialContratos(lista, resumo) {
       }
     }
     const linhasSetor = [...porSetor.entries()].map(([label, g]) => ({ label, qtd: g.qtd, valor: g.valor, criticos: g.criticos, maiorContrato: g.maiorContrato }));
-    document.getElementById("ger-setor").innerHTML = tabelaMescladaHTML(linhasSetor, {
-      colunaRotulo: "SETOR DEMANDANTE",
-      selecionado: filtroArea,
-      idPrefixo: "tabela-setor-demandante",
-      colunaExtra: { titulo: "CRÍTICOS/A VENCER", campo: "criticos" },
+    // Mesmo cuidado do Financeiro/landing de cada perfil: botão MAPA só
+    // aparece quando este recorte tem alguma unidade regional cadastrada
+    // (senão seria mapa vazio fingindo leitura geográfica).
+    const podeMapaGerSetor = filtrada.some((c) => (c.unidades || []).length > 0);
+    if (modoVisualGerSetor === "mapa" && !podeMapaGerSetor) modoVisualGerSetor = "lista";
+    document.getElementById("ger-setor-visual-toggle").querySelector('[data-modo-visual="mapa"]').hidden = !podeMapaGerSetor;
+    document.querySelectorAll("#ger-setor-visual-toggle [data-modo-visual]").forEach((btn) => {
+      btn.classList.toggle("active", btn.dataset.modoVisual === modoVisualGerSetor);
     });
-    ligarOrdenacaoTabelaPropria(document.getElementById("ger-setor"));
+    if (modoVisualGerSetor === "mapa") {
+      document.getElementById("ger-setor").innerHTML = mapaCoorpinSVG(paraLinhasMapaCoorpin(linhasSetor, filtrada), { selecionado: filtroArea });
+      document.getElementById("ger-setor-legenda").innerHTML = legendaMapaUnidadeHTML(paraLinhasMapaCoorpin(linhasSetor, filtrada), (u) => u.label === filtroArea);
+    } else {
+      document.getElementById("ger-setor-legenda").innerHTML = "";
+      document.getElementById("ger-setor").innerHTML = tabelaMescladaHTML(linhasSetor, {
+        colunaRotulo: "SETOR DEMANDANTE",
+        selecionado: filtroArea,
+        idPrefixo: "tabela-setor-demandante",
+        colunaExtra: { titulo: "CRÍTICOS/A VENCER", campo: "criticos" },
+      });
+      ligarOrdenacaoTabelaPropria(document.getElementById("ger-setor"));
+    }
     // Pedido direto (crítica externa que ela trouxe): "Tipo de Objeto: uma
     // tabela com contratos, valor e valor médio juntos" em vez de 2 tabelas
     // repetindo as mesmas 22 categorias. Agrega contagem E valor no mesmo
@@ -7362,7 +7423,7 @@ function configPorCategoria() {
     labelBuscaPlural: "todas as categorias",
     labelTrocar: "← TROCAR DE CATEGORIA",
     dicaLanding: "Escolha uma categoria (no campo acima, ou clicando num cartão abaixo) pra ver o perfil completo dela — vencimentos, financeiro, pessoas.",
-    complementar: { campoFn: (c) => setoresDemandantesDoContrato(c), rotuloVazio: "(sem unidade)", titulo: "Valor por Setor Demandante", prefixoAlvo: "area", tituloAba: "Por Setor Demandante" },
+    complementar: { campoFn: (c) => setoresDemandantesDoContrato(c), rotuloVazio: "(sem unidade)", titulo: "Valor por Setor Demandante", prefixoAlvo: "area", tituloAba: "Por Setor Demandante", geografico: true },
   };
 }
 // configPorDirpin()/renderPorDirpinContratos() (a aba própria "Por DIRPIN")
@@ -7398,7 +7459,7 @@ function configPorGestor() {
     labelBuscaPlural: "todos os gestores",
     labelTrocar: "← TROCAR DE GESTOR",
     dicaLanding: "Escolha um gestor (no campo acima, ou clicando num cartão abaixo, ou digitando na busca) pra ver o perfil completo dele — vencimentos, financeiro, e a quais setores/categorias ele costuma atender.",
-    complementar: { campoFn: (c) => setoresDemandantesDoContrato(c), rotuloVazio: "(sem unidade)", titulo: "Valor por Setor Demandante", prefixoAlvo: "area", tituloAba: "Por Setor Demandante" },
+    complementar: { campoFn: (c) => setoresDemandantesDoContrato(c), rotuloVazio: "(sem unidade)", titulo: "Valor por Setor Demandante", prefixoAlvo: "area", tituloAba: "Por Setor Demandante", geografico: true },
   };
 }
 function configPorFiscal() {
@@ -7413,7 +7474,7 @@ function configPorFiscal() {
     labelBuscaPlural: "todos os fiscais",
     labelTrocar: "← TROCAR DE FISCAL",
     dicaLanding: "Escolha um fiscal (no campo acima, ou clicando num cartão abaixo, ou digitando na busca) pra ver o perfil completo dele — vencimentos, financeiro, e a quais setores/categorias ele costuma atender.",
-    complementar: { campoFn: (c) => setoresDemandantesDoContrato(c), rotuloVazio: "(sem unidade)", titulo: "Valor por Setor Demandante", prefixoAlvo: "area", tituloAba: "Por Setor Demandante" },
+    complementar: { campoFn: (c) => setoresDemandantesDoContrato(c), rotuloVazio: "(sem unidade)", titulo: "Valor por Setor Demandante", prefixoAlvo: "area", tituloAba: "Por Setor Demandante", geografico: true },
   };
 }
 function configPorAnalista() {
@@ -7428,7 +7489,7 @@ function configPorAnalista() {
     labelBuscaPlural: "todos os analistas",
     labelTrocar: "← TROCAR DE ANALISTA",
     dicaLanding: "Escolha um analista (no campo acima, ou clicando num cartão abaixo, ou digitando na busca) pra ver o perfil completo dele — vencimentos, financeiro, e a quais setores/categorias ele costuma atender.",
-    complementar: { campoFn: (c) => setoresDemandantesDoContrato(c), rotuloVazio: "(sem unidade)", titulo: "Valor por Setor Demandante", prefixoAlvo: "area", tituloAba: "Por Setor Demandante" },
+    complementar: { campoFn: (c) => setoresDemandantesDoContrato(c), rotuloVazio: "(sem unidade)", titulo: "Valor por Setor Demandante", prefixoAlvo: "area", tituloAba: "Por Setor Demandante", geografico: true },
   };
 }
 
@@ -7787,13 +7848,12 @@ function renderPorDimensaoContratos(lista, cfg) {
   // invés desse gráfico de rosca... pelo menos por hora" — só faz sentido em
   // Por Categoria (a landing de Por Área já é só DEPAF/DEPIN, escolher entre
   // 2 cartões não pede mapa; a de Categoria tem 6, então ver ANTES onde cada
-  // uma pesa geograficamente ajuda). Mantém a rosca como opção — troca só o
-  // padrão de qual das duas abre primeiro.
-  let modoLandingComplementar = p === "categoria" ? (lerGraficoSalvo(`cpg-${p}-landing`) || "mapa") : "rosca";
-  // Eixo à parte do toggle acima (aquele escolhe geografia vs lista; este
-  // escolhe lista vs treemap DENTRO do modo lista) — mesmo raciocínio do
-  // toggle novo em Financeiro.
-  let modoVisualLanding = lerGraficoSalvo(`cpg-${p}-landing-visual`) || "lista";
+  // uma pesa geograficamente ajuda). Antes disso era um toggle À PARTE
+  // (geografia vs lista/treemap, `modoLandingComplementar`) que ficou
+  // redundante assim que o mapa virou só mais um modo do MESMO toggle de
+  // sempre (LISTA/MAPA DE ÁRVORE/MAPA, igual o Financeiro de cada perfil) —
+  // unificado num só, o padrão de qual abre primeiro continua vindo daqui.
+  let modoVisualLanding = lerGraficoSalvo(`cpg-${p}-landing-visual`) || (p === "categoria" && cfg.complementar.geografico ? "mapa" : "lista");
 
   alvo.innerHTML = `
     <div class="dash-filtros">
@@ -7894,29 +7954,29 @@ function renderPorDimensaoContratos(lista, cfg) {
   function renderLanding() {
     const porGrupo = agruparPorAreaCriticidade(lista, cfg.campoAgrupador, cfg.rotuloVazio);
     const valorPorGrupo = new Map(agruparValorPorCampo(lista, cfg.campoAgrupador, cfg.rotuloVazio).map((l) => [l.label, l]));
-    // Só a landing de Por Categoria ganha o toggle — Por Área continua só
-    // com a rosca, do jeito que já estava (pedido era específico da Categoria).
-    const todasUnidadesLanding = p === "categoria" ? lista.flatMap((c) => c.unidades || []) : [];
-    const temUnidadeLanding = p === "categoria" && todasUnidadesLanding.length > 0;
+    // Pedido direto (rodada anterior): o mapa só entra como opção quando
+    // existe unidade real de verdade — sem isso, virava mapa vazio
+    // fingindo leitura geográfica (mesma causa raiz do aviso de texto em
+    // "Distribuição Geográfica"). `cfg.complementar.geografico` diz que a
+    // DIMENSÃO é geográfica; ainda precisa checar se o RECORTE atual (esta
+    // conta pode não ter contrato DEPIN nenhum) realmente tem alguma
+    // unidade cadastrada.
+    const podeMapaLanding = cfg.complementar.geografico && lista.some((c) => (c.unidades || []).length > 0);
+    if (modoVisualLanding === "mapa" && !podeMapaLanding) modoVisualLanding = "lista";
     el("landing").innerHTML = `
       <p class="dash-chart-hint">${cfg.dicaLanding}</p>
       <div class="kpi-row" style="grid-template-columns:repeat(auto-fill,minmax(200px,1fr));margin-top:10px" id="${p}-cards"></div>
       <div class="dash-chart-box" style="margin-top:16px">
         <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
           <h4 style="margin:0">${escapeHTML(cfg.complementar.titulo)} (visão geral, ${escapeHTML(cfg.labelBuscaPlural)})</h4>
-          <div style="display:flex;gap:8px;flex-wrap:wrap">
-            ${temUnidadeLanding ? `<div class="dash-toggle" id="${p}-toggle-landing">
-              <button class="dash-toggle-btn" data-modo="rosca" title="Quanto cada setor demandante representa do total">LISTA</button>
-              <button class="dash-toggle-btn" data-modo="mapa" title="Onde as unidades da DEPIN ficam no estado, somando todas as categorias">MAPA</button>
-            </div>` : ""}
-            ${!(temUnidadeLanding && modoLandingComplementar === "mapa") ? `<div class="dash-toggle" id="${p}-landing-visual-toggle">
-              <button class="dash-toggle-btn${modoVisualLanding === "lista" ? " active" : ""}" data-modo-visual="lista" title="Tabela ordenável, com % do total">LISTA</button>
-              <button class="dash-toggle-btn${modoVisualLanding === "treemap" ? " active" : ""}" data-modo-visual="treemap" title="Bloco = tamanho do valor — onde o orçamento se concentra, de relance">MAPA DE ÁRVORE</button>
-            </div>` : ""}
+          <div class="dash-toggle" id="${p}-landing-visual-toggle">
+            <button class="dash-toggle-btn${modoVisualLanding === "lista" ? " active" : ""}" data-modo-visual="lista" title="Tabela ordenável, com % do total">LISTA</button>
+            <button class="dash-toggle-btn${modoVisualLanding === "treemap" ? " active" : ""}" data-modo-visual="treemap" title="Bloco = tamanho do valor — onde o orçamento se concentra, de relance">MAPA DE ÁRVORE</button>
+            ${podeMapaLanding ? `<button class="dash-toggle-btn${modoVisualLanding === "mapa" ? " active" : ""}" data-modo-visual="mapa" title="Onde cada unidade regional fica no estado, somando todas as ${escapeHTML(cfg.labelBuscaPlural)}">MAPA</button>` : ""}
           </div>
         </div>
-        <p class="dash-chart-hint">${temUnidadeLanding && modoLandingComplementar === "mapa"
-          ? "Onde as unidades da DEPIN estão hoje, somando contratos de todas as categorias — clique num ponto pra abrir o perfil completo daquela unidade."
+        <p class="dash-chart-hint">${modoVisualLanding === "mapa"
+          ? `Onde as unidades regionais estão hoje, somando contratos de todas as ${escapeHTML(cfg.labelBuscaPlural)} — clique num ponto pra abrir o perfil completo daquela unidade.`
           : `Antes de escolher uma ${cfg.labelBusca.toLowerCase()}: como o total já se divide do outro lado. Clique numa linha pra abrir o perfil completo dela em "${escapeHTML(cfg.complementar.tituloAba)}".`}</p>
         <div id="${p}-landing-complementar"></div>
         <div id="${p}-landing-complementar-legenda"></div>
@@ -7935,38 +7995,28 @@ function renderPorDimensaoContratos(lista, cfg) {
       card.addEventListener("click", () => selecionar(card.dataset[`${p}Card`]));
     });
 
+    // Rosca virou barra/tabela: com 20-50 categorias reais (tipo de
+    // objeto ou setor demandante, dependendo do perfil), uma fatia por
+    // categoria já não se lê — mesmo limite de ~7-8 do resto do painel.
+    // Treemap é a 3ª forma (pedido direto), MAPA a 4ª (só quando a
+    // dimensão é geográfica — Setor Demandante) — as três escolhidas pelo
+    // mesmo toggle. Antes o modo mapa vivia num toggle À PARTE
+    // (`temUnidadeLanding`/`modoLandingComplementar`, contagem-based via
+    // `agruparPorUnidade`) — unificado aqui: mesmo dado enriquecido
+    // (`agruparValorEnriquecidoPorCampo`) que já alimenta lista/treemap,
+    // só passa por `paraLinhasMapaCoorpin` quando o modo é mapa.
+    // Pedido direto: "o que foi implementado na Gerencial não pode
+    // aparecer também quando a gente divide por categoria ou setor
+    // demandante?" — mesmo ticket médio/críticos-a-vencer/badge de
+    // concentração que Gerencial já tem, aqui na landing (visão de
+    // TODAS as categorias/setores antes de escolher uma).
     function desenharComplementar() {
-      if (temUnidadeLanding && modoLandingComplementar === "mapa") {
-        const linhasUnidadeLanding = agruparPorUnidade(todasUnidadesLanding);
-        el("landing-complementar").innerHTML = mapaCoorpinSVG(linhasUnidadeLanding, {});
-        el("landing-complementar-legenda").innerHTML = legendaMapaUnidadeHTML(linhasUnidadeLanding);
-        adicionarControlesGrafico(el("landing-complementar"));
-        // Clique aqui não isola nada NESTA aba (a landing não tem uma
-        // categoria escolhida ainda) — abre o perfil da DEPIN em "Por Área
-        // Gestora" já com aquela COORPIN isolada, igual o cartão "Unidades
-        // Beneficiadas" já faz, só que direto na unidade certa.
-        el("landing-complementar").addEventListener("click", (ev) => {
-          const alvoClicado = ev.target.closest("[data-cat]");
-          if (!alvoClicado) return;
-          irParaUnidadeDepinEmPorArea(alvoClicado.dataset.cat);
-        });
-        el("landing-complementar-legenda").addEventListener("click", (ev) => {
-          const alvoClicado = ev.target.closest("[data-cat]");
-          if (!alvoClicado) return;
-          irParaUnidadeDepinEmPorArea(alvoClicado.dataset.cat);
-        });
+      const linhasLandingComplementar = agruparValorEnriquecidoPorCampo(lista, cfg.complementar.campoFn, cfg.complementar.rotuloVazio);
+      if (modoVisualLanding === "mapa") {
+        el("landing-complementar").innerHTML = mapaCoorpinSVG(paraLinhasMapaCoorpin(linhasLandingComplementar, lista), {});
+        el("landing-complementar-legenda").innerHTML = legendaMapaUnidadeHTML(paraLinhasMapaCoorpin(linhasLandingComplementar, lista));
       } else {
         el("landing-complementar-legenda").innerHTML = "";
-        // Rosca virou barra/tabela: com 20-50 categorias reais (tipo de
-        // objeto ou setor demandante, dependendo do perfil), uma fatia por
-        // categoria já não se lê — mesmo limite de ~7-8 do resto do painel.
-        // Treemap é a 3ª forma (pedido direto), escolhida no 2º toggle.
-        // Pedido direto: "o que foi implementado na Gerencial não pode
-        // aparecer também quando a gente divide por categoria ou setor
-        // demandante?" — mesmo ticket médio/críticos-a-vencer/badge de
-        // concentração que Gerencial já tem, aqui na landing (visão de
-        // TODAS as categorias/setores antes de escolher uma).
-        const linhasLandingComplementar = agruparValorEnriquecidoPorCampo(lista, cfg.complementar.campoFn, cfg.complementar.rotuloVazio);
         el("landing-complementar").innerHTML = modoVisualLanding === "treemap"
           ? treemapValorSVG(linhasLandingComplementar)
           : tabelaMescladaHTML(linhasLandingComplementar, {
@@ -7974,52 +8024,31 @@ function renderPorDimensaoContratos(lista, cfg) {
               idPrefixo: `${p}-landing-complementar`,
               colunaExtra: { titulo: "CRÍTICOS/A VENCER", campo: "criticos" },
             });
-        adicionarControlesGrafico(el("landing-complementar"));
-        if (modoVisualLanding !== "treemap") ligarOrdenacaoTabelaPropria(el("landing-complementar"));
-        el("landing-complementar").addEventListener("click", (ev) => {
-          const alvoClicado = ev.target.closest("[data-cat]");
-          if (!alvoClicado) return;
-          document.querySelector(`[data-subtab-contratos="por${cfg.complementar.prefixoAlvo}"]`)?.click();
-          const sel = document.getElementById(`${cfg.complementar.prefixoAlvo}-select`);
-          if (sel) { sel.value = alvoClicado.dataset.cat; sel.dispatchEvent(new Event("change", { bubbles: true })); }
-        });
       }
+      adicionarControlesGrafico(el("landing-complementar"));
+      if (modoVisualLanding === "lista") ligarOrdenacaoTabelaPropria(el("landing-complementar"));
+      // Clique aqui não isola nada NESTA aba (a landing não tem uma
+      // categoria/setor escolhido ainda) — abre o perfil completo da
+      // unidade/setor em "Por Setor Demandante" (mesmo destino nos 3
+      // modos, `data-cat` já sai igual de tabela/treemap/mapa).
+      function irParaComplementar(ev) {
+        const alvoClicado = ev.target.closest("[data-cat]");
+        if (!alvoClicado) return;
+        document.querySelector(`[data-subtab-contratos="por${cfg.complementar.prefixoAlvo}"]`)?.click();
+        const sel = document.getElementById(`${cfg.complementar.prefixoAlvo}-select`);
+        if (sel) { sel.value = alvoClicado.dataset.cat; sel.dispatchEvent(new Event("change", { bubbles: true })); }
+      }
+      el("landing-complementar").addEventListener("click", irParaComplementar);
+      el("landing-complementar-legenda").addEventListener("click", irParaComplementar);
     }
     desenharComplementar();
-    if (temUnidadeLanding) {
-      const toggleLanding = el("toggle-landing");
-      toggleLanding.querySelectorAll("button").forEach((btn) => {
-        btn.classList.toggle("active", btn.dataset.modo === modoLandingComplementar);
-      });
-      toggleLanding.addEventListener("click", (ev) => {
-        const btn = ev.target.closest("button[data-modo]");
-        if (!btn || btn.dataset.modo === modoLandingComplementar) return;
-        modoLandingComplementar = btn.dataset.modo;
-        salvarGrafico(`cpg-${p}-landing`, modoLandingComplementar);
-        renderLanding();
-      });
-    }
-    const toggleVisualLanding = el("landing-visual-toggle");
-    if (toggleVisualLanding) {
-      toggleVisualLanding.addEventListener("click", (ev) => {
-        const btn = ev.target.closest("button[data-modo-visual]");
-        if (!btn || btn.dataset.modoVisual === modoVisualLanding) return;
-        modoVisualLanding = btn.dataset.modoVisual;
-        salvarGrafico(`cpg-${p}-landing-visual`, modoVisualLanding);
-        renderLanding();
-      });
-    }
-  }
-
-  // Reaproveitado pelo mapa da landing de Por Categoria: pula pra "Por
-  // Setor Demandante" já com a COORPIN clicada isolada — a COORPIN é uma
-  // opção normal do seletor de setor (igual qualquer setor do DEPAF), não
-  // precisa mais de nenhum passo intermediário.
-  function irParaUnidadeDepinEmPorArea(nomeUnidade) {
-    document.querySelector('[data-subtab-contratos="porarea"]')?.click();
-    if (!nomeUnidade) return;
-    const selArea = document.getElementById("area-select");
-    if (selArea) { selArea.value = nomeUnidade; selArea.dispatchEvent(new Event("change", { bubbles: true })); }
+    el("landing-visual-toggle").addEventListener("click", (ev) => {
+      const btn = ev.target.closest("button[data-modo-visual]");
+      if (!btn || btn.dataset.modoVisual === modoVisualLanding) return;
+      modoVisualLanding = btn.dataset.modoVisual;
+      salvarGrafico(`cpg-${p}-landing-visual`, modoVisualLanding);
+      renderLanding();
+    });
   }
 
   // Só desenha o filtro quando a área/categoria selecionada tem alguma
@@ -8114,7 +8143,7 @@ function renderPorDimensaoContratos(lista, cfg) {
         <div class="kpi-card kpi-clicavel" data-compartilhados title="Clique pra ver quais são — cada um atende mais de uma DIRPIN ao mesmo tempo" style="--kpi-cor:var(--crit-alto);cursor:pointer;${filtroApenasCompartilhados ? "outline:2px solid var(--crit-alto);outline-offset:-2px" : ""}"><div class="kpi-cabeca">${kpiIcone("alerta")}<div class="kpi-label">Compartilhados entre DIRPIN</div></div><div class="kpi-value">${compartilhados}</div></div>
       </div>
       <p class="dash-chart-hint" style="margin-top:4px">${exclusivos} contrato(s) atende(m) uma DIRPIN só — os outros ${compartilhados} atendem mais de uma (por isso a soma dos filtros de DIRPIN acima passa de ${contratosComUnidade.length}). Útil saber antes de montar relatório ou apresentação com esse corte.</p>` : ""}
-      <div class="dash-chart-box" id="${p}-grafico-unidade-caixa" style="margin-top:16px;border-left:4px solid var(--dourado);background:color-mix(in srgb, var(--dourado) 7%, transparent)">
+      ${p !== "area" ? "" : `<div class="dash-chart-box" id="${p}-grafico-unidade-caixa" style="margin-top:16px;border-left:4px solid var(--dourado);background:color-mix(in srgb, var(--dourado) 7%, transparent)">
         <h4>Distribuição Geográfica</h4>
         ${!contratosComUnidade.length ? `
         <!-- Pedido direto (crítica externa que ela trouxe, aprovada via
@@ -8144,10 +8173,15 @@ function renderPorDimensaoContratos(lista, cfg) {
         </div></div>
         <div id="${p}-grafico-unidade"></div>
         <div id="${p}-legenda-mapa-unidade"></div>`}
-      </div>`;
-    // Sem nenhuma unidade real, a caixa acima já virou só o aviso de texto —
-    // nada abaixo (filtros de DIRPIN/COORPIN, toggle, mapa) tem elemento no
-    // DOM pra ligar evento nenhum.
+      </div>`}
+    `;
+    // Fora de "Por Área Gestora", a caixa "Distribuição Geográfica" não
+    // existe mais (pedido dela: o mapa virou modo de visualização da
+    // tabela "Setor Demandante" em Categoria/Gestor/Fiscal/Analista — ver
+    // Financeiro/landing dessas abas). Sem nenhuma unidade real, a caixa
+    // acima já virou só o aviso de texto — nada abaixo (filtros de
+    // DIRPIN/COORPIN, toggle, mapa) tem elemento no DOM pra ligar evento
+    // nenhum.
     if (!contratosComUnidade.length) return;
     el("filtro-dirpin")?.addEventListener("change", (ev) => {
       filtroDirpin = ev.target.value;
@@ -8183,6 +8217,11 @@ function renderPorDimensaoContratos(lista, cfg) {
       });
     }
     el("filtro-coorpin")?.addEventListener("change", (ev) => { filtroCoorpin = ev.target.value; filtroApenasCompartilhados = false; atualizar(); });
+
+    // Fora de "Por Área Gestora" a caixa do gráfico nem existe no DOM (ver
+    // acima) — o resto desta função (BARRAS/MAPA/CRITICIDADE/SALVADOR,
+    // legenda, cliques) é só sobre ela, então não tem nada pra ligar.
+    if (p !== "area") return;
 
     // Pedido direto: "deveria dizer a unidade e não mostrar só os
     // contratos" — o cartão "Unidades Beneficiadas" levava pro perfil da
@@ -8537,6 +8576,12 @@ function renderPorDimensaoContratos(lista, cfg) {
     const ticketMedio = listaFiltrada.length ? valorAtualFin / listaFiltrada.length : 0;
     const maiorContrato = listaFiltrada.reduce((max, c) => ((c.valorGlobalAtual || 0) > (max?.valorGlobalAtual || 0) ? c : max), null);
     const totalAditivosFin = listaFiltrada.reduce((a, c) => a + (c.qtdAditivos || 0), 0);
+    // Modo MAPA só existe de verdade quando a dimensão ativa é geográfica
+    // (Setor Demandante) E o recorte atual tem alguma unidade cadastrada —
+    // se ela trocar pro toggle ANALISTA, ou não tiver contrato DEPIN
+    // nenhum aqui, o botão nem aparece (mesma unidade cadastrada real que
+    // já rege o cartão Compartilhados em `renderFiltroUnidade`).
+    const podeMapa = dimensaoAtiva === cfg.complementar && cfg.complementar.geografico && listaFiltrada.some((c) => (c.unidades || []).length > 0);
     el("sub-financeiro").innerHTML = `
       <div class="kpi-row" style="margin-bottom:16px">
         <div class="kpi-card"><div class="kpi-cabeca">${kpiIcone("moeda")}<div class="kpi-label">Valor Atual Total</div></div><div class="kpi-value">R$ ${formatarMoedaCompacta(valorAtualFin)}</div><div class="kpi-valor-exato">${formatarMoedaBR(valorAtualFin)}</div></div>
@@ -8556,10 +8601,12 @@ function renderPorDimensaoContratos(lista, cfg) {
               <div class="dash-toggle" id="${p}-fin-visual-toggle">
                 <button class="dash-toggle-btn${modoVisualComplementar === "lista" ? " active" : ""}" data-modo-visual="lista" title="Tabela ordenável, com % do total">LISTA</button>
                 <button class="dash-toggle-btn${modoVisualComplementar === "treemap" ? " active" : ""}" data-modo-visual="treemap" title="Bloco = tamanho do valor — onde o orçamento se concentra, de relance">MAPA DE ÁRVORE</button>
+                ${podeMapa ? `<button class="dash-toggle-btn${modoVisualComplementar === "mapa" ? " active" : ""}" data-modo-visual="mapa" title="Onde cada unidade regional fica no estado">MAPA</button>` : ""}
               </div>
             </div>
           </div>
           <div id="${p}-complementar"></div>
+          <div id="${p}-complementar-legenda"></div>
         </div>
         <div class="dash-chart-box">
           <h4>Top 10 Maiores Contratos (Valor Atual)</h4>
@@ -8601,15 +8648,21 @@ function renderPorDimensaoContratos(lista, cfg) {
     // mesmo enriquecimento de Setor Demandante/Tipo de Objeto em
     // Gerencial, agora também dentro do Financeiro de cada perfil.
     const linhasComplementar = agruparValorEnriquecidoPorCampo(listaFiltrada, dimensaoAtiva.campoFn, dimensaoAtiva.rotuloVazio);
+    if (modoVisualComplementar === "mapa" && !podeMapa) modoVisualComplementar = "lista";
     el("complementar").innerHTML = modoVisualComplementar === "treemap"
       ? treemapValorSVG(linhasComplementar)
+      : modoVisualComplementar === "mapa"
+      ? mapaCoorpinSVG(paraLinhasMapaCoorpin(linhasComplementar, listaFiltrada), { selecionado: filtroComplementar })
       : tabelaMescladaHTML(linhasComplementar, {
           selecionado: filtroComplementar,
           colunaRotulo: dimensaoAtiva.titulo.replace(/^Valor por /, "").toUpperCase(),
           idPrefixo: `${p}-fin-complementar`,
           colunaExtra: { titulo: "CRÍTICOS/A VENCER", campo: "criticos" },
         });
-    if (modoVisualComplementar !== "treemap") ligarOrdenacaoTabelaPropria(el("complementar"));
+    if (modoVisualComplementar === "lista") ligarOrdenacaoTabelaPropria(el("complementar"));
+    el("complementar-legenda").innerHTML = modoVisualComplementar === "mapa"
+      ? legendaMapaUnidadeHTML(paraLinhasMapaCoorpin(linhasComplementar, listaFiltrada), (u) => u.label === filtroComplementar)
+      : "";
     el("top-contratos").innerHTML = barraContagemHorizontalSVG(
       agruparTopContratosPorValor(filtrada, 10),
       // limite alto: já é um Top 10 curado, não deve dobrar em "outros".
@@ -8627,6 +8680,12 @@ function renderPorDimensaoContratos(lista, cfg) {
     adicionarControlesGrafico(el("top-contratos"));
     adicionarControlesGrafico(el("aditivos"));
     el("complementar").addEventListener("click", (ev) => {
+      const alvoClicado = ev.target.closest("[data-cat]");
+      if (!alvoClicado) return;
+      filtroComplementar = filtroComplementar === alvoClicado.dataset.cat ? "" : alvoClicado.dataset.cat;
+      renderFinanceiro(listaFiltrada);
+    });
+    el("complementar-legenda").addEventListener("click", (ev) => {
       const alvoClicado = ev.target.closest("[data-cat]");
       if (!alvoClicado) return;
       filtroComplementar = filtroComplementar === alvoClicado.dataset.cat ? "" : alvoClicado.dataset.cat;
