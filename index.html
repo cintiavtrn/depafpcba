@@ -8556,7 +8556,13 @@ function unidadeDetalheHTML(u) {
 // chipsAtivos de Gerencial, só que aplicado também à ligação de clique e
 // ao próprio desenho, não só ao chip.
 const DIMENSOES_OBRAS = [
-  { chave: "statusConstrutivo", campo: (u) => u.statusConstrutivo, rotulo: "Status Construtivo", colunaRotulo: "STATUS CONSTRUTIVO", containerId: "obras-status-construtivo", hintId: "obras-status-construtivo-hint", hintSubstantivo: "status registrado" },
+  // "Status Construtivo" e "Tipo de Intervenção" (Obra/Reforma) SAÍRAM daqui —
+  // essas duas perguntas agora são respondidas com muito mais qualidade pela
+  // seção "Intervenções CEIRF" (334 linhas plenamente transcritas do PDF
+  // oficial, com escopo Ampliado já definido, contra ~170 linhas aqui vindas
+  // de um cruzamento por similaridade de texto). Manter as duas versões teria
+  // mostrado dois números de "quantas são Obra/Reforma" na mesma tela — foi
+  // exatamente essa duplicidade que gerou confusão da vez passada.
   // Pedido direto: "existe diferença entre concluída e inaugurada... a
   // inauguração depende da agenda do governador... acho que status de
   // ocupação não foi aproveitada". Já era campo SEPARADO no schema desde a
@@ -8564,15 +8570,8 @@ const DIMENSOES_OBRAS = [
   // só nunca tinha virado gráfico próprio, ficava só no perfil da unidade.
   // Só 2 valores reais existem na planilha-fonte: Inaugurada e Não ocupada
   // (conferido direto no banco — "Ocupada" não aparece em nenhuma linha).
+  // Fica (não é redundante com CEIRF, que não tem essa distinção).
   { chave: "statusDeUtilizacao", campo: (u) => u.statusDeUtilizacao, rotulo: "Status de Utilização", colunaRotulo: "STATUS DE UTILIZAÇÃO", containerId: "obras-status-utilizacao", hintId: "obras-status-utilizacao-hint", hintSubstantivo: "status de utilização registrado (diferente de Status Construtivo — uma obra pode estar \"Concluída\" e ainda não \"Inaugurada\", a cerimônia depende da agenda do governador)" },
-  // Pedido direto: "faltou gráfico que mostra construção, obra e reforma".
-  // Existia na planilha-fonte desde a Fase 1 (ver seed-obras.js,
-  // NORMALIZACAO_TIPO_INTERVENCAO) mas nunca virou gráfico — só aparecia no
-  // perfil individual da unidade. É um campo SEPARADO de manutenção na
-  // própria planilha (obra/reforma/construção vs valorDaManutencao/
-  // dataUltimaManutencao são colunas diferentes, sem relação entre si) —
-  // por isso "tipo de obra" e "manutenção" não cabem no mesmo gráfico.
-  { chave: "tipoDeIntervencao", campo: (u) => u.tipoDeIntervencao, rotulo: "Tipo de Intervenção", colunaRotulo: "TIPO DE INTERVENÇÃO", containerId: "obras-tipo-intervencao", hintId: "obras-tipo-intervencao-hint", hintSubstantivo: "tipo de intervenção registrado" },
   { chave: "tipoDeUnidade", campo: (u) => u.tipoDeUnidade, rotulo: "Tipo de Unidade", colunaRotulo: "TIPO DE UNIDADE", containerId: "obras-tipo-unidade" },
   { chave: "diretoriaRegional", campo: (u) => u.diretoriaRegional, rotulo: "Diretoria Regional", colunaRotulo: "DIRETORIA REGIONAL", containerId: "obras-diretoria-regional", hintId: "obras-diretoria-regional-hint", hintSubstantivo: "diretoria registrada" },
   { chave: "departamento", campo: (u) => u.departamento, rotulo: "Departamento", colunaRotulo: "DEPARTAMENTO", containerId: "obras-departamento" },
@@ -8584,18 +8583,69 @@ const DIMENSOES_OBRAS = [
   { chave: "programaDeRequalificacao", campo: (u) => u.programaDeRequalificacao, rotulo: "Programa de Requalificação", colunaRotulo: "PROGRAMA DE REQUALIFICAÇÃO", containerId: "obras-requalificacao", hintId: "obras-requalificacao-hint", hintSubstantivo: "programa registrado (Sim/Não — as medidas do .pbip assumem 4 estados que a planilha ainda não tem)" },
 ];
 
+// Duas seções novas, grão diferente de UnidadePolicial (1 linha por
+// intervenção/ordem de serviço, não por unidade física) — pedido dela em
+// cima do Base_SSP_PowerBI.xlsx (334 intervenções CEIRF + 115 ordens de
+// manutenção, ambas transcrições completas e conferidas contra os PDFs
+// originais). Cada dimensão agrega por SOMA DE VALOR (não contagem) — é a
+// pergunta que essas duas bases respondem melhor ("quanto", não "quantas").
+// Motor mais simples que DIMENSOES_OBRAS (sem AGRUPAR, sem tooltip de
+// unidades) de propósito — já são 2 seções grandes a mais na mesma tela.
+const DIMENSOES_CEIRF = [
+  { chave: "status", campo: (r) => r.status, rotulo: "Status", colunaRotulo: "STATUS", containerId: "ceirf-status" },
+  { chave: "tipoIntervencao", campo: (r) => r.tipoIntervencao, rotulo: "Obra ou Reforma", colunaRotulo: "TIPO DE INTERVENÇÃO", containerId: "ceirf-tipo" },
+  { chave: "etapa", campo: (r) => r.etapa, rotulo: "Etapa do Programa", colunaRotulo: "ETAPA", containerId: "ceirf-etapa" },
+  { chave: "padraoUnidade", campo: (r) => r.padraoUnidade, rotulo: "Padrão da Unidade", colunaRotulo: "PADRÃO DA UNIDADE", containerId: "ceirf-padrao" },
+  { chave: "municipio", campo: (r) => r.municipio, rotulo: "Município", colunaRotulo: "MUNICÍPIO", containerId: "ceirf-municipio" },
+];
+const DIMENSOES_MANUTENCAO = [
+  { chave: "grupoStatus", campo: (r) => r.grupoStatus, rotulo: "Status", colunaRotulo: "STATUS", containerId: "manut-status" },
+  { chave: "categoriaUnidade", campo: (r) => r.categoriaUnidade, rotulo: "Categoria de Unidade", colunaRotulo: "CATEGORIA DE UNIDADE", containerId: "manut-categoria" },
+  { chave: "tipoOs", campo: (r) => r.tipoOs, rotulo: "Tipo de OS", colunaRotulo: "TIPO DE OS", containerId: "manut-tipo-os" },
+  // Achado da própria transcrição dela: quase toda OS fica logo abaixo de
+  // R$330 mil — um teto prático de contratação, não coincidência.
+  { chave: "faixaValor", campo: (r) => r.faixaValor, rotulo: "Faixa de Valor (o teto prático de R$ 330 mil)", colunaRotulo: "FAIXA DE VALOR", containerId: "manut-faixa" },
+  { chave: "regiao", campo: (r) => r.regiao, rotulo: "Região", colunaRotulo: "REGIÃO", containerId: "manut-regiao" },
+  { chave: "anoMes", campo: (r) => r.anoMes, rotulo: "Mês de Emissão da OS", colunaRotulo: "MÊS", containerId: "manut-mes" },
+];
+
+// Cross-filter genérico por N dimensões agregando por valor — reaproveitado
+// pelas seções CEIRF e Manutenção PC (mesma forma, dados diferentes). Cada
+// instância tem seu PRÓPRIO objeto de filtros — as duas seções não se
+// cruzam entre si nem com as 7 dimensões de UnidadePolicial (são bases
+// independentes, sem chave de unidade comum pra juntar com segurança).
+function criarMotorDimensoesPorValor(linhasTodas, dimensoes) {
+  const filtros = {};
+  dimensoes.forEach((d) => { filtros[d.chave] = ""; });
+  function bateFiltro(r, ignorar) {
+    return dimensoes.every((d) => d.chave === ignorar || !filtros[d.chave] || (d.campo(r) || "(não informado)") === filtros[d.chave]);
+  }
+  return { filtros, bateFiltro, filtrar: () => linhasTodas.filter((r) => bateFiltro(r, null)) };
+}
+
 async function carregarObrasPortal(portalSlug) {
   const painel = document.getElementById("tab-obras");
   painel.innerHTML = `<p class="tela-intro">Carregando o painel de obras...</p>`;
 
-  let unidades;
+  let unidades, manutencaoTodas, ceirfTodas;
   try {
-    unidades = await apiFetch(`/api/portais/${portalSlug}/obras`);
+    [unidades, manutencaoTodas, ceirfTodas] = await Promise.all([
+      apiFetch(`/api/portais/${portalSlug}/obras`),
+      apiFetch(`/api/portais/${portalSlug}/obras/manutencao-pc`),
+      apiFetch(`/api/portais/${portalSlug}/obras/intervencoes-ceirf`),
+    ]);
   } catch (erro) {
     painel.innerHTML = `<p class="tela-intro">Não consegui carregar o painel de obras: ${escapeHTML(erro.message)}</p>`;
     return;
   }
   const unidadePorId = new Map(unidades.map((u) => [u.id, u]));
+
+  // Escopo Ampliado fixo — pedido direto: "a única coisa que vc não vai
+  // colocar é esse de estrito e funcional porque só estamos usando o
+  // ampliado (o certo)". Sem toggle, sem opção de trocar de escopo.
+  const ceirfAmpliado = ceirfTodas.filter((r) => r.escopoPcAmpliado);
+  const motorCeirf = criarMotorDimensoesPorValor(ceirfAmpliado, DIMENSOES_CEIRF);
+  const motorManutencao = criarMotorDimensoesPorValor(manutencaoTodas, DIMENSOES_MANUTENCAO);
 
   // Pedido direto: "os cartões e barras e linhas não estão clicáveis e
   // redirecionando pra filtrar... cliquei em obra aí refiltrou e mostrou
@@ -8663,6 +8713,35 @@ async function carregarObrasPortal(portalSlug) {
             <div id="obras-valor-manutencao"></div>
           </div>
         </div>
+
+        <div style="margin-top:6px;padding-top:14px;border-top:2px solid var(--tinta)">
+          <h3 style="margin:0 0 4px;text-transform:uppercase;letter-spacing:.05em;font-size:1.05rem">Intervenções CEIRF — Escopo Ampliado</h3>
+          <p class="dash-chart-hint">Base própria (334 intervenções do Controle CEIRF, todas as forças, transcrição completa e conferida contra o PDF oficial) — não usa as unidades de cima, é outro grão (1 linha por intervenção). Escopo Ampliado: PC + EBAL, JOMAFA e DISEP Senhor do Bomfim (unidades integradas/ambíguas).</p>
+        </div>
+        <div id="ceirf-kpis" class="kpi-row"></div>
+        <div id="ceirf-chips"></div>
+        <div class="dash-charts" style="grid-template-columns:1fr 1fr">
+          ${DIMENSOES_CEIRF.map((d) => `
+          <div class="dash-chart-box">
+            <h4>${escapeHTML(d.rotulo)}</h4>
+            <div id="${d.containerId}"></div>
+          </div>`).join("")}
+        </div>
+
+        <div style="margin-top:6px;padding-top:14px;border-top:2px solid var(--tinta)">
+          <h3 style="margin:0 0 4px;text-transform:uppercase;letter-spacing:.05em;font-size:1.05rem">Manutenção PC</h3>
+          <p class="dash-chart-hint">Base própria (115 ordens de serviço de manutenção predial, transcrição completa — Salvador/RMS + Interior) — universo completo, diferente do "Manutenção" parcial lá em cima (aquele é só a fatia vinculada a uma unidade específica).</p>
+        </div>
+        <div id="manut-kpis" class="kpi-row"></div>
+        <div id="manut-chips"></div>
+        <div class="dash-charts" style="grid-template-columns:1fr 1fr">
+          ${DIMENSOES_MANUTENCAO.map((d) => `
+          <div class="dash-chart-box">
+            <h4>${escapeHTML(d.rotulo)}</h4>
+            <div id="${d.containerId}"></div>
+          </div>`).join("")}
+        </div>
+
         <div class="dash-chart-box">
           <h4>Unidades</h4>
           <div class="dash-filtro" style="margin-bottom:10px">
@@ -8700,6 +8779,99 @@ async function carregarObrasPortal(portalSlug) {
       desenharAgrupamento(d);
     });
   });
+
+  DIMENSOES_CEIRF.forEach((d) => {
+    document.getElementById(d.containerId).addEventListener("click", (ev) => {
+      const alvoClicado = ev.target.closest("[data-cat]");
+      if (!alvoClicado) return;
+      const rotulo = alvoClicado.dataset.cat;
+      motorCeirf.filtros[d.chave] = motorCeirf.filtros[d.chave] === rotulo ? "" : rotulo;
+      atualizarCeirf();
+    });
+  });
+  DIMENSOES_MANUTENCAO.forEach((d) => {
+    document.getElementById(d.containerId).addEventListener("click", (ev) => {
+      const alvoClicado = ev.target.closest("[data-cat]");
+      if (!alvoClicado) return;
+      const rotulo = alvoClicado.dataset.cat;
+      motorManutencao.filtros[d.chave] = motorManutencao.filtros[d.chave] === rotulo ? "" : rotulo;
+      atualizarManutencao();
+    });
+  });
+
+  function atualizarCeirf() {
+    const filtrada = motorCeirf.filtrar();
+    const chipsAtivos = DIMENSOES_CEIRF
+      .filter((d) => motorCeirf.filtros[d.chave])
+      .map((d) => ({ rotulo: `${d.rotulo.toLowerCase()}: ${motorCeirf.filtros[d.chave]}`, limpar: () => { motorCeirf.filtros[d.chave] = ""; atualizarCeirf(); } }));
+    document.getElementById("ceirf-chips").innerHTML = chipsAtivos.length
+      ? `<div class="filter-chips">${chipsAtivos.map((c, i) => `<span class="filter-chip">Isolando ${escapeHTML(c.rotulo)}<button type="button" data-chip-limpar="${i}" title="Remover este filtro">${iconeInline("fechar", 10, -1)}</button></span>`).join("")}</div>`
+      : "";
+    document.querySelectorAll("#ceirf-chips [data-chip-limpar]").forEach((btn) => {
+      btn.addEventListener("click", () => chipsAtivos[+btn.dataset.chipLimpar].limpar());
+    });
+
+    const total = filtrada.reduce((a, r) => a + (r.valorGlobal || 0), 0);
+    const entregue = filtrada.filter((r) => r.grupoStatus === "Entregue").reduce((a, r) => a + (r.valorGlobal || 0), 0);
+    const pendente = total - entregue;
+    document.getElementById("ceirf-kpis").innerHTML = `
+      <div class="kpi-card"><div class="kpi-cabeca">${kpiIcone("moeda")}<div class="kpi-label">Valor Global Total</div></div><div class="kpi-value">R$ ${formatarMoedaCompacta(total)}</div><div class="kpi-valor-exato">${formatarMoedaBR(total)}</div></div>
+      <div class="kpi-card"><div class="kpi-cabeca">${kpiIcone("obras")}<div class="kpi-label">Intervenções</div></div><div class="kpi-value">${filtrada.length.toLocaleString("pt-BR")}</div></div>
+      <div class="kpi-card"><div class="kpi-cabeca">${kpiIcone("selo")}<div class="kpi-label">Entregue em Valor</div></div><div class="kpi-value">${total ? (entregue / total * 100).toLocaleString("pt-BR", { maximumFractionDigits: 1 }) : "—"}%</div></div>
+      <div class="kpi-card"><div class="kpi-cabeca">${kpiIcone("moeda")}<div class="kpi-label">Valor Pendente</div></div><div class="kpi-value">R$ ${formatarMoedaCompacta(pendente)}</div></div>
+    `;
+
+    DIMENSOES_CEIRF.forEach((d) => {
+      const linhasRecorte = ceirfAmpliado.filter((r) => motorCeirf.bateFiltro(r, d.chave));
+      const linhas = agruparValorObrasPorCampo(linhasRecorte, (r) => d.campo(r), (r) => r.valorGlobal, "(não informado)");
+      document.getElementById(d.containerId).innerHTML = barraOuTabelaSVG(linhas, {
+        formatarValor: (v) => "R$ " + formatarMoedaCompacta(v),
+        rotuloExtra: (l) => `(${l.qtd})`,
+        selecionado: motorCeirf.filtros[d.chave] || "",
+        colunaRotulo: d.colunaRotulo,
+        colunaValor: "VALOR (R$)",
+        mostrarPercentual: true,
+      });
+      adicionarControlesGrafico(document.getElementById(d.containerId));
+    });
+  }
+
+  function atualizarManutencao() {
+    const filtrada = motorManutencao.filtrar();
+    const chipsAtivos = DIMENSOES_MANUTENCAO
+      .filter((d) => motorManutencao.filtros[d.chave])
+      .map((d) => ({ rotulo: `${d.rotulo.toLowerCase()}: ${motorManutencao.filtros[d.chave]}`, limpar: () => { motorManutencao.filtros[d.chave] = ""; atualizarManutencao(); } }));
+    document.getElementById("manut-chips").innerHTML = chipsAtivos.length
+      ? `<div class="filter-chips">${chipsAtivos.map((c, i) => `<span class="filter-chip">Isolando ${escapeHTML(c.rotulo)}<button type="button" data-chip-limpar="${i}" title="Remover este filtro">${iconeInline("fechar", 10, -1)}</button></span>`).join("")}</div>`
+      : "";
+    document.querySelectorAll("#manut-chips [data-chip-limpar]").forEach((btn) => {
+      btn.addEventListener("click", () => chipsAtivos[+btn.dataset.chipLimpar].limpar());
+    });
+
+    const total = filtrada.reduce((a, r) => a + (r.valorOrcado || 0), 0);
+    const concluido = filtrada.filter((r) => r.grupoStatus === "Concluido").reduce((a, r) => a + (r.valorOrcado || 0), 0);
+    const pendente = total - concluido;
+    document.getElementById("manut-kpis").innerHTML = `
+      <div class="kpi-card"><div class="kpi-cabeca">${kpiIcone("moeda")}<div class="kpi-label">Valor Orçado Total</div></div><div class="kpi-value">R$ ${formatarMoedaCompacta(total)}</div><div class="kpi-valor-exato">${formatarMoedaBR(total)}</div></div>
+      <div class="kpi-card"><div class="kpi-cabeca">${kpiIcone("obras")}<div class="kpi-label">Ordens de Serviço</div></div><div class="kpi-value">${filtrada.length.toLocaleString("pt-BR")}</div></div>
+      <div class="kpi-card"><div class="kpi-cabeca">${kpiIcone("selo")}<div class="kpi-label">Concluído em Valor</div></div><div class="kpi-value">${total ? (concluido / total * 100).toLocaleString("pt-BR", { maximumFractionDigits: 1 }) : "—"}%</div></div>
+      <div class="kpi-card"><div class="kpi-cabeca">${kpiIcone("moeda")}<div class="kpi-label">Valor Pendente</div></div><div class="kpi-value">R$ ${formatarMoedaCompacta(pendente)}</div></div>
+    `;
+
+    DIMENSOES_MANUTENCAO.forEach((d) => {
+      const linhasRecorte = manutencaoTodas.filter((r) => motorManutencao.bateFiltro(r, d.chave));
+      const linhas = agruparValorObrasPorCampo(linhasRecorte, (r) => d.campo(r), (r) => r.valorOrcado, "(não informado)");
+      document.getElementById(d.containerId).innerHTML = barraOuTabelaSVG(linhas, {
+        formatarValor: (v) => "R$ " + formatarMoedaCompacta(v),
+        rotuloExtra: (l) => `(${l.qtd})`,
+        selecionado: motorManutencao.filtros[d.chave] || "",
+        colunaRotulo: d.colunaRotulo,
+        colunaValor: "VALOR (R$)",
+        mostrarPercentual: true,
+      });
+      adicionarControlesGrafico(document.getElementById(d.containerId));
+    });
+  }
 
   // Resolve o rótulo "de exibição" de uma unidade nesta dimensão: se o valor
   // bruto dela está dentro de algum grupo personalizado, mostra o NOME do
@@ -8935,6 +9107,8 @@ async function carregarObrasPortal(portalSlug) {
   }
 
   atualizar();
+  atualizarCeirf();
+  atualizarManutencao();
 }
 
 async function carregarContratosPortal(portalSlug) {
