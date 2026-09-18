@@ -5746,6 +5746,40 @@ function ligarTooltipPessoa(container, papel, resolverContratosDoNome) {
   });
 }
 
+// Mesma lógica do card "Compartilhados entre DIRPIN": listar ali mesmo, sem
+// precisar de mais uma tabela/gráfico na tela — pedido direto: "vc pode
+// adcionar um mecanismo de redirecionamento oculto (ou tooltip mesmo) sem
+// necessariamente criar mais uma tabela/gráfico ali na seção".
+function tooltipCompartilhadosHTML(contratos) {
+  const topo = contratos.slice(0, 6);
+  const resto = contratos.length - topo.length;
+  return `
+    <h4>Compartilhados entre DIRPIN</h4>
+    <p class="obj">${contratos.length} contrato${contratos.length === 1 ? "" : "s"} atende${contratos.length === 1 ? "" : "m"} mais de uma DIRPIN ao mesmo tempo</p>
+    <ul style="margin:6px 0 0;padding-left:16px;list-style:disc">
+      ${topo.map((c) => `<li>${escapeHTML(c.numeroContrato)} — ${escapeHTML(c.empresa)} (${escapeHTML([...new Set((c.unidades || []).map((u) => u.dirpin).filter(Boolean))].join(", "))})</li>`).join("")}
+      ${resto > 0 ? `<li>+${resto} mais</li>` : ""}
+    </ul>
+    <p class="obj" style="margin-top:6px">Clique pra ver a lista completa na tabela de Visão Geral.</p>`;
+}
+
+function ligarTooltipCompartilhados(cardEl, contratos) {
+  const tooltip = tooltipContratoEl();
+  cardEl.addEventListener("mouseenter", () => {
+    tooltip.innerHTML = tooltipCompartilhadosHTML(contratos);
+    tooltip.hidden = false;
+  });
+  cardEl.addEventListener("mousemove", (ev) => {
+    const largura = 320, altura = tooltip.offsetHeight || 220;
+    let x = ev.clientX + 18, y = ev.clientY + 18;
+    if (x + largura > window.innerWidth) x = ev.clientX - largura - 18;
+    if (y + altura > window.innerHeight) y = Math.max(8, window.innerHeight - altura - 8);
+    tooltip.style.left = x + "px";
+    tooltip.style.top = y + "px";
+  });
+  cardEl.addEventListener("mouseleave", () => { tooltip.hidden = true; });
+}
+
 // ---------- Gerencial: cartões de portfólio + matriz e barra por área ----------
 function renderGerencialContratos(lista, resumo) {
   const alvo = document.getElementById("contratos-sub-gerencial");
@@ -8112,6 +8146,8 @@ function renderPorDimensaoContratos(lista, cfg) {
     });
     const cardCompartilhados = el("filtro-unidade").querySelector("[data-compartilhados]");
     if (cardCompartilhados) {
+      const contratosCompartilhadosLista = contratosComUnidade.filter((c) => new Set(c.unidades.map((u) => u.dirpin)).size > 1);
+      ligarTooltipCompartilhados(cardCompartilhados, contratosCompartilhadosLista);
       cardCompartilhados.addEventListener("click", () => {
         filtroApenasCompartilhados = !filtroApenasCompartilhados;
         // Isolar "só compartilhados" não faz sentido junto de "só de tal
@@ -8120,6 +8156,14 @@ function renderPorDimensaoContratos(lista, cfg) {
         // tabela sem entender por quê.
         if (filtroApenasCompartilhados) { filtroDirpin = ""; filtroCoorpin = ""; }
         atualizar();
+        // "Redirecionamento": o filtro muda a tabela de Visão Geral, mas
+        // isso é invisível se a pessoa estiver numa outra sub-aba quando
+        // clica — troca pra lá e rola até a tabela pra sempre mostrar o
+        // resultado.
+        if (filtroApenasCompartilhados) {
+          alvo.querySelector(`[data-subtab-${p}="visao"]`)?.click();
+          el("visao-tabela")?.scrollIntoView?.({ behavior: "smooth", block: "start" });
+        }
       });
     }
     el("filtro-coorpin")?.addEventListener("change", (ev) => { filtroCoorpin = ev.target.value; filtroApenasCompartilhados = false; atualizar(); });
@@ -8329,6 +8373,15 @@ function renderPorDimensaoContratos(lista, cfg) {
         </div></div>
         <div id="${p}-grafico-mes"></div>
       </div>
+      ${p === "categoria" ? `
+      <div class="dash-chart-box" style="margin-top:16px">
+        <h4>Quem Precisa Agir</h4>
+        <p class="dash-chart-hint">Gestores e fiscais com mais contrato vencido ou vencendo em até 90 dias sob responsabilidade, dentro desta categoria — clique num nome pra abrir o perfil completo.</p>
+        <div class="dash-charts" style="grid-template-columns:1fr 1fr">
+          <div><h4 style="font-size:var(--fs-ui-sm);margin-bottom:6px">Gestores</h4><div id="${p}-risco-gestores"></div></div>
+          <div><h4 style="font-size:var(--fs-ui-sm);margin-bottom:6px">Fiscais</h4><div id="${p}-risco-fiscais"></div></div>
+        </div>
+      </div>` : ""}
       <div id="${p}-mes-chip"></div>
       <div id="${p}-prazos-tabela" style="margin-top:16px"></div>`;
     // Pedido direto: "cai naquela coisa deles não lembrarem por número,
@@ -8337,6 +8390,36 @@ function renderPorDimensaoContratos(lista, cfg) {
     // valor...) e o clique-abre-panorama que toda tabela de contrato já
     // usa, em vez de deixar só o número do contrato pra decorar.
     ligarTooltipLinhas(el("sub-prazos"), porId);
+    // Pedido direto: "em categoria: aparecer tambem quem precisa agir
+    // quando formos na aba prazos e vencimentos" — mesma lógica do "Quem
+    // Precisa Agir" do Tático, só que escopada aos contratos DESTA
+    // categoria (listaFiltrada), não o portfólio inteiro.
+    if (p === "categoria") {
+      const contratosEmRiscoCat = listaFiltrada.filter((c) => c.statusVigencia === "Vencido" || c.statusVigencia === "A Vencer");
+      const gestoresRiscoCat = agruparContratosPorPessoa(contratosEmRiscoCat, "Gestor").slice(0, 5);
+      const fiscaisRiscoCat = agruparContratosPorPessoa(contratosEmRiscoCat, "Fiscal").slice(0, 5);
+      el("risco-gestores").innerHTML = gestoresRiscoCat.length
+        ? barraContagemHorizontalSVG(gestoresRiscoCat, { tituloTooltip: (l) => `${l.label}: ${l.total} contrato(s) em risco`, limite: 20 })
+        : `<p class="dash-chart-hint">Nenhum gestor com contrato em risco nesta categoria.</p>`;
+      el("risco-fiscais").innerHTML = fiscaisRiscoCat.length
+        ? barraContagemHorizontalSVG(fiscaisRiscoCat, { tituloTooltip: (l) => `${l.label}: ${l.total} contrato(s) em risco`, limite: 20 })
+        : `<p class="dash-chart-hint">Nenhum fiscal com contrato em risco nesta categoria.</p>`;
+      adicionarControlesGrafico(el("risco-gestores"));
+      adicionarControlesGrafico(el("risco-fiscais"));
+      function irParaPessoaViaCategoria(containerId, papel, idSelect) {
+        document.getElementById(containerId).addEventListener("click", (ev) => {
+          const alvoClicado = ev.target.closest("[data-cat]");
+          if (!alvoClicado) return;
+          document.querySelector('[data-subtab-contratos="porpessoas"]')?.click();
+          const btnPapel = document.querySelector(`#porpessoas-role-toggle [data-role-pessoas="${papel}"]`);
+          if (btnPapel && !btnPapel.classList.contains("active")) btnPapel.click();
+          const sel = document.getElementById(idSelect);
+          if (sel) { sel.value = alvoClicado.dataset.cat; sel.dispatchEvent(new Event("change", { bubbles: true })); }
+        });
+      }
+      irParaPessoaViaCategoria(`${p}-risco-gestores`, "gestor", "gestor-select");
+      irParaPessoaViaCategoria(`${p}-risco-fiscais`, "fiscal", "fiscal-select");
+    }
     // Bug reportado direto: "indo por área gestora clicando em 'vence em
     // 31-90 dias', não redireciona com os cliques, assim como 30... então
     // é um problema que nem todos os cartões tão indo" — esses 3 cartões
@@ -9376,6 +9459,7 @@ async function carregarObrasPortal(portalSlug) {
             </div>
           </div>
           <p class="dash-chart-hint">Obra e manutenção são registros diferentes na planilha-fonte — nem toda unidade com manutenção tem valor de obra, e vice-versa — por isso cada uma tem seu próprio cartão abaixo.</p>
+          <p class="dash-chart-hint">Esta quebra por Diretoria Regional usa o valor registrado em cada unidade individualmente — menos completo que o Controle CEIRF/Manutenção PC, que não têm campo de Diretoria Regional pra cruzar — por isso a soma aqui fica abaixo dos cartões "Valor Total da Obra/Manutenção" lá em cima, que vêm das bases completas.</p>
         </div>
         <div class="dash-charts" style="grid-template-columns:1fr 1fr">
           <div class="dash-chart-box">
@@ -9853,15 +9937,34 @@ async function carregarObrasPortal(portalSlug) {
       btn.addEventListener("click", () => chipsAtivos[+btn.dataset.chipLimpar].limpar());
     });
 
-    // KPIs recalculados do recorte atual (filtrada), não do total fixo.
-    const comValorObra = filtrada.filter((u) => u.valorDaObra != null);
+    // Pedido direto: "o valor de manutenção é o que está na aba
+    // manutenção... o valor de obra é os 290 milhões que está em CEIRF...
+    // verificar isso de número em construção ainda corresponde ao valor
+    // atual e a porcentagem". Achado: valorDaObra/valorDaManutencao/
+    // statusConstrutivo em UnidadePolicial vêm de um cruzamento por
+    // similaridade de texto contra a planilha original (imperfeito — só
+    // 146/588 e 170/588 registros), enquanto CEIRF (334 linhas, 174 no
+    // escopo Ampliado) e Manutenção PC (115 ordens) são as bases
+    // PRÓPRIAS, completas e conferidas contra o PDF oficial — a mesma
+    // razão que já tinha tirado "Status Construtivo"/"Tipo de
+    // Intervenção" daqui (ver comentário de DIMENSOES_OBRAS). Esses 4
+    // cartões agora vêm de lá — por isso NÃO reagem ao filtro por
+    // Departamento/Diretoria/etc. abaixo (CEIRF/Manutenção PC não têm
+    // essas categorias pra filtrar por elas; "Unidades" e "Unidades com
+    // Manutenção Registrada" continuam reagindo, são sobre UnidadePolicial
+    // mesmo). Verificado direto no Postgres antes de mudar: soma
+    // valorGlobal do escopo Ampliado = R$290.791.122,38 em 174 linhas
+    // (ela lembrava "172", bem perto do real); soma valorOrcado de todas
+    // as 115 ordens de Manutenção PC = R$23.348.819,24. "Em Construção"
+    // virou "Em Execução" (nome que a própria base CEIRF usa) porque o
+    // valor mudou de fonte — manter o rótulo antigo ia parecer que ainda
+    // é o mesmo dado de antes.
+    const valorObraCeirf = ceirfAmpliado.reduce((a, r) => a + (r.valorGlobal || 0), 0);
+    const valorManutencaoPC = manutencaoTodas.reduce((a, r) => a + (r.valorOrcado || 0), 0);
+    const emExecucaoCeirf = ceirfAmpliado.filter((r) => r.status === "EXECUCAO").length;
+    const concluidasCeirf = ceirfAmpliado.filter((r) => r.status === "CONCLUIDA").length;
+    const percentualConcluidasCeirf = ceirfAmpliado.length ? concluidasCeirf / ceirfAmpliado.length : null;
     const comValorManutencao = filtrada.filter((u) => u.valorDaManutencao != null);
-    const valorTotalObra = comValorObra.reduce((a, u) => a + u.valorDaObra, 0);
-    const valorTotalManutencao = comValorManutencao.reduce((a, u) => a + u.valorDaManutencao, 0);
-    const comStatus = filtrada.filter((u) => u.statusConstrutivo);
-    const obrasConcluidas = filtrada.filter((u) => u.statusConstrutivo === "Concluída").length;
-    const obrasEmConstrucao = filtrada.filter((u) => u.statusConstrutivo === "Em construção").length;
-    const percentualConcluidas = comStatus.length ? obrasConcluidas / comStatus.length : null;
     // Pedido direto: obra e manutenção "parecem diferentes" — dar à
     // manutenção seu próprio KPI (não só o valor somado, mas quantas
     // unidades de fato têm manutenção registrada), espelhando o mesmo
@@ -9870,12 +9973,17 @@ async function carregarObrasPortal(portalSlug) {
 
     document.getElementById("obras-kpis").innerHTML = `
       <div class="kpi-card"><div class="kpi-cabeca">${kpiIcone("predio")}<div class="kpi-label">Unidades</div></div><div class="kpi-value">${filtrada.length.toLocaleString("pt-BR")}</div></div>
-      <div class="kpi-card"><div class="kpi-cabeca">${kpiIcone("moeda")}<div class="kpi-label">Valor Total da Obra</div></div><div class="kpi-value">R$ ${formatarMoedaCompacta(valorTotalObra)}</div><div class="kpi-valor-exato">${formatarMoedaBR(valorTotalObra)} — ${comValorObra.length} de ${filtrada.length} unidades</div></div>
-      <div class="kpi-card"><div class="kpi-cabeca">${kpiIcone("moeda")}<div class="kpi-label">Valor Total da Manutenção</div></div><div class="kpi-value">R$ ${formatarMoedaCompacta(valorTotalManutencao)}</div><div class="kpi-valor-exato">${formatarMoedaBR(valorTotalManutencao)} — ${comValorManutencao.length} de ${filtrada.length} unidades (valor PARCIAL, só o que foi possível vincular a uma unidade)</div></div>
-      <div class="kpi-card"><div class="kpi-cabeca">${kpiIcone("obras")}<div class="kpi-label">Obras Em Construção</div></div><div class="kpi-value">${obrasEmConstrucao.toLocaleString("pt-BR")}</div></div>
-      <div class="kpi-card"><div class="kpi-cabeca">${kpiIcone("selo")}<div class="kpi-label">% Obras Concluídas</div></div><div class="kpi-value">${percentualConcluidas === null ? "—" : (percentualConcluidas * 100).toLocaleString("pt-BR", { maximumFractionDigits: 1 }) + "%"}</div><div class="kpi-valor-exato">${obrasConcluidas} de ${comStatus.length} com status registrado</div></div>
+      <div class="kpi-card kpi-clicavel" data-acao-obras-kpi="ceirf" title="Clique pra ver o detalhe no Controle CEIRF" style="cursor:pointer"><div class="kpi-cabeca">${kpiIcone("moeda")}<div class="kpi-label">Valor Total da Obra</div></div><div class="kpi-value">R$ ${formatarMoedaCompacta(valorObraCeirf)}</div><div class="kpi-valor-exato">${formatarMoedaBR(valorObraCeirf)} — ${ceirfAmpliado.length} intervenções do Controle CEIRF (escopo ampliado)</div></div>
+      <div class="kpi-card kpi-clicavel" data-acao-obras-kpi="manutencao" title="Clique pra ver o detalhe em Manutenção PC" style="cursor:pointer"><div class="kpi-cabeca">${kpiIcone("moeda")}<div class="kpi-label">Valor Total da Manutenção</div></div><div class="kpi-value">R$ ${formatarMoedaCompacta(valorManutencaoPC)}</div><div class="kpi-valor-exato">${formatarMoedaBR(valorManutencaoPC)} — ${manutencaoTodas.length} ordens de serviço (Manutenção PC, universo completo)</div></div>
+      <div class="kpi-card kpi-clicavel" data-acao-obras-kpi="ceirf" title="Clique pra ver o detalhe no Controle CEIRF" style="cursor:pointer"><div class="kpi-cabeca">${kpiIcone("obras")}<div class="kpi-label">Obras Em Execução</div></div><div class="kpi-value">${emExecucaoCeirf.toLocaleString("pt-BR")}</div><div class="kpi-valor-exato">de ${ceirfAmpliado.length} intervenções (Controle CEIRF)</div></div>
+      <div class="kpi-card kpi-clicavel" data-acao-obras-kpi="ceirf" title="Clique pra ver o detalhe no Controle CEIRF" style="cursor:pointer"><div class="kpi-cabeca">${kpiIcone("selo")}<div class="kpi-label">% Obras Concluídas</div></div><div class="kpi-value">${percentualConcluidasCeirf === null ? "—" : (percentualConcluidasCeirf * 100).toLocaleString("pt-BR", { maximumFractionDigits: 1 }) + "%"}</div><div class="kpi-valor-exato">${concluidasCeirf} de ${ceirfAmpliado.length} intervenções (Controle CEIRF)</div></div>
       <div class="kpi-card"><div class="kpi-cabeca">${kpiIcone("obras")}<div class="kpi-label">Unidades com Manutenção Registrada</div></div><div class="kpi-value">${percentualComManutencao === null ? "—" : (percentualComManutencao * 100).toLocaleString("pt-BR", { maximumFractionDigits: 1 }) + "%"}</div><div class="kpi-valor-exato">${comValorManutencao.length} de ${filtrada.length} unidades</div></div>
     `;
+    document.querySelectorAll("#obras-kpis [data-acao-obras-kpi]").forEach((card) => {
+      card.addEventListener("click", () => {
+        document.querySelector(`[data-subtab-obras="${card.dataset.acaoObrasKpi === "ceirf" ? "ceirf" : "manutencao"}"]`)?.click();
+      });
+    });
 
     // Cada dimensão é calculada IGNORANDO o próprio filtro (mas respeitando
     // os das outras) — assim continua mostrando todas as opções dela, com
