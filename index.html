@@ -4821,6 +4821,14 @@ function barraContagemHorizontalSVG(linhas, opcoes = {}) {
     // (ex.: Tipo de Objeto, pareado com a rosca de Valor por Tipo — aí a
     // cor precisa bater nos dois pra dar pra identificar a fatia/barra).
     corUnica = true,
+    // Pedido direto (crítica externa que ela trouxe): "não dá pra saber se
+    // 2 contratos é muito ou pouco sem ter uma referência de comparação" —
+    // linha vertical tracejada opcional (ex.: média de carga por gestor),
+    // só desenhada quando o chamador passa um valor > 0. Não muda a escala
+    // (maxTotal já vem das linhas reais) nem afeta nenhum outro chamador
+    // que não passa essa opção — cresce só o padding do topo, pra sobrar
+    // espaço pro rótulo da linha sem cortar no viewBox.
+    linhaReferencia = null, // { valor, rotulo }
   } = opcoes;
   // Corta ANTES de medir padding/altura — "outros" precisa entrar na conta
   // como se fosse mais uma linha comum.
@@ -4845,7 +4853,7 @@ function barraContagemHorizontalSVG(linhas, opcoes = {}) {
   const padL = 170;
   const maiorTextoValor = Math.max(0, ...linhasPlot.map((l) => larguraTextoMonoAprox(formatarValor(l.total) + (rotuloExtra ? ` ${rotuloExtra(l)}` : ""), 9, true)));
   const padR = Math.max(44, maiorTextoValor + 10);
-  const padT = 6;
+  const padT = linhaReferencia ? 16 : 6;
   const larguraPlot = 250;
   const ALTURA_LINHA_TEXTO = 10, alturaBarra = 15;
   // Altura de linha FIXA não dava conta de rótulo comprido (nº do contrato +
@@ -4898,7 +4906,13 @@ function barraContagemHorizontalSVG(linhas, opcoes = {}) {
     }
     y += rowH;
   });
-  const svg = `<svg viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg">${corpo}</svg>`;
+  let linhaRef = "";
+  if (linhaReferencia && linhaReferencia.valor > 0 && maxTotal) {
+    const xRef = padL + larguraPlot * (linhaReferencia.valor / maxTotal);
+    linhaRef = `<line x1="${xRef.toFixed(1)}" y1="${padT}" x2="${xRef.toFixed(1)}" y2="${y.toFixed(1)}" stroke="var(--carvao)" stroke-width="1.2" stroke-dasharray="3 3" opacity="0.7" />`;
+    linhaRef += `<text x="${xRef.toFixed(1)}" y="${(padT - 8).toFixed(1)}" text-anchor="middle" font-family="monospace" font-size="8" font-weight="700" fill="var(--carvao)">${escapeHTML(linhaReferencia.rotulo)}</text>`;
+  }
+  const svg = `<svg viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg">${corpo}${linhaRef}</svg>`;
   if (!passouLimite) return svg;
 
   // Lista completa em tabela HTML simples, escondida até clicar em
@@ -7776,11 +7790,20 @@ function renderPorDimensaoContratos(lista, cfg) {
       <p class="dash-chart-hint" style="margin-top:4px">${exclusivos} contrato(s) atende(m) uma DIRPIN só — os outros ${compartilhados} atendem mais de uma (por isso a soma dos filtros de DIRPIN acima passa de ${contratosComUnidade.length}). Útil saber antes de montar relatório ou apresentação com esse corte.</p>` : ""}
       <div class="dash-chart-box" id="${p}-grafico-unidade-caixa" style="margin-top:16px;border-left:4px solid var(--dourado);background:color-mix(in srgb, var(--dourado) 7%, transparent)">
         <h4>Distribuição Geográfica</h4>
-        <p class="dash-chart-hint">${contratosComUnidade.length && contratosSemUnidade.length
+        ${!contratosComUnidade.length ? `
+        <!-- Pedido direto (crítica externa que ela trouxe, aprovada via
+        pergunta direta): mostrar mapa/barras/Salvador pra um recorte SEM
+        NENHUM contrato com unidade regional (COORPIN) real cadastrada
+        induzia a pensar que "Salvador (outras áreas)" era uma leitura
+        geográfica de verdade — não é, é só o campo vazio de todo mundo
+        agregado num balde só. Quando existe ALGUMA unidade real misturada
+        (contratosComUnidade.length > 0, ramo de baixo), o mapa continua —
+        aí Salvador é uma aproximação legítima ao lado de dado real, não a
+        íntegra do gráfico. -->
+        <p class="dash-chart-hint">100% dos ${contratosSemUnidade.length} contrato(s) desta seleção não têm unidade regional (COORPIN) cadastrada — hoje só a DEPIN cadastra essa informação. Sem nenhum ponto real pra ancorar, um mapa aqui só mostraria "tudo em Salvador", o que parece uma leitura geográfica sem ser — por isso não desenha nenhum.</p>` : `
+        <p class="dash-chart-hint">${contratosSemUnidade.length
           ? `${contratosComUnidade.length} contrato(s) têm unidade regional (COORPIN) cadastrada e entram um a um no mapa; ${contratosSemUnidade.length} são de outras áreas gestoras (sem essa informação, hoje só a DEPIN cadastra) e entram juntos em "Salvador (outras áreas)" — a maioria dessas áreas é coordenação central do estado, então Salvador é a melhor aproximação sem inventar dado que a planilha não tem.`
-          : contratosComUnidade.length
-          ? `Todos os ${contratosComUnidade.length} contrato(s) desta seleção têm unidade regional (COORPIN) cadastrada.`
-          : `Nenhum destes ${contratosSemUnidade.length} contrato(s) tem unidade regional cadastrada (hoje só a DEPIN cadastra) — todos entram juntos em "Salvador (outras áreas)", a melhor aproximação geográfica sem inventar dado que a planilha não tem.`
+          : `Todos os ${contratosComUnidade.length} contrato(s) desta seleção têm unidade regional (COORPIN) cadastrada.`
         } Clique numa barra ou num ponto do mapa pra isolar.</p>
         <div class="linha-troca-grafico"><div class="dash-toggle" id="${p}-toggle-grafico-unidade">
           <button class="dash-toggle-btn" data-modo="barras" title="Lista as 26, ordenada por número — melhor pra achar uma específica ou comparar valores">BARRAS</button>
@@ -7788,8 +7811,12 @@ function renderPorDimensaoContratos(lista, cfg) {
           ${contratosSalvador.length ? `<button class="dash-toggle-btn" data-modo="salvador" title="Zoom só em Salvador — ${contratosSalvador.length} contrato(s) sem unidade do interior (Sede da DEPIN + outras áreas), um por bolinha">SALVADOR</button>` : ""}
         </div></div>
         <div id="${p}-grafico-unidade"></div>
-        <div id="${p}-legenda-mapa-unidade"></div>
+        <div id="${p}-legenda-mapa-unidade"></div>`}
       </div>`;
+    // Sem nenhuma unidade real, a caixa acima já virou só o aviso de texto —
+    // nada abaixo (filtros de DIRPIN/COORPIN, toggle, mapa) tem elemento no
+    // DOM pra ligar evento nenhum.
+    if (!contratosComUnidade.length) return;
     el("filtro-dirpin")?.addEventListener("change", (ev) => {
       filtroDirpin = ev.target.value;
       // Se a COORPIN escolhida não pertence mais à DIRPIN nova, esvazia —
@@ -8435,26 +8462,28 @@ function renderPorPessoasContratos(lista) {
 
   const gestores = agruparContratosPorPessoa(lista, "Gestor");
   const fiscais = agruparContratosPorPessoa(lista, "Fiscal");
-  const totalAnalistas = new Set(lista.map((c) => c.analista).filter(Boolean)).size;
+  const analistas = agruparContagemPorCampo(lista, (c) => c.analista, "(sem analista)").filter((l) => l.label !== "(sem analista)");
+  const totalAnalistas = analistas.length;
   const duplas = agruparDuplasGestorFiscal(lista);
   const mapaDuplas = new Map(duplas.map((d) => [d.label, d]));
-  // Média de contratos por pessoa: soma de "quantos contratos cada um tem"
-  // dividida por quantas pessoas distintas existem (gestor + fiscal juntos,
-  // já que ambos representam a mesma pergunta — "carga de trabalho por
-  // responsável") — mesmo raciocínio do card "Média de Aditivos / Contrato"
-  // que já existe em Gerencial.
-  const pessoasComCarga = [...gestores, ...fiscais];
-  const mediaCarga = pessoasComCarga.length
-    ? pessoasComCarga.reduce((a, l) => a + l.total, 0) / pessoasComCarga.length
-    : 0;
+  // Pedido direto (crítica externa que ela trouxe): "Média de Contratos/
+  // Pessoa: 1,8 mistura populações com carga bem diferente (gestor ~2,
+  // fiscal ~1,4, analista ~14,8) — um número só esconde que analista carrega
+  // MUITO mais contrato por pessoa que gestor/fiscal". Uma média por papel,
+  // não uma média geral — cada papel é uma pergunta de carga de trabalho
+  // diferente (mesmo espírito da separação já feita em Setor Demandante e
+  // Tipo de Objeto: não misturar o que responde perguntas diferentes).
+  const mediaPorPapel = (grupo) => (grupo.length ? grupo.reduce((a, l) => a + l.total, 0) / grupo.length : 0);
+  const mediaGestor = mediaPorPapel(gestores);
+  const mediaFiscal = mediaPorPapel(fiscais);
+  const mediaAnalista = mediaPorPapel(analistas);
 
   alvo.innerHTML = `
     <div class="kpi-row" style="margin-bottom:16px">
       <div class="kpi-card"><div class="kpi-cabeca">${kpiIcone("competencia_normas")}<div class="kpi-label">Contratos</div></div><div class="kpi-value">${lista.length.toLocaleString("pt-BR")}</div></div>
-      <div class="kpi-card"><div class="kpi-cabeca">${kpiIcone("pessoa")}<div class="kpi-label">Gestores</div></div><div class="kpi-value">${gestores.length.toLocaleString("pt-BR")}</div></div>
-      <div class="kpi-card"><div class="kpi-cabeca">${kpiIcone("pessoa")}<div class="kpi-label">Fiscais</div></div><div class="kpi-value">${fiscais.length.toLocaleString("pt-BR")}</div></div>
-      <div class="kpi-card"><div class="kpi-cabeca">${kpiIcone("pessoa")}<div class="kpi-label">Analistas</div></div><div class="kpi-value">${totalAnalistas.toLocaleString("pt-BR")}</div></div>
-      <div class="kpi-card"><div class="kpi-cabeca">${kpiIcone("competencia_normas")}<div class="kpi-label">Média de Contratos / Pessoa</div></div><div class="kpi-value">${mediaCarga.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}</div></div>
+      <div class="kpi-card"><div class="kpi-cabeca">${kpiIcone("pessoa")}<div class="kpi-label">Gestores</div></div><div class="kpi-value">${gestores.length.toLocaleString("pt-BR")}</div><div class="kpi-valor-exato">${mediaGestor.toLocaleString("pt-BR", { maximumFractionDigits: 1 })} contrato(s)/gestor</div></div>
+      <div class="kpi-card"><div class="kpi-cabeca">${kpiIcone("pessoa")}<div class="kpi-label">Fiscais</div></div><div class="kpi-value">${fiscais.length.toLocaleString("pt-BR")}</div><div class="kpi-valor-exato">${mediaFiscal.toLocaleString("pt-BR", { maximumFractionDigits: 1 })} contrato(s)/fiscal</div></div>
+      <div class="kpi-card"><div class="kpi-cabeca">${kpiIcone("pessoa")}<div class="kpi-label">Analistas</div></div><div class="kpi-value">${totalAnalistas.toLocaleString("pt-BR")}</div><div class="kpi-valor-exato">${mediaAnalista.toLocaleString("pt-BR", { maximumFractionDigits: 1 })} contrato(s)/analista</div></div>
     </div>
     <div class="dash-charts" style="grid-template-columns:1fr 1fr">
       <div class="dash-chart-box">
@@ -8482,13 +8511,18 @@ function renderPorPessoasContratos(lista) {
     ${PAPEIS.map((r, i) => `<div class="tab-panel" id="contratos-sub-${r.painel}"${i === 0 ? "" : " hidden"}></div>`).join("")}
   `;
 
+  // Linha de referência (crítica externa): a barra sozinha mostra quem tem
+  // mais, mas não se "2 contratos" é muito ou pouco — a média do PRÓPRIO
+  // papel (não a média geral misturada) dá essa referência de comparação.
   document.getElementById("porpessoas-top-gestores").innerHTML = barraContagemHorizontalSVG(gestores.slice(0, 10), {
     tituloTooltip: (l) => `${l.label}: ${l.total} contrato(s)`,
     limite: 20,
+    linhaReferencia: { valor: mediaGestor, rotulo: `MÉDIA: ${mediaGestor.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}` },
   });
   document.getElementById("porpessoas-top-fiscais").innerHTML = barraContagemHorizontalSVG(fiscais.slice(0, 10), {
     tituloTooltip: (l) => `${l.label}: ${l.total} contrato(s)`,
     limite: 20,
+    linhaReferencia: { valor: mediaFiscal, rotulo: `MÉDIA: ${mediaFiscal.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}` },
   });
   document.getElementById("porpessoas-duplas").innerHTML = duplas.length
     ? barraContagemHorizontalSVG(duplas.slice(0, 10), { tituloTooltip: (l) => `${l.label}: ${l.total} contrato(s)`, limite: 20 })
