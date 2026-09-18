@@ -8735,7 +8735,11 @@ const DIMENSOES_CEIRF = [
   // pedido direto, com eixo Y de valor e as 3 cores próprias (não o azul/
   // dourado/rosa do painel de referência: oliva=entregue, mostarda=
   // pendente, terracota=suprimida — mesmo raciocínio semântico, cores da casa).
-  { chave: "etapa", campo: (r) => r.etapa, rotulo: "Etapa do Programa (gradiente entregue × pendente)", colunaRotulo: "ETAPA", containerId: "ceirf-etapa", tipo: "empilhado" },
+  // largo: true — no painel de referência dela, este cartão já era
+  // "card wide" (linha inteira pra ele sozinho); eu tinha deixado espremido
+  // em meia coluna igual aos outros, causando o "precisa ampliar pra ver
+  // algo" que ela reclamou.
+  { chave: "etapa", campo: (r) => r.etapa, rotulo: "Etapa do Programa (gradiente entregue × pendente)", colunaRotulo: "ETAPA", containerId: "ceirf-etapa", tipo: "empilhado", largo: true },
   { chave: "padraoUnidade", campo: (r) => r.padraoUnidade, rotulo: "Padrão da Unidade", colunaRotulo: "PADRÃO DA UNIDADE", containerId: "ceirf-padrao", tipo: "barraEixo", cor: "var(--dourado)" },
   // Top 8 (a lista real tem 162 municípios — sem corte a barra vira uma
   // escada infinita, ilegível).
@@ -8753,7 +8757,9 @@ const DIMENSOES_MANUTENCAO = [
   { chave: "faixaValor", campo: (r) => r.faixaValor, rotulo: "Faixa de Valor (o teto prático de R$ 330 mil)", colunaRotulo: "FAIXA DE VALOR", containerId: "manut-faixa", tipo: "coluna" },
   // Linha acumulada (simpleLineChartSVG, já existente) — "evolução" é
   // pergunta de tendência no tempo, não de comparação entre categorias.
-  { chave: "anoMes", campo: (r) => r.anoMes, rotulo: "Evolução das Emissões (acumulado por mês)", colunaRotulo: "MÊS", containerId: "manut-mes", tipo: "linha" },
+  // largo: true — mesmo raciocínio do Etapa: era "card wide" no painel de
+  // referência dela, linha inteira pra caber os ~20 meses sem apertar.
+  { chave: "anoMes", campo: (r) => r.anoMes, rotulo: "Evolução das Emissões (acumulado por mês)", colunaRotulo: "MÊS", containerId: "manut-mes", tipo: "linha", largo: true },
 ];
 
 // Cross-filter genérico por N dimensões agregando por valor — reaproveitado
@@ -8913,7 +8919,7 @@ async function carregarObrasPortal(portalSlug) {
         <div id="manut-kpis" style="flex:0 0 220px;min-width:200px;display:flex;flex-direction:column;gap:12px"></div>
         <div class="dash-charts" style="flex:1;min-width:280px;grid-template-columns:1fr 1fr">
           ${DIMENSOES_MANUTENCAO.map((d) => `
-          <div class="dash-chart-box">
+          <div class="dash-chart-box"${d.largo ? ` style="grid-column:1/-1"` : ""}>
             <h4>${escapeHTML(d.rotulo)}</h4>
             <div id="${d.containerId}"></div>
           </div>`).join("")}
@@ -8938,7 +8944,7 @@ async function carregarObrasPortal(portalSlug) {
         <div id="ceirf-kpis" style="flex:0 0 220px;min-width:200px;display:flex;flex-direction:column;gap:12px"></div>
         <div class="dash-charts" style="flex:1;min-width:280px;grid-template-columns:1fr 1fr">
           ${DIMENSOES_CEIRF.map((d) => `
-          <div class="dash-chart-box">
+          <div class="dash-chart-box"${d.largo ? ` style="grid-column:1/-1"` : ""}>
             <h4>${escapeHTML(d.rotulo)}</h4>
             <div id="${d.containerId}"></div>
           </div>`).join("")}
