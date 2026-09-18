@@ -5016,17 +5016,29 @@ function tabelaMescladaHTML(linhas, opcoes = {}) {
   const somaValor = linhas.reduce((a, l) => a + l.valor, 0);
   const maxValor = maxSeguro(linhas.map((l) => l.valor));
   const ordenadas = linhas.slice().sort((a, b) => b.valor - a.valor);
+  // Pedido direto: "um contrato desses cair não é um evento médio" — ticket
+  // médio sozinho não distingue um setor de contratos parecidos entre si de
+  // um setor com 1 contrato gigante e vários pequenos (mesmo ticket médio,
+  // risco bem diferente). Quando o MAIOR contrato do grupo já é uma fatia
+  // grande do valor total (>=40%, e só com mais de 1 contrato — com 1 só a
+  // razão é sempre 100%, não é achado nenhum), acrescenta um aviso inline
+  // — mesmo estilo `.kpi-delta` já usado pros deltas de valor do sistema.
+  const LIMIAR_CONCENTRACAO = 0.4;
   const corpo = ordenadas.map((l) => {
     const destacado = selecionado === l.label;
     const pct = somaValor ? Math.round((l.valor / somaValor) * 1000) / 10 : 0;
     const ticket = l.qtd ? l.valor / l.qtd : 0;
+    const concentracao = l.qtd > 1 && l.valor ? (l.maiorContrato || 0) / l.valor : 0;
+    const avisoConcentracao = concentracao >= LIMIAR_CONCENTRACAO
+      ? `<div class="kpi-delta down" style="margin-top:3px;white-space:nowrap">1 contrato = ${Math.round(concentracao * 100)}%</div>`
+      : "";
     const extraAttr = colunaExtra ? ` data-${colunaExtra.campo}="${l[colunaExtra.campo]}"` : "";
     const extraTd = colunaExtra ? `<td class="num">${colunaExtra.render ? colunaExtra.render(l[colunaExtra.campo]) : l[colunaExtra.campo].toLocaleString("pt-BR")}</td>` : "";
     return `<tr data-cat="${escapeAttr(l.label)}" data-busca="${escapeAttr(normalizarBusca(l.label))}" data-qtd="${l.qtd}" data-valor="${l.valor}" data-ticket="${ticket}" data-pct="${pct}"${extraAttr} class="${destacado ? "selecionada" : ""}">
       <td>${escapeHTML(l.label)}</td>
       <td class="num">${l.qtd.toLocaleString("pt-BR")}</td>
       <td class="num"><span class="barra-embutida"><span class="barra-embutida-fill" style="width:${maxValor ? (l.valor / maxValor) * 100 : 0}%"></span></span>R$ ${escapeHTML(formatarMoedaCompacta(l.valor))}</td>
-      <td class="num">R$ ${escapeHTML(formatarMoedaCompacta(ticket))}</td>
+      <td class="num">R$ ${escapeHTML(formatarMoedaCompacta(ticket))}${avisoConcentracao}</td>
       <td class="num">${pct.toLocaleString("pt-BR")}%</td>
       ${extraTd}
     </tr>`;
@@ -5919,13 +5931,16 @@ function renderGerencialContratos(lista, resumo) {
     // funciona" — não tinha clique nenhum (só informativo). "Unidades
     // Beneficiadas" é conceitualmente diferente de "Setor Demandante"
     // (quem USA vs quem PEDIU o contrato — pra DEPIN as duas coincidem,
-    // mas "Por Setor Demandante" mistura os setores do DEPAF junto, o que
-    // confunde essa leitura). "Por DIRPIN" é a aba certa: só DEPIN, sem
-    // mistura, e já mostra cada COORPIN como sua própria unidade.
+    // mas "Por Setor Demandante" sem filtro nenhum mistura os setores do
+    // DEPAF junto, o que confunde essa leitura). Não existe mais uma aba
+    // "Por DIRPIN" própria (virou sub-filtro de Unidade Gestora=DEPIN, ver
+    // comentário perto de DIRPINS_DISPONIVEIS) — selecionar DEPIN ali em
+    // cima já dá "só DEPIN, sem mistura", então o destino agora é a MESMA
+    // aba Por Setor Demandante, só que escopada a DEPIN, onde cada COORPIN
+    // aparece como sua própria unidade.
     if (acaoRodape?.dataset.acao === "unidades-beneficiadas") {
-      document.querySelector('[data-subtab-contratos="pordirpin"]')?.click();
-      const selDirpin = document.getElementById("dirpin-select");
-      if (selDirpin && selDirpin.value) { selDirpin.value = ""; selDirpin.dispatchEvent(new Event("change", { bubbles: true })); }
+      document.querySelector('.unidade-gestora-btn[data-unidade="DEPIN"]')?.click();
+      document.querySelector('[data-subtab-contratos="porarea"]')?.click();
     }
   });
   document.getElementById("ger-setor").addEventListener("click", (ev) => {
@@ -6153,18 +6168,26 @@ function renderGerencialContratos(lista, resumo) {
     // a matriz antiga e a barra de valor antiga contavam qtd de jeitos
     // diferentes entre si, o que é exatamente o tipo de inconsistência que
     // essa limpeza busca eliminar.
+    // Pedido direto: "um contrato desses cair não é um evento médio, é um
+    // evento que derruba mais da metade do orçamento do setor" — ticket
+    // médio sozinho não mostra CONCENTRAÇÃO (setor com 1 contrato gigante e
+    // vários pequenos tem o mesmo ticket médio de um setor com contratos
+    // parecidos entre si). maiorContrato rastreia o maior contrato de cada
+    // grupo pra `tabelaMescladaHTML` calcular essa razão e avisar quando
+    // for alta — sem precisar de gráfico novo nenhum.
     const porSetor = new Map();
     for (const c of filtrada) {
       const critico = c.statusVigencia === "Vencido" || c.statusVigencia === "A Vencer";
       for (const chave of setoresDemandantesDoContrato(c)) {
-        if (!porSetor.has(chave)) porSetor.set(chave, { qtd: 0, valor: 0, criticos: 0 });
+        if (!porSetor.has(chave)) porSetor.set(chave, { qtd: 0, valor: 0, criticos: 0, maiorContrato: 0 });
         const g = porSetor.get(chave);
         g.qtd += 1;
         g.valor += c.valorGlobalAtual || 0;
+        g.maiorContrato = Math.max(g.maiorContrato, c.valorGlobalAtual || 0);
         if (critico) g.criticos += 1;
       }
     }
-    const linhasSetor = [...porSetor.entries()].map(([label, g]) => ({ label, qtd: g.qtd, valor: g.valor, criticos: g.criticos }));
+    const linhasSetor = [...porSetor.entries()].map(([label, g]) => ({ label, qtd: g.qtd, valor: g.valor, criticos: g.criticos, maiorContrato: g.maiorContrato }));
     document.getElementById("ger-setor").innerHTML = tabelaMescladaHTML(linhasSetor, {
       colunaRotulo: "SETOR DEMANDANTE",
       selecionado: filtroArea,
@@ -6180,12 +6203,13 @@ function renderGerencialContratos(lista, resumo) {
     const porTipo = new Map();
     for (const c of filtrada) {
       const chave = valorEfetivoTipo(c);
-      if (!porTipo.has(chave)) porTipo.set(chave, { qtd: 0, valor: 0 });
+      if (!porTipo.has(chave)) porTipo.set(chave, { qtd: 0, valor: 0, maiorContrato: 0 });
       const g = porTipo.get(chave);
       g.qtd += 1;
       g.valor += c.valorGlobalAtual || 0;
+      g.maiorContrato = Math.max(g.maiorContrato, c.valorGlobalAtual || 0);
     }
-    const linhasTipo = [...porTipo.entries()].map(([label, g]) => ({ label, qtd: g.qtd, valor: g.valor }));
+    const linhasTipo = [...porTipo.entries()].map(([label, g]) => ({ label, qtd: g.qtd, valor: g.valor, maiorContrato: g.maiorContrato }));
     document.getElementById("ger-tipo").innerHTML = tabelaMescladaHTML(linhasTipo, {
       colunaRotulo: "TIPO DE OBJETO",
       selecionado: filtroTipo,
@@ -6968,9 +6992,15 @@ function renderResumoRapido(lista, resumo) {
     }
     const cardDirpin = ev.target.closest("[data-resumo-dirpin]");
     if (cardDirpin) {
-      document.querySelector('[data-subtab-contratos="pordirpin"]')?.click();
-      const selDirpin = document.getElementById("dirpin-select");
-      if (selDirpin) { selDirpin.value = cardDirpin.dataset.resumoDirpin; selDirpin.dispatchEvent(new Event("change", { bubbles: true })); }
+      // DIRPIN não tem aba própria mais (virou sub-filtro de Unidade
+      // Gestora=DEPIN) — seleciona DEPIN em cima, escolhe a DIRPIN clicada
+      // no sub-filtro que acabou de aparecer, e pousa no Gerencial (já
+      // filtrado pelos dois), mesmo destino que qualquer outra troca de
+      // unidade/DIRPIN de cima já usa.
+      document.querySelector('.unidade-gestora-btn[data-unidade="DEPIN"]')?.click();
+      const selDirpinTopo = document.getElementById("contratos-filtro-dirpin-topo");
+      if (selDirpinTopo) { selDirpinTopo.value = cardDirpin.dataset.resumoDirpin; selDirpinTopo.dispatchEvent(new Event("change", { bubbles: true })); }
+      document.querySelector('[data-subtab-contratos="gerencial"]')?.click();
       return;
     }
     const cardCategoria = ev.target.closest("[data-resumo-categoria]");
@@ -7099,33 +7129,16 @@ function configPorCategoria() {
     complementar: { campoFn: (c) => setoresDemandantesDoContrato(c), rotuloVazio: "(sem unidade)", titulo: "Valor por Setor Demandante", prefixoAlvo: "area", tituloAba: "Por Setor Demandante" },
   };
 }
-// Pedido direto: "acho que falei toggle mas era aba, como tem gerencial,
-// tático, operacional... se eu seleciono o setor demandante já deveria
-// selecionar automaticamente a DIRPIN e a COORPIN, não permitir outra
-// seleção" — DIRPIN não é uma dimensão PARALELA a setor demandante (isso
-// era o erro do toggle que troquei ontem): é uma camada ACIMA da COORPIN,
-// hierárquica. Por isso vira aba própria (mesmo padrão de Por Setor
-// Demandante/Por Categoria) em vez de um modo alternativo dentro do
-// Gerencial — escolher uma DIRPIN aqui não compete com escolher um setor
-// demandante lá, são níveis diferentes da mesma árvore.
-function configPorDirpin() {
-  return {
-    prefixo: "dirpin",
-    campoAgrupador: (c) => dirpinsDoContrato(c),
-    // Pedido direto: "o cartão sem DIRPIN precisa ser melhor explicado...
-    // a pessoa pode ter uma leitura confusa" — DIRPIN só existe pra
-    // contrato da DEPIN; o rótulo sozinho ("(sem DIRPIN)") não deixa claro
-    // que é isso, não um dado faltando por erro.
-    rotuloVazio: "Fora da DEPIN (sem DIRPIN)",
-    labelSelect: "SELECIONE A DIRPIN",
-    opcaoPadrao: "— Escolha uma DIRPIN —",
-    labelBusca: "DIRPIN",
-    labelBuscaPlural: "todas as DIRPINs",
-    labelTrocar: "← TROCAR DE DIRPIN",
-    dicaLanding: "Escolha uma DIRPIN (no campo acima, ou clicando num cartão abaixo) pra ver o perfil completo dela — vencimentos, financeiro, pessoas, e as COORPINs que ela agrupa. DIRPIN só existe pra contrato da DEPIN — o cartão \"Fora da DEPIN (sem DIRPIN)\" reúne todo o resto (DEPAF e demais unidades), que ainda não cadastra essa informação.",
-    complementar: { campoFn: (c) => setoresDemandantesDoContrato(c), rotuloVazio: "(sem unidade)", titulo: "Valor por Setor Demandante", prefixoAlvo: "area", tituloAba: "Por Setor Demandante" },
-  };
-}
+// configPorDirpin()/renderPorDirpinContratos() (a aba própria "Por DIRPIN")
+// foram removidas — DIRPIN virou sub-filtro de Unidade Gestora=DEPIN em vez
+// de dimensão com aba própria (ver comentário perto de DIRPINS_DISPONIVEIS,
+// em carregarContratosPortal). A razão de existir aba própria em vez de
+// toggle (DIRPIN é hierárquica, não paralela a setor demandante — ver
+// [[feedback_dimensao_paralela_vs_hierarquica]]) continua válida; o que
+// mudou foi que uma aba fixa dando conta de TODAS as unidades gestoras
+// (Todos/DEPAF/DEPIN) tinha que representar "não se aplica" com um cartão
+// de leitura confusa. Um sub-filtro condicional resolve isso sem widget de
+// exceção nenhum.
 
 // Pedido direto: "gerar uma aba pessoas junto com as outras existentes" —
 // Gestor (83) e Fiscal (118) já passam do mesmo teto de cardinalidade que
@@ -8434,7 +8447,6 @@ function renderPorDimensaoContratos(lista, cfg) {
 }
 function renderPorAreaContratos(lista) { return renderPorDimensaoContratos(lista, configPorArea()); }
 function renderPorCategoriaContratos(lista) { return renderPorDimensaoContratos(lista, configPorCategoria()); }
-function renderPorDirpinContratos(lista) { return renderPorDimensaoContratos(lista, configPorDirpin()); }
 function renderPorGestorContratos(lista) { return renderPorDimensaoContratos(lista, configPorGestor()); }
 function renderPorFiscalContratos(lista) { return renderPorDimensaoContratos(lista, configPorFiscal()); }
 function renderPorAnalistaContratos(lista) { return renderPorDimensaoContratos(lista, configPorAnalista()); }
@@ -9573,6 +9585,24 @@ async function carregarContratosPortal(portalSlug) {
     { chave: "DEPOM", label: "DEPOM", icone: "unidade_depom", semDados: true },
   ];
 
+  // Pedido direto (crítica externa que ela trouxe): "DIRPIN não devia ser
+  // um filtro PARALELO ao nível de Unidade Gestora — devia ser um sub-
+  // filtro que só aparece depois que 'DEPIN' é escolhido". DIRPIN só existe
+  // pra contrato da DEPIN (`c.unidades[].dirpin`) — antes disso, a aba "Por
+  // DIRPIN" (peer de Gerencial/Tático/etc.) tinha que dar conta de Todos e
+  // DEPAF também, e resolvia isso jogando os 111 contratos do DEPAF dentro
+  // de um cartão "Fora da DEPIN (sem DIRPIN)" ao lado de Leste/Norte/Oeste/
+  // Sudoeste/Sul, como se fosse uma 6ª região — parecia dado faltando
+  // (nulo), quando na verdade é dado NÃO APLICÁVEL (estrutural: DEPAF nunca
+  // vai ter DIRPIN, não é falha de cadastro), e a borda vermelha de alerta
+  // reforçava a leitura errada de "algo está errado aqui". A aba própria
+  // saiu de cena — DIRPIN agora é só um <select> que aparece dentro de
+  // UNIDADE GESTORA = DEPIN e filtra Gerencial/Tático/Operacional/Por
+  // Setor Demandante/etc. junto (mesmo mecanismo do seletor de unidade),
+  // sem card nenhum pra quem está fora da DEPIN — a pergunta simplesmente
+  // não existe fora desse universo.
+  const DIRPINS_DISPONIVEIS = [...new Set(lista.flatMap(dirpinsDoContrato))].sort();
+
   // Mesmo formato que /contratos/resumo devolve, recalculado no navegador
   // em cima da lista JÁ FILTRADA pela unidade — o endpoint sempre soma
   // TUDO (não sabe de DEPAF/DEPIN). Cada contrato já chega com
@@ -9632,6 +9662,12 @@ async function carregarContratosPortal(portalSlug) {
         </div>
       </div>
     </div>` : ""}
+    <div class="dash-filtros" id="contratos-filtro-dirpin-linha" style="margin-bottom:12px" hidden>
+      <div class="dash-filtro" style="flex:1;min-width:280px">
+        <label>DIRPIN</label>
+        <select id="contratos-filtro-dirpin-topo"><option value="">Todas</option>${DIRPINS_DISPONIVEIS.map((d) => `<option value="${escapeAttr(d)}">${escapeHTML(d)}</option>`).join("")}</select>
+      </div>
+    </div>
     <!-- Pedido direto: "risco de vencimento é a razão de existir do
     dashboard; valor gasto é contexto. A ordem hoje inverte isso" — alerta
     de vencimento agora vem ANTES do Resumo Rápido (onde mais se gasta),
@@ -9644,7 +9680,6 @@ async function carregarContratosPortal(portalSlug) {
       <button class="tab-btn" data-subtab-contratos="tatico">${ICONS.mira}TÁTICO</button>
       <button class="tab-btn" data-subtab-contratos="operacional">${ICONS.engrenagem}OPERACIONAL</button>
       <button class="tab-btn" data-subtab-contratos="porarea">${ICONS.predio}POR SETOR DEMANDANTE</button>
-      <button class="tab-btn" data-subtab-contratos="pordirpin">${ICONS.unidade_depin}POR DIRPIN</button>
       <button class="tab-btn" data-subtab-contratos="porcategoria">${ICONS.categoria_tag}POR CATEGORIA</button>
       <button class="tab-btn" data-subtab-contratos="porpessoas">${ICONS.pessoa}POR PESSOAS</button>
       <button class="tab-btn" data-subtab-contratos="atualizados">${ICONS.atualizar}ATUALIZADOS RECENTEMENTE</button>
@@ -9653,13 +9688,12 @@ async function carregarContratosPortal(portalSlug) {
     <div class="tab-panel" id="contratos-sub-tatico" hidden></div>
     <div class="tab-panel" id="contratos-sub-operacional" hidden></div>
     <div class="tab-panel" id="contratos-sub-porarea" hidden></div>
-    <div class="tab-panel" id="contratos-sub-pordirpin" hidden></div>
     <div class="tab-panel" id="contratos-sub-porcategoria" hidden></div>
     <div class="tab-panel" id="contratos-sub-porpessoas" hidden></div>
     <div class="tab-panel" id="contratos-sub-atualizados" hidden></div>
   `;
 
-  const SUBABAS_CONTRATOS = ["gerencial", "tatico", "operacional", "porarea", "pordirpin", "porcategoria", "porpessoas", "atualizados"];
+  const SUBABAS_CONTRATOS = ["gerencial", "tatico", "operacional", "porarea", "porcategoria", "porpessoas", "atualizados"];
   // Pedido direto: "se eu isolo aí uma área aí depois ela fica marcada e
   // não volta ao normal... um desatento pode esquecer de desmarcar... eu
   // já vi em alguns serviços que em casos assim volta pro geral, em
@@ -9685,7 +9719,6 @@ async function carregarContratosPortal(portalSlug) {
     const taticoHandle = renderTaticoContratos(listaExibida);
     const operacionalHandle = renderOperacionalContratos(listaExibida, portalSlug);
     const porAreaHandle = renderPorAreaContratos(listaExibida);
-    const porDirpinHandle = renderPorDirpinContratos(listaExibida);
     const porCategoriaHandle = renderPorCategoriaContratos(listaExibida);
     const porPessoasHandle = renderPorPessoasContratos(listaExibida);
     renderAtualizadosRecentemente(listaExibida, decisoesRenovacao);
@@ -9695,7 +9728,6 @@ async function carregarContratosPortal(portalSlug) {
       tatico: () => taticoHandle?.resetar(),
       operacional: () => operacionalHandle?.resetar(),
       porarea: () => porAreaHandle?.resetar(),
-      pordirpin: () => porDirpinHandle?.resetar(),
       porcategoria: () => porCategoriaHandle?.resetar(),
       porpessoas: () => porPessoasHandle?.resetar(),
     };
@@ -9727,6 +9759,21 @@ async function carregarContratosPortal(portalSlug) {
   montarAbas(lista, resumo);
 
   const seletorUnidadeGestora = document.getElementById("contratos-filtro-unidade-gestora");
+  const linhaFiltroDirpin = document.getElementById("contratos-filtro-dirpin-linha");
+  const seletorDirpinTopo = document.getElementById("contratos-filtro-dirpin-topo");
+  let filtroDirpinTopo = "";
+  // Recalcula a lista em cima dos DOIS filtros de topo (unidade gestora +,
+  // só dentro de DEPIN, a DIRPIN) — chamada tanto quando a unidade muda
+  // quanto quando a DIRPIN muda, pra não duplicar a composição dos dois
+  // filtros em dois lugares.
+  function aplicarFiltrosTopoContratos() {
+    const valor = seletorUnidadeGestora?.querySelector(".unidade-gestora-btn.active")?.dataset.unidade || "";
+    let listaExibida = valor ? lista.filter((c) => unidadeGestoraTopo(c) === valor) : lista;
+    if (valor === "DEPIN" && filtroDirpinTopo) {
+      listaExibida = listaExibida.filter((c) => dirpinsDoContrato(c).includes(filtroDirpinTopo));
+    }
+    montarAbas(listaExibida, calcularResumo(listaExibida));
+  }
   if (seletorUnidadeGestora) {
     seletorUnidadeGestora.querySelectorAll(".unidade-gestora-btn").forEach((btn) => {
       btn.addEventListener("click", () => {
@@ -9739,10 +9786,21 @@ async function carregarContratosPortal(portalSlug) {
         }
         seletorUnidadeGestora.querySelectorAll(".unidade-gestora-btn").forEach((b) => b.classList.remove("active"));
         btn.classList.add("active");
-        const valor = btn.dataset.unidade;
-        const listaExibida = valor ? lista.filter((c) => unidadeGestoraTopo(c) === valor) : lista;
-        montarAbas(listaExibida, calcularResumo(listaExibida));
+        // DIRPIN só existe dentro de DEPIN — trocar de unidade gestora
+        // esconde/mostra o sub-filtro e zera a seleção anterior (mesmo
+        // espírito de "trocar de contexto reseta o filtro que só fazia
+        // sentido no contexto antigo").
+        filtroDirpinTopo = "";
+        if (seletorDirpinTopo) seletorDirpinTopo.value = "";
+        if (linhaFiltroDirpin) linhaFiltroDirpin.hidden = btn.dataset.unidade !== "DEPIN";
+        aplicarFiltrosTopoContratos();
       });
+    });
+  }
+  if (seletorDirpinTopo) {
+    seletorDirpinTopo.addEventListener("change", (ev) => {
+      filtroDirpinTopo = ev.target.value;
+      aplicarFiltrosTopoContratos();
     });
   }
 }
