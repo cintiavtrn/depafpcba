@@ -1035,6 +1035,18 @@ function formatarMoedaCompacta(valor) {
   return Math.round(valor).toLocaleString("pt-BR");
 }
 
+// Bug real achado ao verificar ao vivo: "34 intervençãos" — o +s ingênuo
+// (substantivoQtd + "s") quebra em qualquer substantivo terminado em "ão",
+// bem comum no vocabulário burocrático deste sistema (intervenção,
+// licitação, informação...). "ão" → "ões" cobre a esmagadora maioria desse
+// domínio (as exceções tipo "mão"/"cidadão" não aparecem aqui). Contratos
+// já tinha caído nesse mesmo buraco com "está/estão" — mesma classe de bug,
+// resolvida aqui uma vez pra não repetir de novo a cada substantivo novo.
+function pluralizarPT(palavra, qtd) {
+  if (qtd === 1) return palavra;
+  return palavra.endsWith("ão") ? palavra.slice(0, -2) + "ões" : palavra + "s";
+}
+
 // quando tem muito ponto no eixo X (planilha com 100+ linhas, por exemplo),
 // mostrar rótulo em cada um empilha tudo ilegível — mostra só 1 a cada N
 function passoRotulo(n, maxRotulos = 12) {
@@ -1134,9 +1146,13 @@ function simpleLineChartSVG(pontos, cor, opcoes = {}) {
     // ninguém ler "180" como "180 adquiridas em 2026"; a linha não tem espaço
     // pra isso, então o segundo número vai pra dica — some da tela, não do
     // gráfico.
+    // Pedido direto (crítica geral, "serve pra tudo desses gráficos"): o
+    // acumulado em R$ não cruzava com quantidade — quantos registros
+    // entraram naquele período, não só quanto em dinheiro.
+    const qtdTexto = p.qtdIncremento != null ? ` (${p.qtdIncremento.toLocaleString("pt-BR")} no período)` : "";
     const dica = p.incremento != null
-      ? `${p.label}: ${Number(p.valor).toLocaleString("pt-BR")} acumulado · +${Number(p.incremento).toLocaleString("pt-BR")} no período`
-      : `${p.label}: ${Number(p.valor).toLocaleString("pt-BR")}`;
+      ? `${p.label}: ${Number(p.valor).toLocaleString("pt-BR")} acumulado · +${Number(p.incremento).toLocaleString("pt-BR")} no período${qtdTexto}`
+      : `${p.label}: ${Number(p.valor).toLocaleString("pt-BR")}${qtdTexto}`;
     nodos += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${raio}" fill="${ultimo ? cor : "var(--surface)"}" stroke="${cor}" stroke-width="1.6"><title>${escapeHTML(dica)}</title></circle>`;
     if (i % passo === 0 || ultimo) {
       const corLabel = ultimo ? 1 : 0.55, pesoLabel = ultimo ? 700 : 400;
@@ -1300,7 +1316,12 @@ function barraHorizontalComEixoSVG(categorias, opcoes = {}) {
   // (não 5) pra abrir espaço, mas o texto por extenso ("R$ 243,4 milhões")
   // ainda aperta em telas estreitas — inclinado, ganha a largura da
   // diagonal em vez da largura reta.
-  const { formatarValor = (v) => "R$ " + formatarMoedaCompacta(v), formatarEixoTick = (v) => "R$ " + formatarEixo(v), cor = "var(--tinta)", selecionado = "", rotularDiagonal = false } = opcoes;
+  // rotuloExtra (opcional): texto extra no tooltip depois do valor — mesmo
+  // mecanismo de pieChartSVG, pra qty não sumir quando o valor já é R$.
+  // Pedido direto: "mostra o valor entregue em dinheiro mas não cruza com
+  // quantidade... a pessoa pode se perguntar quantas unidades foram... ser
+  // parte daquele mecanismo quando a gente passa o mouse".
+  const { formatarValor = (v) => "R$ " + formatarMoedaCompacta(v), formatarEixoTick = (v) => "R$ " + formatarEixo(v), cor = "var(--tinta)", selecionado = "", rotularDiagonal = false, rotuloExtra = null } = opcoes;
   const MAX_ROTULO = 22;
   const padL = 150, padR = 14, padT = 4, alturaEixoX = rotularDiagonal ? 34 : 24;
   const larguraPlot = 280;
@@ -1331,7 +1352,7 @@ function barraHorizontalComEixoSVG(categorias, opcoes = {}) {
     barras += `<g data-cat="${escapeAttr(c.label)}" style="cursor:pointer" opacity="${dim ? 0.4 : 1}">
       <rect class="area-hit" x="0" y="${y.toFixed(1)}" width="${w}" height="${rowH}" fill="transparent" />
       ${rotulo}
-      <rect x="${padL}" y="${(y + 4).toFixed(1)}" width="${Math.max(largura, 1.5).toFixed(1)}" height="${(rowH - 8).toFixed(1)}" fill="${cor}"><title>${escapeHTML(c.label)}: ${formatarValor(c.valor)}</title></rect>
+      <rect x="${padL}" y="${(y + 4).toFixed(1)}" width="${Math.max(largura, 1.5).toFixed(1)}" height="${(rowH - 8).toFixed(1)}" fill="${cor}"><title>${escapeHTML(c.label)}: ${formatarValor(c.valor)}${rotuloExtra ? ` ${escapeHTML(rotuloExtra(c))}` : ""}</title></rect>
     </g>`;
   });
   return `<svg viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg">${grade}${barras}${eixoX}</svg>`;
@@ -1350,7 +1371,13 @@ function colunaEmpilhadaSVG(grupos, segmentos, opcoes = {}) {
   // tamanho, ancorado à direita num padL de 42px, cresce pra x negativo,
   // pra FORA da viewBox. formatarEixo (compacta) resolve, mesma correção
   // já aplicada em barraHorizontalComEixoSVG.
-  const { formatarValor = (v) => "R$ " + formatarMoedaCompacta(v), formatarEixoTick = (v) => "R$ " + formatarEixo(v), selecionado = "" } = opcoes;
+  // Pedido direto: "mostra o valor entregue em dinheiro na etapa X do
+  // programa mas não cruza com quantidade... a pessoa pode se perguntar,
+  // quantas unidades foram?" — cada grupo pode carregar um `quantidades`
+  // paralelo a `valores` (mesma chave de segmento), só usado no tooltip —
+  // não mexe na conta de altura/empilhamento, que continua só em cima de
+  // `valores`.
+  const { formatarValor = (v) => "R$ " + formatarMoedaCompacta(v), formatarEixoTick = (v) => "R$ " + formatarEixo(v), selecionado = "", substantivoQtd = "registro" } = opcoes;
   const w = 460, padL = 46, padR = 10, padT = 10;
   const alturaPlot = 190, alturaRotulos = 22;
   const alturaLegenda = 18;
@@ -1379,7 +1406,9 @@ function colunaEmpilhadaSVG(grupos, segmentos, opcoes = {}) {
       const v = g.valores[s.label] || 0;
       if (!v) return;
       const alt = maxTotal ? alturaPlot * (v / maxTotal) : 0;
-      coluna += `<rect x="${(cx - barW / 2).toFixed(1)}" y="${(y - alt).toFixed(1)}" width="${barW.toFixed(1)}" height="${alt.toFixed(1)}" fill="${s.cor}"><title>${escapeHTML(g.label)} — ${escapeHTML(s.label)}: ${formatarValor(v)}</title></rect>`;
+      const qtd = g.quantidades ? g.quantidades[s.label] : undefined;
+      const qtdTexto = qtd != null ? ` — ${qtd.toLocaleString("pt-BR")} ${pluralizarPT(substantivoQtd, qtd)}` : "";
+      coluna += `<rect x="${(cx - barW / 2).toFixed(1)}" y="${(y - alt).toFixed(1)}" width="${barW.toFixed(1)}" height="${alt.toFixed(1)}" fill="${s.cor}"><title>${escapeHTML(g.label)} — ${escapeHTML(s.label)}: ${formatarValor(v)}${qtdTexto}</title></rect>`;
       y -= alt;
     });
     colunas += `<g data-cat="${escapeAttr(g.label)}" style="cursor:pointer" opacity="${dim ? 0.4 : 1}">${coluna}</g>`;
@@ -4647,7 +4676,7 @@ function treemapValorSVG(linhas, opcoes = {}) {
     const rotulo = l.label.length > maxChars ? l.label.slice(0, maxChars - 1) + "…" : l.label;
     const pct = somaTotal ? Math.round((l.total / somaTotal) * 1000) / 10 : 0;
     corpo += `<g data-cat="${escapeAttr(l.label)}" style="cursor:pointer">
-      <rect x="${r.x.toFixed(1)}" y="${r.y.toFixed(1)}" width="${Math.max(r.w - 1.5, 0.5).toFixed(1)}" height="${Math.max(r.h - 1.5, 0.5).toFixed(1)}" fill="${TONS[0]}" fill-opacity="${intensidade.toFixed(2)}" stroke="var(--paper)" stroke-width="1.5"><title>${escapeHTML(l.label)}: ${formatarValor(l.total)} (${pct}% do total)${l.qtd != null ? ` — ${l.qtd} ${substantivoQtd}${l.qtd === 1 ? "" : "s"}` : ""}</title></rect>
+      <rect x="${r.x.toFixed(1)}" y="${r.y.toFixed(1)}" width="${Math.max(r.w - 1.5, 0.5).toFixed(1)}" height="${Math.max(r.h - 1.5, 0.5).toFixed(1)}" fill="${TONS[0]}" fill-opacity="${intensidade.toFixed(2)}" stroke="var(--paper)" stroke-width="1.5"><title>${escapeHTML(l.label)}: ${formatarValor(l.total)} (${pct}% do total)${l.qtd != null ? ` — ${l.qtd} ${pluralizarPT(substantivoQtd, l.qtd)}` : ""}</title></rect>
       ${cabe ? `<text x="${(r.x + 5).toFixed(1)}" y="${(r.y + 12).toFixed(1)}" font-family="monospace" font-size="8.5" font-weight="700" fill="var(--paper)" style="pointer-events:none">${escapeHTML(rotulo)}</text>` : ""}
       ${cabe ? `<text x="${(r.x + 5).toFixed(1)}" y="${(r.y + r.h - 8).toFixed(1)}" font-family="monospace" font-size="9" font-weight="700" fill="var(--paper)" style="pointer-events:none">${escapeHTML(formatarValor(l.total))}</text>` : ""}
     </g>`;
@@ -9025,6 +9054,45 @@ function tabelaUnidadesHTML(lista) {
   </table>`;
 }
 
+// Pedido direto: "da um jeito de aparecer quantidade e de ter os cliques
+// redirecionando" — CEIRF e Manutenção PC tinham gráfico cross-filtrável
+// (clicar já refiltra os outros), mas nenhum lugar pra ver QUAIS registros
+// formam aquele recorte — clicar "redirecionava" só dentro dos próprios
+// gráficos, nunca pra uma lista de verdade. Ordenado por valor (a pergunta
+// que essas duas bases respondem melhor é "quanto", não "quantas" — ver
+// comentário de DIMENSOES_CEIRF/MANUTENCAO).
+function tabelaCeirfHTML(linhas) {
+  if (!linhas.length) return `<p class="tela-intro">Nenhuma intervenção neste recorte.</p>`;
+  const ordenadas = [...linhas].sort((a, b) => (b.valorGlobal || 0) - (a.valorGlobal || 0));
+  return `<table class="dash-tabela">
+    <thead><tr><th>MUNICÍPIO</th><th>ETAPA</th><th>OBRA OU REFORMA</th><th>STATUS</th><th>VALOR GLOBAL</th></tr></thead>
+    <tbody>${ordenadas.map((r) => `
+      <tr>
+        <td>${escapeHTML(r.municipio || "—")}</td>
+        <td>${escapeHTML(r.etapa || "—")}</td>
+        <td>${escapeHTML(r.tipoIntervencao || "—")}</td>
+        <td>${escapeHTML(normalizarStatusCeirf(r.status) || "—")}</td>
+        <td class="num">${r.valorGlobal != null ? "R$ " + formatarMoedaCompacta(r.valorGlobal) : "—"}</td>
+      </tr>`).join("")}</tbody>
+  </table>`;
+}
+function tabelaManutencaoHTML(linhas) {
+  if (!linhas.length) return `<p class="tela-intro">Nenhuma ordem de serviço neste recorte.</p>`;
+  const ordenadas = [...linhas].sort((a, b) => (b.valorOrcado || 0) - (a.valorOrcado || 0));
+  return `<table class="dash-tabela">
+    <thead><tr><th>SEI</th><th>MUNICÍPIO</th><th>CATEGORIA DE UNIDADE</th><th>TIPO DE OS</th><th>STATUS</th><th>VALOR ORÇADO</th></tr></thead>
+    <tbody>${ordenadas.map((r) => `
+      <tr>
+        <td>${escapeHTML(r.sei || "—")}</td>
+        <td>${escapeHTML(r.municipio || "—")}</td>
+        <td>${escapeHTML(r.categoriaUnidade || "—")}</td>
+        <td>${escapeHTML(r.tipoOs || "—")}</td>
+        <td>${escapeHTML(normalizarGrupoStatusManutencao(r.grupoStatus) || "—")}</td>
+        <td class="num">${r.valorOrcado != null ? "R$ " + formatarMoedaCompacta(r.valorOrcado) : "—"}</td>
+      </tr>`).join("")}</tbody>
+  </table>`;
+}
+
 // Perfil completo de uma unidade — pedido direto de Fase 2. Agrupado em
 // blocos temáticos (identificação/contato, situação da obra, manutenção,
 // vistoria) em vez de uma lista plana de 27 campos, pra ficar escaneável.
@@ -9136,8 +9204,22 @@ const DIMENSOES_OBRAS = [
 // do gerador de indicadores genérico) em vez de barra — status e proporção
 // binária leem melhor em rosca; ranking/categoria continua em barra. Região
 // SAIU daqui — virou seletor por botão (seg), não mais uma barra pra clicar.
+// Pedido direto: valores brutos de status vêm da planilha em CAIXA ALTA sem
+// acento ("CONCLUIDA", "A INICIAR") — normaliza pro mesmo padrão bonito que
+// o resto do painel já usa (statusConstrutivo já chega certo da fonte).
+// Conferido direto no banco: são exatamente 6 valores reais — Concluída,
+// Inaugurada, Em Execução, A Iniciar, Paralisada, Suprimida — o "status de
+// utilização" completo do ciclo de vida de uma intervenção.
+const ROTULOS_STATUS_CEIRF = {
+  "CONCLUIDA": "Concluída", "INAUGURADA": "Inaugurada", "EXECUCAO": "Em Execução",
+  "A INICIAR": "A Iniciar", "PARALISADA": "Paralisada", "SUPRIMIDA": "Suprimida",
+};
+function normalizarStatusCeirf(v) { return v ? (ROTULOS_STATUS_CEIRF[v] || v) : v; }
 const DIMENSOES_CEIRF = [
-  { chave: "status", campo: (r) => r.status, rotulo: "Status", colunaRotulo: "STATUS", containerId: "ceirf-status", tipo: "rosca" },
+  // Pedido direto: "Status pode ser status ou como está o andamento?" —
+  // mantém o rótulo curto (Status) com o hint explicando a pergunta que
+  // responde, em vez de um título mais longo.
+  { chave: "status", campo: (r) => normalizarStatusCeirf(r.status), rotulo: "Status", colunaRotulo: "STATUS", containerId: "ceirf-status", hint: "Como está o andamento de cada intervenção — do início (A Iniciar) até em uso (Inaugurada). Passe o mouse numa fatia pra ver valor em R$ e quantidade juntos.", tipo: "rosca" },
   { chave: "tipoIntervencao", campo: (r) => r.tipoIntervencao, rotulo: "Obra ou Reforma", colunaRotulo: "TIPO DE INTERVENÇÃO", containerId: "ceirf-tipo", tipo: "barraEixo", cor: "var(--terracota)" },
   // Coluna empilhada (colunaEmpilhadaSVG, nova) — "o gradiente por etapa"
   // pedido direto, com eixo Y de valor e as 3 cores próprias (não o azul/
@@ -9153,10 +9235,22 @@ const DIMENSOES_CEIRF = [
   // escada infinita, ilegível).
   { chave: "municipio", campo: (r) => r.municipio, rotulo: "Município (8 com maior valor)", colunaRotulo: "MUNICÍPIO", containerId: "ceirf-municipio", tipo: "barraEixo", cor: "var(--tinta)", limite: 8 },
 ];
+// Mesma correção de acento/maiúscula que o status do CEIRF precisou.
+const ROTULOS_GRUPO_STATUS_MANUTENCAO = { "Concluido": "Concluído", "Em andamento": "Em Andamento", "Nao iniciado": "Não Iniciado" };
+function normalizarGrupoStatusManutencao(v) { return v ? (ROTULOS_GRUPO_STATUS_MANUTENCAO[v] || v) : v; }
 const DIMENSOES_MANUTENCAO = [
-  { chave: "grupoStatus", campo: (r) => r.grupoStatus, rotulo: "Status", colunaRotulo: "STATUS", containerId: "manut-status", tipo: "rosca" },
-  { chave: "categoriaUnidade", campo: (r) => r.categoriaUnidade, rotulo: "Categoria de Unidade", colunaRotulo: "CATEGORIA DE UNIDADE", containerId: "manut-categoria", tipo: "barraEixo", cor: "var(--tinta)" },
-  { chave: "tipoOs", campo: (r) => r.tipoOs, rotulo: "Complementar ou Principal", colunaRotulo: "TIPO DE OS", containerId: "manut-tipo-os", tipo: "rosca" },
+  { chave: "grupoStatus", campo: (r) => normalizarGrupoStatusManutencao(r.grupoStatus), rotulo: "Status", colunaRotulo: "STATUS", containerId: "manut-status", hint: "Como está o andamento de cada ordem de serviço — concluída, em andamento ou ainda não iniciada.", tipo: "rosca" },
+  // Pedido direto: "categoria de unidade você dizer onde o valor está
+  // concentrado?" — o rótulo curto vira subtítulo entre parênteses, e a
+  // pergunta que o gráfico responde vem primeiro, pro leigo não ter que
+  // adivinhar.
+  { chave: "categoriaUnidade", campo: (r) => r.categoriaUnidade, rotulo: "Onde o Valor se Concentra (Categoria de Unidade)", colunaRotulo: "CATEGORIA DE UNIDADE", containerId: "manut-categoria", tipo: "barraEixo", cor: "var(--tinta)" },
+  // Pedido direto: "OS complementar ou principal... são nomes que já
+  // mostram o que aquilo responde porque um leigo pode não saber
+  // claramente... uma pra ampliar escopo ou orçamento, outra é a primeira
+  // ordem aberta" — hint explica a distinção real (schema: tipoOs
+  // "Principal" | "Complementar").
+  { chave: "tipoOs", campo: (r) => r.tipoOs, rotulo: "OS Complementar ou Principal", colunaRotulo: "TIPO DE OS", containerId: "manut-tipo-os", hint: "OS Principal: a primeira ordem aberta para aquela intervenção. OS Complementar: uma ordem posterior que amplia o escopo ou o orçamento de uma obra já em andamento.", tipo: "rosca" },
   // Achado da própria transcrição dela: quase toda OS fica logo abaixo de
   // R$330 mil — um teto prático de contratação, não coincidência.
   // Coluna vertical (simpleBarChartSVG, já existente) — a pergunta aqui é
@@ -9329,9 +9423,21 @@ async function carregarObrasPortal(portalSlug) {
           ${DIMENSOES_MANUTENCAO.map((d) => `
           <div class="dash-chart-box"${d.largo ? ` style="grid-column:1/-1"` : ""}>
             <h4>${escapeHTML(d.rotulo)}</h4>
+            ${d.hint ? `<p class="dash-chart-hint">${escapeHTML(d.hint)}</p>` : ""}
             <div id="${d.containerId}"></div>
           </div>`).join("")}
         </div>
+      </div>
+      <!-- Pedido direto: "da um jeito de aparecer quantidade e de ter os
+      cliques redirecionando" — clicar numa fatia/barra já refiltra os
+      outros gráficos (cross-filter), mas não existia nenhum lugar pra ver
+      QUAIS ordens de serviço formam aquele recorte. Esta tabela reage ao
+      mesmo motorManutencao.filtros — "clicar redireciona" agora também
+      quer dizer "revela a lista por trás do número". -->
+      <div class="dash-chart-box" style="margin-top:16px">
+        <h4>Ordens de Serviço deste Recorte</h4>
+        <p class="dash-chart-hint">Atualiza sozinha conforme você filtra pelos gráficos acima.</p>
+        <div class="tabela-rolavel" style="max-height:360px" id="manut-tabela"></div>
       </div>
     </div>
 
@@ -9354,9 +9460,18 @@ async function carregarObrasPortal(portalSlug) {
           ${DIMENSOES_CEIRF.map((d) => `
           <div class="dash-chart-box"${d.largo ? ` style="grid-column:1/-1"` : ""}>
             <h4>${escapeHTML(d.rotulo)}</h4>
+            ${d.hint ? `<p class="dash-chart-hint">${escapeHTML(d.hint)}</p>` : ""}
             <div id="${d.containerId}"></div>
           </div>`).join("")}
         </div>
+      </div>
+      <!-- Pedido direto: "da um jeito de aparecer quantidade e de ter os
+      cliques redirecionando" — mesma tabela reativa da Manutenção, aqui
+      escopada ao motorCeirf.filtros. -->
+      <div class="dash-chart-box" style="margin-top:16px">
+        <h4>Intervenções deste Recorte</h4>
+        <p class="dash-chart-hint">Atualiza sozinha conforme você filtra pelos gráficos acima.</p>
+        <div class="tabela-rolavel" style="max-height:360px" id="ceirf-tabela"></div>
       </div>
     </div>
   `;
@@ -9472,30 +9587,36 @@ async function carregarObrasPortal(portalSlug) {
       const linhasRecorte = ceirfAmpliado.filter((r) => motorCeirf.bateFiltro(r, d.chave));
       const container = document.getElementById(d.containerId);
       if (d.tipo === "empilhado") {
+        // Pedido direto: "mostra o valor entregue em dinheiro na etapa X
+        // mas não cruza com quantidade" — cada segmento guarda o valor
+        // (define a altura, sem mudança) E a quantidade (só no tooltip).
         const grupos = ETAPA_ORDEM.map((et) => {
           const doGrupo = linhasRecorte.filter((r) => (r.etapa || "SEM ETAPA") === et);
-          const valores = {};
+          const valores = {}, quantidades = {};
           SEGMENTOS_ENTREGA_CEIRF.forEach((s) => {
-            valores[s.label] = doGrupo.filter((r) => r.grupoStatus === s.label).reduce((a, r) => a + (r.valorGlobal || 0), 0);
+            const doSegmento = doGrupo.filter((r) => r.grupoStatus === s.label);
+            valores[s.label] = doSegmento.reduce((a, r) => a + (r.valorGlobal || 0), 0);
+            quantidades[s.label] = doSegmento.length;
           });
-          return { label: et, valores };
+          return { label: et, valores, quantidades };
         }).filter((g) => Object.values(g.valores).some((v) => v > 0));
         container.innerHTML = colunaEmpilhadaSVG(grupos, SEGMENTOS_ENTREGA_CEIRF, {
           formatarValor: (v) => "R$ " + formatarMoedaCompacta(v),
           selecionado: motorCeirf.filtros[d.chave] || "",
+          substantivoQtd: "intervenção",
         });
       } else if (d.tipo === "rosca") {
         const linhas = agruparValorObrasPorCampo(linhasRecorte, (r) => d.campo(r), (r) => r.valorGlobal, "(não informado)");
         container.innerHTML = pieChartSVG(
-          linhas.map((l) => ({ label: l.label, valor: l.total })),
+          linhas.map((l) => ({ label: l.label, valor: l.total, qtd: l.qtd })),
           motorCeirf.filtros[d.chave] || "",
-          { formatarValor: (v) => "R$ " + formatarMoedaCompacta(v) }
+          { formatarValor: (v) => "R$ " + formatarMoedaCompacta(v), rotuloExtra: (l) => `(${l.qtd} interv.)` }
         );
       } else if (d.tipo === "barraEixo") {
         const linhas = agruparValorObrasPorCampo(linhasRecorte, (r) => d.campo(r), (r) => r.valorGlobal, "(não informado)");
         container.innerHTML = barraHorizontalComEixoSVG(
-          linhas.slice(0, d.limite || linhas.length).map((l) => ({ label: l.label, valor: l.total })),
-          { formatarValor: (v) => "R$ " + formatarMoedaCompacta(v), cor: d.cor, selecionado: motorCeirf.filtros[d.chave] || "", rotularDiagonal: true }
+          linhas.slice(0, d.limite || linhas.length).map((l) => ({ label: l.label, valor: l.total, qtd: l.qtd })),
+          { formatarValor: (v) => "R$ " + formatarMoedaCompacta(v), cor: d.cor, selecionado: motorCeirf.filtros[d.chave] || "", rotularDiagonal: true, rotuloExtra: (l) => `(${l.qtd} interv.)` }
         );
       } else {
         const linhas = agruparValorObrasPorCampo(linhasRecorte, (r) => d.campo(r), (r) => r.valorGlobal, "(não informado)");
@@ -9510,6 +9631,7 @@ async function carregarObrasPortal(portalSlug) {
       }
       adicionarControlesGrafico(container);
     });
+    document.getElementById("ceirf-tabela").innerHTML = tabelaCeirfHTML(filtrada);
   }
 
   function atualizarManutencao() {
@@ -9556,20 +9678,20 @@ async function carregarObrasPortal(portalSlug) {
           .filter((l) => l.label !== "(sem mês)")
           .sort((a, b) => a.label.localeCompare(b.label));
         let acumulado = 0;
-        const pontos = porMes.map((m) => { acumulado += m.total; return { label: m.label, valor: acumulado, incremento: m.total }; });
+        const pontos = porMes.map((m) => { acumulado += m.total; return { label: m.label, valor: acumulado, incremento: m.total, qtdIncremento: m.qtd }; });
         container.innerHTML = pontos.length ? simpleLineChartSVG(pontos, "var(--tinta)", { rotularDiagonal: true }) : `<p class="dash-chart-hint">Sem datas legíveis neste recorte.</p>`;
       } else if (d.tipo === "rosca") {
         const linhas = agruparValorObrasPorCampo(linhasRecorte, (r) => d.campo(r), (r) => r.valorOrcado, "(não informado)");
         container.innerHTML = pieChartSVG(
-          linhas.map((l) => ({ label: l.label, valor: l.total })),
+          linhas.map((l) => ({ label: l.label, valor: l.total, qtd: l.qtd })),
           motorManutencao.filtros[d.chave] || "",
-          { formatarValor: (v) => "R$ " + formatarMoedaCompacta(v) }
+          { formatarValor: (v) => "R$ " + formatarMoedaCompacta(v), rotuloExtra: (l) => `(${l.qtd} OS)` }
         );
       } else if (d.tipo === "barraEixo") {
         const linhas = agruparValorObrasPorCampo(linhasRecorte, (r) => d.campo(r), (r) => r.valorOrcado, "(não informado)");
         container.innerHTML = barraHorizontalComEixoSVG(
-          linhas.slice(0, d.limite || linhas.length).map((l) => ({ label: l.label, valor: l.total })),
-          { formatarValor: (v) => "R$ " + formatarMoedaCompacta(v), cor: d.cor, selecionado: motorManutencao.filtros[d.chave] || "", rotularDiagonal: true }
+          linhas.slice(0, d.limite || linhas.length).map((l) => ({ label: l.label, valor: l.total, qtd: l.qtd })),
+          { formatarValor: (v) => "R$ " + formatarMoedaCompacta(v), cor: d.cor, selecionado: motorManutencao.filtros[d.chave] || "", rotularDiagonal: true, rotuloExtra: (l) => `(${l.qtd} OS)` }
         );
       } else {
         const linhas = agruparValorObrasPorCampo(linhasRecorte, (r) => d.campo(r), (r) => r.valorOrcado, "(não informado)");
@@ -9584,6 +9706,7 @@ async function carregarObrasPortal(portalSlug) {
       }
       adicionarControlesGrafico(container);
     });
+    document.getElementById("manut-tabela").innerHTML = tabelaManutencaoHTML(filtrada);
   }
 
   // Resolve o rótulo "de exibição" de uma unidade nesta dimensão: se o valor
