@@ -1041,8 +1041,15 @@ function passoRotulo(n, maxRotulos = 12) {
   return Math.max(1, Math.ceil(n / maxRotulos));
 }
 
-function simpleBarChartSVG(pontos, cor) {
-  const w = 520, h = 200, padL = 44, padR = 14, padT = 14, baseInf = h - 34;
+// opcoes.rotularDiagonal: rótulos do eixo X inclinados (-38°), em vez de
+// horizontais — pedido direto, achado ao ver rótulo comprido colidindo com o
+// vizinho ("300-330 mil" em cima de "acima de 330 mil", faixas de valor
+// apertadas numa coluna só). Default false — não muda nenhum outro lugar que
+// já chama esta função (Contratos, por exemplo, onde os rótulos são mês/ano,
+// sempre curtos o bastante).
+function simpleBarChartSVG(pontos, cor, opcoes = {}) {
+  const { rotularDiagonal = false } = opcoes;
+  const w = 520, h = rotularDiagonal ? 214 : 200, padL = 44, padR = 14, padT = 14, baseInf = h - (rotularDiagonal ? 48 : 34);
   const n = pontos.length || 1;
   const valores = pontos.map(p => Number(p.valor) || 0);
   // domínio real: com estorno/glosa/saldo existe valor negativo, e um eixo
@@ -1086,14 +1093,23 @@ function simpleBarChartSVG(pontos, cor) {
       barras += `<text x="${cxB.toFixed(1)}" y="${yTexto.toFixed(1)}" text-anchor="middle" font-family="monospace" font-size="9" font-weight="700" fill="${negativo ? "var(--terracota)" : "var(--carvao)"}">${formatarEixo(v)}</text>`;
     }
     if (i % passo === 0 || ultimo) {
-      labels += `<text x="${cxB.toFixed(1)}" y="${h - 8}" text-anchor="middle" font-family="monospace" font-size="9" fill="var(--carvao)" fill-opacity="${ultimo ? 1 : 0.6}" font-weight="${ultimo ? 700 : 400}">${escapeHTML(p.label)}</text>`;
+      const corLabel = ultimo ? 1 : 0.6, pesoLabel = ultimo ? 700 : 400;
+      labels += rotularDiagonal
+        ? `<text x="${cxB.toFixed(1)}" y="${(baseInf + 12).toFixed(1)}" text-anchor="end" transform="rotate(-38 ${cxB.toFixed(1)} ${(baseInf + 12).toFixed(1)})" font-family="monospace" font-size="8.5" fill="var(--carvao)" fill-opacity="${corLabel}" font-weight="${pesoLabel}">${escapeHTML(p.label)}</text>`
+        : `<text x="${cxB.toFixed(1)}" y="${h - 8}" text-anchor="middle" font-family="monospace" font-size="9" fill="var(--carvao)" fill-opacity="${corLabel}" font-weight="${pesoLabel}">${escapeHTML(p.label)}</text>`;
     }
   });
   return `<svg viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg">${grade}${eixoY}${barras}${labels}</svg>`;
 }
 
-function simpleLineChartSVG(pontos, cor) {
-  const w = 520, h = 200, padL = 34, padR = 14, padT = 10, baseY = h - 34;
+// opcoes.rotularDiagonal: mesmo raciocínio de simpleBarChartSVG — rótulo
+// comprido no ÚLTIMO ponto (ex.: "2023-08"), centralizado bem na borda
+// direita do SVG, estourava a viewBox por causa do texto crescendo pros
+// dois lados do centro. Rotacionado, o texto cresce só pra cima-esquerda a
+// partir do próprio ponto, e para de vazar.
+function simpleLineChartSVG(pontos, cor, opcoes = {}) {
+  const { rotularDiagonal = false } = opcoes;
+  const w = 520, h = rotularDiagonal ? 214 : 200, padL = 34, padR = 14, padT = 10, baseY = h - (rotularDiagonal ? 48 : 34);
   const n = pontos.length;
   const max = maxSeguro(pontos.map(p => p.valor));
   const plotH = baseY - padT;
@@ -1123,7 +1139,10 @@ function simpleLineChartSVG(pontos, cor) {
       : `${p.label}: ${Number(p.valor).toLocaleString("pt-BR")}`;
     nodos += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${raio}" fill="${ultimo ? cor : "var(--surface)"}" stroke="${cor}" stroke-width="1.6"><title>${escapeHTML(dica)}</title></circle>`;
     if (i % passo === 0 || ultimo) {
-      labels += `<text x="${x.toFixed(1)}" y="${baseY + 16}" text-anchor="middle" font-family="monospace" font-size="9" fill="var(--carvao)" fill-opacity="${ultimo ? 1 : 0.55}" font-weight="${ultimo ? 700 : 400}">${p.label}</text>`;
+      const corLabel = ultimo ? 1 : 0.55, pesoLabel = ultimo ? 700 : 400;
+      labels += rotularDiagonal
+        ? `<text x="${x.toFixed(1)}" y="${(baseY + 12).toFixed(1)}" text-anchor="end" transform="rotate(-38 ${x.toFixed(1)} ${(baseY + 12).toFixed(1)})" font-family="monospace" font-size="8.5" fill="var(--carvao)" fill-opacity="${corLabel}" font-weight="${pesoLabel}">${p.label}</text>`
+        : `<text x="${x.toFixed(1)}" y="${baseY + 16}" text-anchor="middle" font-family="monospace" font-size="9" fill="var(--carvao)" fill-opacity="${corLabel}" font-weight="${pesoLabel}">${p.label}</text>`;
     }
   });
   return `<svg viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg">${grade}${eixoY}<path d="${area}" fill="${corGlow(cor)}" stroke="none" /><path d="${linha}" fill="none" stroke="${cor}" stroke-width="2.2" stroke-linejoin="round" />${nodos}${labels}</svg>`;
@@ -1276,9 +1295,14 @@ function barraHorizontalComEixoSVG(categorias, opcoes = {}) {
   // curta pro rótulo do eixo — "R$ 243,4 milhões" por extenso não cabe
   // repetido a cada marca de grade sem colidir; formatarEixo (mesma que
   // simpleBarChartSVG/simpleLineChartSVG já usam) resolve isso.
-  const { formatarValor = (v) => "R$ " + formatarMoedaCompacta(v), formatarEixoTick = (v) => "R$ " + formatarEixo(v), cor = "var(--tinta)", selecionado = "" } = opcoes;
+  // rotularDiagonal: mesmo raciocínio dos outros gráficos — pedido direto
+  // depois de ver rótulo de eixo colidindo. Aqui a marca já tinha virado 3
+  // (não 5) pra abrir espaço, mas o texto por extenso ("R$ 243,4 milhões")
+  // ainda aperta em telas estreitas — inclinado, ganha a largura da
+  // diagonal em vez da largura reta.
+  const { formatarValor = (v) => "R$ " + formatarMoedaCompacta(v), formatarEixoTick = (v) => "R$ " + formatarEixo(v), cor = "var(--tinta)", selecionado = "", rotularDiagonal = false } = opcoes;
   const MAX_ROTULO = 22;
-  const padL = 150, padR = 14, padT = 4, alturaEixoX = 24;
+  const padL = 150, padR = 14, padT = 4, alturaEixoX = rotularDiagonal ? 34 : 24;
   const larguraPlot = 280;
   const rowH = 26;
   const w = padL + larguraPlot + padR;
@@ -1292,7 +1316,10 @@ function barraHorizontalComEixoSVG(categorias, opcoes = {}) {
   [0, 0.5, 1].forEach((f) => {
     const x = padL + larguraPlot * f;
     grade += `<line x1="${x.toFixed(1)}" y1="${padT}" x2="${x.toFixed(1)}" y2="${baseY.toFixed(1)}" stroke="var(--paper-line)" stroke-width="1" stroke-dasharray="${f === 0 ? "0" : "2 4"}" />`;
-    eixoX += `<text x="${x.toFixed(1)}" y="${(baseY + 14).toFixed(1)}" text-anchor="${f === 0 ? "start" : f === 1 ? "end" : "middle"}" font-family="monospace" font-size="8" fill="var(--carvao)" fill-opacity="0.55">${formatarEixoTick(maxV * f)}</text>`;
+    const texto = formatarEixoTick(maxV * f);
+    eixoX += rotularDiagonal
+      ? `<text x="${x.toFixed(1)}" y="${(baseY + 12).toFixed(1)}" text-anchor="end" transform="rotate(-38 ${x.toFixed(1)} ${(baseY + 12).toFixed(1)})" font-family="monospace" font-size="8" fill="var(--carvao)" fill-opacity="0.55">${texto}</text>`
+      : `<text x="${x.toFixed(1)}" y="${(baseY + 14).toFixed(1)}" text-anchor="${f === 0 ? "start" : f === 1 ? "end" : "middle"}" font-family="monospace" font-size="8" fill="var(--carvao)" fill-opacity="0.55">${texto}</text>`;
   });
 
   let barras = "";
@@ -1317,8 +1344,14 @@ function barraHorizontalComEixoSVG(categorias, opcoes = {}) {
 // fora, pra caber qualquer conjunto de segmentos (Entregue/Pendente/
 // Suprimida, ou outro no futuro).
 function colunaEmpilhadaSVG(grupos, segmentos, opcoes = {}) {
-  const { formatarValor = (v) => "R$ " + formatarMoedaCompacta(v), selecionado = "" } = opcoes;
-  const w = 460, padL = 42, padR = 10, padT = 10;
+  // formatarValor: número completo (tooltip/legenda). formatarEixoTick:
+  // versão curta pro rótulo do eixo Y — achado ao ver "R$ 64,3 milhões"
+  // (por extenso) estourando a margem esquerda do SVG: um rótulo desse
+  // tamanho, ancorado à direita num padL de 42px, cresce pra x negativo,
+  // pra FORA da viewBox. formatarEixo (compacta) resolve, mesma correção
+  // já aplicada em barraHorizontalComEixoSVG.
+  const { formatarValor = (v) => "R$ " + formatarMoedaCompacta(v), formatarEixoTick = (v) => "R$ " + formatarEixo(v), selecionado = "" } = opcoes;
+  const w = 460, padL = 46, padR = 10, padT = 10;
   const alturaPlot = 190, alturaRotulos = 22;
   const alturaLegenda = 18;
   const h = padT + alturaPlot + alturaRotulos + alturaLegenda;
@@ -1333,7 +1366,7 @@ function colunaEmpilhadaSVG(grupos, segmentos, opcoes = {}) {
   [0, 0.25, 0.5, 0.75, 1].forEach((f) => {
     const y = baseY - alturaPlot * f;
     grade += `<line x1="${padL}" y1="${y.toFixed(1)}" x2="${(w - padR).toFixed(1)}" y2="${y.toFixed(1)}" stroke="var(--paper-line)" stroke-width="1" stroke-dasharray="${f === 0 ? "0" : "2 4"}" />`;
-    eixoY += `<text x="${(padL - 6).toFixed(1)}" y="${(y + 3).toFixed(1)}" text-anchor="end" font-family="monospace" font-size="8" fill="var(--carvao)" fill-opacity="0.55">${formatarValor(maxTotal * f)}</text>`;
+    eixoY += `<text x="${(padL - 6).toFixed(1)}" y="${(y + 3).toFixed(1)}" text-anchor="end" font-family="monospace" font-size="8" fill="var(--carvao)" fill-opacity="0.55">${formatarEixoTick(maxTotal * f)}</text>`;
   });
 
   let colunas = "", rotulos = "";
@@ -9048,7 +9081,7 @@ async function carregarObrasPortal(portalSlug) {
         const linhas = agruparValorObrasPorCampo(linhasRecorte, (r) => d.campo(r), (r) => r.valorGlobal, "(não informado)");
         container.innerHTML = barraHorizontalComEixoSVG(
           linhas.slice(0, d.limite || linhas.length).map((l) => ({ label: l.label, valor: l.total })),
-          { formatarValor: (v) => "R$ " + formatarMoedaCompacta(v), cor: d.cor, selecionado: motorCeirf.filtros[d.chave] || "" }
+          { formatarValor: (v) => "R$ " + formatarMoedaCompacta(v), cor: d.cor, selecionado: motorCeirf.filtros[d.chave] || "", rotularDiagonal: true }
         );
       } else {
         const linhas = agruparValorObrasPorCampo(linhasRecorte, (r) => d.campo(r), (r) => r.valorGlobal, "(não informado)");
@@ -9103,14 +9136,14 @@ async function carregarObrasPortal(portalSlug) {
         // já vem com o prefixo numérico, então ordenar por texto já resolve.
         const linhas = agruparValorObrasPorCampo(linhasRecorte, (r) => d.campo(r), (r) => r.valorOrcado, "(não informado)");
         const porFaixa = [...linhas].sort((a, b) => a.label.localeCompare(b.label));
-        container.innerHTML = simpleBarChartSVG(porFaixa.map((l) => ({ label: l.label.replace(/^\d+\.\s*/, ""), valor: l.qtd })), "var(--tinta)");
+        container.innerHTML = simpleBarChartSVG(porFaixa.map((l) => ({ label: l.label.replace(/^\d+\.\s*/, ""), valor: l.qtd })), "var(--tinta)", { rotularDiagonal: true });
       } else if (d.tipo === "linha") {
         const porMes = agruparValorObrasPorCampo(linhasRecorte, (r) => d.campo(r), (r) => r.valorOrcado, "(sem mês)")
           .filter((l) => l.label !== "(sem mês)")
           .sort((a, b) => a.label.localeCompare(b.label));
         let acumulado = 0;
         const pontos = porMes.map((m) => { acumulado += m.total; return { label: m.label, valor: acumulado, incremento: m.total }; });
-        container.innerHTML = pontos.length ? simpleLineChartSVG(pontos, "var(--tinta)") : `<p class="dash-chart-hint">Sem datas legíveis neste recorte.</p>`;
+        container.innerHTML = pontos.length ? simpleLineChartSVG(pontos, "var(--tinta)", { rotularDiagonal: true }) : `<p class="dash-chart-hint">Sem datas legíveis neste recorte.</p>`;
       } else if (d.tipo === "rosca") {
         const linhas = agruparValorObrasPorCampo(linhasRecorte, (r) => d.campo(r), (r) => r.valorOrcado, "(não informado)");
         container.innerHTML = pieChartSVG(
@@ -9122,7 +9155,7 @@ async function carregarObrasPortal(portalSlug) {
         const linhas = agruparValorObrasPorCampo(linhasRecorte, (r) => d.campo(r), (r) => r.valorOrcado, "(não informado)");
         container.innerHTML = barraHorizontalComEixoSVG(
           linhas.slice(0, d.limite || linhas.length).map((l) => ({ label: l.label, valor: l.total })),
-          { formatarValor: (v) => "R$ " + formatarMoedaCompacta(v), cor: d.cor, selecionado: motorManutencao.filtros[d.chave] || "" }
+          { formatarValor: (v) => "R$ " + formatarMoedaCompacta(v), cor: d.cor, selecionado: motorManutencao.filtros[d.chave] || "", rotularDiagonal: true }
         );
       } else {
         const linhas = agruparValorObrasPorCampo(linhasRecorte, (r) => d.campo(r), (r) => r.valorOrcado, "(não informado)");
