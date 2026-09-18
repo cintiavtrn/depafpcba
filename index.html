@@ -9686,11 +9686,20 @@ async function carregarObrasPortal(portalSlug) {
 
     // Etapa/Pendente/Entregue/Suprimida — mesmas cores em todo canto que usa
     // esse conceito (semântica: verde=bom/entregue, âmbar=em curso,
-    // terracota=ruim/suprimida), definidas uma vez só.
+    // terracota=ruim/suprimida), definidas uma vez só. "Entregue" some como
+    // rótulo próprio aqui: pedido direto dela (depois de perguntar o que o
+    // KPI "Entregue em Valor" queria dizer) foi manter a divisão visível
+    // TAMBÉM neste gráfico, não só no cartão — Concluída (obra pronta) e
+    // Inaugurada (já em uso) são dado importante mesmo continuando as duas
+    // "verdes" (2 tons da mesma família, não uma cor nova). `teste` resolve
+    // cada segmento: os 2 primeiros olham `status` dentro de quem já é
+    // "Entregue" em `grupoStatus`; os outros 2 continuam batendo direto em
+    // `grupoStatus`, como antes.
     const SEGMENTOS_ENTREGA_CEIRF = [
-      { label: "Entregue", cor: "var(--oliva)" },
-      { label: "Pendente", cor: "var(--mostarda)" },
-      { label: "Suprimida", cor: "var(--terracota)" },
+      { label: "Concluída", cor: "color-mix(in srgb, var(--oliva) 55%, var(--paper))", teste: (r) => r.grupoStatus === "Entregue" && normalizarStatusCeirf(r.status) === "Concluída" },
+      { label: "Inaugurada", cor: "var(--oliva)", teste: (r) => r.grupoStatus === "Entregue" && normalizarStatusCeirf(r.status) === "Inaugurada" },
+      { label: "Pendente", cor: "var(--mostarda)", teste: (r) => r.grupoStatus === "Pendente" },
+      { label: "Suprimida", cor: "var(--terracota)", teste: (r) => r.grupoStatus === "Suprimida" },
     ];
     const ETAPA_ORDEM = ["I", "II", "III", "IV", "V", "SEM ETAPA"];
 
@@ -9705,7 +9714,7 @@ async function carregarObrasPortal(portalSlug) {
           const doGrupo = linhasRecorte.filter((r) => (r.etapa || "SEM ETAPA") === et);
           const valores = {}, quantidades = {};
           SEGMENTOS_ENTREGA_CEIRF.forEach((s) => {
-            const doSegmento = doGrupo.filter((r) => r.grupoStatus === s.label);
+            const doSegmento = doGrupo.filter(s.teste);
             valores[s.label] = doSegmento.reduce((a, r) => a + (r.valorGlobal || 0), 0);
             quantidades[s.label] = doSegmento.length;
           });
