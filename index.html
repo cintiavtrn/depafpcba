@@ -7864,8 +7864,24 @@ function renderPorDimensaoContratos(lista, cfg) {
     filtroMes = "";
     filtroStatusVisao = "";
     filtroUrgenciaPrazo = "";
-    filtroDirpin = "";
-    filtroCoorpin = "";
+    // Pedido direto: "se a gente seleciona o setor demandante... já deveria
+    // selecionar automático no filtro dirpin qual ela fica e na coorpin,
+    // porque senão fica confuso" — quando o valor escolhido É, ele mesmo,
+    // o nome de uma unidade regional real (só acontece pra Setor Demandante
+    // da DEPIN, onde "setor" e "COORPIN" são a mesma coisa), pré-seleciona
+    // os dois filtros com ela em vez de deixar em "Todas" — resolve ao
+    // mesmo tempo o "por que preciso escolher de novo o que já escolhi" E
+    // o "por que a Distribuição Geográfica não destaca nada", já que os
+    // dois usam esse mesmo par de variáveis (`destacarUnidadeFn` já lê
+    // filtroCoorpin/filtroDirpin). Não trava o select — continua dando pra
+    // voltar pra "Todas" manualmente se ela quiser ver o grupo inteiro.
+    // Genérico de propósito (não travado a p==="area"): pra
+    // categoria/gestor/fiscal/analista, `valor` nunca bate o nome de uma
+    // COORPIN de verdade, então isso não muda nada nesses casos — mesmo
+    // código cobre "em outro lugar tiver esse erro" sem precisar enumerar.
+    const unidadeCorrespondente = lista.flatMap((c) => c.unidades || []).find((u) => u.nomeUnidade === valor);
+    filtroDirpin = unidadeCorrespondente ? unidadeCorrespondente.dirpin : "";
+    filtroCoorpin = unidadeCorrespondente ? valor : "";
     filtroApenasCompartilhados = false;
     atualizar();
     alvo.scrollIntoView?.({ behavior: "smooth", block: "start" });
@@ -8373,10 +8389,10 @@ function renderPorDimensaoContratos(lista, cfg) {
         </div></div>
         <div id="${p}-grafico-mes"></div>
       </div>
-      ${p === "categoria" ? `
+      ${(p === "categoria" || p === "area") ? `
       <div class="dash-chart-box" style="margin-top:16px">
         <h4>Quem Precisa Agir</h4>
-        <p class="dash-chart-hint">Gestores e fiscais com mais contrato vencido ou vencendo em até 90 dias sob responsabilidade, dentro desta categoria — clique num nome pra abrir o perfil completo.</p>
+        <p class="dash-chart-hint">Gestores e fiscais com mais contrato vencido ou vencendo em até 90 dias sob responsabilidade, dentro d${p === "categoria" ? "esta categoria" : "este setor"} — clique num nome pra abrir o perfil completo.</p>
         <div class="dash-charts" style="grid-template-columns:1fr 1fr">
           <div><h4 style="font-size:var(--fs-ui-sm);margin-bottom:6px">Gestores</h4><div id="${p}-risco-gestores"></div></div>
           <div><h4 style="font-size:var(--fs-ui-sm);margin-bottom:6px">Fiscais</h4><div id="${p}-risco-fiscais"></div></div>
@@ -8392,18 +8408,21 @@ function renderPorDimensaoContratos(lista, cfg) {
     ligarTooltipLinhas(el("sub-prazos"), porId);
     // Pedido direto: "em categoria: aparecer tambem quem precisa agir
     // quando formos na aba prazos e vencimentos" — mesma lógica do "Quem
-    // Precisa Agir" do Tático, só que escopada aos contratos DESTA
-    // categoria (listaFiltrada), não o portfólio inteiro.
-    if (p === "categoria") {
+    // Precisa Agir" do Tático, escopada aos contratos DESTA categoria/deste
+    // setor (listaFiltrada), não o portfólio inteiro. Segunda rodada, ela
+    // perguntou direto se não valia também em Setor Demandante — mesmo
+    // raciocínio, mesmo código, só estendendo a condição.
+    if (p === "categoria" || p === "area") {
+      const substantivoRisco = p === "categoria" ? "nesta categoria" : "neste setor";
       const contratosEmRiscoCat = listaFiltrada.filter((c) => c.statusVigencia === "Vencido" || c.statusVigencia === "A Vencer");
       const gestoresRiscoCat = agruparContratosPorPessoa(contratosEmRiscoCat, "Gestor").slice(0, 5);
       const fiscaisRiscoCat = agruparContratosPorPessoa(contratosEmRiscoCat, "Fiscal").slice(0, 5);
       el("risco-gestores").innerHTML = gestoresRiscoCat.length
         ? barraContagemHorizontalSVG(gestoresRiscoCat, { tituloTooltip: (l) => `${l.label}: ${l.total} contrato(s) em risco`, limite: 20 })
-        : `<p class="dash-chart-hint">Nenhum gestor com contrato em risco nesta categoria.</p>`;
+        : `<p class="dash-chart-hint">Nenhum gestor com contrato em risco ${substantivoRisco}.</p>`;
       el("risco-fiscais").innerHTML = fiscaisRiscoCat.length
         ? barraContagemHorizontalSVG(fiscaisRiscoCat, { tituloTooltip: (l) => `${l.label}: ${l.total} contrato(s) em risco`, limite: 20 })
-        : `<p class="dash-chart-hint">Nenhum fiscal com contrato em risco nesta categoria.</p>`;
+        : `<p class="dash-chart-hint">Nenhum fiscal com contrato em risco ${substantivoRisco}.</p>`;
       adicionarControlesGrafico(el("risco-gestores"));
       adicionarControlesGrafico(el("risco-fiscais"));
       function irParaPessoaViaCategoria(containerId, papel, idSelect) {
