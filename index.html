@@ -6794,7 +6794,24 @@ function renderOperacionalContratos(lista, portalSlug) {
   }
 
   document.getElementById("op-select-setor").addEventListener("change", (ev) => { setor = ev.target.value; contratoId = ""; atualizar(); });
-  document.getElementById("op-select-contrato").addEventListener("change", (ev) => { contratoId = ev.target.value; atualizar(); });
+  document.getElementById("op-select-contrato").addEventListener("change", (ev) => {
+    contratoId = ev.target.value;
+    // Pedido direto: "se eu posso ir no slicer e selecionar o contrato sem
+    // selecionar o setor, deveria depois de selecionado o contrato
+    // reconhecer o setor" — sem isso, os cartões de cima (op-resumo, que só
+    // respeitam `setor`) continuavam mostrando o PORTFÓLIO inteiro enquanto
+    // os de baixo (op-kpis, que já respeitam o contrato) escopavam certo
+    // pro contrato escolhido — metade da tela acompanhava a seleção, a
+    // outra metade não.
+    if (contratoId && !setor) {
+      const selecionado = porId.get(contratoId);
+      if (selecionado) {
+        setor = selecionado.unidadeGestora || "(sem unidade)";
+        document.getElementById("op-select-setor").value = setor;
+      }
+    }
+    atualizar();
+  });
   document.getElementById("op-gestor-fiscal-baixar").addEventListener("click", () =>
     baixarTabelaComoImagem(document.getElementById("op-gestor-fiscal"), "cpg-contratos-gestor-fiscal.png"));
 
