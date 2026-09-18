@@ -5125,6 +5125,40 @@ function agruparValorPorCampo(lista, campoFn, rotuloVazio = "(não informado)") 
   return [...mapa.entries()].map(([label, g]) => ({ label, total: g.total, qtd: g.qtd })).sort((a, b) => b.total - a.total);
 }
 
+// Pedido direto: "o que foi implementado na Gerencial (ticket médio,
+// críticos/a vencer, badge de concentração) não pode aparecer também
+// quando a gente divide por categoria ou setor demandante? a pessoa pode
+// ter que voltar" — a "dimensão complementar" de cada perfil (landing E
+// dentro do Financeiro de cada Setor/Categoria/Gestor/Fiscal/Analista)
+// ainda usava agruparValorPorCampo (só valor+qtd) alimentando
+// barraOuTabelaSVG, sem o enriquecimento que Setor Demandante/Tipo de
+// Objeto já ganharam em Gerencial. Esta função é o mesmo agrupamento, só
+// que guardando o que tabelaMescladaHTML precisa pra desenhar tudo isso
+// de uma vez — mesma convenção da rodada anterior: qtd conta TODO
+// contrato (não só quem tem valor lançado, ao contrário de
+// agruparValorPorCampo acima — evita reintroduzir a mesma inconsistência
+// de contagem que a fusão de Setor Demandante corrigiu), valor soma só
+// quem tem valor lançado. `total` é um alias de `valor` só pra
+// treemapValorSVG (que lê `.total`) continuar funcionando sem mudar nada
+// nela.
+function agruparValorEnriquecidoPorCampo(lista, campoFn, rotuloVazio) {
+  const mapa = new Map();
+  for (const c of lista) {
+    const bruto = campoFn(c);
+    const chaves = Array.isArray(bruto) ? (bruto.length ? bruto : [rotuloVazio]) : [bruto || rotuloVazio];
+    const critico = c.statusVigencia === "Vencido" || c.statusVigencia === "A Vencer";
+    for (const chave of chaves) {
+      if (!mapa.has(chave)) mapa.set(chave, { qtd: 0, valor: 0, maiorContrato: 0, criticos: 0 });
+      const g = mapa.get(chave);
+      g.qtd += 1;
+      g.valor += c.valorGlobalAtual || 0;
+      g.maiorContrato = Math.max(g.maiorContrato, c.valorGlobalAtual || 0);
+      if (critico) g.criticos += 1;
+    }
+  }
+  return [...mapa.entries()].map(([label, g]) => ({ label, qtd: g.qtd, valor: g.valor, total: g.valor, maiorContrato: g.maiorContrato, criticos: g.criticos }));
+}
+
 // Pedido direto: "a área gestora do contrato é a unidade administrativa,
 // setor ou departamento... responsável por coordenar, acompanhar,
 // fiscalizar... existe mais de um entendimento possível... eu entendo que
@@ -7848,17 +7882,21 @@ function renderPorDimensaoContratos(lista, cfg) {
         // objeto ou setor demandante, dependendo do perfil), uma fatia por
         // categoria já não se lê — mesmo limite de ~7-8 do resto do painel.
         // Treemap é a 3ª forma (pedido direto), escolhida no 2º toggle.
-        const linhasLandingComplementar = agruparValorPorCampo(lista, cfg.complementar.campoFn, cfg.complementar.rotuloVazio);
+        // Pedido direto: "o que foi implementado na Gerencial não pode
+        // aparecer também quando a gente divide por categoria ou setor
+        // demandante?" — mesmo ticket médio/críticos-a-vencer/badge de
+        // concentração que Gerencial já tem, aqui na landing (visão de
+        // TODAS as categorias/setores antes de escolher uma).
+        const linhasLandingComplementar = agruparValorEnriquecidoPorCampo(lista, cfg.complementar.campoFn, cfg.complementar.rotuloVazio);
         el("landing-complementar").innerHTML = modoVisualLanding === "treemap"
           ? treemapValorSVG(linhasLandingComplementar)
-          : barraOuTabelaSVG(linhasLandingComplementar, {
-              formatarValor: (v) => "R$ " + formatarMoedaCompacta(v),
-              rotuloExtra: (l) => `(${l.qtd} contrato${l.qtd === 1 ? "" : "s"})`,
+          : tabelaMescladaHTML(linhasLandingComplementar, {
               colunaRotulo: cfg.complementar.titulo.replace(/^Valor por /, "").toUpperCase(),
-              colunaValor: "VALOR (R$)",
-              mostrarPercentual: true,
+              idPrefixo: `${p}-landing-complementar`,
+              colunaExtra: { titulo: "CRÍTICOS/A VENCER", campo: "criticos" },
             });
         adicionarControlesGrafico(el("landing-complementar"));
+        if (modoVisualLanding !== "treemap") ligarOrdenacaoTabelaPropria(el("landing-complementar"));
         el("landing-complementar").addEventListener("click", (ev) => {
           const alvoClicado = ev.target.closest("[data-cat]");
           if (!alvoClicado) return;
@@ -8426,17 +8464,21 @@ function renderPorDimensaoContratos(lista, cfg) {
     // Setor Demandante e até Analista (11) já passam do teto de ~6-7 fatias
     // legíveis numa rosca — ver barraOuTabelaSVG. Treemap é a 3ª opção
     // (pedido direto) — mesmo dado, outra forma, escolhida no 2º toggle.
-    const linhasComplementar = agruparValorPorCampo(listaFiltrada, dimensaoAtiva.campoFn, dimensaoAtiva.rotuloVazio);
+    // Pedido direto: "o que foi implementado na Gerencial (ticket médio,
+    // críticos/a vencer) não pode aparecer também quando a gente divide
+    // por categoria ou setor demandante? a pessoa pode ter que voltar" —
+    // mesmo enriquecimento de Setor Demandante/Tipo de Objeto em
+    // Gerencial, agora também dentro do Financeiro de cada perfil.
+    const linhasComplementar = agruparValorEnriquecidoPorCampo(listaFiltrada, dimensaoAtiva.campoFn, dimensaoAtiva.rotuloVazio);
     el("complementar").innerHTML = modoVisualComplementar === "treemap"
       ? treemapValorSVG(linhasComplementar)
-      : barraOuTabelaSVG(linhasComplementar, {
-          formatarValor: (v) => "R$ " + formatarMoedaCompacta(v),
-          rotuloExtra: (l) => `(${l.qtd} contrato${l.qtd === 1 ? "" : "s"})`,
+      : tabelaMescladaHTML(linhasComplementar, {
           selecionado: filtroComplementar,
           colunaRotulo: dimensaoAtiva.titulo.replace(/^Valor por /, "").toUpperCase(),
-          colunaValor: "VALOR (R$)",
-          mostrarPercentual: true,
+          idPrefixo: `${p}-fin-complementar`,
+          colunaExtra: { titulo: "CRÍTICOS/A VENCER", campo: "criticos" },
         });
+    if (modoVisualComplementar !== "treemap") ligarOrdenacaoTabelaPropria(el("complementar"));
     el("top-contratos").innerHTML = barraContagemHorizontalSVG(
       agruparTopContratosPorValor(filtrada, 10),
       // limite alto: já é um Top 10 curado, não deve dobrar em "outros".
