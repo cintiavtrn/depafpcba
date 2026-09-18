@@ -4666,8 +4666,8 @@ const ABREVIACAO_CRITICIDADE = {
 };
 
 // Mapa de calor: linha = área gestora, coluna = faixa de criticidade — a
-// MESMA informação da matriz numérica (renderMatrizAreaGestora), só que lida
-// pela cor em vez do número. Cor = a rampa de criticidade de sempre;
+// MESMA informação da barra/treemap ao lado, só que lida pela cor em vez do
+// número. Cor = a rampa de criticidade de sempre;
 // intensidade (opacidade) ∝ volume de contratos daquela célula relativo ao
 // maior valor da matriz inteira, então além de "qual a pior criticidade" (o
 // que o treemap já responde) dá pra ver ONDE está concentrado o volume.
@@ -4998,7 +4998,7 @@ function tabelaDistribuicaoHTML(linhas, opcoes = {}) {
 // ticket, %) ela ordenaria errado. Usa ligarOrdenacaoTabela (abaixo),
 // dedicada, com extrator por coluna.
 function tabelaMescladaHTML(linhas, opcoes = {}) {
-  const { colunaRotulo = "CATEGORIA", selecionado = "", idPrefixo = "tabela-mesclada" } = opcoes;
+  const { colunaRotulo = "CATEGORIA", selecionado = "", idPrefixo = "tabela-mesclada", colunaExtra = null } = opcoes;
   const somaValor = linhas.reduce((a, l) => a + l.valor, 0);
   const maxValor = maxSeguro(linhas.map((l) => l.valor));
   const ordenadas = linhas.slice().sort((a, b) => b.valor - a.valor);
@@ -5006,12 +5006,15 @@ function tabelaMescladaHTML(linhas, opcoes = {}) {
     const destacado = selecionado === l.label;
     const pct = somaValor ? Math.round((l.valor / somaValor) * 1000) / 10 : 0;
     const ticket = l.qtd ? l.valor / l.qtd : 0;
-    return `<tr data-cat="${escapeAttr(l.label)}" data-busca="${escapeAttr(normalizarBusca(l.label))}" data-qtd="${l.qtd}" data-valor="${l.valor}" data-ticket="${ticket}" data-pct="${pct}" class="${destacado ? "selecionada" : ""}">
+    const extraAttr = colunaExtra ? ` data-${colunaExtra.campo}="${l[colunaExtra.campo]}"` : "";
+    const extraTd = colunaExtra ? `<td class="num">${colunaExtra.render ? colunaExtra.render(l[colunaExtra.campo]) : l[colunaExtra.campo].toLocaleString("pt-BR")}</td>` : "";
+    return `<tr data-cat="${escapeAttr(l.label)}" data-busca="${escapeAttr(normalizarBusca(l.label))}" data-qtd="${l.qtd}" data-valor="${l.valor}" data-ticket="${ticket}" data-pct="${pct}"${extraAttr} class="${destacado ? "selecionada" : ""}">
       <td>${escapeHTML(l.label)}</td>
       <td class="num">${l.qtd.toLocaleString("pt-BR")}</td>
       <td class="num"><span class="barra-embutida"><span class="barra-embutida-fill" style="width:${maxValor ? (l.valor / maxValor) * 100 : 0}%"></span></span>R$ ${escapeHTML(formatarMoedaCompacta(l.valor))}</td>
       <td class="num">R$ ${escapeHTML(formatarMoedaCompacta(ticket))}</td>
       <td class="num">${pct.toLocaleString("pt-BR")}%</td>
+      ${extraTd}
     </tr>`;
   }).join("");
   const idTabela = `${idPrefixo}-${Math.random().toString(36).slice(2, 9)}`;
@@ -5027,6 +5030,7 @@ function tabelaMescladaHTML(linhas, opcoes = {}) {
           <th class="sortable-propria sort-desc num" data-campo="valor">VALOR TOTAL</th>
           <th class="sortable-propria num" data-campo="ticket">TICKET MÉDIO</th>
           <th class="sortable-propria num" data-campo="pct">%</th>
+          ${colunaExtra ? `<th class="sortable-propria num" data-campo="${colunaExtra.campo}">${escapeHTML(colunaExtra.titulo)}</th>` : ""}
         </tr></thead>
         <tbody>${corpo}</tbody>
       </table>
@@ -5446,32 +5450,6 @@ function ganttContratosSVG(lista) {
   return { svg: `<svg viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg">${grade}${barras}${legenda}</svg>`, alturaPx: h };
 }
 
-// "Detalhamento por Área Gestora" — matriz com uma coluna por criticidade e
-// linha de TOTAL, réplica direta da tabela do Power BI.
-function renderMatrizAreaGestora(linhasArea) {
-  const colunasCrit = CRITICIDADE_VISUAL.map((cv) => cv.label).filter((l) => linhasArea.some((a) => a.porCrit[l]));
-  const totalGeral = { total: 0, porCrit: {} };
-  linhasArea.forEach((a) => {
-    totalGeral.total += a.total;
-    colunasCrit.forEach((l) => { totalGeral.porCrit[l] = (totalGeral.porCrit[l] || 0) + (a.porCrit[l] || 0); });
-  });
-  const linhasHtml = linhasArea.map((a) => `
-    <tr data-cat="${escapeAttr(a.label)}">
-      <td>${escapeHTML(a.label)}</td>
-      <td class="num">${a.total}</td>
-      ${colunasCrit.map((l) => `<td class="num">${a.porCrit[l] || ""}</td>`).join("")}
-    </tr>`).join("");
-  return `
-    <table class="dash-tabela">
-      <thead><tr><th>SETOR DEMANDANTE</th><th>QTD CONTRATOS</th>${colunasCrit.map((l) => `<th>QTD ${escapeHTML(l.replace(/\s*\(.*\)/, "").toUpperCase())}</th>`).join("")}</tr></thead>
-      <tbody>${linhasHtml}
-        <tr style="border-top:2px solid var(--carvao);font-weight:700">
-          <td>TOTAL</td><td class="num">${totalGeral.total}</td>
-          ${colunasCrit.map((l) => `<td class="num">${totalGeral.porCrit[l] || ""}</td>`).join("")}
-        </tr>
-      </tbody>
-    </table>`;
-}
 
 // Pedido direto: "acho que deveria no objeto selecionado melhorar a
 // descrição, adicionar algumas informações relevantes mesmo que não
@@ -5711,15 +5689,27 @@ function renderGerencialContratos(lista, resumo) {
     <div id="ger-chip-filtro"></div>
     <div id="ger-kpis" style="margin-bottom:16px"></div>
     <div id="ger-kpi-tabela" style="margin-bottom:16px"></div>
-    <div class="dash-charts" style="grid-template-columns:1.1fr 1fr">
+    <div class="dash-charts" style="grid-template-columns:1fr">
       <div class="dash-chart-box">
-        <h4>Detalhamento por Setor Demandante</h4>
-        <p class="dash-chart-hint">Clique numa linha ou numa barra pra isolar só aquele setor (a lista de contratos aparece logo abaixo dos cartões) — clique de novo (ou em "Todos" acima) pra voltar a ver tudo.</p>
-        <div style="text-align:right;margin-bottom:6px"><button type="button" class="dash-toggle-btn" id="ger-matriz-baixar" title="Baixar esta tabela como imagem">${iconeInline("download", 12, -2)} TABELA (PNG)</button></div>
-        <div id="ger-matriz" class="tabela-rolavel"></div>
+        <h4>Setor Demandante</h4>
+        <!-- Pedido direto (crítica externa que ela trouxe): "funda setor ×
+        criticidade × valor numa visão só — a tabela de valor por setor
+        ganhando uma coluna de contratos críticos/a vencer. Isso mata dois
+        widgets e cria um terceiro mais forte que os dois." Antes eram 2
+        tabelas (matriz de criticidade por setor + valor por setor) com
+        contagens que nem batiam entre si (uma contava TODO contrato, a
+        outra só os com valor lançado). Mantém o gráfico de criticidade
+        (barra/mapa/mapa de calor, logo abaixo) separado de propósito — ele
+        responde uma pergunta de FORMATO (como a criticidade se distribui
+        dentro de cada setor) que uma tabela não substitui. -->
+        <p class="dash-chart-hint">Contratos, valor total, ticket médio e quantos estão vencidos ou a vencer, por setor demandante — clique numa linha pra isolar aquele setor.</p>
+        <div id="ger-setor"></div>
       </div>
+    </div>
+    <div class="dash-charts" style="grid-template-columns:1fr">
       <div class="dash-chart-box">
         <h4>Contratos por Criticidade e Setor Demandante</h4>
+        <p class="dash-chart-hint">Clique numa barra pra isolar aquele setor.</p>
         <div class="linha-troca-grafico"><div class="dash-toggle" id="ger-barra-toggle">
           <button class="dash-toggle-btn" data-modo="proporcao" title="Compara a composição de criticidade de cada setor">% POR SETOR</button>
           <button class="dash-toggle-btn" data-modo="absoluto" title="Compara o tamanho dos setores entre si">QTD POR SETOR</button>
@@ -5727,13 +5717,6 @@ function renderGerencialContratos(lista, resumo) {
           <button class="dash-toggle-btn" data-modo="calor" title="Cor = criticidade; intensidade = volume de contratos na célula">MAPA DE CALOR</button>
         </div></div>
         <div id="ger-barra"></div>
-      </div>
-    </div>
-    <div class="dash-charts" style="grid-template-columns:1fr">
-      <div class="dash-chart-box">
-        <h4>Valor Total por Setor Demandante</h4>
-        <p class="dash-chart-hint">Pra responder rápido "quanto se gasta em tal setor" sem precisar somar na mão. Clique numa barra pra isolar aquele setor.</p>
-        <div id="ger-valor-area"></div>
       </div>
     </div>
     <div class="dash-charts" style="grid-template-columns:1fr">
@@ -5931,15 +5914,11 @@ function renderGerencialContratos(lista, resumo) {
       if (selDirpin && selDirpin.value) { selDirpin.value = ""; selDirpin.dispatchEvent(new Event("change", { bubbles: true })); }
     }
   });
-  document.getElementById("ger-matriz").addEventListener("click", (ev) => {
-    const tr = ev.target.closest("[data-cat]");
-    if (tr) selecionarArea(tr.dataset.cat);
-  });
-  document.getElementById("ger-barra").addEventListener("click", (ev) => {
+  document.getElementById("ger-setor").addEventListener("click", (ev) => {
     const alvoClicado = ev.target.closest("[data-cat]");
     if (alvoClicado) selecionarArea(alvoClicado.dataset.cat);
   });
-  document.getElementById("ger-valor-area").addEventListener("click", (ev) => {
+  document.getElementById("ger-barra").addEventListener("click", (ev) => {
     const alvoClicado = ev.target.closest("[data-cat]");
     if (alvoClicado) selecionarArea(alvoClicado.dataset.cat);
   });
@@ -6027,9 +6006,6 @@ function renderGerencialContratos(lista, resumo) {
     const alvoClicado = ev.target.closest("[data-cat]");
     if (alvoClicado) selecionarFornecedor(alvoClicado.dataset.cat);
   });
-  document.getElementById("ger-matriz-baixar").addEventListener("click", () =>
-    baixarTabelaComoImagem(document.getElementById("ger-matriz"), "cpg-contratos-detalhamento-area-gestora.png"));
-
   function atualizar() {
     const filtrada = lista.filter((c) =>
       (!filtroArea || setoresDemandantesDoContrato(c).includes(filtroArea)) &&
@@ -6147,7 +6123,6 @@ function renderGerencialContratos(lista, resumo) {
     } else {
       document.getElementById("ger-kpi-tabela").innerHTML = "";
     }
-    document.getElementById("ger-matriz").innerHTML = renderMatrizAreaGestora(porArea);
     document.getElementById("ger-barra").innerHTML = modoBarra === "treemap"
       ? treemapAreaCriticidadeSVG(porArea)
       : modoBarra === "calor"
@@ -6156,18 +6131,33 @@ function renderGerencialContratos(lista, resumo) {
     document.querySelectorAll("#ger-barra-toggle [data-modo]").forEach((btn) => {
       btn.classList.toggle("active", btn.dataset.modo === modoBarra);
     });
-    document.getElementById("ger-valor-area").innerHTML = barraOuTabelaSVG(
-      agruparValorPorCampo(filtrada, setoresDemandantesDoContrato, "(sem unidade)"),
-      {
-        formatarValor: (v) => "R$ " + formatarMoedaCompacta(v),
-        rotuloExtra: (l) => `(${l.qtd} contrato${l.qtd === 1 ? "" : "s"})`,
-        tituloTooltip: (l) => `${l.label}: ${formatarMoedaBR(l.total)} — ${l.qtd} contrato${l.qtd === 1 ? "" : "s"}`,
-        selecionado: filtroArea,
-        colunaRotulo: "SETOR DEMANDANTE",
-        colunaValor: "VALOR (R$)",
-        mostrarPercentual: true,
+    // Pedido direto (crítica externa): setor × criticidade × valor numa
+    // tabela só, com uma coluna de "críticos/a vencer" em vez das 7 colunas
+    // de criticidade da antiga matriz (esse detalhe fino continua no
+    // gráfico ger-barra, que não foi embutido aqui de propósito). qtd conta
+    // TODO contrato do setor (mesma convenção do Tipo de Objeto, acima) —
+    // a matriz antiga e a barra de valor antiga contavam qtd de jeitos
+    // diferentes entre si, o que é exatamente o tipo de inconsistência que
+    // essa limpeza busca eliminar.
+    const porSetor = new Map();
+    for (const c of filtrada) {
+      const critico = c.statusVigencia === "Vencido" || c.statusVigencia === "A Vencer";
+      for (const chave of setoresDemandantesDoContrato(c)) {
+        if (!porSetor.has(chave)) porSetor.set(chave, { qtd: 0, valor: 0, criticos: 0 });
+        const g = porSetor.get(chave);
+        g.qtd += 1;
+        g.valor += c.valorGlobalAtual || 0;
+        if (critico) g.criticos += 1;
       }
-    );
+    }
+    const linhasSetor = [...porSetor.entries()].map(([label, g]) => ({ label, qtd: g.qtd, valor: g.valor, criticos: g.criticos }));
+    document.getElementById("ger-setor").innerHTML = tabelaMescladaHTML(linhasSetor, {
+      colunaRotulo: "SETOR DEMANDANTE",
+      selecionado: filtroArea,
+      idPrefixo: "tabela-setor-demandante",
+      colunaExtra: { titulo: "CRÍTICOS/A VENCER", campo: "criticos" },
+    });
+    ligarOrdenacaoTabelaPropria(document.getElementById("ger-setor"));
     // Pedido direto (crítica externa que ela trouxe): "Tipo de Objeto: uma
     // tabela com contratos, valor e valor médio juntos" em vez de 2 tabelas
     // repetindo as mesmas 22 categorias. Agrega contagem E valor no mesmo
@@ -6238,7 +6228,7 @@ function renderGerencialContratos(lista, resumo) {
       }
     );
     adicionarControlesGrafico(document.getElementById("ger-barra"));
-    adicionarControlesGrafico(document.getElementById("ger-valor-area"));
+    adicionarControlesGrafico(document.getElementById("ger-setor"));
     adicionarControlesGrafico(document.getElementById("ger-tipo"));
     adicionarControlesGrafico(document.getElementById("ger-analista"));
     adicionarControlesGrafico(document.getElementById("ger-aditivos"));
