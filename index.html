@@ -6140,10 +6140,11 @@ function renderGerencialContratos(lista, resumo) {
   function irParaUnidadeBeneficiada(nomeUnidade) {
     document.querySelector('.unidade-gestora-btn[data-unidade="DEPIN"]')?.click();
     document.querySelector('[data-subtab-contratos="porarea"]')?.click();
-    const selArea = document.getElementById("area-select");
-    if (!selArea) return;
-    selArea.value = "DEPIN";
-    selArea.dispatchEvent(new Event("change", { bubbles: true }));
+    // Escopada a DEPIN, "Por Setor Demandante"/"Unidades Atendidas" já pula
+    // a landing e entra direto no perfil da DEPIN (o clique acima dispara
+    // isso, síncrono) — não existe mais um <select id="area-select"> pra
+    // setar aqui, só falta fixar a COORPIN clicada no filtro de dentro do
+    // perfil (que essa mesma cadeia síncrona já deixou pronto no DOM).
     const selCoorpin = document.getElementById("area-filtro-coorpin");
     if (selCoorpin) { selCoorpin.value = nomeUnidade; selCoorpin.dispatchEvent(new Event("change", { bubbles: true })); }
   }
@@ -7892,7 +7893,13 @@ function legendaMapaCriticidadeHTML(linhas, destacarUnidadeFn = () => false) {
     </div>`;
 }
 
-function renderPorDimensaoContratos(lista, cfg) {
+function renderPorDimensaoContratos(lista, cfg, unidadeGestoraAtiva) {
+  // Escopada a DEPIN, "Por Setor Demandante" sempre resolve pra 1 único
+  // valor ("DEPIN" — ver setoresDemandantesDoContrato) — a pessoa já
+  // escolheu isso lá em cima, no seletor de Unidade Gestora; repetir o
+  // clique aqui era só um passo morto. Pula a landing e entra direto no
+  // perfil (feito mais abaixo, perto de `selecionar`/`atualizar`).
+  const pulaLandingDepin = cfg.prefixo === "area" && unidadeGestoraAtiva === "DEPIN";
   const p = cfg.prefixo;
   const el = (sufixo) => document.getElementById(`${p}-${sufixo}`);
   const alvo = document.getElementById(`contratos-sub-por${p}`);
@@ -7915,7 +7922,7 @@ function renderPorDimensaoContratos(lista, cfg) {
     return pertenceAoValorGenerico(cfg.campoAgrupador, cfg.rotuloVazio, c, valor);
   }
   const valoresDisponiveis = [...new Set(lista.flatMap(valoresDoContrato))].sort(cfg.compararValores || ((a, b) => a.localeCompare(b, "pt-BR")));
-  let selecionada = "";
+  let selecionada = pulaLandingDepin ? "DEPIN" : "";
   let filtroComplementar = "";
   let modoComplementar = "padrao"; // "padrao" (dimensão complementar de cfg) | "analista"
   // Eixo diferente do modoComplementar acima: aquele escolhe QUAL dimensão
@@ -7966,10 +7973,10 @@ function renderPorDimensaoContratos(lista, cfg) {
 
   alvo.innerHTML = `
     <div class="dash-filtros">
-      <div class="dash-filtro" style="flex:1;min-width:280px">
+      ${pulaLandingDepin ? "" : `<div class="dash-filtro" style="flex:1;min-width:280px">
         <label>${cfg.labelSelect}</label>
         <select id="${p}-select"><option value="">${cfg.opcaoPadrao}</option>${valoresDisponiveis.map((a) => `<option value="${escapeAttr(a)}">${escapeHTML(a)}</option>`).join("")}</select>
-      </div>
+      </div>`}
       <div class="dash-filtro" style="flex:1;min-width:280px">
         <label>BUSCAR (Nº, EMPRESA, OBJETO, VALOR, DATA, ÁREA, ANALISTA, GESTOR, FISCAL...)</label>
         <input type="text" id="${p}-busca" placeholder="Digite qualquer parte do que lembrar..." />
@@ -8025,7 +8032,7 @@ function renderPorDimensaoContratos(lista, cfg) {
 
   function selecionar(valor) {
     selecionada = valor;
-    el("select").value = valor;
+    if (el("select")) el("select").value = valor;
     filtroComplementar = "";
     modoComplementar = "padrao";
     filtroAditivos = null;
@@ -8055,7 +8062,7 @@ function renderPorDimensaoContratos(lista, cfg) {
     atualizar();
     alvo.scrollIntoView?.({ behavior: "smooth", block: "start" });
   }
-  el("select").addEventListener("change", (ev) => selecionar(ev.target.value));
+  el("select")?.addEventListener("change", (ev) => selecionar(ev.target.value));
 
   // Landing (nada escolhido ainda): grade com TODOS os valores de uma vez,
   // qtd de contrato e valor — o equivalente ao mapa/lista de municípios do
@@ -8164,14 +8171,19 @@ function renderPorDimensaoContratos(lista, cfg) {
         const alvoClicado = ev.target.closest("[data-cat]");
         if (!alvoClicado) return;
         document.querySelector(`[data-subtab-contratos="por${complementarAtivoLanding.prefixoAlvo}"]`)?.click();
-        const sel = document.getElementById(`${complementarAtivoLanding.prefixoAlvo}-select`);
-        if (!sel) return;
         if (modoDimensaoLanding === "unidades") {
-          sel.value = "DEPIN";
-          sel.dispatchEvent(new Event("change", { bubbles: true }));
+          // Escopada a DEPIN lá em cima, o perfil de "Por Setor Demandante"
+          // já entra direto em "DEPIN" (pulaLandingDepin — não existe mais
+          // <select id="area-select"> nesse escopo, o clique acima já
+          // deixou o perfil certo no DOM); fora desse escopo, o select
+          // ainda existe e precisa ser setado pra "DEPIN" primeiro.
+          const sel = document.getElementById(`${complementarAtivoLanding.prefixoAlvo}-select`);
+          if (sel) { sel.value = "DEPIN"; sel.dispatchEvent(new Event("change", { bubbles: true })); }
           const selCoorpin = document.getElementById(`${complementarAtivoLanding.prefixoAlvo}-filtro-coorpin`);
           if (selCoorpin) { selCoorpin.value = alvoClicado.dataset.cat; selCoorpin.dispatchEvent(new Event("change", { bubbles: true })); }
         } else {
+          const sel = document.getElementById(`${complementarAtivoLanding.prefixoAlvo}-select`);
+          if (!sel) return;
           sel.value = alvoClicado.dataset.cat;
           sel.dispatchEvent(new Event("change", { bubbles: true }));
         }
@@ -8510,9 +8522,11 @@ function renderPorDimensaoContratos(lista, cfg) {
             <p class="font-mono" style="font-size:var(--fs-ui-sm);color:#8B93A3">${listaFiltrada.length} contrato(s) · ${formatarMoedaBR(valorAtual)} em valor atual${qtdVencidos ? ` · ${qtdVencidos} vencido(s)` : ""}</p>
           </div>
         </div>
-        <button type="button" class="dash-toggle-btn" id="${p}-trocar">${cfg.labelTrocar}</button>
+        ${pulaLandingDepin ? "" : `<button type="button" class="dash-toggle-btn" id="${p}-trocar">${cfg.labelTrocar}</button>`}
       </div>`;
-    el("trocar").addEventListener("click", () => selecionar(""));
+    // Escopada a DEPIN não tem "trocar" — só existe 1 valor possível aqui
+    // (DEPIN), o botão nem é desenhado (ver `pulaLandingDepin` acima).
+    el("trocar")?.addEventListener("click", () => selecionar(""));
   }
 
   function renderVisaoGeral(listaFiltrada) {
@@ -9064,7 +9078,12 @@ function renderPorDimensaoContratos(lista, cfg) {
   // landing" (mesmo caminho do botão "← TROCAR"), só falta limpar a busca.
   return {
     resetar() {
-      selecionar("");
+      // Escopada a DEPIN não existe landing pra voltar (pulaLandingDepin) —
+      // "resetar" aqui só pode significar limpar os sub-filtros de
+      // DIRPIN/COORPIN, mantendo o perfil da DEPIN aberto; "" levaria pra
+      // uma landing sem <select> pra escolher de novo (órfã, ver
+      // `pulaLandingDepin` no topo da função).
+      selecionar(pulaLandingDepin ? "DEPIN" : "");
       const buscaInput = el("busca");
       if (buscaInput) buscaInput.value = "";
       const buscaResultado = el("busca-resultado");
@@ -9072,7 +9091,7 @@ function renderPorDimensaoContratos(lista, cfg) {
     },
   };
 }
-function renderPorAreaContratos(lista) { return renderPorDimensaoContratos(lista, configPorArea()); }
+function renderPorAreaContratos(lista, unidadeGestoraAtiva) { return renderPorDimensaoContratos(lista, configPorArea(), unidadeGestoraAtiva); }
 function renderPorCategoriaContratos(lista) { return renderPorDimensaoContratos(lista, configPorCategoria()); }
 function renderPorGestorContratos(lista) { return renderPorDimensaoContratos(lista, configPorGestor()); }
 function renderPorFiscalContratos(lista) { return renderPorDimensaoContratos(lista, configPorFiscal()); }
@@ -10500,7 +10519,7 @@ async function carregarContratosPortal(portalSlug) {
       <button class="tab-btn active" data-subtab-contratos="gerencial">${ICONS.painel_dashboard}GERENCIAL</button>
       <button class="tab-btn" data-subtab-contratos="tatico">${ICONS.mira}TÁTICO</button>
       <button class="tab-btn" data-subtab-contratos="operacional">${ICONS.engrenagem}OPERACIONAL</button>
-      <button class="tab-btn" data-subtab-contratos="porarea">${ICONS.predio}POR SETOR DEMANDANTE</button>
+      <button class="tab-btn" data-subtab-contratos="porarea">${ICONS.predio}<span id="contratos-tab-porarea-label">POR SETOR DEMANDANTE</span></button>
       <button class="tab-btn" data-subtab-contratos="porcategoria">${ICONS.categoria_tag}POR CATEGORIA</button>
       <button class="tab-btn" data-subtab-contratos="porpessoas">${ICONS.pessoa}POR PESSOAS</button>
       <button class="tab-btn" data-subtab-contratos="atualizados">${ICONS.atualizar}ATUALIZADOS RECENTEMENTE</button>
@@ -10533,13 +10552,24 @@ async function carregarContratosPortal(portalSlug) {
   // o clique neles é ligado uma vez só, mais abaixo) em cima da lista que
   // deve aparecer agora (tudo, ou só a unidade escolhida). Chamada na
   // carga inicial E toda vez que o seletor de unidade muda.
-  function montarAbas(listaExibida, resumoExibido) {
+  function montarAbas(listaExibida, resumoExibido, unidadeGestoraAtiva) {
     renderAlertaVencimentoContratos(listaExibida, new Map(listaExibida.map((c) => [c.id, c])), decisoesRenovacao);
+
+    // Pedido direto: "não faz muito sentido... ter Setor Demandante como
+    // aba dentro da DEPIN porque é repetitivo... acho que essa aba poderia
+    // mudar de nome pra unidades atendidas" — escopada a DEPIN, "setor
+    // demandante" sempre resolve pra 1 cartão só ("DEPIN"), a mesma unidade
+    // já escolhida ali em cima; a aba muda de nome pra refletir o que ela
+    // realmente vira nesse escopo (browsing por COORPIN, não uma escolha de
+    // setor). Em DEPAF/Todos continua "Por Setor Demandante" — lá a escolha
+    // é real.
+    const labelPorArea = document.getElementById("contratos-tab-porarea-label");
+    if (labelPorArea) labelPorArea.textContent = unidadeGestoraAtiva === "DEPIN" ? "UNIDADES ATENDIDAS" : "POR SETOR DEMANDANTE";
 
     const gerencialHandle = renderGerencialContratos(listaExibida, resumoExibido);
     const taticoHandle = renderTaticoContratos(listaExibida);
     const operacionalHandle = renderOperacionalContratos(listaExibida, portalSlug);
-    const porAreaHandle = renderPorAreaContratos(listaExibida);
+    const porAreaHandle = renderPorAreaContratos(listaExibida, unidadeGestoraAtiva);
     const porCategoriaHandle = renderPorCategoriaContratos(listaExibida);
     const porPessoasHandle = renderPorPessoasContratos(listaExibida);
     renderAtualizadosRecentemente(listaExibida, decisoesRenovacao);
@@ -10593,7 +10623,7 @@ async function carregarContratosPortal(portalSlug) {
     if (valor === "DEPIN" && filtroDirpinTopo) {
       listaExibida = listaExibida.filter((c) => dirpinsDoContrato(c).includes(filtroDirpinTopo));
     }
-    montarAbas(listaExibida, calcularResumo(listaExibida));
+    montarAbas(listaExibida, calcularResumo(listaExibida), valor);
   }
   if (seletorUnidadeGestora) {
     seletorUnidadeGestora.querySelectorAll(".unidade-gestora-btn").forEach((btn) => {
