@@ -5495,6 +5495,17 @@ function colunaCriticidadeEmpilhadaSVG(meses, mesSelecionado = "") {
   // logo um pouco mais largo) + uma folga pequena — não um número fixo
   // escolhido no olho (foi exatamente isso que errou da primeira vez).
   const MARGEM_ROTULO = 4;
+  // Mesmo problema do mês selecionado, achado direto por ela ("veja como
+  // essas duas datas últimas estão se sobrepondo"): o ÚLTIMO mês (i===n-1)
+  // também é forçado a aparecer sempre, mas os meses no fim da série tendem
+  // a ter meses SEM contrato entre um e outro (grandes intervalos de tempo,
+  // poucos pixels de distância no gráfico — a posição é por ÍNDICE, não por
+  // data real) — então o rótulo do passo normal logo antes dele cola nele
+  // com frequência bem maior que no meio da série. Mesma solução: faixa de
+  // exclusão em pixels ao redor do último, igual já existe pro selecionado.
+  const idxUltimo = n - 1;
+  const cxUltimo = padL + bw * idxUltimo + bw / 2;
+  const labelUltimo = meses[idxUltimo].label;
   let barras = "", rotulos = "";
   meses.forEach((m, i) => {
     const cx = padL + bw * i + bw / 2;
@@ -5510,12 +5521,15 @@ function colunaCriticidadeEmpilhadaSVG(meses, mesSelecionado = "") {
     });
     barras += `<g data-mes="${escapeAttr(m.label)}" style="cursor:pointer" opacity="${dim ? 0.35 : 1}">${coluna}</g>`;
     const ehSelecionado = m.label === mesSelecionado;
-    const candidatoNormal = i % passo === 0 || i === n - 1;
+    const ehUltimo = i === idxUltimo;
+    const candidatoNormal = i % passo === 0 || ehUltimo;
     const distanciaMinima = cxSelecionado !== null
       ? (larguraTextoMonoAprox(mesSelecionado, 8, true) + larguraTextoMonoAprox(m.label, 8, false)) / 2 + MARGEM_ROTULO
       : 0;
     const pertoDoSelecionado = cxSelecionado !== null && !ehSelecionado && Math.abs(cx - cxSelecionado) < distanciaMinima;
-    if (ehSelecionado || (candidatoNormal && !pertoDoSelecionado)) {
+    const distanciaMinimaUltimo = (larguraTextoMonoAprox(labelUltimo, 8, false) + larguraTextoMonoAprox(m.label, 8, false)) / 2 + MARGEM_ROTULO;
+    const pertoDoUltimo = !ehUltimo && !ehSelecionado && Math.abs(cx - cxUltimo) < distanciaMinimaUltimo;
+    if (ehSelecionado || (candidatoNormal && !pertoDoSelecionado && !pertoDoUltimo)) {
       rotulos += `<text x="${cx.toFixed(1)}" y="${(baseY + 14).toFixed(1)}" text-anchor="middle" font-family="monospace" font-size="8" fill="var(--carvao)" fill-opacity="${ehSelecionado ? 1 : 0.7}" font-weight="${ehSelecionado ? 700 : 400}">${escapeHTML(m.label)}</text>`;
     }
   });
