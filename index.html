@@ -6675,7 +6675,7 @@ function renderTaticoContratos(lista) {
     comparação com carga de trabalho) continua em Por Pessoas. -->
     <div class="dash-chart-box" style="margin-bottom:16px">
       <h4>Quem Precisa Agir</h4>
-      <p class="dash-chart-hint">Gestores e fiscais com mais contrato vencido ou vencendo em até 90 dias sob responsabilidade agora — clique num nome pra abrir o perfil completo (Top 10, Duplas e comparação com carga de trabalho total ficam na aba "Por Pessoas").</p>
+      <p class="dash-chart-hint" id="tat-risco-hint">Gestores e fiscais com mais contrato vencido ou vencendo em até 90 dias sob responsabilidade agora — clique num nome pra abrir o perfil completo (Top 10, Duplas e comparação com carga de trabalho total ficam na aba "Por Pessoas").</p>
       <div class="dash-charts" style="grid-template-columns:1fr 1fr">
         <div><h4 style="font-size:var(--fs-ui-sm);margin-bottom:6px">Gestores</h4><div id="tat-risco-gestores"></div></div>
         <div><h4 style="font-size:var(--fs-ui-sm);margin-bottom:6px">Fiscais</h4><div id="tat-risco-fiscais"></div></div>
@@ -6690,21 +6690,35 @@ function renderTaticoContratos(lista) {
 
   ligarBuscaContratos(lista, porId, "tat-busca", "tat-busca-resultado");
 
-  // "Quem Precisa Agir" — estático (mesma convenção de tat-resumo acima:
-  // lista INTEIRA, não a filtrada pelo toggle de criticidade/tipo — é um
-  // resumo de topo, não outro filtro pra aprender). Top 5, não 10 (versão
-  // resumida — a completa mora em Por Pessoas).
-  const contratosEmRiscoTat = lista.filter((c) => c.statusVigencia === "Vencido" || c.statusVigencia === "A Vencer");
-  const gestoresRiscoTat = agruparContratosPorPessoa(contratosEmRiscoTat, "Gestor").slice(0, 5);
-  const fiscaisRiscoTat = agruparContratosPorPessoa(contratosEmRiscoTat, "Fiscal").slice(0, 5);
-  document.getElementById("tat-risco-gestores").innerHTML = gestoresRiscoTat.length
-    ? barraContagemHorizontalSVG(gestoresRiscoTat, { tituloTooltip: (l) => `${l.label}: ${l.total} contrato(s) em risco`, limite: 20 })
-    : `<p class="dash-chart-hint">Nenhum gestor com contrato em risco no momento.</p>`;
-  document.getElementById("tat-risco-fiscais").innerHTML = fiscaisRiscoTat.length
-    ? barraContagemHorizontalSVG(fiscaisRiscoTat, { tituloTooltip: (l) => `${l.label}: ${l.total} contrato(s) em risco`, limite: 20 })
-    : `<p class="dash-chart-hint">Nenhum fiscal com contrato em risco no momento.</p>`;
-  adicionarControlesGrafico(document.getElementById("tat-risco-gestores"));
-  adicionarControlesGrafico(document.getElementById("tat-risco-fiscais"));
+  // "Quem Precisa Agir" — não segue o toggle de criticidade/tipo (mesma
+  // convenção de tat-resumo: é um resumo de topo, não outro filtro pra
+  // aprender), MAS segue o mês isolado no gráfico. Pedido direto: "cliquei
+  // em 2027-02, ai deveria refiltrar no quem precisa agir e não ficar
+  // parado só levando em consideração os 90 dias de hoje" — sem mês
+  // escolhido, é "quem tem contrato vencido/vencendo agora" (90 dias);
+  // com um mês escolhido, vira "quem tem contrato vencendo NESSE mês"
+  // (pode ser passado ou > 90 dias no futuro — o mês escolhido é que manda,
+  // não "hoje"). Top 5, não 10 (versão resumida — a completa mora em Por
+  // Pessoas).
+  function renderQuemPrecisaAgirTat() {
+    const contratosEmRiscoTat = filtroMes
+      ? lista.filter((c) => chaveAnoMes(c.dataFim) === filtroMes)
+      : lista.filter((c) => c.statusVigencia === "Vencido" || c.statusVigencia === "A Vencer");
+    document.getElementById("tat-risco-hint").textContent = filtroMes
+      ? `Gestores e fiscais com contrato vencendo em ${filtroMes} sob responsabilidade — clique num nome pra abrir o perfil completo (Top 10, Duplas e comparação com carga de trabalho total ficam na aba "Por Pessoas").`
+      : `Gestores e fiscais com mais contrato vencido ou vencendo em até 90 dias sob responsabilidade agora — clique num nome pra abrir o perfil completo (Top 10, Duplas e comparação com carga de trabalho total ficam na aba "Por Pessoas").`;
+    const gestoresRiscoTat = agruparContratosPorPessoa(contratosEmRiscoTat, "Gestor").slice(0, 5);
+    const fiscaisRiscoTat = agruparContratosPorPessoa(contratosEmRiscoTat, "Fiscal").slice(0, 5);
+    document.getElementById("tat-risco-gestores").innerHTML = gestoresRiscoTat.length
+      ? barraContagemHorizontalSVG(gestoresRiscoTat, { tituloTooltip: (l) => `${l.label}: ${l.total} contrato(s) em risco`, limite: 20 })
+      : `<p class="dash-chart-hint">Nenhum gestor com contrato em risco${filtroMes ? ` em ${filtroMes}` : " no momento"}.</p>`;
+    document.getElementById("tat-risco-fiscais").innerHTML = fiscaisRiscoTat.length
+      ? barraContagemHorizontalSVG(fiscaisRiscoTat, { tituloTooltip: (l) => `${l.label}: ${l.total} contrato(s) em risco`, limite: 20 })
+      : `<p class="dash-chart-hint">Nenhum fiscal com contrato em risco${filtroMes ? ` em ${filtroMes}` : " no momento"}.</p>`;
+    adicionarControlesGrafico(document.getElementById("tat-risco-gestores"));
+    adicionarControlesGrafico(document.getElementById("tat-risco-fiscais"));
+  }
+  renderQuemPrecisaAgirTat();
   // Clique leva pro perfil completo em "Por Pessoas" — mesmo padrão de
   // clique-abre-perfil usado em todo canto do sistema (Por Pessoas já
   // monta o DOM inteiro no carregamento, só fica escondido até essa aba
@@ -6758,6 +6772,7 @@ function renderTaticoContratos(lista) {
 
   function atualizar() {
     const filtrada = listaFiltrada();
+    renderQuemPrecisaAgirTat();
     if (modoMes === "gantt") {
       const graficoGantt = document.getElementById("tat-grafico-mes");
       graficoGantt.innerHTML = ganttContratosSVG(listaSemMes()).svg;
@@ -8601,7 +8616,7 @@ function renderPorDimensaoContratos(lista, cfg, unidadeGestoraAtiva) {
       ${(p === "categoria" || p === "area") ? `
       <div class="dash-chart-box" style="margin-top:16px">
         <h4>Quem Precisa Agir</h4>
-        <p class="dash-chart-hint">Gestores e fiscais com mais contrato vencido ou vencendo em até 90 dias sob responsabilidade, dentro d${p === "categoria" ? "esta categoria" : "este setor"} — clique num nome pra abrir o perfil completo.</p>
+        <p class="dash-chart-hint" id="${p}-risco-hint"></p>
         <div class="dash-charts" style="grid-template-columns:1fr 1fr">
           <div><h4 style="font-size:var(--fs-ui-sm);margin-bottom:6px">Gestores</h4><div id="${p}-risco-gestores"></div></div>
           <div><h4 style="font-size:var(--fs-ui-sm);margin-bottom:6px">Fiscais</h4><div id="${p}-risco-fiscais"></div></div>
@@ -8621,17 +8636,29 @@ function renderPorDimensaoContratos(lista, cfg, unidadeGestoraAtiva) {
     // setor (listaFiltrada), não o portfólio inteiro. Segunda rodada, ela
     // perguntou direto se não valia também em Setor Demandante — mesmo
     // raciocínio, mesmo código, só estendendo a condição.
+    // Pedido direto (rodada seguinte): "cliquei em 2027-02, ai deveria
+    // refiltrar no quem precisa agir e não ficar parado só levando em
+    // consideração os 90 dias de hoje" — com um mês isolado no gráfico
+    // (filtroMes), "quem precisa agir" segue ELE (quem tem contrato
+    // vencendo NESSE mês, passado ou futuro), não mais o padrão fixo de
+    // vencido/90 dias — mesma mudança já feita no Tático.
     if (p === "categoria" || p === "area") {
       const substantivoRisco = p === "categoria" ? "nesta categoria" : "neste setor";
-      const contratosEmRiscoCat = listaFiltrada.filter((c) => c.statusVigencia === "Vencido" || c.statusVigencia === "A Vencer");
+      const contratosEmRiscoCat = filtroMes
+        ? listaFiltrada.filter((c) => chaveAnoMes(c.dataFim) === filtroMes)
+        : listaFiltrada.filter((c) => c.statusVigencia === "Vencido" || c.statusVigencia === "A Vencer");
+      el("risco-hint").textContent = filtroMes
+        ? `Gestores e fiscais com contrato vencendo em ${filtroMes} sob responsabilidade, dentro d${p === "categoria" ? "esta categoria" : "este setor"} — clique num nome pra abrir o perfil completo.`
+        : `Gestores e fiscais com mais contrato vencido ou vencendo em até 90 dias sob responsabilidade, dentro d${p === "categoria" ? "esta categoria" : "este setor"} — clique num nome pra abrir o perfil completo.`;
       const gestoresRiscoCat = agruparContratosPorPessoa(contratosEmRiscoCat, "Gestor").slice(0, 5);
       const fiscaisRiscoCat = agruparContratosPorPessoa(contratosEmRiscoCat, "Fiscal").slice(0, 5);
+      const substantivoRiscoMes = filtroMes ? `em ${filtroMes}` : substantivoRisco;
       el("risco-gestores").innerHTML = gestoresRiscoCat.length
         ? barraContagemHorizontalSVG(gestoresRiscoCat, { tituloTooltip: (l) => `${l.label}: ${l.total} contrato(s) em risco`, limite: 20 })
-        : `<p class="dash-chart-hint">Nenhum gestor com contrato em risco ${substantivoRisco}.</p>`;
+        : `<p class="dash-chart-hint">Nenhum gestor com contrato em risco ${substantivoRiscoMes}.</p>`;
       el("risco-fiscais").innerHTML = fiscaisRiscoCat.length
         ? barraContagemHorizontalSVG(fiscaisRiscoCat, { tituloTooltip: (l) => `${l.label}: ${l.total} contrato(s) em risco`, limite: 20 })
-        : `<p class="dash-chart-hint">Nenhum fiscal com contrato em risco ${substantivoRisco}.</p>`;
+        : `<p class="dash-chart-hint">Nenhum fiscal com contrato em risco ${substantivoRiscoMes}.</p>`;
       adicionarControlesGrafico(el("risco-gestores"));
       adicionarControlesGrafico(el("risco-fiscais"));
       function irParaPessoaViaCategoria(containerId, papel, idSelect) {
