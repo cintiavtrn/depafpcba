@@ -7947,7 +7947,7 @@ function renderPorDimensaoContratos(lista, cfg) {
   // Pedido direto: "monta o mapa de pontos... e nessa aba coloque como
   // opção, ainda não elimine as barras" — os dois ficam, a pessoa escolhe;
   // por padrão continua nas barras (o que já existia).
-  let modoGraficoUnidade = lerGraficoSalvo(`cpg-${p}-unidade`) || "barras";
+  let modoGraficoUnidade = lerGraficoSalvo(`cpg-${p}-unidade`) || "mapa";
   // Pedido direto: "na área por categoria deveria de novo aparecer o mapa...
   // invés desse gráfico de rosca... pelo menos por hora" — só faz sentido em
   // Por Categoria (a landing de Por Área já é só DEPAF/DEPIN, escolher entre
@@ -8203,10 +8203,10 @@ function renderPorDimensaoContratos(lista, cfg) {
   // Só desenha o filtro quando a área/categoria selecionada tem alguma
   // unidade regional atrelada (hoje, só CONTRATOS/DEPIN) — nas outras, o
   // container fica vazio, sem selects inúteis sempre em "Todos".
-  function renderFiltroUnidade(listaFiltrada) {
+  function renderFiltroUnidade(listaCompleta, listaFiltrada) {
     const container = el("filtro-unidade");
-    if (!listaFiltrada.length) { container.innerHTML = ""; return; }
-    const todasUnidades = listaFiltrada.flatMap((c) => c.unidades || []);
+    if (!listaCompleta.length) { container.innerHTML = ""; return; }
+    const todasUnidades = listaCompleta.flatMap((c) => c.unidades || []);
     // Pedido direto: "você não consegue colocar o mapa pra corresponder a
     // Salvador sem ficar totalmente preso à DEPIN?... quando eu te peço é
     // pra pegar essa parte e acoplar também Salvador com lógica de mapa...
@@ -8235,16 +8235,13 @@ function renderPorDimensaoContratos(lista, cfg) {
     // Pedido direto: "quando vou na aba por dirpin e clico em oeste chapada
     // aparece um segundo slicer de todas e coorpin... dá a sensação de que
     // a pessoa pode escolher de novo quando não pode... se eu selecionei
-    // dirpin oeste tem que ser só as que fazem parte do oeste" — dentro de
-    // "Por DIRPIN", a DIRPIN já está fixada pela seleção de fora
-    // (`selecionada`); reoferecer um select de DIRPIN aqui (que deixaria
-    // pular pra uma OUTRA região sem passar por "← TROCAR DE DIRPIN") é
-    // exatamente a mesma confusão que ela já tinha apontado pro COORPIN
-    // dentro do setor demandante. `dirpinEfetivo` trava nisso: dentro de
-    // Por DIRPIN, é sempre a região já escolhida; nas outras abas
-    // (setor demandante/categoria), continua sendo o filtro interno de
-    // sempre.
-    const dirpinEfetivo = p === "dirpin" ? selecionada : filtroDirpin;
+    // dirpin oeste tem que ser só as que fazem parte do oeste" — `dirpinEfetivo`
+    // é sempre o filtro de DIRPIN ativo agora ("Por DIRPIN" não existe mais
+    // como aba própria, virou sub-filtro de Unidade Gestora=DEPIN — ver
+    // DIRPINS_DISPONIVEIS). Usado tanto pra estreitar as OPÇÕES do select
+    // de COORPIN quanto pra estreitar o próprio mapa/barra (linhasUnidade,
+    // mais abaixo) só às COORPINs daquela região, em vez da Bahia inteira.
+    const dirpinEfetivo = filtroDirpin;
     const coorpinsDisponiveis = [
       ...new Set(todasUnidades.filter((u) => !dirpinEfetivo || u.dirpin === dirpinEfetivo).map((u) => u.nomeUnidade)),
     ].sort((a, b) => (parseInt(a, 10) || 0) - (parseInt(b, 10) || 0));
@@ -8365,7 +8362,17 @@ function renderPorDimensaoContratos(lista, cfg) {
         }
       });
     }
-    el("filtro-coorpin")?.addEventListener("change", (ev) => { filtroCoorpin = ev.target.value; filtroApenasCompartilhados = false; atualizar(); });
+    el("filtro-coorpin")?.addEventListener("change", (ev) => {
+      filtroCoorpin = ev.target.value;
+      // Pedido direto: escolher uma COORPIN no select tem que reconhecer a
+      // DIRPIN dela também — clicar no mapa/legenda já fazia isso
+      // (dirpinParaFiltro, definido mais abaixo), mas o select ficava
+      // manco: sem isso o resto da tela (cartões, tabela, mapa) continuava
+      // mostrando tudo, "ambíguo", em vez de destacar/filtrar pela região.
+      if (filtroCoorpin) filtroDirpin = todasUnidades.find((u) => u.nomeUnidade === filtroCoorpin)?.dirpin || "";
+      filtroApenasCompartilhados = false;
+      atualizar();
+    });
 
     // Fora de "Por Área Gestora" a caixa do gráfico nem existe no DOM (ver
     // acima) — o resto desta função (BARRAS/MAPA/CRITICIDADE/SALVADOR,
@@ -8383,7 +8390,7 @@ function renderPorDimensaoContratos(lista, cfg) {
     // COORPINs desta região — sem o filtro, contrato compartilhado com
     // OUTRA DIRPIN fazia unidade de fora aparecer no gráfico de uma DIRPIN
     // que não é a dela.
-    const linhasUnidade = agruparPorUnidade(p === "dirpin" ? todasUnidades.filter((u) => u.dirpin === selecionada) : todasUnidades);
+    const linhasUnidade = agruparPorUnidade(dirpinEfetivo ? todasUnidades.filter((u) => u.dirpin === dirpinEfetivo) : todasUnidades);
     // Entra só quando tem pelo menos 1 contrato sem unidade E não tem
     // filtro de DIRPIN ativo (a "Outras Áreas" não pertence a DIRPIN
     // nenhuma — filtrar por uma DIRPIN real não deveria trazê-la junto).
@@ -9023,7 +9030,6 @@ function renderPorDimensaoContratos(lista, cfg) {
     el("landing").innerHTML = "";
     el("perfil").hidden = false;
     const listaArea = lista.filter((c) => pertenceAoValor(c, selecionada));
-    renderFiltroUnidade(listaArea);
     let listaFiltrada = listaArea;
     if (filtroDirpin) listaFiltrada = listaFiltrada.filter((c) => (c.unidades || []).some((u) => u.dirpin === filtroDirpin));
     // "Salvador (outras áreas)" não é uma unidade de verdade cadastrada em
@@ -9033,6 +9039,17 @@ function renderPorDimensaoContratos(lista, cfg) {
     if (filtroCoorpin === OUTRAS_AREAS_LABEL) listaFiltrada = listaFiltrada.filter((c) => !(c.unidades || []).length);
     else if (filtroCoorpin) listaFiltrada = listaFiltrada.filter((c) => (c.unidades || []).some((u) => u.nomeUnidade === filtroCoorpin));
     if (filtroApenasCompartilhados) listaFiltrada = listaFiltrada.filter((c) => new Set((c.unidades || []).map((u) => u.dirpin)).size > 1);
+    // Pedido direto: "os cartões ali em cima ficam sempre com 52 mesmo
+    // filtrando por dirpin ou coorpin específica, só embaixo mostrando o
+    // filtrado... se clico só setor demandante faz sentido mostrar assim
+    // [tudo], mas se eu filtro deveria mostrar de outra forma o mapa, a
+    // lista, os cartões" — passa as DUAS listas: a completa (`listaArea`,
+    // pras OPÇÕES dos selects continuarem completas) e a já filtrada por
+    // DIRPIN/COORPIN (pros cartões/mapa/tabela DENTRO de Distribuição
+    // Geográfica refletirem o filtro ativo, igual o resto da tela já
+    // fazia). Sem filtro nenhum, as duas são a mesma lista — comportamento
+    // de "mostrar tudo" continua intacto.
+    renderFiltroUnidade(listaArea, listaFiltrada);
     renderCabecalho(listaFiltrada);
     renderVisaoGeral(listaFiltrada);
     renderPrazos(listaFiltrada);
