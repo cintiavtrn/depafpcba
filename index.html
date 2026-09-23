@@ -70,6 +70,14 @@
   --cfcr-info:#2B5CA8;    --cfcr-info-glow:rgba(43,92,168,.18);
   --cfcr-neutro:#8A8F9C;        --cfcr-neutro-glow:rgba(138,143,156,.16);
   --cfcr-neutro-escuro:#5B6478; --cfcr-neutro-escuro-glow:rgba(91,100,120,.18);
+  /* Faixa de criticidade (Prazos e Criticidade) — cores que ela mesma
+     definiu na aba dim_criticidade da planilha (Vermelho/Laranja/Amarelo/
+     Verde/Roxo/Cinza, pedido direto, print da planilha). Vermelho/Verde/
+     Cinza reaproveitam --cfcr-bad/ok/neutro acima (mesma cor, mesmo
+     conceito); Laranja/Amarelo/Roxo são exclusivos desta faixa. */
+  --cfcr-laranja:#ED7D31; --cfcr-laranja-glow:rgba(237,125,49,.18);
+  --cfcr-amarelo:#FFC000; --cfcr-amarelo-glow:rgba(255,192,0,.2);
+  --cfcr-roxo:#7C5CBF;    --cfcr-roxo-glow:rgba(124,92,191,.18);
 
   --radius-sm:4px;
   --radius-md:8px;
@@ -10466,6 +10474,23 @@ const CFCR_STATUS_INFO = {
 };
 function corStatusCfcr(status) { return (CFCR_STATUS_INFO[status] || {}).cor || "var(--crit-neutro)"; }
 
+// Faixa de criticidade — pedido direto: "a mesma lógica de prioridade
+// usada em contratos... menor igual a 30 dias, 31 a 60, 61 a 90 dias
+// inclusive, na planilha coloquei Vermelho/Laranja/Amarelo/Verde/Roxo/
+// Cinza" (print da aba dim_criticidade da planilha). Cálculo ao vivo em
+// cfcr.service.js (diasParaVencer/faixaCriticidade), mesmos cortes que
+// contratos.service.js:criticidade (≤30/31–60/61–90/>90) — só os rótulos e
+// cores são dela, não a rampa --crit-* do resto do sistema.
+const CFCR_CRITICIDADE_INFO = {
+  "Até 30 dias": { cor: "var(--cfcr-bad)", ordem: 1 },
+  "31 a 60 dias": { cor: "var(--cfcr-laranja)", ordem: 2 },
+  "61 a 90 dias": { cor: "var(--cfcr-amarelo)", ordem: 3 },
+  "Acima de 90 dias": { cor: "var(--cfcr-ok)", ordem: 4 },
+  "Data inválida - verificar": { cor: "var(--cfcr-roxo)", ordem: 5 },
+  "Não aplicável": { cor: "var(--cfcr-neutro)", ordem: 6 },
+};
+function corCriticidadeCfcr(faixa) { return (CFCR_CRITICIDADE_INFO[faixa] || {}).cor || "var(--crit-neutro)"; }
+
 // Rosca própria do CFCR — mesma matemática de pieChartSVG (arco donut,
 // rótulo de % dentro da fatia quando cabe, número total no miolo), mas com
 // cor EXPLÍCITA por categoria (`c.cor`) em vez do índice cíclico de
@@ -10558,8 +10583,12 @@ async function carregarCfcrPortal(portalSlug) {
       <div id="cfcr-mapa-legenda"></div>
     </div>
     <div class="dash-chart-box" style="margin-top:14px">
-      <h4>Prioridade Máxima — Termos VIGENTE com Prazo Já Expirado</h4>
-      <p class="dash-chart-hint">Status ainda marcado como VIGENTE na planilha, mas a data de fim de vigência já passou — provável atraso de atualização, não erro deste painel.</p>
+      <h4>Prazos e Criticidade<small class="dash-chart-hint" style="display:block;margin-top:4px">Só termos VIGENTE com data de fim válida — quanto falta pra vencer, na mesma escala de urgência usada em CPG-Contratos (≤30 / 31–60 / 61–90 / acima de 90 dias). Clique numa barra pra isolar.</small></h4>
+      <div id="cfcr-criticidade"></div>
+    </div>
+    <div class="dash-chart-box" style="margin-top:14px">
+      <h4>Mais Urgentes — VIGENTE com Prazo Já Expirado</h4>
+      <p class="dash-chart-hint">Status ainda marcado como VIGENTE na planilha, mas a data de fim de vigência já passou — provável atraso de atualização, não erro deste painel. Dentro do recorte atual, do mais vencido pro menos.</p>
       <div class="tabela-rolavel" style="max-height:360px" id="cfcr-prioridade"></div>
     </div>
   `;
@@ -10572,7 +10601,7 @@ async function carregarCfcrPortal(portalSlug) {
   // uma), necessário pro mapa: ao desenhar os pontos, precisa ignorar
   // dirpin E nomeUnidade ao mesmo tempo (senão a COORPIN escolhida faria o
   // próprio mapa desenhar só ela mesma, sem as outras pra comparar/trocar).
-  const filtros = { status: "", departamento: "", tipo: "", servico: "", dirpin: "", nomeUnidade: "", convenio: "" };
+  const filtros = { status: "", departamento: "", tipo: "", servico: "", dirpin: "", nomeUnidade: "", convenio: "", criticidade: "" };
   function bateFiltroExceto(t, chavesIgnorar) {
     const ignorar = new Set(chavesIgnorar);
     return (ignorar.has("status") || !filtros.status || t.status === filtros.status)
@@ -10581,12 +10610,13 @@ async function carregarCfcrPortal(portalSlug) {
       && (ignorar.has("servico") || !filtros.servico || (t.servicos || []).some((s) => s.servicoNome === filtros.servico))
       && (ignorar.has("dirpin") || !filtros.dirpin || t.dirpin === filtros.dirpin)
       && (ignorar.has("nomeUnidade") || !filtros.nomeUnidade || t.nomeUnidade === filtros.nomeUnidade)
-      && (ignorar.has("convenio") || !filtros.convenio || (filtros.convenio === "sim" ? t.temConvenio : !t.temConvenio));
+      && (ignorar.has("convenio") || !filtros.convenio || (filtros.convenio === "sim" ? t.temConvenio : !t.temConvenio))
+      && (ignorar.has("criticidade") || !filtros.criticidade || t.faixaCriticidade === filtros.criticidade);
   }
   function bateFiltro(t, ignorar) { return bateFiltroExceto(t, ignorar ? [ignorar] : []); }
   function filtrar() { return termosTodos.filter((t) => bateFiltro(t, null)); }
 
-  const ROTULOS_FILTRO_CFCR = { status: "status", departamento: "departamento", tipo: "tipo", servico: "serviço", dirpin: "DIRPIN", nomeUnidade: "unidade", convenio: "convênio" };
+  const ROTULOS_FILTRO_CFCR = { status: "status", departamento: "departamento", tipo: "tipo", servico: "serviço", dirpin: "DIRPIN", nomeUnidade: "unidade", convenio: "convênio", criticidade: "prazo" };
   function valorFiltroExibicao(chave) {
     if (chave === "convenio") return filtros.convenio === "sim" ? "com convênio" : "sem convênio";
     return filtros[chave];
@@ -10730,12 +10760,33 @@ async function carregarCfcrPortal(portalSlug) {
       el.addEventListener("click", () => selecionarUnidadeCfcr(el.dataset.cat));
     });
 
-    // ---- Prioridade máxima: VIGENTE com fim de vigência já no passado ----
-    const agora = new Date();
+    // ---- Prazos e Criticidade: mesma lógica de faixa de contratos.service.js
+    // (≤30/31–60/61–90/>90), calculada ao vivo em cfcr.service.js — não a
+    // faixa que a planilha congelou na data de processamento dela. ----
+    const criticidadeRecorte = termosTodos.filter((t) => bateFiltro(t, "criticidade"));
+    const criticidadeLinhas = agruparValorObrasPorCampo(criticidadeRecorte, (t) => t.faixaCriticidade, () => 1, "Não aplicável")
+      .map((l) => ({ label: l.label, valor: l.total }))
+      .sort((a, b) => (CFCR_CRITICIDADE_INFO[a.label]?.ordem || 99) - (CFCR_CRITICIDADE_INFO[b.label]?.ordem || 99));
+    document.getElementById("cfcr-criticidade").innerHTML = criticidadeLinhas.length
+      ? barraHorizontalComEixoSVG(criticidadeLinhas, {
+          formatarValor: (v) => v.toLocaleString("pt-BR"),
+          formatarEixoTick: (v) => Math.round(v).toLocaleString("pt-BR"),
+          cor: (c) => corCriticidadeCfcr(c.label),
+          selecionado: filtros.criticidade,
+        })
+      : `<p class="dash-chart-hint">Nenhum termo neste recorte.</p>`;
+
+    // ---- Mais urgentes: VIGENTE com fim de vigência já no passado (dias
+    // negativo) — recalculado ao vivo (t.diasParaVencer já vem enriquecido
+    // do backend), não um valor congelado da planilha. Pedido direto: "não
+    // adicionar só prioridade máxima, mas a mesma lógica de prioridade
+    // usada em contratos" — o gráfico acima cobre a faixa inteira, esta
+    // lista continua existindo pra não deixar os casos mais graves
+    // perdidos dentro do bucket "Até 30 dias" (que também pega os
+    // negativos — mesma convenção da planilha original). ----
     const prioridade = filtrada
-      .filter((t) => t.status === "VIGENTE" && t.fimVigenciaData && new Date(t.fimVigenciaData) < agora)
-      .map((t) => ({ ...t, diasVencido: Math.floor((agora - new Date(t.fimVigenciaData)) / 86400000) }))
-      .sort((a, b) => b.diasVencido - a.diasVencido);
+      .filter((t) => t.diasParaVencer !== null && t.diasParaVencer < 0)
+      .sort((a, b) => a.diasParaVencer - b.diasParaVencer);
     document.getElementById("cfcr-prioridade").innerHTML = prioridade.length
       ? `<table class="dash-tabela">
           <thead><tr><th>MUNICÍPIO / PARCEIRO</th><th>DEPARTAMENTO</th><th>DIAS VENCIDO</th><th>PROCESSO SEI</th><th></th></tr></thead>
@@ -10743,7 +10794,7 @@ async function carregarCfcrPortal(portalSlug) {
             <tr title="Vigência terminou em ${new Date(t.fimVigenciaData).toLocaleDateString("pt-BR")}">
               <td>${escapeHTML(t.participe)}</td>
               <td>${escapeHTML(t.departamento)}</td>
-              <td>${t.diasVencido.toLocaleString("pt-BR")} dia(s)</td>
+              <td>${Math.abs(t.diasParaVencer).toLocaleString("pt-BR")} dia(s)</td>
               <td>${escapeHTML(t.processoSei || "—")}</td>
               <td><span class="badge">CRÍTICO</span></td>
             </tr>`).join("")}</tbody>
@@ -10786,6 +10837,12 @@ async function carregarCfcrPortal(portalSlug) {
   document.getElementById("cfcr-filtro-dirpin").addEventListener("change", (ev) => {
     filtros.dirpin = ev.target.value;
     filtros.nomeUnidade = "";
+    atualizar();
+  });
+  document.getElementById("cfcr-criticidade").addEventListener("click", (ev) => {
+    const alvo = ev.target.closest("[data-cat]");
+    if (!alvo) return;
+    filtros.criticidade = filtros.criticidade === alvo.dataset.cat ? "" : alvo.dataset.cat;
     atualizar();
   });
   document.getElementById("cfcr-prioridade").addEventListener("click", (ev) => {
