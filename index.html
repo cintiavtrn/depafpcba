@@ -10584,6 +10584,10 @@ async function carregarCfcrPortal(portalSlug) {
       </div>
     </div>
     <div class="dash-chart-box" style="margin-top:14px">
+      <h4>Recurso Financeiro<small class="dash-chart-hint" style="display:block;margin-top:4px">Como cada termo está classificado quanto a repasse/investimento (texto cru da planilha) — clique numa barra pra isolar. O objeto de cada termo Congênere aparece na coluna OBJETO do Detalhamento, mais abaixo — é texto livre, não dá pra agrupar em categorias.</small></h4>
+      <div id="cfcr-recurso"></div>
+    </div>
+    <div class="dash-chart-box" style="margin-top:14px">
       <h4>Distribuição Geográfica<small class="dash-chart-hint" style="display:block;margin-top:4px">Só termos Municipais com COORPIN cadastrada — clique num ponto, na legenda ou escolha a DIRPIN.</small></h4>
       <div class="dash-filtros" style="margin-bottom:12px">
         <div class="dash-filtro" style="flex:1;min-width:220px">
@@ -10618,7 +10622,8 @@ async function carregarCfcrPortal(portalSlug) {
   // uma), necessário pro mapa: ao desenhar os pontos, precisa ignorar
   // dirpin E nomeUnidade ao mesmo tempo (senão a COORPIN escolhida faria o
   // próprio mapa desenhar só ela mesma, sem as outras pra comparar/trocar).
-  const filtros = { status: "", departamento: "", tipo: "", servico: "", dirpin: "", nomeUnidade: "", convenio: "", criticidade: "" };
+  const RECURSO_VAZIO_CFCR = "(sem informação)";
+  const filtros = { status: "", departamento: "", tipo: "", servico: "", dirpin: "", nomeUnidade: "", convenio: "", criticidade: "", recurso: "" };
   function bateFiltroExceto(t, chavesIgnorar) {
     const ignorar = new Set(chavesIgnorar);
     return (ignorar.has("status") || !filtros.status || t.status === filtros.status)
@@ -10628,12 +10633,13 @@ async function carregarCfcrPortal(portalSlug) {
       && (ignorar.has("dirpin") || !filtros.dirpin || t.dirpin === filtros.dirpin)
       && (ignorar.has("nomeUnidade") || !filtros.nomeUnidade || t.nomeUnidade === filtros.nomeUnidade)
       && (ignorar.has("convenio") || !filtros.convenio || (filtros.convenio === "sim" ? t.temConvenio : !t.temConvenio))
-      && (ignorar.has("criticidade") || !filtros.criticidade || t.faixaCriticidade === filtros.criticidade);
+      && (ignorar.has("criticidade") || !filtros.criticidade || t.faixaCriticidade === filtros.criticidade)
+      && (ignorar.has("recurso") || !filtros.recurso || (t.recursoFinanceiro || RECURSO_VAZIO_CFCR) === filtros.recurso);
   }
   function bateFiltro(t, ignorar) { return bateFiltroExceto(t, ignorar ? [ignorar] : []); }
   function filtrar() { return termosTodos.filter((t) => bateFiltro(t, null)); }
 
-  const ROTULOS_FILTRO_CFCR = { status: "status", departamento: "departamento", tipo: "tipo", servico: "serviço", dirpin: "DIRPIN", nomeUnidade: "unidade", convenio: "convênio", criticidade: "prazo" };
+  const ROTULOS_FILTRO_CFCR = { status: "status", departamento: "departamento", tipo: "tipo", servico: "serviço", dirpin: "DIRPIN", nomeUnidade: "unidade", convenio: "convênio", criticidade: "prazo", recurso: "recurso financeiro" };
   function valorFiltroExibicao(chave) {
     if (chave === "convenio") return filtros.convenio === "sim" ? "com convênio" : "sem convênio";
     return filtros[chave];
@@ -10748,6 +10754,25 @@ async function carregarCfcrPortal(portalSlug) {
         })
       : `<p class="dash-chart-hint">Nenhum serviço registrado neste recorte.</p>`;
 
+    // ---- Recurso Financeiro — pedido direto: "também senti falta do
+    // recurso financeiro e do objeto... um visual pra isso que se ligue ao
+    // que já está posto". Texto cru da planilha ("sem repasse", "sem
+    // repasse, com investimento R$"...), sem tentar limpar/reclassificar —
+    // ela mesma não modelou isso como valor numérico. Mesmo mecanismo de
+    // clique-pra-isolar de todo o resto do painel. ----
+    const recursoRecorte = termosTodos.filter((t) => bateFiltro(t, "recurso"));
+    const recursoLinhas = agruparValorObrasPorCampo(recursoRecorte, (t) => t.recursoFinanceiro, () => 1, RECURSO_VAZIO_CFCR)
+      .map((l) => ({ label: l.label, valor: l.total }))
+      .sort((a, b) => b.valor - a.valor);
+    document.getElementById("cfcr-recurso").innerHTML = recursoLinhas.length
+      ? barraHorizontalComEixoSVG(recursoLinhas, {
+          formatarValor: (v) => v.toLocaleString("pt-BR"),
+          formatarEixoTick: (v) => Math.round(v).toLocaleString("pt-BR"),
+          cor: "var(--cfcr-info)",
+          selecionado: filtros.recurso,
+        })
+      : `<p class="dash-chart-hint">Nenhum termo neste recorte.</p>`;
+
     // ---- Distribuição Geográfica ----
     const geoRecorte = termosTodos.filter((t) => t.tipo === "Municipal" && t.nomeUnidade && bateFiltroExceto(t, ["dirpin", "nomeUnidade"]));
     const linhasUnidadeCfcr = agruparPorUnidade(geoRecorte);
@@ -10828,7 +10853,7 @@ async function carregarCfcrPortal(portalSlug) {
     document.getElementById("cfcr-detalhamento-contagem").textContent = `${filtrada.length.toLocaleString("pt-BR")} de ${termosTodos.length.toLocaleString("pt-BR")} termo(s)`;
     document.getElementById("cfcr-detalhamento").innerHTML = filtrada.length
       ? `<table class="dash-tabela">
-          <thead><tr><th>MUNICÍPIO / PARCEIRO</th><th>TIPO</th><th>DEPARTAMENTO</th><th>STATUS</th><th>PRAZO</th><th>PROCESSO SEI</th></tr></thead>
+          <thead><tr><th>MUNICÍPIO / PARCEIRO</th><th>TIPO</th><th>DEPARTAMENTO</th><th>STATUS</th><th>PRAZO</th><th>RECURSO FINANCEIRO</th><th>OBJETO</th><th>PROCESSO SEI</th></tr></thead>
           <tbody>${filtrada.map((t) => {
             const prazo = prazoCelulaCfcr(t);
             const tituloData = t.fimVigenciaData ? `Fim de vigência: ${new Date(t.fimVigenciaData).toLocaleDateString("pt-BR")}` : "Sem data de fim de vigência";
@@ -10838,6 +10863,8 @@ async function carregarCfcrPortal(portalSlug) {
               <td>${escapeHTML(t.departamento)}</td>
               <td><span style="color:${corStatusCfcr(t.status)};font-weight:700">${escapeHTML(t.status)}</span></td>
               <td style="color:${prazo.cor}">${escapeHTML(prazo.texto)}</td>
+              <td>${escapeHTML(t.recursoFinanceiro || "—")}</td>
+              <td style="max-width:220px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${escapeAttr(t.objeto || "")}">${escapeHTML(t.objeto || "—")}</td>
               <td>${escapeHTML(t.processoSei || "—")}</td>
             </tr>`;
           }).join("")}</tbody>
@@ -10875,6 +10902,12 @@ async function carregarCfcrPortal(portalSlug) {
     const alvo = ev.target.closest("[data-cat]");
     if (!alvo) return;
     filtros.servico = filtros.servico === alvo.dataset.cat ? "" : alvo.dataset.cat;
+    atualizar();
+  });
+  document.getElementById("cfcr-recurso").addEventListener("click", (ev) => {
+    const alvo = ev.target.closest("[data-cat]");
+    if (!alvo) return;
+    filtros.recurso = filtros.recurso === alvo.dataset.cat ? "" : alvo.dataset.cat;
     atualizar();
   });
   document.getElementById("cfcr-filtro-dirpin").addEventListener("change", (ev) => {
