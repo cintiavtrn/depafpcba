@@ -10695,7 +10695,7 @@ async function carregarCfcrPortal(portalSlug) {
           <p class="dash-chart-hint" id="cfcr-servicos-sem-dado"></p>
         </div>
         <div class="dash-chart-box">
-          <h4>Periodicidade<small class="dash-chart-hint" style="display:block;margin-top:4px">Com qual frequência os serviços do recorte atual são prestados — isole um serviço ao lado pra ver a periodicidade só dele. Clique numa barra pra isolar.</small></h4>
+          <h4>Periodicidade e Quantidade<small class="dash-chart-hint" style="display:block;margin-top:4px">Com qual frequência (ou quantidade, quando não há frequência informada) os serviços REALMENTE prestados no recorte atual acontecem — "Não disponibiliza" e "x" não entram aqui, já estão no gráfico de Serviços ao lado. Isole um serviço ao lado pra ver só o dele. Clique numa barra pra isolar.</small></h4>
           <div id="cfcr-periodicidade"></div>
         </div>
       </div>
@@ -10913,16 +10913,24 @@ async function carregarCfcrPortal(portalSlug) {
       ? `${semNenhumDadoServico.toLocaleString("pt-BR")} de ${servicoRecorte.length.toLocaleString("pt-BR")} município(s) do recorte não preencheram nenhum dado de serviço (nem "Não disponibiliza") — a cobertura acima é calculada só sobre quem respondeu.`
       : "";
 
-    // ---- Periodicidade — dado novo da planilha modelo v2 ("temporalidade"
-    // com que cada serviço é prestado). Mesmo recorte de Serviços acima —
-    // se filtros.servico já estiver ativo, servicoRecorte já vem restrito
-    // àquele serviço, então a periodicidade calculada aqui já responde "com
-    // qual frequência esse serviço é prestado" sem sincronismo extra. ----
+    // ---- Periodicidade e Quantidade — dado novo da planilha modelo v2
+    // ("temporalidade" com que cada serviço é prestado). Mesmo recorte de
+    // Serviços acima — se filtros.servico já estiver ativo, servicoRecorte
+    // já vem restrito àquele serviço, então a periodicidade calculada aqui
+    // já responde "com qual frequência esse serviço é prestado" sem
+    // sincronismo extra. Pedido direto dela: "esse x a gente não deve
+    // retornar nada... é um vazio como não existisse, ignorado" — igual
+    // "Não disponibiliza": pergunta "com que frequência" só faz sentido
+    // pra quem realmente presta o serviço, então usa o mesmo
+    // servicoOferecido() do gráfico de Serviços — não mostra as duas
+    // categorias como barra aqui (o painel já conta "não oferece" no
+    // gráfico de Serviços, não precisa repetir). ----
     const periodicidadeRecorte = termosTodos.filter((t) => t.tipo === TIPO_TCT_CFCR && bateFiltro(t, "periodicidade"));
     const contagemPeriodicidade = new Map();
     for (const t of periodicidadeRecorte) {
       for (const s of t.servicos || []) {
         if (filtros.servico && s.servicoNome !== filtros.servico) continue;
+        if (!servicoOferecido(s)) continue;
         const chave = s.periodicidade || "(sem classificação)";
         contagemPeriodicidade.set(chave, (contagemPeriodicidade.get(chave) || 0) + 1);
       }
