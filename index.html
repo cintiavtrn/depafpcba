@@ -10627,70 +10627,102 @@ async function carregarCfcrPortal(portalSlug) {
 
   const DIRPINS_CFCR = [...new Set(termosTodos.map((t) => t.dirpin).filter(Boolean))].sort();
 
+  // Pedido direto: "acho que o visual tá muito poluido... são informações
+  // necessárias mas mal organizadas" — 12 seções empilhadas numa página só
+  // obrigavam rolar bastante pra achar qualquer coisa. Mesmo padrão de
+  // sub-aba ANINHADA que Obras já usa (SUBABAS_OBRAS) — sem reset-on-leave
+  // do padrão de Contratos, porque aqui `filtros` é um objeto ÚNICO
+  // compartilhado por TODAS as seções: trocar de sub-aba não perde filtro
+  // nenhum, é só mostrar/esconder o que já foi renderizado. Cartões/chips
+  // ficam FORA das duas, como cabeçalho comum sempre visível.
+  const SUBABAS_CFCR = [
+    { chave: "visaogeral", rotulo: "VISÃO GERAL" },
+    { chave: "geoservicos", rotulo: "GEOGRAFIA E SERVIÇOS" },
+  ];
+
   painel.innerHTML = `
     <p class="tela-intro">Termos de Cooperação Técnica e parcerias a classificar (aba GDG) · DEPIN · DEPOM · DPMCV · GDG · ISPE — clique em qualquer cartão, fatia ou barra pra isolar o recorte em todas as seções ao mesmo tempo.</p>
     <div id="cfcr-chips"></div>
     <div class="kpi-row" id="cfcr-kpis" style="margin-bottom:16px"></div>
-    <div class="dash-charts" style="grid-template-columns:1fr 1fr">
-      <div class="dash-chart-box">
-        <h4>Distribuição por Status<small class="dash-chart-hint" style="display:block;margin-top:4px">Clique numa fatia ou na legenda pra isolar aquele status.</small></h4>
-        <div id="cfcr-status"></div>
-      </div>
-      <div class="dash-chart-box">
-        <h4>Termo Firmado por Departamento<small class="dash-chart-hint" style="display:block;margin-top:4px">Firmado vs. não firmado — clique numa coluna pra isolar o departamento responsável (a unidade da PCBA). O parceiro/município de cada termo está na tabela de Detalhamento, coluna MUNICÍPIO/PARCEIRO.</small></h4>
-        <div id="cfcr-departamento"></div>
-      </div>
+    <div class="tabs" id="cfcr-subtabs" style="margin-bottom:14px">
+      ${SUBABAS_CFCR.map((s, i) => `<button type="button" class="tab-btn${i === 0 ? " active" : ""}" data-subtab-cfcr="${s.chave}">${s.rotulo}</button>`).join("")}
     </div>
-    <div class="dash-charts" style="grid-template-columns:1fr 1fr;margin-top:14px">
-      <div class="dash-chart-box">
-        <h4>Motivo da Pendência<small class="dash-chart-hint" style="display:block;margin-top:4px">Só os termos NÃO firmados — clique numa barra (mesmo filtro de Status).</small></h4>
-        <div id="cfcr-motivo"></div>
-      </div>
-      <div class="dash-chart-box">
-        <h4>Repasse Financeiro<small class="dash-chart-hint" style="display:block;margin-top:4px">Sim/Não/Não informado — clique numa barra pra isolar. O texto original da planilha aparece no hover da coluna RECURSO FINANCEIRO do Detalhamento, mais abaixo.</small></h4>
-        <div id="cfcr-recurso"></div>
-      </div>
-    </div>
-    <div class="dash-charts" style="grid-template-columns:1fr 1fr;margin-top:14px">
-      <div class="dash-chart-box">
-        <h4>Serviços Prestados pelos Municípios<small class="dash-chart-hint" style="display:block;margin-top:4px">Quantos municípios (do recorte atual) marcam cada serviço — clique pra isolar.</small></h4>
-        <div id="cfcr-servicos"></div>
-      </div>
-      <div class="dash-chart-box">
-        <h4>Periodicidade<small class="dash-chart-hint" style="display:block;margin-top:4px">Com qual frequência os serviços do recorte atual são prestados — isole um serviço ao lado pra ver a periodicidade só dele. Clique numa barra pra isolar.</small></h4>
-        <div id="cfcr-periodicidade"></div>
-      </div>
-    </div>
-    <div class="dash-chart-box" style="margin-top:14px">
-      <h4>Termo Firmado por COORPIN<small class="dash-chart-hint" style="display:block;margin-top:4px">Mesmo recorte Firmado/Não firmado de cima, agora no detalhe de cada COORPIN do DEPIN — clique numa barra (mesmo clique de ponto/legenda no mapa abaixo).</small></h4>
-      <div id="cfcr-coorpin"></div>
-    </div>
-    <div class="dash-chart-box" style="margin-top:14px">
-      <h4>Distribuição Geográfica<small class="dash-chart-hint" style="display:block;margin-top:4px">Só termos de Cooperação Técnica com COORPIN cadastrada — clique num ponto, na legenda ou escolha a DIRPIN.</small></h4>
-      <div class="dash-filtros" style="margin-bottom:12px">
-        <div class="dash-filtro" style="flex:1;min-width:220px">
-          <label>DIRPIN</label>
-          <select id="cfcr-filtro-dirpin"><option value="">Todas</option>${DIRPINS_CFCR.map((d) => `<option value="${escapeAttr(d)}">${escapeHTML(d)}</option>`).join("")}</select>
+
+    <div id="cfcr-sub-visaogeral">
+      <div class="dash-charts" style="grid-template-columns:1fr 1fr">
+        <div class="dash-chart-box">
+          <h4>Distribuição por Status<small class="dash-chart-hint" style="display:block;margin-top:4px">Clique numa fatia ou na legenda pra isolar aquele status.</small></h4>
+          <div id="cfcr-status"></div>
+        </div>
+        <div class="dash-chart-box">
+          <h4>Termo Firmado por Departamento<small class="dash-chart-hint" style="display:block;margin-top:4px">Firmado vs. não firmado — clique numa coluna pra isolar o departamento responsável (a unidade da PCBA). O parceiro/município de cada termo está na tabela de Detalhamento, coluna MUNICÍPIO/PARCEIRO.</small></h4>
+          <div id="cfcr-departamento"></div>
         </div>
       </div>
-      <div id="cfcr-mapa"></div>
-      <div id="cfcr-mapa-legenda"></div>
+      <div class="dash-charts" style="grid-template-columns:1fr 1fr;margin-top:14px">
+        <div class="dash-chart-box">
+          <h4>Motivo da Pendência<small class="dash-chart-hint" style="display:block;margin-top:4px">Só os termos NÃO firmados — clique numa barra (mesmo filtro de Status).</small></h4>
+          <div id="cfcr-motivo"></div>
+        </div>
+        <div class="dash-chart-box">
+          <h4>Repasse Financeiro<small class="dash-chart-hint" style="display:block;margin-top:4px">Sim/Não/Não informado — clique numa barra pra isolar. O texto original da planilha aparece no hover da coluna RECURSO FINANCEIRO do Detalhamento, mais abaixo.</small></h4>
+          <div id="cfcr-recurso"></div>
+        </div>
+      </div>
+      <div class="dash-chart-box" style="margin-top:14px">
+        <h4>Prazos e Criticidade<small class="dash-chart-hint" style="display:block;margin-top:4px">Só termos VIGENTE com data de fim válida — quanto falta pra vencer, na mesma escala de urgência usada em CPG-Contratos (≤30 / 31–60 / 61–90 / acima de 90 dias). Clique numa barra pra isolar.</small></h4>
+        <div id="cfcr-criticidade"></div>
+        <p class="dash-chart-hint" id="cfcr-criticidade-penhasco"></p>
+        <p class="dash-chart-hint" id="cfcr-criticidade-sei"></p>
+      </div>
+      <div class="dash-chart-box" style="margin-top:14px">
+        <h4>Mais Urgentes — VIGENTE com Prazo Já Expirado</h4>
+        <p class="dash-chart-hint">Status ainda marcado como VIGENTE na planilha, mas a data de fim de vigência já passou — provável atraso de atualização, não erro deste painel. Dentro do recorte atual, do mais vencido pro menos.</p>
+        <div class="tabela-rolavel" style="max-height:360px" id="cfcr-prioridade"></div>
+      </div>
+      <div class="dash-chart-box" style="margin-top:14px">
+        <h4>Detalhamento dos Termos<small class="dash-chart-hint" style="display:block;margin-top:4px" id="cfcr-detalhamento-contagem"></small></h4>
+        <p class="dash-chart-hint">A lista completa do recorte atual — atualiza sozinha conforme você filtra em qualquer cartão, fatia, barra ou ponto acima (não só nos mais urgentes).</p>
+        <div class="tabela-rolavel" style="max-height:420px" id="cfcr-detalhamento"></div>
+      </div>
     </div>
-    <div class="dash-chart-box" style="margin-top:14px">
-      <h4>Prazos e Criticidade<small class="dash-chart-hint" style="display:block;margin-top:4px">Só termos VIGENTE com data de fim válida — quanto falta pra vencer, na mesma escala de urgência usada em CPG-Contratos (≤30 / 31–60 / 61–90 / acima de 90 dias). Clique numa barra pra isolar.</small></h4>
-      <div id="cfcr-criticidade"></div>
-    </div>
-    <div class="dash-chart-box" style="margin-top:14px">
-      <h4>Mais Urgentes — VIGENTE com Prazo Já Expirado</h4>
-      <p class="dash-chart-hint">Status ainda marcado como VIGENTE na planilha, mas a data de fim de vigência já passou — provável atraso de atualização, não erro deste painel. Dentro do recorte atual, do mais vencido pro menos.</p>
-      <div class="tabela-rolavel" style="max-height:360px" id="cfcr-prioridade"></div>
-    </div>
-    <div class="dash-chart-box" style="margin-top:14px">
-      <h4>Detalhamento dos Termos<small class="dash-chart-hint" style="display:block;margin-top:4px" id="cfcr-detalhamento-contagem"></small></h4>
-      <p class="dash-chart-hint">A lista completa do recorte atual — atualiza sozinha conforme você filtra em qualquer cartão, fatia, barra ou ponto acima (não só nos mais urgentes).</p>
-      <div class="tabela-rolavel" style="max-height:420px" id="cfcr-detalhamento"></div>
+
+    <div id="cfcr-sub-geoservicos" hidden>
+      <div class="dash-charts" style="grid-template-columns:1fr 1fr">
+        <div class="dash-chart-box">
+          <h4>Serviços Prestados pelos Municípios<small class="dash-chart-hint" style="display:block;margin-top:4px">Quantos municípios (do recorte atual) marcam cada serviço — clique pra isolar.</small></h4>
+          <div id="cfcr-servicos"></div>
+          <p class="dash-chart-hint" id="cfcr-servicos-sem-dado"></p>
+        </div>
+        <div class="dash-chart-box">
+          <h4>Periodicidade<small class="dash-chart-hint" style="display:block;margin-top:4px">Com qual frequência os serviços do recorte atual são prestados — isole um serviço ao lado pra ver a periodicidade só dele. Clique numa barra pra isolar.</small></h4>
+          <div id="cfcr-periodicidade"></div>
+        </div>
+      </div>
+      <div class="dash-chart-box" style="margin-top:14px">
+        <h4>Termo Firmado por COORPIN<small class="dash-chart-hint" style="display:block;margin-top:4px">Mesmo recorte Firmado/Não firmado da Visão Geral, agora no detalhe de cada COORPIN do DEPIN — clique numa barra (mesmo clique de ponto/legenda no mapa abaixo).</small></h4>
+        <div id="cfcr-coorpin"></div>
+      </div>
+      <div class="dash-chart-box" style="margin-top:14px">
+        <h4>Distribuição Geográfica<small class="dash-chart-hint" style="display:block;margin-top:4px">Só termos de Cooperação Técnica com COORPIN cadastrada — clique num ponto, na legenda ou escolha a DIRPIN.</small></h4>
+        <div class="dash-filtros" style="margin-bottom:12px">
+          <div class="dash-filtro" style="flex:1;min-width:220px">
+            <label>DIRPIN</label>
+            <select id="cfcr-filtro-dirpin"><option value="">Todas</option>${DIRPINS_CFCR.map((d) => `<option value="${escapeAttr(d)}">${escapeHTML(d)}</option>`).join("")}</select>
+          </div>
+        </div>
+        <div id="cfcr-mapa"></div>
+        <div id="cfcr-mapa-legenda"></div>
+      </div>
     </div>
   `;
+
+  document.getElementById("cfcr-subtabs").addEventListener("click", (ev) => {
+    const btn = ev.target.closest("[data-subtab-cfcr]");
+    if (!btn) return;
+    document.querySelectorAll("#cfcr-subtabs .tab-btn").forEach((b) => b.classList.toggle("active", b === btn));
+    SUBABAS_CFCR.forEach((s) => { document.getElementById(`cfcr-sub-${s.chave}`).hidden = s.chave !== btn.dataset.subtabCfcr; });
+  });
 
   // Cross-filter genérico por 10 chaves — mesmo espírito de
   // criarMotorDimensoesPorValor (CEIRF/Manutenção), mas escrito à mão aqui
@@ -10870,6 +10902,17 @@ async function carregarCfcrPortal(portalSlug) {
         })
       : `<p class="dash-chart-hint">Nenhum serviço efetivamente prestado neste recorte.</p>`;
 
+    // Achado direto dela, cruzado com a planilha original: um município
+    // pode não ter preenchido NENHUM dado de serviço (nem "Não
+    // disponibiliza") — diferente de quem preencheu e disse que não
+    // oferece. Isso já não entra nas contagens acima (servicos: []), mas
+    // ficava invisível — sem essa nota, "cobertura baixa" e "ninguém
+    // respondeu" pareciam a mesma coisa.
+    const semNenhumDadoServico = servicoRecorte.filter((t) => (t.servicos || []).length === 0).length;
+    document.getElementById("cfcr-servicos-sem-dado").textContent = semNenhumDadoServico
+      ? `${semNenhumDadoServico.toLocaleString("pt-BR")} de ${servicoRecorte.length.toLocaleString("pt-BR")} município(s) do recorte não preencheram nenhum dado de serviço (nem "Não disponibiliza") — a cobertura acima é calculada só sobre quem respondeu.`
+      : "";
+
     // ---- Periodicidade — dado novo da planilha modelo v2 ("temporalidade"
     // com que cada serviço é prestado). Mesmo recorte de Serviços acima —
     // se filtros.servico já estiver ativo, servicoRecorte já vem restrito
@@ -10967,6 +11010,26 @@ async function carregarCfcrPortal(portalSlug) {
           selecionado: filtros.criticidade,
         })
       : `<p class="dash-chart-hint">Nenhum termo neste recorte.</p>`;
+
+    // Achado direto dela, confirmado nos dados: a distribuição de
+    // vencimento não é uma rampa suave — é um "penhasco" (ou já venceu, ou
+    // tranquilo por 3+ meses). Sem esse texto, um dia em que os 3 baldes
+    // do meio (≤30/31–60/61–90) ficam vazios passa impressão de painel
+    // quebrado, não de portfólio saudável.
+    const proximoVencimento = criticidadeRecorte.filter((t) => t.status === "VIGENTE" && t.diasParaVencer !== null && t.diasParaVencer >= 0 && t.diasParaVencer <= 90).length;
+    document.getElementById("cfcr-criticidade-penhasco").textContent = proximoVencimento === 0 && criticidadeRecorte.length
+      ? "Nenhum termo vence nos próximos 90 dias — os vigentes restantes estão tranquilos por mais tempo (o que aparecer em \"Até 30 dias\" acima são só os já vencidos mas ainda marcados VIGENTE, cobertos em \"Mais Urgentes\" abaixo)."
+      : "";
+
+    // Achado direto dela, confirmado nos dados: entre os vencidos, uns têm
+    // processo SEI (só não foram renovados) e outros nunca tiveram
+    // processo nenhum aberto — sinal de severidade que hoje se perde numa
+    // cor só ("Vencido").
+    const vencidosRecorte = criticidadeRecorte.filter((t) => t.status === "VENCIDO");
+    const vencidosSemSei = vencidosRecorte.filter((t) => !t.processoSei || String(t.processoSei).trim().toUpperCase() === "SEM PROCESSO");
+    document.getElementById("cfcr-criticidade-sei").textContent = vencidosRecorte.length
+      ? `Entre os vencidos deste recorte, ${Math.round(vencidosSemSei.length / vencidosRecorte.length * 100)}% (${vencidosSemSei.length.toLocaleString("pt-BR")} de ${vencidosRecorte.length.toLocaleString("pt-BR")}) nunca tiveram processo SEI aberto — os demais têm processo, só não foram renovados.`
+      : "";
 
     // ---- Mais urgentes: VIGENTE com fim de vigência já no passado (dias
     // negativo) — recalculado ao vivo (t.diasParaVencer já vem enriquecido
