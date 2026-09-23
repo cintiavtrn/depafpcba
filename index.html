@@ -1384,6 +1384,62 @@ function barraHorizontalComEixoSVG(categorias, opcoes = {}) {
   return `<svg viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg">${grade}${barras}${eixoX}</svg>`;
 }
 
+// Barra horizontal EMPILHADA — mesmo layout de barraHorizontalComEixoSVG
+// (rótulo comprido à esquerda, escala numa faixa de 280px), mas cada linha
+// vira 2+ segmentos coloridos em vez de 1 bloco só. Existe porque
+// colunaEmpilhadaSVG (vertical) não aguenta muitas categorias com rótulo
+// longo — pensada pro "Termo Firmado por COORPIN" do CFCR (26 unidades,
+// rótulo tipo "15ª Serrinha"), onde colunaEmpilhadaSVG amassaria tudo numa
+// faixa de 460px.
+function barraHorizontalEmpilhadaSVG(grupos, segmentos, opcoes = {}) {
+  const { formatarValor = (v) => v.toLocaleString("pt-BR"), formatarEixoTick = (v) => Math.round(v).toLocaleString("pt-BR"), selecionado = "" } = opcoes;
+  const MAX_ROTULO = 22;
+  const padL = 150, padR = 14, padT = 4;
+  const larguraPlot = 280;
+  const rowH = 26;
+  const alturaEixoX = 24, alturaLegenda = 18;
+  const w = padL + larguraPlot + padR;
+  const baseY = padT + grupos.length * rowH;
+  const h = baseY + alturaEixoX + alturaLegenda;
+  const totais = grupos.map((g) => segmentos.reduce((a, s) => a + (g.valores[s.label] || 0), 0));
+  const maxV = maxSeguro(totais);
+
+  let grade = "", eixoX = "";
+  [0, 0.5, 1].forEach((f) => {
+    const x = padL + larguraPlot * f;
+    grade += `<line x1="${x.toFixed(1)}" y1="${padT}" x2="${x.toFixed(1)}" y2="${baseY.toFixed(1)}" stroke="var(--paper-line)" stroke-width="1" stroke-dasharray="${f === 0 ? "0" : "2 4"}" />`;
+    eixoX += `<text x="${x.toFixed(1)}" y="${(baseY + 14).toFixed(1)}" text-anchor="${f === 0 ? "start" : f === 1 ? "end" : "middle"}" font-family="monospace" font-size="8" fill="var(--carvao)" fill-opacity="0.55">${formatarEixoTick(maxV * f)}</text>`;
+  });
+
+  let barras = "";
+  grupos.forEach((g, i) => {
+    const y = padT + i * rowH;
+    const dim = selecionado && selecionado !== g.label;
+    const rotulo = textoSVG(g.label, padL - 8, y + rowH / 2, { maxChars: MAX_ROTULO, anchor: "end", fontSize: 9, alturaLinha: 11, peso: selecionado === g.label ? 700 : 400 });
+    let segmentosSVG = "", x = padL;
+    segmentos.forEach((s) => {
+      const v = g.valores[s.label] || 0;
+      if (!v) return;
+      const largura = maxV ? larguraPlot * (v / maxV) : 0;
+      segmentosSVG += `<rect x="${x.toFixed(1)}" y="${(y + 4).toFixed(1)}" width="${Math.max(largura, 1).toFixed(1)}" height="${(rowH - 8).toFixed(1)}" fill="${s.cor}"><title>${escapeHTML(g.label)} — ${escapeHTML(s.label)}: ${formatarValor(v)}</title></rect>`;
+      x += largura;
+    });
+    barras += `<g data-cat="${escapeAttr(g.label)}" style="cursor:pointer" opacity="${dim ? 0.4 : 1}">
+      <rect class="area-hit" x="0" y="${y.toFixed(1)}" width="${w}" height="${rowH}" fill="transparent" />
+      ${rotulo}
+      ${segmentosSVG}
+    </g>`;
+  });
+
+  const yLeg = baseY + alturaEixoX + 10;
+  const legenda = segmentos.map((s, k) => {
+    const lx = padL + k * 110;
+    return `<rect x="${lx.toFixed(1)}" y="${(yLeg - 7).toFixed(1)}" width="8" height="8" fill="${s.cor}" /><text x="${(lx + 12).toFixed(1)}" y="${yLeg.toFixed(1)}" font-family="monospace" font-size="8" fill="var(--carvao)">${escapeHTML(s.label)}</text>`;
+  }).join("");
+
+  return `<svg viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg">${grade}${barras}${eixoX}${legenda}</svg>`;
+}
+
 // Coluna empilhada genérica — eixo Y de valor com grade (igual
 // simpleBarChartSVG) e cada coluna dividida em segmentos coloridos por uma
 // SUBcategoria. Versão sem paleta fixa de colunaCriticidadeEmpilhadaSVG (que
@@ -10464,6 +10520,13 @@ async function carregarObrasPortal(portalSlug) {
 // constante única evita repetir a string longa e existe um só lugar pra
 // corrigir se o rótulo mudar de novo.
 const TIPO_TCT_CFCR = "Termo de Cooperação Técnica";
+// A aba de origem (GDG-DEPARTAMENTOS) chama isso de "Congênere", mas ela
+// revisou e não tem certeza que a classificação vale pros 30 — pediu
+// direto pra não afirmar isso ainda ("se vc não tiver como precisar ainda
+// não estabeleça essa separação congênere, coloque... outro nome só pra
+// ter uma separação mínima"). O próprio seed já grava "A Classificar" no
+// banco (não fica só um rótulo de exibição) — ver prisma/seed-cfcr.js.
+const TIPO_A_CLASSIFICAR_CFCR = "A Classificar";
 
 // Cores por status — paleta própria dela (--cfcr-*), não a rampa --crit-*
 // do resto do sistema (pedido direto: "as cores estão aí inclusive... usar
@@ -10565,7 +10628,7 @@ async function carregarCfcrPortal(portalSlug) {
   const DIRPINS_CFCR = [...new Set(termosTodos.map((t) => t.dirpin).filter(Boolean))].sort();
 
   painel.innerHTML = `
-    <p class="tela-intro">Termos de Cooperação Técnica e Congêneres · DEPIN · DEPOM · DPMCV · GDG · ISPE — clique em qualquer cartão, fatia ou barra pra isolar o recorte em todas as seções ao mesmo tempo.</p>
+    <p class="tela-intro">Termos de Cooperação Técnica e parcerias a classificar (aba GDG) · DEPIN · DEPOM · DPMCV · GDG · ISPE — clique em qualquer cartão, fatia ou barra pra isolar o recorte em todas as seções ao mesmo tempo.</p>
     <div id="cfcr-chips"></div>
     <div class="kpi-row" id="cfcr-kpis" style="margin-bottom:16px"></div>
     <div class="dash-charts" style="grid-template-columns:1fr 1fr">
@@ -10597,6 +10660,10 @@ async function carregarCfcrPortal(portalSlug) {
         <h4>Periodicidade<small class="dash-chart-hint" style="display:block;margin-top:4px">Com qual frequência os serviços do recorte atual são prestados — isole um serviço ao lado pra ver a periodicidade só dele. Clique numa barra pra isolar.</small></h4>
         <div id="cfcr-periodicidade"></div>
       </div>
+    </div>
+    <div class="dash-chart-box" style="margin-top:14px">
+      <h4>Termo Firmado por COORPIN<small class="dash-chart-hint" style="display:block;margin-top:4px">Mesmo recorte Firmado/Não firmado de cima, agora no detalhe de cada COORPIN do DEPIN — clique numa barra (mesmo clique de ponto/legenda no mapa abaixo).</small></h4>
+      <div id="cfcr-coorpin"></div>
     </div>
     <div class="dash-chart-box" style="margin-top:14px">
       <h4>Distribuição Geográfica<small class="dash-chart-hint" style="display:block;margin-top:4px">Só termos de Cooperação Técnica com COORPIN cadastrada — clique num ponto, na legenda ou escolha a DIRPIN.</small></h4>
@@ -10684,14 +10751,14 @@ async function carregarCfcrPortal(portalSlug) {
     const firmados = filtrada.filter((t) => t.termoFirmado).length;
     const naoFirmados = total - firmados;
     const tct = filtrada.filter((t) => t.tipo === TIPO_TCT_CFCR).length;
-    const congenere = total - tct;
+    const aClassificar = total - tct;
     const pct = (n) => total ? (n / total * 100).toLocaleString("pt-BR", { maximumFractionDigits: 0 }) : "0";
     document.getElementById("cfcr-kpis").innerHTML = `
       <div class="kpi-card"><div class="kpi-cabeca">${kpiIcone("predio")}<div class="kpi-label">Total de Termos</div></div><div class="kpi-value">${total.toLocaleString("pt-BR")}</div></div>
       <div class="kpi-card kpi-clicavel" data-kpi-firmado="sim" title="Clique pra isolar" style="--kpi-cor:var(--cfcr-ok);cursor:pointer;${filtros.firmado === "sim" ? "outline:2px solid var(--cfcr-ok);outline-offset:-2px" : ""}"><div class="kpi-cabeca">${kpiIcone("selo")}<div class="kpi-label">Termo Firmado</div></div><div class="kpi-value">${firmados.toLocaleString("pt-BR")} <span style="font-size:.9rem;color:#8B93A3">(${pct(firmados)}%)</span></div></div>
       <div class="kpi-card kpi-clicavel" data-kpi-firmado="nao" title="Clique pra isolar" style="--kpi-cor:var(--cfcr-bad);cursor:pointer;${filtros.firmado === "nao" ? "outline:2px solid var(--cfcr-bad);outline-offset:-2px" : ""}"><div class="kpi-cabeca">${kpiIcone("alerta")}<div class="kpi-label">Não Firmado</div></div><div class="kpi-value">${naoFirmados.toLocaleString("pt-BR")} <span style="font-size:.9rem;color:#8B93A3">(${pct(naoFirmados)}%)</span></div></div>
       <div class="kpi-card kpi-clicavel" data-kpi-tipo="${escapeAttr(TIPO_TCT_CFCR)}" title="Clique pra isolar" style="cursor:pointer;${filtros.tipo === TIPO_TCT_CFCR ? "outline:2px solid var(--carvao);outline-offset:-2px" : ""}"><div class="kpi-cabeca">${kpiIcone("obras")}<div class="kpi-label">Cooperação Técnica</div></div><div class="kpi-value">${tct.toLocaleString("pt-BR")}</div></div>
-      <div class="kpi-card kpi-clicavel" data-kpi-tipo="Congênere" title="Clique pra isolar" style="cursor:pointer;${filtros.tipo === "Congênere" ? "outline:2px solid var(--carvao);outline-offset:-2px" : ""}"><div class="kpi-cabeca">${kpiIcone("pessoa")}<div class="kpi-label">Congêneres</div></div><div class="kpi-value">${congenere.toLocaleString("pt-BR")}</div></div>
+      <div class="kpi-card kpi-clicavel" data-kpi-tipo="${escapeAttr(TIPO_A_CLASSIFICAR_CFCR)}" title="Clique pra isolar — ainda não é possível afirmar que todos são Congênere, ver Detalhamento" style="cursor:pointer;${filtros.tipo === TIPO_A_CLASSIFICAR_CFCR ? "outline:2px solid var(--carvao);outline-offset:-2px" : ""}"><div class="kpi-cabeca">${kpiIcone("pessoa")}<div class="kpi-label">A Classificar</div></div><div class="kpi-value">${aClassificar.toLocaleString("pt-BR")}</div></div>
     `;
 
     // ---- Distribuição por status (rosca) ----
@@ -10837,6 +10904,33 @@ async function carregarCfcrPortal(portalSlug) {
       el.addEventListener("click", () => selecionarUnidadeCfcr(el.dataset.cat));
     });
     document.getElementById("cfcr-mapa-legenda").querySelectorAll("[data-cat]").forEach((el) => {
+      el.addEventListener("click", () => selecionarUnidadeCfcr(el.dataset.cat));
+    });
+
+    // ---- Termo Firmado por COORPIN — pedido direto: repartir "departamento"
+    // do DEPIN por COORPIN (15ª, 16ª...) SEM trocar o campo departamento em
+    // si (ela confirmou: seção nova, ao lado do que já existe). Mesmo
+    // recorte geográfico (geoRecorte/linhasUnidadeCfcr) do mapa acima, só
+    // que quebrado em Firmado/Não firmado por unidade — clique reaproveita
+    // o mesmo selecionarUnidadeCfcr do mapa (mesma DIRPIN auto-derivada). ----
+    const gruposCoorpin = linhasUnidadeCfcr.map((u) => {
+      const doUnidade = geoRecorte.filter((t) => t.nomeUnidade === u.label);
+      return {
+        label: u.label,
+        valores: {
+          "Firmado": doUnidade.filter((t) => t.termoFirmado).length,
+          "Não firmado": doUnidade.filter((t) => !t.termoFirmado).length,
+        },
+      };
+    });
+    document.getElementById("cfcr-coorpin").innerHTML = gruposCoorpin.length
+      ? barraHorizontalEmpilhadaSVG(gruposCoorpin, SEGMENTOS_FIRMADO_CFCR, {
+          formatarValor: (v) => v.toLocaleString("pt-BR"),
+          formatarEixoTick: (v) => Math.round(v).toLocaleString("pt-BR"),
+          selecionado: filtros.nomeUnidade,
+        })
+      : `<p class="dash-chart-hint">Nenhum termo de Cooperação Técnica com COORPIN cadastrada neste recorte.</p>`;
+    document.getElementById("cfcr-coorpin").querySelectorAll("[data-cat]").forEach((el) => {
       el.addEventListener("click", () => selecionarUnidadeCfcr(el.dataset.cat));
     });
 
