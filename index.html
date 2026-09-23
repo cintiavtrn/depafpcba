@@ -10491,6 +10491,18 @@ const CFCR_CRITICIDADE_INFO = {
 };
 function corCriticidadeCfcr(faixa) { return (CFCR_CRITICIDADE_INFO[faixa] || {}).cor || "var(--crit-neutro)"; }
 
+// Célula "PRAZO" da tabela de detalhamento — resume status+prazo num texto
+// só, colorido: fora de VIGENTE mostra o próprio status (é a informação
+// que importa ali); dentro de VIGENTE, mostra os dias (negativo = "vencido
+// há", mesma convenção do resto do painel).
+function prazoCelulaCfcr(t) {
+  if (t.verificarDadoOriginal) return { texto: "Data inválida", cor: "var(--cfcr-roxo)" };
+  if (t.status !== "VIGENTE") return { texto: t.status, cor: corStatusCfcr(t.status) };
+  if (t.diasParaVencer === null) return { texto: "—", cor: "var(--cfcr-neutro)" };
+  if (t.diasParaVencer < 0) return { texto: `Vencido há ${Math.abs(t.diasParaVencer)} dia(s)`, cor: "var(--cfcr-bad)" };
+  return { texto: `${t.diasParaVencer} dia(s)`, cor: corCriticidadeCfcr(t.faixaCriticidade) };
+}
+
 // Rosca própria do CFCR — mesma matemática de pieChartSVG (arco donut,
 // rótulo de % dentro da fatia quando cabe, número total no miolo), mas com
 // cor EXPLÍCITA por categoria (`c.cor`) em vez do índice cíclico de
@@ -10590,6 +10602,11 @@ async function carregarCfcrPortal(portalSlug) {
       <h4>Mais Urgentes — VIGENTE com Prazo Já Expirado</h4>
       <p class="dash-chart-hint">Status ainda marcado como VIGENTE na planilha, mas a data de fim de vigência já passou — provável atraso de atualização, não erro deste painel. Dentro do recorte atual, do mais vencido pro menos.</p>
       <div class="tabela-rolavel" style="max-height:360px" id="cfcr-prioridade"></div>
+    </div>
+    <div class="dash-chart-box" style="margin-top:14px">
+      <h4>Detalhamento dos Termos<small class="dash-chart-hint" style="display:block;margin-top:4px" id="cfcr-detalhamento-contagem"></small></h4>
+      <p class="dash-chart-hint">A lista completa do recorte atual — atualiza sozinha conforme você filtra em qualquer cartão, fatia, barra ou ponto acima (não só nos mais urgentes).</p>
+      <div class="tabela-rolavel" style="max-height:420px" id="cfcr-detalhamento"></div>
     </div>
   `;
 
@@ -10800,6 +10817,32 @@ async function carregarCfcrPortal(portalSlug) {
             </tr>`).join("")}</tbody>
         </table>`
       : `<p class="dash-chart-hint">Nenhum termo VIGENTE com prazo já expirado neste recorte.</p>`;
+
+    // ---- Detalhamento: a lista COMPLETA do recorte atual, não só os
+    // urgentes. Pedido direto: "se eu clico em alimentação, consigo ver a
+    // distribuição por departamento, mas não consigo ver qual município,
+    // quais contratos... isso não é só a criticidade, é geral" — todo
+    // filtro (serviço, criticidade "Acima de 90 dias", departamento
+    // qualquer...) precisa revelar a lista por trás do número, não só o
+    // recorte "Mais Urgentes" acima. ----
+    document.getElementById("cfcr-detalhamento-contagem").textContent = `${filtrada.length.toLocaleString("pt-BR")} de ${termosTodos.length.toLocaleString("pt-BR")} termo(s)`;
+    document.getElementById("cfcr-detalhamento").innerHTML = filtrada.length
+      ? `<table class="dash-tabela">
+          <thead><tr><th>MUNICÍPIO / PARCEIRO</th><th>TIPO</th><th>DEPARTAMENTO</th><th>STATUS</th><th>PRAZO</th><th>PROCESSO SEI</th></tr></thead>
+          <tbody>${filtrada.map((t) => {
+            const prazo = prazoCelulaCfcr(t);
+            const tituloData = t.fimVigenciaData ? `Fim de vigência: ${new Date(t.fimVigenciaData).toLocaleDateString("pt-BR")}` : "Sem data de fim de vigência";
+            return `<tr title="${escapeAttr(tituloData)}">
+              <td>${escapeHTML(t.participe)}</td>
+              <td>${escapeHTML(t.tipo)}</td>
+              <td>${escapeHTML(t.departamento)}</td>
+              <td><span style="color:${corStatusCfcr(t.status)};font-weight:700">${escapeHTML(t.status)}</span></td>
+              <td style="color:${prazo.cor}">${escapeHTML(prazo.texto)}</td>
+              <td>${escapeHTML(t.processoSei || "—")}</td>
+            </tr>`;
+          }).join("")}</tbody>
+        </table>`
+      : `<p class="dash-chart-hint">Nenhum termo neste recorte.</p>`;
   }
 
   // Clique delegado UMA vez, nos containers estáveis (não recriados a cada
