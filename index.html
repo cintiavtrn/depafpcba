@@ -57,6 +57,20 @@
   --crit-neutro:#A6A6A6;   --crit-neutro-glow:rgba(166,166,166,.16);
   --crit-semdata:#BFBFBF;  --crit-semdata-glow:rgba(191,191,191,.16);
 
+  /* CFCR - Termos de Cooperação: paleta própria, por pedido direto ("as
+     cores estão aí inclusive... usar as cores do mockup como estão") — não
+     mapeada pra --crit-*, mesma lógica de exceção documentada que --crit-*
+     já é (cores que o mockup dela já definiu, não a paleta padrão do
+     sistema). ok=convênio vigente, bad=vencido/crítico, warn=em construção/
+     tratativa, info=neutro informativo (ex. "acima de X"), neutro(-escuro)
+     = sem informação/nunca firmado. */
+  --cfcr-ok:#1E7D45;      --cfcr-ok-glow:rgba(30,125,69,.18);
+  --cfcr-bad:#B23A2F;     --cfcr-bad-glow:rgba(178,58,47,.18);
+  --cfcr-warn:#C98A12;    --cfcr-warn-glow:rgba(201,138,18,.2);
+  --cfcr-info:#2B5CA8;    --cfcr-info-glow:rgba(43,92,168,.18);
+  --cfcr-neutro:#8A8F9C;        --cfcr-neutro-glow:rgba(138,143,156,.16);
+  --cfcr-neutro-escuro:#5B6478; --cfcr-neutro-escuro-glow:rgba(91,100,120,.18);
+
   --radius-sm:4px;
   --radius-md:8px;
   --ease-spring:cubic-bezier(.34,1.56,.64,1);
@@ -1321,7 +1335,11 @@ function barraHorizontalComEixoSVG(categorias, opcoes = {}) {
   // Pedido direto: "mostra o valor entregue em dinheiro mas não cruza com
   // quantidade... a pessoa pode se perguntar quantas unidades foram... ser
   // parte daquele mecanismo quando a gente passa o mouse".
+  // cor: string (cor única pra todas as barras, como sempre foi) OU função
+  // (c) => cor (uma cor por categoria — CFCR precisa disso pro "Motivo da
+  // Pendência", onde cada barra usa a MESMA cor do status equivalente).
   const { formatarValor = (v) => "R$ " + formatarMoedaCompacta(v), formatarEixoTick = (v) => "R$ " + formatarEixo(v), cor = "var(--tinta)", selecionado = "", rotularDiagonal = false, rotuloExtra = null } = opcoes;
+  const corDe = typeof cor === "function" ? cor : () => cor;
   const MAX_ROTULO = 22;
   const padL = 150, padR = 14, padT = 4, alturaEixoX = rotularDiagonal ? 34 : 24;
   const larguraPlot = 280;
@@ -1352,7 +1370,7 @@ function barraHorizontalComEixoSVG(categorias, opcoes = {}) {
     barras += `<g data-cat="${escapeAttr(c.label)}" style="cursor:pointer" opacity="${dim ? 0.4 : 1}">
       <rect class="area-hit" x="0" y="${y.toFixed(1)}" width="${w}" height="${rowH}" fill="transparent" />
       ${rotulo}
-      <rect x="${padL}" y="${(y + 4).toFixed(1)}" width="${Math.max(largura, 1.5).toFixed(1)}" height="${(rowH - 8).toFixed(1)}" fill="${cor}"><title>${escapeHTML(c.label)}: ${formatarValor(c.valor)}${rotuloExtra ? ` ${escapeHTML(rotuloExtra(c))}` : ""}</title></rect>
+      <rect x="${padL}" y="${(y + 4).toFixed(1)}" width="${Math.max(largura, 1.5).toFixed(1)}" height="${(rowH - 8).toFixed(1)}" fill="${corDe(c)}"><title>${escapeHTML(c.label)}: ${formatarValor(c.valor)}${rotuloExtra ? ` ${escapeHTML(rotuloExtra(c))}` : ""}</title></rect>
     </g>`;
   });
   return `<svg viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg">${grade}${barras}${eixoX}</svg>`;
@@ -1739,7 +1757,10 @@ function corCategoria(i) { return TONS[i % TONS.length]; }
 // na tela do portal, com sua própria aba, sem mexer no hub/rosa dos ventos.
 // Se um dia surgir mais de um subportal por portal, é só empilhar aqui.
 const SUBPORTAIS = {
-  orcamento: [{ tab: "contratos", rotulo: "CPG - CONTRATOS" }],
+  orcamento: [
+    { tab: "contratos", rotulo: "CPG - CONTRATOS" },
+    { tab: "cfcr", rotulo: "CFCR - TERMOS DE COOPERAÇÃO" },
+  ],
   infraestrutura: [{ tab: "obras", rotulo: "PAINEL DE OBRAS" }],
 };
 
@@ -10430,6 +10451,351 @@ async function carregarObrasPortal(portalSlug) {
   atualizarManutencao();
 }
 
+// ---------- CFCR: Termos de Cooperação (Municipais e Congêneres) ----------
+// Cores por status — paleta própria dela (--cfcr-*), não a rampa --crit-*
+// do resto do sistema (pedido direto: "as cores estão aí inclusive... usar
+// as cores do mockup como estão"). ordem: define a ordem de leitura do
+// donut e da legenda (mesma ordem que dim_status trazia na planilha).
+const CFCR_STATUS_INFO = {
+  "VIGENTE": { cor: "var(--cfcr-ok)", ordem: 1 },
+  "VENCIDO": { cor: "var(--cfcr-bad)", ordem: 2 },
+  "NUNCA FIRMADO": { cor: "var(--cfcr-neutro-escuro)", ordem: 3 },
+  "EM CONSTRUÇÃO": { cor: "var(--cfcr-warn)", ordem: 4 },
+  "INDETERMINADO": { cor: "var(--cfcr-info)", ordem: 5 },
+  "SEM INFORMAÇÃO": { cor: "var(--cfcr-neutro)", ordem: 6 },
+};
+function corStatusCfcr(status) { return (CFCR_STATUS_INFO[status] || {}).cor || "var(--crit-neutro)"; }
+
+// Rosca própria do CFCR — mesma matemática de pieChartSVG (arco donut,
+// rótulo de % dentro da fatia quando cabe, número total no miolo), mas com
+// cor EXPLÍCITA por categoria (`c.cor`) em vez do índice cíclico de
+// corCategoria — aqui a cor É a informação (mesmo vermelho de "Vencido" em
+// qualquer outro lugar do painel), não pode mudar se a ordem mudar.
+function donutCfcrSVG(categorias, selecionado, opcoes = {}) {
+  const { formatarValor = (v) => v.toLocaleString("pt-BR"), rotuloCentro = "TERMOS" } = opcoes;
+  const cx = 100, cy = 100, rOut = 88, rIn = 48, total = categorias.reduce((a, c) => a + c.valor, 0) || 1;
+  const toXY = (a, r) => { const rad = a * Math.PI / 180; return [cx + r * Math.cos(rad), cy + r * Math.sin(rad)]; };
+  let ang = -90, fatias = "", rotulosFatia = "";
+  categorias.forEach((c) => {
+    const a0 = ang, frac = c.valor / total, a1 = ang + frac * 360; ang = a1;
+    const dim = selecionado && selecionado !== c.label;
+    let d;
+    if (frac >= 0.999) {
+      const aMeio = a0 + 180;
+      const [xoA, yoA] = toXY(a0, rOut), [xoB, yoB] = toXY(aMeio, rOut);
+      const [xiA, yiA] = toXY(a0, rIn), [xiB, yiB] = toXY(aMeio, rIn);
+      d = `M ${xoA.toFixed(1)} ${yoA.toFixed(1)} A ${rOut} ${rOut} 0 1 1 ${xoB.toFixed(1)} ${yoB.toFixed(1)} A ${rOut} ${rOut} 0 1 1 ${xoA.toFixed(1)} ${yoA.toFixed(1)} L ${xiA.toFixed(1)} ${yiA.toFixed(1)} A ${rIn} ${rIn} 0 1 0 ${xiB.toFixed(1)} ${yiB.toFixed(1)} A ${rIn} ${rIn} 0 1 0 ${xiA.toFixed(1)} ${yiA.toFixed(1)} Z`;
+    } else {
+      const [x0o, y0o] = toXY(a0, rOut), [x1o, y1o] = toXY(a1, rOut);
+      const [x1i, y1i] = toXY(a1, rIn), [x0i, y0i] = toXY(a0, rIn);
+      const large = (a1 - a0) > 180 ? 1 : 0;
+      d = `M ${x0o.toFixed(1)} ${y0o.toFixed(1)} A ${rOut} ${rOut} 0 ${large} 1 ${x1o.toFixed(1)} ${y1o.toFixed(1)} L ${x1i.toFixed(1)} ${y1i.toFixed(1)} A ${rIn} ${rIn} 0 ${large} 0 ${x0i.toFixed(1)} ${y0i.toFixed(1)} Z`;
+    }
+    const tituloFatia = `${c.label}: ${formatarValor(c.valor)} (${(frac * 100).toFixed(1)}%)`;
+    fatias += `<path class="donut-fatia" data-cat="${escapeAttr(c.label)}" d="${d}" fill="${c.cor}" opacity="${dim ? 0.28 : 1}" style="cursor:pointer"><title>${escapeHTML(tituloFatia)}</title></path>`;
+    if (frac >= 0.06 && !dim) {
+      const angMeio = (a0 + a1) / 2;
+      const [xr, yr] = toXY(angMeio, (rIn + rOut) / 2);
+      rotulosFatia += `<text x="${xr.toFixed(1)}" y="${yr.toFixed(1)}" text-anchor="middle" dominant-baseline="middle" font-family="monospace" font-size="11" font-weight="700" fill="var(--paper)" style="pointer-events:none">${(frac * 100).toFixed(0)}%</text>`;
+    }
+  });
+  const legenda = categorias.map((c) => {
+    const pct = ((c.valor / total) * 100).toFixed(1);
+    return `<button class="donut-leg" data-cat="${escapeAttr(c.label)}" style="cursor:pointer"><span class="sw" style="background:${c.cor}"></span><span class="lg-nome">${escapeHTML(c.label)}</span><span class="lg-valor" style="font-variant-numeric:tabular-nums;color:var(--carvao);opacity:.8">${escapeHTML(formatarValor(c.valor))}</span><span class="lg-pct">${pct}%</span></button>`;
+  }).join("");
+  const totalTexto = total.toLocaleString("pt-BR");
+  const totalFontSize = totalTexto.length <= 5 ? 22 : totalTexto.length <= 7 ? 17 : 13;
+  return `<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">${fatias}${rotulosFatia}<text x="${cx}" y="${(cy - 3).toFixed(1)}" text-anchor="middle" font-family="'Space Grotesk',sans-serif" font-size="${totalFontSize}" font-weight="700" fill="var(--carvao)">${escapeHTML(totalTexto)}</text><text x="${cx}" y="${(cy + 13).toFixed(1)}" text-anchor="middle" font-family="monospace" font-size="7.5" letter-spacing="1.5" fill="var(--carvao)" fill-opacity="0.6">${escapeHTML(rotuloCentro)}</text></svg><div class="donut-legenda">${legenda}</div>`;
+}
+
+async function carregarCfcrPortal(portalSlug) {
+  const painel = document.getElementById("tab-cfcr");
+  painel.innerHTML = `<p class="tela-intro">Carregando os termos de cooperação...</p>`;
+
+  let termosTodos;
+  try {
+    termosTodos = await apiFetch(`/api/portais/${portalSlug}/cfcr`);
+  } catch (erro) {
+    painel.innerHTML = `<p class="tela-intro">Não consegui carregar os termos de cooperação: ${escapeHTML(erro.message)}</p>`;
+    return;
+  }
+
+  const DIRPINS_CFCR = [...new Set(termosTodos.map((t) => t.dirpin).filter(Boolean))].sort();
+
+  painel.innerHTML = `
+    <p class="tela-intro">Municipais e Congêneres · DEPIN · DEPOM · DPMCV · GDG · ISPE — clique em qualquer cartão, fatia ou barra pra isolar o recorte em todas as seções ao mesmo tempo.</p>
+    <div id="cfcr-chips"></div>
+    <div class="kpi-row" id="cfcr-kpis" style="margin-bottom:16px"></div>
+    <div class="dash-charts" style="grid-template-columns:1fr 1fr">
+      <div class="dash-chart-box">
+        <h4>Distribuição por Status<small class="dash-chart-hint" style="display:block;margin-top:4px">Clique numa fatia ou na legenda pra isolar aquele status.</small></h4>
+        <div id="cfcr-status"></div>
+      </div>
+      <div class="dash-chart-box">
+        <h4>Convênio por Departamento<small class="dash-chart-hint" style="display:block;margin-top:4px">Com vs. sem convênio vigente — clique numa coluna pra isolar o departamento.</small></h4>
+        <div id="cfcr-departamento"></div>
+      </div>
+    </div>
+    <div class="dash-charts" style="grid-template-columns:1fr 1fr;margin-top:14px">
+      <div class="dash-chart-box">
+        <h4>Motivo da Pendência<small class="dash-chart-hint" style="display:block;margin-top:4px">Só os termos SEM convênio vigente — clique numa barra (mesmo filtro de Status).</small></h4>
+        <div id="cfcr-motivo"></div>
+      </div>
+      <div class="dash-chart-box">
+        <h4>Serviços Prestados pelos Municípios<small class="dash-chart-hint" style="display:block;margin-top:4px">Quantos municípios (do recorte atual) marcam cada serviço — clique pra isolar.</small></h4>
+        <div id="cfcr-servicos"></div>
+      </div>
+    </div>
+    <div class="dash-chart-box" style="margin-top:14px">
+      <h4>Distribuição Geográfica<small class="dash-chart-hint" style="display:block;margin-top:4px">Só termos Municipais com COORPIN cadastrada — clique num ponto, na legenda ou escolha a DIRPIN.</small></h4>
+      <div class="dash-filtros" style="margin-bottom:12px">
+        <div class="dash-filtro" style="flex:1;min-width:220px">
+          <label>DIRPIN</label>
+          <select id="cfcr-filtro-dirpin"><option value="">Todas</option>${DIRPINS_CFCR.map((d) => `<option value="${escapeAttr(d)}">${escapeHTML(d)}</option>`).join("")}</select>
+        </div>
+      </div>
+      <div id="cfcr-mapa"></div>
+      <div id="cfcr-mapa-legenda"></div>
+    </div>
+    <div class="dash-chart-box" style="margin-top:14px">
+      <h4>Prioridade Máxima — Termos VIGENTE com Prazo Já Expirado</h4>
+      <p class="dash-chart-hint">Status ainda marcado como VIGENTE na planilha, mas a data de fim de vigência já passou — provável atraso de atualização, não erro deste painel.</p>
+      <div class="tabela-rolavel" style="max-height:360px" id="cfcr-prioridade"></div>
+    </div>
+  `;
+
+  // Cross-filter genérico por 7 chaves — mesmo espírito de
+  // criarMotorDimensoesPorValor (CEIRF/Manutenção), mas escrito à mão aqui
+  // porque "servico" é multivalorado (um termo pode marcar VÁRIOS serviços,
+  // .some() em vez de ===) — a função genérica só sabe comparar campo
+  // escalar. bateFiltroExceto aceita uma LISTA de chaves a ignorar (não só
+  // uma), necessário pro mapa: ao desenhar os pontos, precisa ignorar
+  // dirpin E nomeUnidade ao mesmo tempo (senão a COORPIN escolhida faria o
+  // próprio mapa desenhar só ela mesma, sem as outras pra comparar/trocar).
+  const filtros = { status: "", departamento: "", tipo: "", servico: "", dirpin: "", nomeUnidade: "", convenio: "" };
+  function bateFiltroExceto(t, chavesIgnorar) {
+    const ignorar = new Set(chavesIgnorar);
+    return (ignorar.has("status") || !filtros.status || t.status === filtros.status)
+      && (ignorar.has("departamento") || !filtros.departamento || t.departamento === filtros.departamento)
+      && (ignorar.has("tipo") || !filtros.tipo || t.tipo === filtros.tipo)
+      && (ignorar.has("servico") || !filtros.servico || (t.servicos || []).some((s) => s.servicoNome === filtros.servico))
+      && (ignorar.has("dirpin") || !filtros.dirpin || t.dirpin === filtros.dirpin)
+      && (ignorar.has("nomeUnidade") || !filtros.nomeUnidade || t.nomeUnidade === filtros.nomeUnidade)
+      && (ignorar.has("convenio") || !filtros.convenio || (filtros.convenio === "sim" ? t.temConvenio : !t.temConvenio));
+  }
+  function bateFiltro(t, ignorar) { return bateFiltroExceto(t, ignorar ? [ignorar] : []); }
+  function filtrar() { return termosTodos.filter((t) => bateFiltro(t, null)); }
+
+  const ROTULOS_FILTRO_CFCR = { status: "status", departamento: "departamento", tipo: "tipo", servico: "serviço", dirpin: "DIRPIN", nomeUnidade: "unidade", convenio: "convênio" };
+  function valorFiltroExibicao(chave) {
+    if (chave === "convenio") return filtros.convenio === "sim" ? "com convênio" : "sem convênio";
+    return filtros[chave];
+  }
+
+  function atualizar() {
+    const filtrada = filtrar();
+
+    // ---- chips de filtro ativo ----
+    const chipsAtivos = Object.keys(filtros)
+      .filter((chave) => filtros[chave])
+      .map((chave) => ({
+        rotulo: `${ROTULOS_FILTRO_CFCR[chave]}: ${valorFiltroExibicao(chave)}`,
+        limpar: () => {
+          filtros[chave] = "";
+          if (chave === "dirpin") filtros.nomeUnidade = "";
+          atualizar();
+        },
+      }));
+    document.getElementById("cfcr-chips").innerHTML = chipsAtivos.length
+      ? `<div class="filter-chips">${chipsAtivos.map((c, i) => `<span class="filter-chip">Isolando ${escapeHTML(c.rotulo)}<button type="button" data-chip-limpar="${i}" title="Remover este filtro">${iconeInline("fechar", 10, -1)}</button></span>`).join("")}</div>`
+      : "";
+    document.querySelectorAll("#cfcr-chips [data-chip-limpar]").forEach((btn) => {
+      btn.addEventListener("click", () => chipsAtivos[+btn.dataset.chipLimpar].limpar());
+    });
+
+    // ---- KPIs ----
+    const total = filtrada.length;
+    const comConvenio = filtrada.filter((t) => t.temConvenio).length;
+    const semConvenio = total - comConvenio;
+    const municipal = filtrada.filter((t) => t.tipo === "Municipal").length;
+    const congenere = total - municipal;
+    const pct = (n) => total ? (n / total * 100).toLocaleString("pt-BR", { maximumFractionDigits: 0 }) : "0";
+    document.getElementById("cfcr-kpis").innerHTML = `
+      <div class="kpi-card"><div class="kpi-cabeca">${kpiIcone("predio")}<div class="kpi-label">Total de Termos</div></div><div class="kpi-value">${total.toLocaleString("pt-BR")}</div></div>
+      <div class="kpi-card kpi-clicavel" data-kpi-convenio="sim" title="Clique pra isolar" style="--kpi-cor:var(--cfcr-ok);cursor:pointer;${filtros.convenio === "sim" ? "outline:2px solid var(--cfcr-ok);outline-offset:-2px" : ""}"><div class="kpi-cabeca">${kpiIcone("selo")}<div class="kpi-label">Com Convênio Vigente</div></div><div class="kpi-value">${comConvenio.toLocaleString("pt-BR")} <span style="font-size:.9rem;color:#8B93A3">(${pct(comConvenio)}%)</span></div></div>
+      <div class="kpi-card kpi-clicavel" data-kpi-convenio="nao" title="Clique pra isolar" style="--kpi-cor:var(--cfcr-bad);cursor:pointer;${filtros.convenio === "nao" ? "outline:2px solid var(--cfcr-bad);outline-offset:-2px" : ""}"><div class="kpi-cabeca">${kpiIcone("alerta")}<div class="kpi-label">Sem Convênio / Pendente</div></div><div class="kpi-value">${semConvenio.toLocaleString("pt-BR")} <span style="font-size:.9rem;color:#8B93A3">(${pct(semConvenio)}%)</span></div></div>
+      <div class="kpi-card kpi-clicavel" data-kpi-tipo="Municipal" title="Clique pra isolar" style="cursor:pointer;${filtros.tipo === "Municipal" ? "outline:2px solid var(--carvao);outline-offset:-2px" : ""}"><div class="kpi-cabeca">${kpiIcone("obras")}<div class="kpi-label">Municipais</div></div><div class="kpi-value">${municipal.toLocaleString("pt-BR")}</div></div>
+      <div class="kpi-card kpi-clicavel" data-kpi-tipo="Congênere" title="Clique pra isolar" style="cursor:pointer;${filtros.tipo === "Congênere" ? "outline:2px solid var(--carvao);outline-offset:-2px" : ""}"><div class="kpi-cabeca">${kpiIcone("pessoa")}<div class="kpi-label">Congêneres</div></div><div class="kpi-value">${congenere.toLocaleString("pt-BR")}</div></div>
+    `;
+
+    // ---- Distribuição por status (rosca) ----
+    const statusRecorte = termosTodos.filter((t) => bateFiltro(t, "status"));
+    const statusLinhas = agruparValorObrasPorCampo(statusRecorte, (t) => t.status, () => 1, "(sem status)")
+      .map((l) => ({ label: l.label, valor: l.total, cor: corStatusCfcr(l.label) }))
+      .sort((a, b) => (CFCR_STATUS_INFO[a.label]?.ordem || 99) - (CFCR_STATUS_INFO[b.label]?.ordem || 99));
+    document.getElementById("cfcr-status").innerHTML = statusLinhas.length
+      ? donutCfcrSVG(statusLinhas, filtros.status)
+      : `<p class="dash-chart-hint">Nenhum termo neste recorte.</p>`;
+
+    // ---- Convênio por departamento (coluna empilhada) ----
+    const deptRecorte = termosTodos.filter((t) => bateFiltro(t, "departamento"));
+    const departamentos = [...new Set(deptRecorte.map((t) => t.departamento))].sort();
+    const SEGMENTOS_CONVENIO_CFCR = [
+      { label: "Com convênio", cor: "var(--cfcr-ok)" },
+      { label: "Sem convênio", cor: "var(--cfcr-bad)" },
+    ];
+    const gruposDept = departamentos.map((dep) => {
+      const doDept = deptRecorte.filter((t) => t.departamento === dep);
+      return {
+        label: dep,
+        valores: {
+          "Com convênio": doDept.filter((t) => t.temConvenio).length,
+          "Sem convênio": doDept.filter((t) => !t.temConvenio).length,
+        },
+      };
+    });
+    document.getElementById("cfcr-departamento").innerHTML = gruposDept.length
+      ? colunaEmpilhadaSVG(gruposDept, SEGMENTOS_CONVENIO_CFCR, {
+          formatarValor: (v) => v.toLocaleString("pt-BR"),
+          formatarEixoTick: (v) => Math.round(v).toLocaleString("pt-BR"),
+          selecionado: filtros.departamento,
+          substantivoQtd: "termo",
+        })
+      : `<p class="dash-chart-hint">Nenhum termo neste recorte.</p>`;
+
+    // ---- Motivo da pendência (reaproveita o filtro de status — motivo É
+    // status, só que escopado a quem não tem convênio) ----
+    const motivoRecorte = termosTodos.filter((t) => !t.temConvenio && bateFiltro(t, "status"));
+    const motivoLinhas = agruparValorObrasPorCampo(motivoRecorte, (t) => t.status, () => 1, "(sem status)")
+      .map((l) => ({ label: l.label, valor: l.total }))
+      .sort((a, b) => b.valor - a.valor);
+    document.getElementById("cfcr-motivo").innerHTML = motivoLinhas.length
+      ? barraHorizontalComEixoSVG(motivoLinhas, {
+          formatarValor: (v) => v.toLocaleString("pt-BR"),
+          formatarEixoTick: (v) => Math.round(v).toLocaleString("pt-BR"),
+          cor: (c) => corStatusCfcr(c.label),
+          selecionado: filtros.status,
+        })
+      : `<p class="dash-chart-hint">Nenhum termo sem convênio neste recorte.</p>`;
+
+    // ---- Serviços prestados pelos municípios ----
+    const servicoRecorte = termosTodos.filter((t) => t.tipo === "Municipal" && bateFiltro(t, "servico"));
+    const contagemServico = new Map();
+    for (const t of servicoRecorte) {
+      for (const s of t.servicos || []) contagemServico.set(s.servicoNome, (contagemServico.get(s.servicoNome) || 0) + 1);
+    }
+    const baseServico = servicoRecorte.length || 1;
+    const servicoLinhas = [...contagemServico.entries()]
+      .map(([label, valor]) => ({ label, valor }))
+      .sort((a, b) => b.valor - a.valor);
+    document.getElementById("cfcr-servicos").innerHTML = servicoLinhas.length
+      ? barraHorizontalComEixoSVG(servicoLinhas, {
+          formatarValor: (v) => v.toLocaleString("pt-BR"),
+          formatarEixoTick: (v) => Math.round(v).toLocaleString("pt-BR"),
+          // Destaca (vermelho) quem está bem abaixo dos demais dentro do
+          // recorte atual — mesma ideia do mockup ("Cessão de veículo" era
+          // exceção clara, só 11 de 249), só que proporcional ao recorte em
+          // vez de um número fixo (249 era só o total SEM filtro nenhum).
+          cor: (c) => c.valor < baseServico * 0.3 ? "var(--cfcr-bad)" : "var(--cfcr-info)",
+          selecionado: filtros.servico,
+        })
+      : `<p class="dash-chart-hint">Nenhum serviço registrado neste recorte.</p>`;
+
+    // ---- Distribuição Geográfica ----
+    const geoRecorte = termosTodos.filter((t) => t.tipo === "Municipal" && t.nomeUnidade && bateFiltroExceto(t, ["dirpin", "nomeUnidade"]));
+    const linhasUnidadeCfcr = agruparPorUnidade(geoRecorte);
+    document.getElementById("cfcr-mapa").innerHTML = linhasUnidadeCfcr.length
+      ? mapaCoorpinSVG(linhasUnidadeCfcr, {
+          destacarFn: (l) => (filtros.nomeUnidade ? l.label === filtros.nomeUnidade : filtros.dirpin ? l.dirpin === filtros.dirpin : false),
+          formatarTotal: (l) => `${l.total} termo(s)`,
+        })
+      : `<p class="dash-chart-hint">Nenhum termo Municipal com COORPIN cadastrada neste recorte.</p>`;
+    document.getElementById("cfcr-mapa-legenda").innerHTML = legendaMapaUnidadeHTML(linhasUnidadeCfcr, (l) => filtros.nomeUnidade === l.label);
+    document.getElementById("cfcr-filtro-dirpin").value = filtros.dirpin;
+
+    function selecionarUnidadeCfcr(nomeUnidade) {
+      if (filtros.nomeUnidade === nomeUnidade) {
+        filtros.nomeUnidade = "";
+        filtros.dirpin = "";
+      } else {
+        filtros.nomeUnidade = nomeUnidade;
+        filtros.dirpin = linhasUnidadeCfcr.find((l) => l.label === nomeUnidade)?.dirpin || "";
+      }
+      atualizar();
+    }
+    document.getElementById("cfcr-mapa").querySelectorAll("[data-cat]").forEach((el) => {
+      el.addEventListener("click", () => selecionarUnidadeCfcr(el.dataset.cat));
+    });
+    document.getElementById("cfcr-mapa-legenda").querySelectorAll("[data-cat]").forEach((el) => {
+      el.addEventListener("click", () => selecionarUnidadeCfcr(el.dataset.cat));
+    });
+
+    // ---- Prioridade máxima: VIGENTE com fim de vigência já no passado ----
+    const agora = new Date();
+    const prioridade = filtrada
+      .filter((t) => t.status === "VIGENTE" && t.fimVigenciaData && new Date(t.fimVigenciaData) < agora)
+      .map((t) => ({ ...t, diasVencido: Math.floor((agora - new Date(t.fimVigenciaData)) / 86400000) }))
+      .sort((a, b) => b.diasVencido - a.diasVencido);
+    document.getElementById("cfcr-prioridade").innerHTML = prioridade.length
+      ? `<table class="dash-tabela">
+          <thead><tr><th>MUNICÍPIO / PARCEIRO</th><th>DEPARTAMENTO</th><th>DIAS VENCIDO</th><th>PROCESSO SEI</th><th></th></tr></thead>
+          <tbody>${prioridade.map((t) => `
+            <tr title="Vigência terminou em ${new Date(t.fimVigenciaData).toLocaleDateString("pt-BR")}">
+              <td>${escapeHTML(t.participe)}</td>
+              <td>${escapeHTML(t.departamento)}</td>
+              <td>${t.diasVencido.toLocaleString("pt-BR")} dia(s)</td>
+              <td>${escapeHTML(t.processoSei || "—")}</td>
+              <td><span class="badge">CRÍTICO</span></td>
+            </tr>`).join("")}</tbody>
+        </table>`
+      : `<p class="dash-chart-hint">Nenhum termo VIGENTE com prazo já expirado neste recorte.</p>`;
+  }
+
+  // Clique delegado UMA vez, nos containers estáveis (não recriados a cada
+  // atualizar()) — mesmo padrão já usado em CEIRF/Manutenção/Contratos.
+  document.getElementById("cfcr-kpis").addEventListener("click", (ev) => {
+    const btnConvenio = ev.target.closest("[data-kpi-convenio]");
+    if (btnConvenio) { filtros.convenio = filtros.convenio === btnConvenio.dataset.kpiConvenio ? "" : btnConvenio.dataset.kpiConvenio; atualizar(); return; }
+    const btnTipo = ev.target.closest("[data-kpi-tipo]");
+    if (btnTipo) { filtros.tipo = filtros.tipo === btnTipo.dataset.kpiTipo ? "" : btnTipo.dataset.kpiTipo; atualizar(); }
+  });
+  document.getElementById("cfcr-status").addEventListener("click", (ev) => {
+    const alvo = ev.target.closest("[data-cat]");
+    if (!alvo) return;
+    filtros.status = filtros.status === alvo.dataset.cat ? "" : alvo.dataset.cat;
+    atualizar();
+  });
+  document.getElementById("cfcr-departamento").addEventListener("click", (ev) => {
+    const alvo = ev.target.closest("[data-cat]");
+    if (!alvo) return;
+    filtros.departamento = filtros.departamento === alvo.dataset.cat ? "" : alvo.dataset.cat;
+    atualizar();
+  });
+  document.getElementById("cfcr-motivo").addEventListener("click", (ev) => {
+    const alvo = ev.target.closest("[data-cat]");
+    if (!alvo) return;
+    filtros.status = filtros.status === alvo.dataset.cat ? "" : alvo.dataset.cat;
+    atualizar();
+  });
+  document.getElementById("cfcr-servicos").addEventListener("click", (ev) => {
+    const alvo = ev.target.closest("[data-cat]");
+    if (!alvo) return;
+    filtros.servico = filtros.servico === alvo.dataset.cat ? "" : alvo.dataset.cat;
+    atualizar();
+  });
+  document.getElementById("cfcr-filtro-dirpin").addEventListener("change", (ev) => {
+    filtros.dirpin = ev.target.value;
+    filtros.nomeUnidade = "";
+    atualizar();
+  });
+  document.getElementById("cfcr-prioridade").addEventListener("click", (ev) => {
+    const linha = ev.target.closest("tr[title]");
+    if (linha) linha.scrollIntoView?.({ behavior: "smooth", block: "center" });
+  });
+
+  atualizar();
+}
+
 async function carregarContratosPortal(portalSlug) {
   const painel = document.getElementById("tab-contratos");
   painel.innerHTML = `<p class="tela-intro">Carregando contratos...</p>`;
@@ -10863,6 +11229,7 @@ async function abrirTela(id) {
     if (nome === "paineis") carregarPaineisPortal(p.id);
     if (nome === "contratos") carregarContratosPortal(p.id);
     if (nome === "obras") carregarObrasPortal(p.id);
+    if (nome === "cfcr") carregarCfcrPortal(p.id);
     // recarrega os destaques ao voltar pra Visão Geral: marcar um painel na
     // aba PAINÉIS precisa refletir aqui sem ter que sair e entrar no portal
     if (nome === "geral") carregarDestaques(p.id);
