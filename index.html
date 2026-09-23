@@ -10702,13 +10702,21 @@ async function carregarCfcrPortal(portalSlug) {
   // ignorar dirpin E nomeUnidade ao mesmo tempo (senão a COORPIN escolhida
   // faria o próprio mapa desenhar só ela mesma, sem as outras pra
   // comparar/trocar).
+  // Achado direto dela, cruzado com a planilha original: as colunas de
+  // serviço trazem uma linha PRA TODO município, mesmo quando ele não
+  // oferece nada ("Não disponibiliza" — dado real da fonte, não erro de
+  // modelagem). "Presta o serviço" só é verdade quando NÃO é isso e NÃO é
+  // só uma marcação "x" sem detalhe (especificado=false) — mesmo critério
+  // que ela já confirmou pro "x" ("é como não ter escrito nada").
+  function servicoOferecido(s) { return s.periodicidade !== "Não disponibiliza" && s.especificado; }
+
   const filtros = { status: "", departamento: "", tipo: "", servico: "", periodicidade: "", dirpin: "", nomeUnidade: "", firmado: "", criticidade: "", recurso: "" };
   function bateFiltroExceto(t, chavesIgnorar) {
     const ignorar = new Set(chavesIgnorar);
     return (ignorar.has("status") || !filtros.status || t.status === filtros.status)
       && (ignorar.has("departamento") || !filtros.departamento || t.departamento === filtros.departamento)
       && (ignorar.has("tipo") || !filtros.tipo || t.tipo === filtros.tipo)
-      && (ignorar.has("servico") || !filtros.servico || (t.servicos || []).some((s) => s.servicoNome === filtros.servico))
+      && (ignorar.has("servico") || !filtros.servico || (t.servicos || []).some((s) => s.servicoNome === filtros.servico && servicoOferecido(s)))
       && (ignorar.has("periodicidade") || !filtros.periodicidade || (t.servicos || []).some((s) => s.periodicidade === filtros.periodicidade))
       && (ignorar.has("dirpin") || !filtros.dirpin || t.dirpin === filtros.dirpin)
       && (ignorar.has("nomeUnidade") || !filtros.nomeUnidade || t.nomeUnidade === filtros.nomeUnidade)
@@ -10829,11 +10837,21 @@ async function carregarCfcrPortal(portalSlug) {
         })
       : `<p class="dash-chart-hint">Nenhum termo neste recorte.</p>`;
 
-    // ---- Serviços prestados pelos municípios ----
+    // ---- Serviços prestados pelos municípios — achado direto dela,
+    // cruzado com a planilha ORIGINAL (ela mandou): cada município tem uma
+    // linha pra CADA um dos 11 serviços, mesmo quando não oferece nada
+    // ("Não disponibiliza" é dado real da fonte, não erro de modelagem).
+    // Contar essas linhas como "presta o serviço" inflava tudo pra perto
+    // de 100% (ex.: "Alimentação a custodiados" aparecia com ~248, quando
+    // na real só ~14 têm algo além de "Não disponibiliza"). Agora só conta
+    // quando servicoOferecido(s) é verdade. ----
     const servicoRecorte = termosTodos.filter((t) => t.tipo === TIPO_TCT_CFCR && bateFiltro(t, "servico"));
     const contagemServico = new Map();
     for (const t of servicoRecorte) {
-      for (const s of t.servicos || []) contagemServico.set(s.servicoNome, (contagemServico.get(s.servicoNome) || 0) + 1);
+      for (const s of t.servicos || []) {
+        if (!servicoOferecido(s)) continue;
+        contagemServico.set(s.servicoNome, (contagemServico.get(s.servicoNome) || 0) + 1);
+      }
     }
     const baseServico = servicoRecorte.length || 1;
     const servicoLinhas = [...contagemServico.entries()]
@@ -10844,13 +10862,13 @@ async function carregarCfcrPortal(portalSlug) {
           formatarValor: (v) => v.toLocaleString("pt-BR"),
           formatarEixoTick: (v) => Math.round(v).toLocaleString("pt-BR"),
           // Destaca (vermelho) quem está bem abaixo dos demais dentro do
-          // recorte atual — mesma ideia do mockup ("Cessão de veículo" era
-          // exceção clara, só 11 de 249), só que proporcional ao recorte em
-          // vez de um número fixo (249 era só o total SEM filtro nenhum).
+          // recorte atual — proporcional ao total de termos TCT do
+          // recorte, não ao total de linhas de serviço (que sempre inclui
+          // os "Não disponibiliza").
           cor: (c) => c.valor < baseServico * 0.3 ? "var(--cfcr-bad)" : "var(--cfcr-info)",
           selecionado: filtros.servico,
         })
-      : `<p class="dash-chart-hint">Nenhum serviço registrado neste recorte.</p>`;
+      : `<p class="dash-chart-hint">Nenhum serviço efetivamente prestado neste recorte.</p>`;
 
     // ---- Periodicidade — dado novo da planilha modelo v2 ("temporalidade"
     // com que cada serviço é prestado). Mesmo recorte de Serviços acima —
