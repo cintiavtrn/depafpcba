@@ -10695,8 +10695,8 @@ async function carregarCfcrPortal(portalSlug) {
           <p class="dash-chart-hint" id="cfcr-servicos-sem-dado"></p>
         </div>
         <div class="dash-chart-box">
-          <h4>Periodicidade e Quantidade<small class="dash-chart-hint" style="display:block;margin-top:4px">Com qual frequência (ou quantidade, quando não há frequência informada) os serviços REALMENTE prestados no recorte atual acontecem — "Não disponibiliza" e "x" não entram aqui, já estão no gráfico de Serviços ao lado. Isole um serviço ao lado pra ver só o dele. Clique numa barra pra isolar.</small></h4>
-          <div id="cfcr-periodicidade"></div>
+          <h4>Quem Presta e Com Que Frequência<small class="dash-chart-hint" style="display:block;margin-top:4px">Detalhe do serviço selecionado ao lado — clique num serviço em "Serviços Prestados" pra ver aqui quais municípios prestam e com qual periodicidade/quantidade.</small></h4>
+          <div class="tabela-rolavel" style="max-height:360px" id="cfcr-servico-detalhe"></div>
         </div>
       </div>
       <div class="dash-chart-box" style="margin-top:14px">
@@ -10724,16 +10724,20 @@ async function carregarCfcrPortal(portalSlug) {
     SUBABAS_CFCR.forEach((s) => { document.getElementById(`cfcr-sub-${s.chave}`).hidden = s.chave !== btn.dataset.subtabCfcr; });
   });
 
-  // Cross-filter genérico por 10 chaves — mesmo espírito de
+  // Cross-filter genérico por 9 chaves — mesmo espírito de
   // criarMotorDimensoesPorValor (CEIRF/Manutenção), mas escrito à mão aqui
   // porque "servico" é multivalorado (um termo pode marcar VÁRIOS serviços,
   // .some() em vez de ===) — a função genérica só sabe comparar campo
-  // escalar. "periodicidade" também é por serviço (dentro de servicos[]),
-  // mesma lógica. bateFiltroExceto aceita uma LISTA de chaves a ignorar
-  // (não só uma), necessário pro mapa: ao desenhar os pontos, precisa
-  // ignorar dirpin E nomeUnidade ao mesmo tempo (senão a COORPIN escolhida
-  // faria o próprio mapa desenhar só ela mesma, sem as outras pra
-  // comparar/trocar).
+  // escalar. bateFiltroExceto aceita uma LISTA de chaves a ignorar (não só
+  // uma), necessário pro mapa: ao desenhar os pontos, precisa ignorar
+  // dirpin E nomeUnidade ao mesmo tempo (senão a COORPIN escolhida faria o
+  // próprio mapa desenhar só ela mesma, sem as outras pra comparar/
+  // trocar). Pedido direto dela: periodicidade/quantidade NÃO é mais uma
+  // chave de filtro própria — "linkar com os partícipes... dar
+  // detalhamento, mas não usar como dado pra criar o gráfico" — virou
+  // detalhe do serviço selecionado (ver "Quem Presta e Com Que
+  // Frequência", logo abaixo de Serviços Prestados), não um slicer
+  // independente.
   // Achado direto dela, cruzado com a planilha original: as colunas de
   // serviço trazem uma linha PRA TODO município, mesmo quando ele não
   // oferece nada ("Não disponibiliza" — dado real da fonte, não erro de
@@ -10742,14 +10746,13 @@ async function carregarCfcrPortal(portalSlug) {
   // que ela já confirmou pro "x" ("é como não ter escrito nada").
   function servicoOferecido(s) { return s.periodicidade !== "Não disponibiliza" && s.especificado; }
 
-  const filtros = { status: "", departamento: "", tipo: "", servico: "", periodicidade: "", dirpin: "", nomeUnidade: "", firmado: "", criticidade: "", recurso: "" };
+  const filtros = { status: "", departamento: "", tipo: "", servico: "", dirpin: "", nomeUnidade: "", firmado: "", criticidade: "", recurso: "" };
   function bateFiltroExceto(t, chavesIgnorar) {
     const ignorar = new Set(chavesIgnorar);
     return (ignorar.has("status") || !filtros.status || t.status === filtros.status)
       && (ignorar.has("departamento") || !filtros.departamento || t.departamento === filtros.departamento)
       && (ignorar.has("tipo") || !filtros.tipo || t.tipo === filtros.tipo)
       && (ignorar.has("servico") || !filtros.servico || (t.servicos || []).some((s) => s.servicoNome === filtros.servico && servicoOferecido(s)))
-      && (ignorar.has("periodicidade") || !filtros.periodicidade || (t.servicos || []).some((s) => s.periodicidade === filtros.periodicidade))
       && (ignorar.has("dirpin") || !filtros.dirpin || t.dirpin === filtros.dirpin)
       && (ignorar.has("nomeUnidade") || !filtros.nomeUnidade || t.nomeUnidade === filtros.nomeUnidade)
       && (ignorar.has("firmado") || !filtros.firmado || (filtros.firmado === "sim" ? t.termoFirmado : !t.termoFirmado))
@@ -10759,7 +10762,7 @@ async function carregarCfcrPortal(portalSlug) {
   function bateFiltro(t, ignorar) { return bateFiltroExceto(t, ignorar ? [ignorar] : []); }
   function filtrar() { return termosTodos.filter((t) => bateFiltro(t, null)); }
 
-  const ROTULOS_FILTRO_CFCR = { status: "status", departamento: "departamento", tipo: "tipo", servico: "serviço", periodicidade: "periodicidade", dirpin: "DIRPIN", nomeUnidade: "unidade", firmado: "termo firmado", criticidade: "prazo", recurso: "repasse financeiro" };
+  const ROTULOS_FILTRO_CFCR = { status: "status", departamento: "departamento", tipo: "tipo", servico: "serviço", dirpin: "DIRPIN", nomeUnidade: "unidade", firmado: "termo firmado", criticidade: "prazo", recurso: "repasse financeiro" };
   function valorFiltroExibicao(chave) {
     if (chave === "firmado") return filtros.firmado === "sim" ? "sim" : "não";
     return filtros[chave];
@@ -10913,39 +10916,33 @@ async function carregarCfcrPortal(portalSlug) {
       ? `${semNenhumDadoServico.toLocaleString("pt-BR")} de ${servicoRecorte.length.toLocaleString("pt-BR")} município(s) do recorte não preencheram nenhum dado de serviço (nem "Não disponibiliza") — a cobertura acima é calculada só sobre quem respondeu.`
       : "";
 
-    // ---- Periodicidade e Quantidade — dado novo da planilha modelo v2
-    // ("temporalidade" com que cada serviço é prestado). Mesmo recorte de
-    // Serviços acima — se filtros.servico já estiver ativo, servicoRecorte
-    // já vem restrito àquele serviço, então a periodicidade calculada aqui
-    // já responde "com qual frequência esse serviço é prestado" sem
-    // sincronismo extra. Pedido direto dela: "esse x a gente não deve
-    // retornar nada... é um vazio como não existisse, ignorado" — igual
-    // "Não disponibiliza": pergunta "com que frequência" só faz sentido
-    // pra quem realmente presta o serviço, então usa o mesmo
-    // servicoOferecido() do gráfico de Serviços — não mostra as duas
-    // categorias como barra aqui (o painel já conta "não oferece" no
-    // gráfico de Serviços, não precisa repetir). ----
-    const periodicidadeRecorte = termosTodos.filter((t) => t.tipo === TIPO_TCT_CFCR && bateFiltro(t, "periodicidade"));
-    const contagemPeriodicidade = new Map();
-    for (const t of periodicidadeRecorte) {
-      for (const s of t.servicos || []) {
-        if (filtros.servico && s.servicoNome !== filtros.servico) continue;
-        if (!servicoOferecido(s)) continue;
-        const chave = s.periodicidade || "(sem classificação)";
-        contagemPeriodicidade.set(chave, (contagemPeriodicidade.get(chave) || 0) + 1);
-      }
+    // ---- Quem Presta e Com Que Frequência — pedido direto dela: "pegar
+    // esses tipos de serviço e linkar com os partícipes... dar
+    // detalhamento, mas não usar como dado pra criar o gráfico como tá
+    // fazendo" — periodicidade/quantidade deixou de ser um slicer
+    // independente (a barra "Periodicidade e Quantidade" foi removida) e
+    // virou detalhe do serviço selecionado, reaproveitando servicoRecorte
+    // (já filtrado por tudo o mais). Só faz sentido depois de escolher um
+    // serviço em "Serviços Prestados" — sem isso, "com que frequência" não
+    // tem contexto nenhum (frequência de QUAL serviço?). ----
+    if (!filtros.servico) {
+      document.getElementById("cfcr-servico-detalhe").innerHTML = `<p class="dash-chart-hint">Clique num serviço em "Serviços Prestados" pra ver aqui quais municípios prestam e com qual periodicidade/quantidade.</p>`;
+    } else {
+      const linhasDetalheServico = servicoRecorte
+        .map((t) => ({ t, s: (t.servicos || []).find((s) => s.servicoNome === filtros.servico && servicoOferecido(s)) }))
+        .filter((x) => x.s)
+        .sort((a, b) => a.t.participe.localeCompare(b.t.participe, "pt-BR"));
+      document.getElementById("cfcr-servico-detalhe").innerHTML = linhasDetalheServico.length
+        ? `<table class="dash-tabela">
+            <thead><tr><th>MUNICÍPIO / PARCEIRO</th><th>DEPARTAMENTO</th><th>PERIODICIDADE / QUANTIDADE</th></tr></thead>
+            <tbody>${linhasDetalheServico.map(({ t, s }) => `<tr title="${escapeAttr(s.valorRegistrado || "")}">
+              <td>${escapeHTML(t.participe)}</td>
+              <td>${escapeHTML(t.departamento)}</td>
+              <td>${escapeHTML(s.periodicidade || "—")}</td>
+            </tr>`).join("")}</tbody>
+          </table>`
+        : `<p class="dash-chart-hint">Nenhum município presta este serviço neste recorte.</p>`;
     }
-    const periodicidadeLinhas = [...contagemPeriodicidade.entries()]
-      .map(([label, valor]) => ({ label, valor }))
-      .sort((a, b) => b.valor - a.valor);
-    document.getElementById("cfcr-periodicidade").innerHTML = periodicidadeLinhas.length
-      ? barraHorizontalComEixoSVG(periodicidadeLinhas, {
-          formatarValor: (v) => v.toLocaleString("pt-BR"),
-          formatarEixoTick: (v) => Math.round(v).toLocaleString("pt-BR"),
-          cor: "var(--cfcr-info)",
-          selecionado: filtros.periodicidade,
-        })
-      : `<p class="dash-chart-hint">Nenhum serviço registrado neste recorte.</p>`;
 
     // ---- Distribuição Geográfica ----
     const geoRecorte = termosTodos.filter((t) => t.tipo === TIPO_TCT_CFCR && t.nomeUnidade && bateFiltroExceto(t, ["dirpin", "nomeUnidade"]));
@@ -11124,12 +11121,6 @@ async function carregarCfcrPortal(portalSlug) {
     const alvo = ev.target.closest("[data-cat]");
     if (!alvo) return;
     filtros.servico = filtros.servico === alvo.dataset.cat ? "" : alvo.dataset.cat;
-    atualizar();
-  });
-  document.getElementById("cfcr-periodicidade").addEventListener("click", (ev) => {
-    const alvo = ev.target.closest("[data-cat]");
-    if (!alvo) return;
-    filtros.periodicidade = filtros.periodicidade === alvo.dataset.cat ? "" : alvo.dataset.cat;
     atualizar();
   });
   document.getElementById("cfcr-recurso").addEventListener("click", (ev) => {
