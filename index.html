@@ -10853,6 +10853,7 @@ async function carregarCfcrPortal(portalSlug) {
   // de propósito (escopo pequeno, 30 registros, não precisa do motor de
   // 8 chaves do TCT).
   let filtroStatusAC = "";
+  let filtroFirmadoAC = "";
   function bateFiltroExceto(t, chavesIgnorar) {
     const ignorar = new Set(chavesIgnorar);
     return (ignorar.has("status") || !filtros.status || t.status === filtros.status)
@@ -11221,23 +11222,39 @@ async function carregarCfcrPortal(portalSlug) {
 
     // ---- A Classificar (GDG) — sub-aba própria (pedido direto: revisão
     // do PDF, os 30 não entram mais na Visão Geral). Escopo pequeno demais
-    // pra justificar o motor de 8 chaves do TCT — filtro local, só por
-    // status, independente de `filtros`. ----
+    // pra justificar o motor de 8 chaves do TCT — filtro local (status +
+    // vigência), independente de `filtros`. Pedido direto: "não chame de
+    // termo firmado ou não firmado, por não termos certeza se é termo" —
+    // aqui NUNCA usa a palavra "termo" nos rótulos (só "vigência
+    // definida"/"sem vigência definida", que descreve o fato — status
+    // VIGENTE/VENCIDO tem uma data, os outros não — sem presumir que é um
+    // termo formal). O campo `termoFirmado` do banco continua com esse
+    // nome internamente (é genérico o bastante, e usado em todo o resto
+    // do painel pros 418 TCT, onde "termo" já é certeza) — só o RÓTULO
+    // visível aqui muda. ----
     const todosAC = termosTodos.filter((t) => t.tipo === TIPO_A_CLASSIFICAR_CFCR);
-    const acRecorte = filtroStatusAC ? todosAC.filter((t) => t.status === filtroStatusAC) : todosAC;
+    const acRecorte = todosAC
+      .filter((t) => !filtroStatusAC || t.status === filtroStatusAC)
+      .filter((t) => !filtroFirmadoAC || (filtroFirmadoAC === "sim" ? t.termoFirmado : !t.termoFirmado));
     const firmadosAC = todosAC.filter((t) => t.termoFirmado).length;
     document.getElementById("cfcr-ac-kpis").innerHTML = `
       <div class="kpi-card"><div class="kpi-cabeca">${kpiIcone("predio")}<div class="kpi-label">Total</div></div><div class="kpi-value">${todosAC.length.toLocaleString("pt-BR")}</div></div>
-      <div class="kpi-card"><div class="kpi-cabeca">${kpiIcone("selo")}<div class="kpi-label">Termo Firmado</div></div><div class="kpi-value">${firmadosAC.toLocaleString("pt-BR")}</div></div>
-      <div class="kpi-card"><div class="kpi-cabeca">${kpiIcone("alerta")}<div class="kpi-label">Não Firmado</div></div><div class="kpi-value">${(todosAC.length - firmadosAC).toLocaleString("pt-BR")}</div></div>
+      <div class="kpi-card kpi-clicavel" data-kpi-firmado-ac="sim" title="Clique pra isolar" style="--kpi-cor:var(--cfcr-ok);cursor:pointer;${filtroFirmadoAC === "sim" ? "outline:2px solid var(--cfcr-ok);outline-offset:-2px" : ""}"><div class="kpi-cabeca">${kpiIcone("selo")}<div class="kpi-label">Com Vigência Definida</div></div><div class="kpi-value">${firmadosAC.toLocaleString("pt-BR")}</div></div>
+      <div class="kpi-card kpi-clicavel" data-kpi-firmado-ac="nao" title="Clique pra isolar" style="--kpi-cor:var(--cfcr-bad);cursor:pointer;${filtroFirmadoAC === "nao" ? "outline:2px solid var(--cfcr-bad);outline-offset:-2px" : ""}"><div class="kpi-cabeca">${kpiIcone("alerta")}<div class="kpi-label">Sem Vigência Definida</div></div><div class="kpi-value">${(todosAC.length - firmadosAC).toLocaleString("pt-BR")}</div></div>
     `;
+    document.getElementById("cfcr-ac-kpis").querySelectorAll("[data-kpi-firmado-ac]").forEach((el) => {
+      el.addEventListener("click", () => {
+        filtroFirmadoAC = filtroFirmadoAC === el.dataset.kpiFirmadoAc ? "" : el.dataset.kpiFirmadoAc;
+        atualizar();
+      });
+    });
 
     const statusLinhasAC = agruparValorObrasPorCampo(todosAC, (t) => t.status, () => 1, "(sem status)")
       .map((l) => ({ label: l.label, valor: l.total, cor: corStatusCfcr(l.label) }))
       .sort((a, b) => (CFCR_STATUS_INFO[a.label]?.ordem || 99) - (CFCR_STATUS_INFO[b.label]?.ordem || 99));
     document.getElementById("cfcr-ac-status").innerHTML = statusLinhasAC.length
       ? donutCfcrSVG(statusLinhasAC, filtroStatusAC)
-      : `<p class="dash-chart-hint">Nenhum termo.</p>`;
+      : `<p class="dash-chart-hint">Nenhum registro.</p>`;
     document.getElementById("cfcr-ac-status").querySelectorAll("[data-cat]").forEach((el) => {
       el.addEventListener("click", () => {
         filtroStatusAC = filtroStatusAC === el.dataset.cat ? "" : el.dataset.cat;
@@ -11245,7 +11262,7 @@ async function carregarCfcrPortal(portalSlug) {
       });
     });
 
-    document.getElementById("cfcr-ac-detalhamento-contagem").textContent = `${acRecorte.length.toLocaleString("pt-BR")} de ${todosAC.length.toLocaleString("pt-BR")} termo(s)`;
+    document.getElementById("cfcr-ac-detalhamento-contagem").textContent = `${acRecorte.length.toLocaleString("pt-BR")} de ${todosAC.length.toLocaleString("pt-BR")} registro(s)`;
     document.getElementById("cfcr-ac-detalhamento").innerHTML = acRecorte.length
       ? `<table class="dash-tabela">
           <thead><tr><th>PARCEIRO</th><th>DEPARTAMENTO</th><th>STATUS</th><th>PRAZO</th><th>RECURSO FINANCEIRO</th><th>OBJETO</th><th>PROCESSO SEI</th></tr></thead>
