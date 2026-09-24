@@ -10565,19 +10565,31 @@ const PERIODICIDADE_QUANTIDADE_CFCR = "Quantidade informada (sem periodicidade)"
 // periodicidade, e o texto cru já é mais informativo que o nome do balde.
 // Exceção confirmada por ela ("pessoas dá sim pra extrair a quantidade,
 // só que você escreve caracterizando"): pra "Disponibilização de
-// funcionário da Prefeitura", extrai o número quando é INEQUÍVOCO — um
-// único número líder seguido de palavra de pessoal, sem nenhum outro
-// número no resto do texto (evita somar errado casos aditivos tipo "21
-// servidores + 05 estagiários" ou "02 administrativos, 02 vigilantes e 01
-// auxiliar" — nesses, melhor mostrar o texto cru do que arriscar uma
-// conta errada).
+// funcionário da Prefeitura", extrai o número de pessoas. Pedido direto
+// (2ª rodada — "você não sabe somar? pode somar"): casos aditivos tipo
+// "21 servidores + 05 estagiários" ou "02 administrativos, 02 vigilantes
+// e 01 auxiliar" SOMAM os números, em vez de cair pro texto cru. Único
+// cuidado real: quando o texto já declara um total antes de ":" (ex. "04
+// pessoas: 01 administrativo e 03 limpeza" — 1+3 já é os mesmos 4), usa
+// o total declarado, não soma tudo de novo (senão vira 4+1+3=8, errado
+// por dobrar a conta). E "40h semanais" não conta — "h" de hora, não é
+// gente. O texto cru completo continua no hover da linha (title), então
+// nada se perde mesmo resumindo pra um número só.
+function extrairContagemPessoasCfcr(texto) {
+  const comDoisPontos = texto.match(/^(\d+)\D*:/);
+  if (comDoisPontos) return parseInt(comDoisPontos[1], 10);
+  const numeros = [...texto.matchAll(/(\d+)\s*(\p{L}*)/gu)]
+    .filter(([, , palavra]) => !/^h(oras?)?\b/i.test(palavra))
+    .map(([, n]) => parseInt(n, 10));
+  return numeros.length ? numeros.reduce((a, b) => a + b, 0) : null;
+}
+
 function rotularPeriodicidadeCfcr(s) {
   if (s.periodicidade !== PERIODICIDADE_QUANTIDADE_CFCR) return s.periodicidade || "—";
   const texto = s.valorRegistrado || "";
   if (s.servicoNome === "Disponibilização de funcionário da Prefeitura") {
-    const m = texto.match(/^\D*(\d+)\s*(?:\(.*?\)\s*)?(servidor|funcionári|pessoa|estagiári)/i);
-    const outrosDigitos = m && texto.slice(m[0].length).match(/\d/);
-    if (m && !outrosDigitos) return `${parseInt(m[1], 10)} pessoa(s)`;
+    const total = extrairContagemPessoasCfcr(texto);
+    if (total !== null) return `${total} pessoa(s)`;
   }
   return texto || "—";
 }
