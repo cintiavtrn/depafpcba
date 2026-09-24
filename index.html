@@ -10552,6 +10552,36 @@ function rotularUnidadeCfcr(nomeUnidade) {
   return m ? `${m[1]} COORPIN — ${m[2]}` : nomeUnidade;
 }
 
+// Balde catch-all do seed pra texto que não é frequência real nem "x"/
+// "não disponibiliza" (ver reclassificarPeriodicidade em seed-cfcr.js).
+const PERIODICIDADE_QUANTIDADE_CFCR = "Quantidade informada (sem periodicidade)";
+
+// Pedido direto dela: "poderia agrupar esses casos como uma notação de
+// objeto... se o objeto do serviço fosse uma periodicidade ou quantidade
+// notável mostrava, mas em casos poderia ser objeto". Pra periodicidade
+// REAL (Mensal, Diária, Sob demanda...), mostra normal. Pro balde
+// catch-all, em vez do rótulo genérico "Quantidade informada..." (que não
+// diz nada por si só), mostra o TEXTO ORIGINAL — é objeto, não
+// periodicidade, e o texto cru já é mais informativo que o nome do balde.
+// Exceção confirmada por ela ("pessoas dá sim pra extrair a quantidade,
+// só que você escreve caracterizando"): pra "Disponibilização de
+// funcionário da Prefeitura", extrai o número quando é INEQUÍVOCO — um
+// único número líder seguido de palavra de pessoal, sem nenhum outro
+// número no resto do texto (evita somar errado casos aditivos tipo "21
+// servidores + 05 estagiários" ou "02 administrativos, 02 vigilantes e 01
+// auxiliar" — nesses, melhor mostrar o texto cru do que arriscar uma
+// conta errada).
+function rotularPeriodicidadeCfcr(s) {
+  if (s.periodicidade !== PERIODICIDADE_QUANTIDADE_CFCR) return s.periodicidade || "—";
+  const texto = s.valorRegistrado || "";
+  if (s.servicoNome === "Disponibilização de funcionário da Prefeitura") {
+    const m = texto.match(/^\D*(\d+)\s*(?:\(.*?\)\s*)?(servidor|funcionári|pessoa|estagiári)/i);
+    const outrosDigitos = m && texto.slice(m[0].length).match(/\d/);
+    if (m && !outrosDigitos) return `${parseInt(m[1], 10)} pessoa(s)`;
+  }
+  return texto || "—";
+}
+
 // Cores por status — paleta própria dela (--cfcr-*), não a rampa --crit-*
 // do resto do sistema (pedido direto: "as cores estão aí inclusive... usar
 // as cores do mockup como estão"). ordem: define a ordem de leitura do
@@ -11015,7 +11045,7 @@ async function carregarCfcrPortal(portalSlug) {
             <tbody>${linhasDetalheServico.map(({ t, s }) => `<tr title="${escapeAttr(s.valorRegistrado || "")}">
               <td>${escapeHTML(t.participe)}</td>
               <td>${escapeHTML(t.departamento)}</td>
-              <td>${escapeHTML(s.periodicidade || "—")}</td>
+              <td>${escapeHTML(rotularPeriodicidadeCfcr(s))}</td>
             </tr>`).join("")}</tbody>
           </table>`
         : `<p class="dash-chart-hint">Nenhum município presta este serviço neste recorte.</p>`;
