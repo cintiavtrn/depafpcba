@@ -1351,7 +1351,13 @@ function barraHorizontalComEixoSVG(categorias, opcoes = {}) {
   const MAX_ROTULO = 22;
   const padL = 150, padR = 14, padT = 4, alturaEixoX = rotularDiagonal ? 34 : 24;
   const larguraPlot = 280;
-  const rowH = 26;
+  // Achado dela (rótulos tipo "Serviço de manutenção do mobiliário da DT"
+  // quebrando em 2-3 linhas e invadindo a linha vizinha): rowH fixa de 26
+  // só cabe rótulo de 1 linha — mesmo ajuste já usado em outro gráfico
+  // horizontal deste arquivo (linhasDoTexto + rowH proporcional ao maior
+  // rótulo quebrado).
+  const maxLinhasRotulo = Math.max(1, ...categorias.map((c) => linhasDoTexto(c.label, MAX_ROTULO)));
+  const rowH = Math.max(26, maxLinhasRotulo * 12 + 10);
   const w = padL + larguraPlot + padR;
   const baseY = padT + categorias.length * rowH;
   const h = baseY + alturaEixoX;
@@ -1392,11 +1398,15 @@ function barraHorizontalComEixoSVG(categorias, opcoes = {}) {
 // rótulo tipo "15ª Serrinha"), onde colunaEmpilhadaSVG amassaria tudo numa
 // faixa de 460px.
 function barraHorizontalEmpilhadaSVG(grupos, segmentos, opcoes = {}) {
-  const { formatarValor = (v) => v.toLocaleString("pt-BR"), formatarEixoTick = (v) => Math.round(v).toLocaleString("pt-BR"), selecionado = "" } = opcoes;
+  const { formatarValor = (v) => v.toLocaleString("pt-BR"), formatarEixoTick = (v) => Math.round(v).toLocaleString("pt-BR"), selecionado = "", formatarRotulo = (g) => g.label } = opcoes;
   const MAX_ROTULO = 22;
   const padL = 150, padR = 14, padT = 4;
   const larguraPlot = 280;
-  const rowH = 26;
+  // Mesmo ajuste de barraHorizontalComEixoSVG — necessário agora que os
+  // rótulos de COORPIN ficaram mais longos ("1ª COORPIN — Feira de
+  // Santana" passa de 22 caracteres e quebra linha).
+  const maxLinhasRotulo = Math.max(1, ...grupos.map((g) => linhasDoTexto(formatarRotulo(g), MAX_ROTULO)));
+  const rowH = Math.max(26, maxLinhasRotulo * 12 + 10);
   const alturaEixoX = 24, alturaLegenda = 18;
   const w = padL + larguraPlot + padR;
   const baseY = padT + grupos.length * rowH;
@@ -1415,13 +1425,14 @@ function barraHorizontalEmpilhadaSVG(grupos, segmentos, opcoes = {}) {
   grupos.forEach((g, i) => {
     const y = padT + i * rowH;
     const dim = selecionado && selecionado !== g.label;
-    const rotulo = textoSVG(g.label, padL - 8, y + rowH / 2, { maxChars: MAX_ROTULO, anchor: "end", fontSize: 9, alturaLinha: 11, peso: selecionado === g.label ? 700 : 400 });
+    const rotuloTexto = formatarRotulo(g);
+    const rotulo = textoSVG(rotuloTexto, padL - 8, y + rowH / 2, { maxChars: MAX_ROTULO, anchor: "end", fontSize: 9, alturaLinha: 11, peso: selecionado === g.label ? 700 : 400 });
     let segmentosSVG = "", x = padL;
     segmentos.forEach((s) => {
       const v = g.valores[s.label] || 0;
       if (!v) return;
       const largura = maxV ? larguraPlot * (v / maxV) : 0;
-      segmentosSVG += `<rect x="${x.toFixed(1)}" y="${(y + 4).toFixed(1)}" width="${Math.max(largura, 1).toFixed(1)}" height="${(rowH - 8).toFixed(1)}" fill="${s.cor}"><title>${escapeHTML(g.label)} — ${escapeHTML(s.label)}: ${formatarValor(v)}</title></rect>`;
+      segmentosSVG += `<rect x="${x.toFixed(1)}" y="${(y + 4).toFixed(1)}" width="${Math.max(largura, 1).toFixed(1)}" height="${(rowH - 8).toFixed(1)}" fill="${s.cor}"><title>${escapeHTML(rotuloTexto)} — ${escapeHTML(s.label)}: ${formatarValor(v)}</title></rect>`;
       x += largura;
     });
     barras += `<g data-cat="${escapeAttr(g.label)}" style="cursor:pointer" opacity="${dim ? 0.4 : 1}">
@@ -7789,7 +7800,7 @@ function mapaCoorpinSVG(linhas, opcoes = {}) {
   // representando outra coisa (valor em R$, por exemplo, no mapa de Setor
   // Demandante) passa seu próprio formatador pro tooltip não ler "5,8
   // milhões contrato(s)".
-  const { selecionado = "", destacarFn = null, corFn = null, formatarTotal = (l) => `${l.total} contrato(s)` } = opcoes;
+  const { selecionado = "", destacarFn = null, corFn = null, formatarTotal = (l) => `${l.total} contrato(s)`, formatarRotulo = (l) => l.label } = opcoes;
   const [vbX, vbY, vbW, vbH] = MAPA_BAHIA_VIEWBOX.split(" ").map(Number);
   // Pedido direto: "adicionar os contratos outros no mapa... talvez uma
   // bola maior" — mas uma bola literalmente proporcional (111 contratos
@@ -7819,7 +7830,7 @@ function mapaCoorpinSVG(linhas, opcoes = {}) {
     const numero = ehOutras ? "+" : parseInt(l.label, 10) || (l.dirpin ? "" : "S");
     pontos += `<g data-cat="${escapeAttr(l.label)}" style="cursor:pointer" opacity="${dim ? 0.35 : 1}">`;
     const corPonto = corFn ? corFn(l) : (CORES_DIRPIN[l.dirpin] || "var(--carvao)");
-    const tituloTooltip = `<title>${escapeHTML(l.label)}${ehOutras ? "" : ` (DIRPIN ${escapeHTML(l.dirpin || "—")})`}: ${escapeHTML(formatarTotal(l))}${l.rotuloTooltipExtra ? ` — ${escapeHTML(l.rotuloTooltipExtra)}` : ""}${ehOutras ? " — localização presumida (área central do estado, sem unidade regional cadastrada)" : ""}</title>`;
+    const tituloTooltip = `<title>${escapeHTML(formatarRotulo(l))}${ehOutras ? "" : ` (DIRPIN ${escapeHTML(l.dirpin || "—")})`}: ${escapeHTML(formatarTotal(l))}${l.rotuloTooltipExtra ? ` — ${escapeHTML(l.rotuloTooltipExtra)}` : ""}${ehOutras ? " — localização presumida (área central do estado, sem unidade regional cadastrada)" : ""}</title>`;
     // Pedido direto: "queria ver se dá pra fazer do outro modo, de
     // destaque, ou se estou sonhando muito" — em vez de "1 contrato
     // concentra X%" só aparecer passando o mouse, ganha um anel tracejado
@@ -7967,7 +7978,7 @@ function agruparCriticidadePorUnidade(listaFiltrada) {
 
 // Mesma legenda (cor por DIRPIN + número por COORPIN, Sede em grupo próprio)
 // usada no mapa de dentro do perfil — extraída pra reaproveitar na landing.
-function legendaMapaUnidadeHTML(linhasUnidade, destacarUnidadeFn = () => false) {
+function legendaMapaUnidadeHTML(linhasUnidade, destacarUnidadeFn = () => false, formatarRotulo = (l) => l.label) {
   const porDirpinLegenda = new Map();
   for (const l of linhasUnidade) {
     const chave = l.dirpin || "Sede";
@@ -7983,7 +7994,7 @@ function legendaMapaUnidadeHTML(linhasUnidade, destacarUnidadeFn = () => false) 
             ${dirpin === "Sede" ? "Sede" : dirpin === CHAVE_OUTRAS_AREAS ? "Outras Áreas Gestoras" : `DIRPIN ${escapeHTML(dirpin)}`}
           </div>
           <div style="color:#8B93A3;font-family:'IBM Plex Mono',monospace">
-            ${unidades.map((u) => `<span class="legenda-unidade-item" data-cat="${escapeAttr(u.label)}" style="cursor:pointer;${destacarUnidadeFn(u) ? "text-decoration:underline;color:var(--carvao)" : ""}">${escapeHTML(u.label)}</span>`).join(" · ")}
+            ${unidades.map((u) => `<span class="legenda-unidade-item" data-cat="${escapeAttr(u.label)}" style="cursor:pointer;${destacarUnidadeFn(u) ? "text-decoration:underline;color:var(--carvao)" : ""}">${escapeHTML(formatarRotulo(u))}</span>`).join(" · ")}
           </div>
         </div>
       `).join("")}
@@ -10528,6 +10539,19 @@ const TIPO_TCT_CFCR = "Termo de Cooperação Técnica";
 // banco (não fica só um rótulo de exibição) — ver prisma/seed-cfcr.js.
 const TIPO_A_CLASSIFICAR_CFCR = "A Classificar";
 
+// nomeUnidade vem como "1ª Feira de Santana" (canonizarUnidade, mesma
+// regra de Contratos) — lido sozinho, soa como "o município de Feira de
+// Santana", quando na real é a COORPIN sediada lá, atendendo vários
+// municípios adjacentes (achado direto dela: "pode dar a impressão de
+// ser só aquele"). Só reformata pra EXIBIÇÃO — a chave de match
+// (nomeUnidade, data-cat, COORPIN_GEO) continua a mesma string crua, pra
+// não quebrar nada que já depende dela (inclusive o mesmo mapa que
+// Contratos usa).
+function rotularUnidadeCfcr(nomeUnidade) {
+  const m = String(nomeUnidade || "").match(/^(\d+ª)\s+(.+)$/);
+  return m ? `${m[1]} COORPIN — ${m[2]}` : nomeUnidade;
+}
+
 // Cores por status — paleta própria dela (--cfcr-*), não a rampa --crit-*
 // do resto do sistema (pedido direto: "as cores estão aí inclusive... usar
 // as cores do mockup como estão"). ordem: define a ordem de leitura do
@@ -10697,7 +10721,8 @@ async function carregarCfcrPortal(portalSlug) {
     <div id="cfcr-sub-geoservicos" hidden>
       <div class="dash-charts" style="grid-template-columns:1fr 1fr">
         <div class="dash-chart-box">
-          <h4>Serviços Prestados pelos Municípios<small class="dash-chart-hint" style="display:block;margin-top:4px">Quantos municípios (do recorte atual) marcam cada serviço — clique pra isolar.</small></h4>
+          <h4>Serviços Prestados pelos Municípios<small class="dash-chart-hint" style="display:block;margin-top:4px">Quantos municípios (do recorte atual) marcam cada serviço — clique pra isolar. Um mesmo município pode prestar mais de um serviço, então a soma das barras é maior que o nº de municípios.</small></h4>
+          <p class="dash-chart-hint" id="cfcr-servicos-cobertura" style="font-weight:600"></p>
           <div id="cfcr-servicos"></div>
           <p class="dash-chart-hint" id="cfcr-servicos-sem-dado"></p>
         </div>
@@ -10803,6 +10828,7 @@ async function carregarCfcrPortal(portalSlug) {
   const ROTULOS_FILTRO_CFCR = { status: "status", departamento: "departamento", servico: "serviço", dirpin: "DIRPIN", nomeUnidade: "unidade", firmado: "termo firmado", criticidade: "prazo", recurso: "repasse financeiro" };
   function valorFiltroExibicao(chave) {
     if (chave === "firmado") return filtros.firmado === "sim" ? "sim" : "não";
+    if (chave === "nomeUnidade") return rotularUnidadeCfcr(filtros.nomeUnidade);
     return filtros[chave];
   }
 
@@ -10945,6 +10971,17 @@ async function carregarCfcrPortal(portalSlug) {
         })
       : `<p class="dash-chart-hint">Nenhum serviço efetivamente prestado neste recorte.</p>`;
 
+    // Pergunta direta dela sobre como ler o cruzamento (ex.: isolar "1ª
+    // Feira de Santana" — 9 municípios, até 17 "oferecimentos" de serviço
+    // espalhados em 6 tipos diferentes, porque um mesmo município conta
+    // em mais de uma barra). Essa frase resume os três números juntos, em
+    // vez de deixar a leitura implícita nas barras.
+    const municipiosComServico = servicoRecorte.filter((t) => (t.servicos || []).some(servicoOferecido)).length;
+    const totalOferecimentos = servicoLinhas.reduce((a, l) => a + l.valor, 0);
+    document.getElementById("cfcr-servicos-cobertura").textContent = servicoRecorte.length
+      ? `${servicoRecorte.length.toLocaleString("pt-BR")} município(s) no recorte · ${municipiosComServico.toLocaleString("pt-BR")} prestam pelo menos 1 serviço · juntos, somam ${totalOferecimentos.toLocaleString("pt-BR")} oferecimento(s) em ${servicoLinhas.length.toLocaleString("pt-BR")} tipo(s) de serviço diferentes (um mesmo município conta em mais de uma barra quando presta mais de um serviço).`
+      : "";
+
     // Achado direto dela, cruzado com a planilha original: um município
     // pode não ter preenchido NENHUM dado de serviço (nem "Não
     // disponibiliza") — diferente de quem preencheu e disse que não
@@ -11027,15 +11064,17 @@ async function carregarCfcrPortal(portalSlug) {
         ? mapaCoorpinSVG(linhasUnidadeCfcr, {
             destacarFn: (l) => (filtros.nomeUnidade ? l.label === filtros.nomeUnidade : filtros.dirpin ? l.dirpin === filtros.dirpin : false),
             formatarTotal: (l) => `${l.total} termo(s)`,
+            formatarRotulo: (l) => rotularUnidadeCfcr(l.label),
           })
         : `<p class="dash-chart-hint">Nenhum termo de Cooperação Técnica com COORPIN cadastrada neste recorte.</p>`;
-      document.getElementById("cfcr-geo-legenda").innerHTML = legendaMapaUnidadeHTML(linhasUnidadeCfcr, (l) => filtros.nomeUnidade === l.label);
+      document.getElementById("cfcr-geo-legenda").innerHTML = legendaMapaUnidadeHTML(linhasUnidadeCfcr, (l) => filtros.nomeUnidade === l.label, (l) => rotularUnidadeCfcr(l.label));
     } else {
       document.getElementById("cfcr-geo-visual").innerHTML = gruposCoorpin.length
         ? barraHorizontalEmpilhadaSVG(gruposCoorpin, SEGMENTOS_FIRMADO_CFCR, {
             formatarValor: (v) => v.toLocaleString("pt-BR"),
             formatarEixoTick: (v) => Math.round(v).toLocaleString("pt-BR"),
             selecionado: filtros.nomeUnidade,
+            formatarRotulo: (g) => rotularUnidadeCfcr(g.label),
           })
         : `<p class="dash-chart-hint">Nenhum termo de Cooperação Técnica com COORPIN cadastrada neste recorte.</p>`;
       document.getElementById("cfcr-geo-legenda").innerHTML = "";
