@@ -10635,13 +10635,20 @@ async function carregarCfcrPortal(portalSlug) {
   // compartilhado por TODAS as seções: trocar de sub-aba não perde filtro
   // nenhum, é só mostrar/esconder o que já foi renderizado. Cartões/chips
   // ficam FORA das duas, como cabeçalho comum sempre visível.
+  // Pedido direto (revisão do PDF que ela mandou, "Lógica dos Termos de
+  // Cooperação Técnica"): Visão Geral vira só TCT — os 30 "A Classificar"
+  // (GDG) são estruturalmente outra coisa (sem COORPIN, sem servicos[],
+  // objeto livre, partícipe institucional multi-ente — confirmado: 28 dos
+  // 30 têm mais de um ente no partícipe, contra 0 dos 418 TCT) — ganham
+  // sub-aba própria em vez de inflar "Total de Termos".
   const SUBABAS_CFCR = [
     { chave: "visaogeral", rotulo: "VISÃO GERAL" },
     { chave: "geoservicos", rotulo: "GEOGRAFIA E SERVIÇOS" },
+    { chave: "aclassificar", rotulo: "A CLASSIFICAR (GDG)" },
   ];
 
   painel.innerHTML = `
-    <p class="tela-intro">Termos de Cooperação Técnica e parcerias a classificar (aba GDG) · DEPIN · DEPOM · DPMCV · GDG · ISPE — clique em qualquer cartão, fatia ou barra pra isolar o recorte em todas as seções ao mesmo tempo.</p>
+    <p class="tela-intro">Termos de Cooperação Técnica · DEPIN · DEPOM · DPMCV — clique em qualquer cartão, fatia ou barra pra isolar o recorte em todas as seções ao mesmo tempo. Parcerias institucionais do GDG (ainda não confirmadas como Congênere) ficam na aba "A Classificar", à parte.</p>
     <div id="cfcr-chips"></div>
     <div class="kpi-row" id="cfcr-kpis" style="margin-bottom:16px"></div>
     <div class="tabs" id="cfcr-subtabs" style="margin-bottom:14px">
@@ -10700,19 +10707,34 @@ async function carregarCfcrPortal(portalSlug) {
         </div>
       </div>
       <div class="dash-chart-box" style="margin-top:14px">
-        <h4>Termo Firmado por COORPIN<small class="dash-chart-hint" style="display:block;margin-top:4px">Mesmo recorte Firmado/Não firmado da Visão Geral, agora no detalhe de cada COORPIN do DEPIN — clique numa barra (mesmo clique de ponto/legenda no mapa abaixo).</small></h4>
-        <div id="cfcr-coorpin"></div>
-      </div>
-      <div class="dash-chart-box" style="margin-top:14px">
-        <h4>Distribuição Geográfica<small class="dash-chart-hint" style="display:block;margin-top:4px">Só termos de Cooperação Técnica com COORPIN cadastrada — clique num ponto, na legenda ou escolha a DIRPIN.</small></h4>
-        <div class="dash-filtros" style="margin-bottom:12px">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">
+          <h4 style="margin-bottom:0">Distribuição Territorial<small class="dash-chart-hint" style="display:block;margin-top:4px" id="cfcr-geo-hint"></small></h4>
+          <div class="dash-toggle" id="cfcr-geo-visual-toggle">
+            <button type="button" class="dash-toggle-btn" data-modo-visual="lista" title="Uma barra por COORPIN, Firmado/Não firmado">LISTA (COORPIN)</button>
+            <button type="button" class="dash-toggle-btn active" data-modo-visual="mapa" title="Pontos no mapa da Bahia, um por COORPIN">MAPA</button>
+          </div>
+        </div>
+        <div class="dash-filtros" style="margin:12px 0" id="cfcr-geo-filtro-dirpin-box">
           <div class="dash-filtro" style="flex:1;min-width:220px">
             <label>DIRPIN</label>
             <select id="cfcr-filtro-dirpin"><option value="">Todas</option>${DIRPINS_CFCR.map((d) => `<option value="${escapeAttr(d)}">${escapeHTML(d)}</option>`).join("")}</select>
           </div>
         </div>
-        <div id="cfcr-mapa"></div>
-        <div id="cfcr-mapa-legenda"></div>
+        <div id="cfcr-geo-visual"></div>
+        <div id="cfcr-geo-legenda"></div>
+      </div>
+    </div>
+
+    <div id="cfcr-sub-aclassificar" hidden>
+      <p class="dash-chart-hint">Estrutura diferente dos Termos de Cooperação Técnica — parcerias institucionais (não municipais), sem lista de serviços própria, e ainda não confirmadas como "Congênere" propriamente dito (ver Detalhamento abaixo).</p>
+      <div class="kpi-row" id="cfcr-ac-kpis" style="margin-bottom:16px"></div>
+      <div class="dash-chart-box">
+        <h4>Distribuição por Status<small class="dash-chart-hint" style="display:block;margin-top:4px">Clique numa fatia ou na legenda pra isolar aquele status.</small></h4>
+        <div id="cfcr-ac-status"></div>
+      </div>
+      <div class="dash-chart-box" style="margin-top:14px">
+        <h4>Detalhamento<small class="dash-chart-hint" style="display:block;margin-top:4px" id="cfcr-ac-detalhamento-contagem"></small></h4>
+        <div class="tabela-rolavel" style="max-height:420px" id="cfcr-ac-detalhamento"></div>
       </div>
     </div>
   `;
@@ -10723,6 +10745,9 @@ async function carregarCfcrPortal(portalSlug) {
     document.querySelectorAll("#cfcr-subtabs .tab-btn").forEach((b) => b.classList.toggle("active", b === btn));
     SUBABAS_CFCR.forEach((s) => { document.getElementById(`cfcr-sub-${s.chave}`).hidden = s.chave !== btn.dataset.subtabCfcr; });
   });
+  function irParaSubabaCfcr(chave) {
+    document.querySelector(`#cfcr-subtabs [data-subtab-cfcr="${chave}"]`)?.click();
+  }
 
   // Cross-filter genérico por 9 chaves — mesmo espírito de
   // criarMotorDimensoesPorValor (CEIRF/Manutenção), mas escrito à mão aqui
@@ -10746,12 +10771,25 @@ async function carregarCfcrPortal(portalSlug) {
   // que ela já confirmou pro "x" ("é como não ter escrito nada").
   function servicoOferecido(s) { return s.periodicidade !== "Não disponibiliza" && s.especificado; }
 
-  const filtros = { status: "", departamento: "", tipo: "", servico: "", dirpin: "", nomeUnidade: "", firmado: "", criticidade: "", recurso: "" };
+  // Pedido direto (revisão do PDF): Visão Geral/Geografia e Serviços só
+  // consideram TCT — os 30 "A Classificar" (GDG) têm aba própria (ver
+  // "cfcr-sub-aclassificar", com filtro local separado, mais simples).
+  // "tipo" saiu do motor de 9→8 chaves porque não tem mais o que alternar
+  // aqui dentro (já é fixo).
+  const termosTCT = termosTodos.filter((t) => t.tipo === TIPO_TCT_CFCR);
+
+  const filtros = { status: "", departamento: "", servico: "", dirpin: "", nomeUnidade: "", firmado: "", criticidade: "", recurso: "" };
+  // Estado do toggle LISTA/MAPA da Distribuição Territorial — mesmo nível
+  // de `filtros`, sobrevive entre chamadas de atualizar().
+  let modoVisualGeoCfcr = "mapa";
+  // Filtro local da sub-aba "A Classificar (GDG)" — separado de `filtros`
+  // de propósito (escopo pequeno, 30 registros, não precisa do motor de
+  // 8 chaves do TCT).
+  let filtroStatusAC = "";
   function bateFiltroExceto(t, chavesIgnorar) {
     const ignorar = new Set(chavesIgnorar);
     return (ignorar.has("status") || !filtros.status || t.status === filtros.status)
       && (ignorar.has("departamento") || !filtros.departamento || t.departamento === filtros.departamento)
-      && (ignorar.has("tipo") || !filtros.tipo || t.tipo === filtros.tipo)
       && (ignorar.has("servico") || !filtros.servico || (t.servicos || []).some((s) => s.servicoNome === filtros.servico && servicoOferecido(s)))
       && (ignorar.has("dirpin") || !filtros.dirpin || t.dirpin === filtros.dirpin)
       && (ignorar.has("nomeUnidade") || !filtros.nomeUnidade || t.nomeUnidade === filtros.nomeUnidade)
@@ -10760,9 +10798,9 @@ async function carregarCfcrPortal(portalSlug) {
       && (ignorar.has("recurso") || !filtros.recurso || t.temRepasse === filtros.recurso);
   }
   function bateFiltro(t, ignorar) { return bateFiltroExceto(t, ignorar ? [ignorar] : []); }
-  function filtrar() { return termosTodos.filter((t) => bateFiltro(t, null)); }
+  function filtrar() { return termosTCT.filter((t) => bateFiltro(t, null)); }
 
-  const ROTULOS_FILTRO_CFCR = { status: "status", departamento: "departamento", tipo: "tipo", servico: "serviço", dirpin: "DIRPIN", nomeUnidade: "unidade", firmado: "termo firmado", criticidade: "prazo", recurso: "repasse financeiro" };
+  const ROTULOS_FILTRO_CFCR = { status: "status", departamento: "departamento", servico: "serviço", dirpin: "DIRPIN", nomeUnidade: "unidade", firmado: "termo firmado", criticidade: "prazo", recurso: "repasse financeiro" };
   function valorFiltroExibicao(chave) {
     if (chave === "firmado") return filtros.firmado === "sim" ? "sim" : "não";
     return filtros[chave];
@@ -10789,23 +10827,25 @@ async function carregarCfcrPortal(portalSlug) {
       btn.addEventListener("click", () => chipsAtivos[+btn.dataset.chipLimpar].limpar());
     });
 
-    // ---- KPIs ----
+    // ---- KPIs — pedido direto (revisão do PDF): "Total de Termos" não
+    // inclui mais os 30 "A Classificar" (GDG), estruturalmente outra
+    // coisa. O 4º cartão é só informativo (não filtra nada aqui — os 30
+    // vivem na própria sub-aba), clique leva direto pra lá. ----
     const total = filtrada.length;
     const firmados = filtrada.filter((t) => t.termoFirmado).length;
     const naoFirmados = total - firmados;
-    const tct = filtrada.filter((t) => t.tipo === TIPO_TCT_CFCR).length;
-    const aClassificar = total - tct;
+    const totalAClassificar = termosTodos.length - termosTCT.length;
     const pct = (n) => total ? (n / total * 100).toLocaleString("pt-BR", { maximumFractionDigits: 0 }) : "0";
     document.getElementById("cfcr-kpis").innerHTML = `
-      <div class="kpi-card"><div class="kpi-cabeca">${kpiIcone("predio")}<div class="kpi-label">Total de Termos</div></div><div class="kpi-value">${total.toLocaleString("pt-BR")}</div></div>
+      <div class="kpi-card"><div class="kpi-cabeca">${kpiIcone("predio")}<div class="kpi-label">Total de Termos (TCT)</div></div><div class="kpi-value">${total.toLocaleString("pt-BR")}</div></div>
       <div class="kpi-card kpi-clicavel" data-kpi-firmado="sim" title="Clique pra isolar" style="--kpi-cor:var(--cfcr-ok);cursor:pointer;${filtros.firmado === "sim" ? "outline:2px solid var(--cfcr-ok);outline-offset:-2px" : ""}"><div class="kpi-cabeca">${kpiIcone("selo")}<div class="kpi-label">Termo Firmado</div></div><div class="kpi-value">${firmados.toLocaleString("pt-BR")} <span style="font-size:.9rem;color:#8B93A3">(${pct(firmados)}%)</span></div></div>
       <div class="kpi-card kpi-clicavel" data-kpi-firmado="nao" title="Clique pra isolar" style="--kpi-cor:var(--cfcr-bad);cursor:pointer;${filtros.firmado === "nao" ? "outline:2px solid var(--cfcr-bad);outline-offset:-2px" : ""}"><div class="kpi-cabeca">${kpiIcone("alerta")}<div class="kpi-label">Não Firmado</div></div><div class="kpi-value">${naoFirmados.toLocaleString("pt-BR")} <span style="font-size:.9rem;color:#8B93A3">(${pct(naoFirmados)}%)</span></div></div>
-      <div class="kpi-card kpi-clicavel" data-kpi-tipo="${escapeAttr(TIPO_TCT_CFCR)}" title="Clique pra isolar" style="cursor:pointer;${filtros.tipo === TIPO_TCT_CFCR ? "outline:2px solid var(--carvao);outline-offset:-2px" : ""}"><div class="kpi-cabeca">${kpiIcone("obras")}<div class="kpi-label">Cooperação Técnica</div></div><div class="kpi-value">${tct.toLocaleString("pt-BR")}</div></div>
-      <div class="kpi-card kpi-clicavel" data-kpi-tipo="${escapeAttr(TIPO_A_CLASSIFICAR_CFCR)}" title="Clique pra isolar — ainda não é possível afirmar que todos são Congênere, ver Detalhamento" style="cursor:pointer;${filtros.tipo === TIPO_A_CLASSIFICAR_CFCR ? "outline:2px solid var(--carvao);outline-offset:-2px" : ""}"><div class="kpi-cabeca">${kpiIcone("pessoa")}<div class="kpi-label">A Classificar</div></div><div class="kpi-value">${aClassificar.toLocaleString("pt-BR")}</div></div>
+      <div class="kpi-card kpi-clicavel" id="cfcr-kpi-aclassificar" title="Clique pra ver a aba A Classificar (GDG)" style="cursor:pointer"><div class="kpi-cabeca">${kpiIcone("pessoa")}<div class="kpi-label">+ Parcerias a Classificar (GDG)</div></div><div class="kpi-value">${totalAClassificar.toLocaleString("pt-BR")}</div></div>
     `;
+    document.getElementById("cfcr-kpi-aclassificar").addEventListener("click", () => irParaSubabaCfcr("aclassificar"));
 
     // ---- Distribuição por status (rosca) ----
-    const statusRecorte = termosTodos.filter((t) => bateFiltro(t, "status"));
+    const statusRecorte = termosTCT.filter((t) => bateFiltro(t, "status"));
     const statusLinhas = agruparValorObrasPorCampo(statusRecorte, (t) => t.status, () => 1, "(sem status)")
       .map((l) => ({ label: l.label, valor: l.total, cor: corStatusCfcr(l.label) }))
       .sort((a, b) => (CFCR_STATUS_INFO[a.label]?.ordem || 99) - (CFCR_STATUS_INFO[b.label]?.ordem || 99));
@@ -10816,7 +10856,7 @@ async function carregarCfcrPortal(portalSlug) {
     // ---- Termo Firmado por departamento (coluna empilhada) — substitui o
     // antigo "Convênio por Departamento": a planilha modelo v2 não usa mais
     // esse conceito, o real é termo_firmado. ----
-    const deptRecorte = termosTodos.filter((t) => bateFiltro(t, "departamento"));
+    const deptRecorte = termosTCT.filter((t) => bateFiltro(t, "departamento"));
     const departamentos = [...new Set(deptRecorte.map((t) => t.departamento))].sort();
     const SEGMENTOS_FIRMADO_CFCR = [
       { label: "Firmado", cor: "var(--cfcr-ok)" },
@@ -10843,7 +10883,7 @@ async function carregarCfcrPortal(portalSlug) {
 
     // ---- Motivo da pendência (reaproveita o filtro de status — motivo É
     // status, só que escopado a quem não tem termo firmado) ----
-    const motivoRecorte = termosTodos.filter((t) => !t.termoFirmado && bateFiltro(t, "status"));
+    const motivoRecorte = termosTCT.filter((t) => !t.termoFirmado && bateFiltro(t, "status"));
     const motivoLinhas = agruparValorObrasPorCampo(motivoRecorte, (t) => t.status, () => 1, "(sem status)")
       .map((l) => ({ label: l.label, valor: l.total }))
       .sort((a, b) => b.valor - a.valor);
@@ -10859,7 +10899,7 @@ async function carregarCfcrPortal(portalSlug) {
     // ---- Repasse Financeiro — campo já categorizado na planilha modelo v2
     // (Sim/Não/Não informado), substitui o antigo texto cru. Mesmo
     // mecanismo de clique-pra-isolar de todo o resto do painel. ----
-    const recursoRecorte = termosTodos.filter((t) => bateFiltro(t, "recurso"));
+    const recursoRecorte = termosTCT.filter((t) => bateFiltro(t, "recurso"));
     const recursoLinhas = agruparValorObrasPorCampo(recursoRecorte, (t) => t.temRepasse, () => 1, "Não informado")
       .map((l) => ({ label: l.label, valor: l.total }))
       .sort((a, b) => b.valor - a.valor);
@@ -10880,7 +10920,7 @@ async function carregarCfcrPortal(portalSlug) {
     // de 100% (ex.: "Alimentação a custodiados" aparecia com ~248, quando
     // na real só ~14 têm algo além de "Não disponibiliza"). Agora só conta
     // quando servicoOferecido(s) é verdade. ----
-    const servicoRecorte = termosTodos.filter((t) => t.tipo === TIPO_TCT_CFCR && bateFiltro(t, "servico"));
+    const servicoRecorte = termosTCT.filter((t) => bateFiltro(t, "servico"));
     const contagemServico = new Map();
     for (const t of servicoRecorte) {
       for (const s of t.servicos || []) {
@@ -10944,17 +10984,32 @@ async function carregarCfcrPortal(portalSlug) {
         : `<p class="dash-chart-hint">Nenhum município presta este serviço neste recorte.</p>`;
     }
 
-    // ---- Distribuição Geográfica ----
-    const geoRecorte = termosTodos.filter((t) => t.tipo === TIPO_TCT_CFCR && t.nomeUnidade && bateFiltroExceto(t, ["dirpin", "nomeUnidade"]));
+    // ---- Distribuição Territorial — pedido direto (revisão do PDF):
+    // "Distribuição Geográfica" e "Termo Firmado por COORPIN" são o MESMO
+    // dado territorial, só dois recortes — viram um visual só com toggle
+    // LISTA/MAPA (mesmo idioma de Contratos → Unidades Beneficiadas:
+    // dash-toggle + data-modo-visual), em vez de duas seções separadas. A
+    // computação (geoRecorte/linhasUnidadeCfcr/gruposCoorpin) é comum aos
+    // dois modos — só a chamada de render no fim muda. ----
+    const geoRecorte = termosTCT.filter((t) => t.nomeUnidade && bateFiltroExceto(t, ["dirpin", "nomeUnidade"]));
     const linhasUnidadeCfcr = agruparPorUnidade(geoRecorte);
-    document.getElementById("cfcr-mapa").innerHTML = linhasUnidadeCfcr.length
-      ? mapaCoorpinSVG(linhasUnidadeCfcr, {
-          destacarFn: (l) => (filtros.nomeUnidade ? l.label === filtros.nomeUnidade : filtros.dirpin ? l.dirpin === filtros.dirpin : false),
-          formatarTotal: (l) => `${l.total} termo(s)`,
-        })
-      : `<p class="dash-chart-hint">Nenhum termo de Cooperação Técnica com COORPIN cadastrada neste recorte.</p>`;
-    document.getElementById("cfcr-mapa-legenda").innerHTML = legendaMapaUnidadeHTML(linhasUnidadeCfcr, (l) => filtros.nomeUnidade === l.label);
-    document.getElementById("cfcr-filtro-dirpin").value = filtros.dirpin;
+    const gruposCoorpin = linhasUnidadeCfcr.map((u) => {
+      const doUnidade = geoRecorte.filter((t) => t.nomeUnidade === u.label);
+      return {
+        label: u.label,
+        valores: {
+          "Firmado": doUnidade.filter((t) => t.termoFirmado).length,
+          "Não firmado": doUnidade.filter((t) => !t.termoFirmado).length,
+        },
+      };
+    });
+
+    document.getElementById("cfcr-geo-hint").textContent = modoVisualGeoCfcr === "mapa"
+      ? "Só termos de Cooperação Técnica com COORPIN cadastrada — clique num ponto, na legenda ou escolha a DIRPIN."
+      : "Firmado vs. não firmado por COORPIN — clique numa barra ou escolha a DIRPIN.";
+    document.querySelectorAll("#cfcr-geo-visual-toggle [data-modo-visual]").forEach((b) => {
+      b.classList.toggle("active", b.dataset.modoVisual === modoVisualGeoCfcr);
+    });
 
     function selecionarUnidadeCfcr(nomeUnidade) {
       if (filtros.nomeUnidade === nomeUnidade) {
@@ -10966,44 +11021,37 @@ async function carregarCfcrPortal(portalSlug) {
       }
       atualizar();
     }
-    document.getElementById("cfcr-mapa").querySelectorAll("[data-cat]").forEach((el) => {
-      el.addEventListener("click", () => selecionarUnidadeCfcr(el.dataset.cat));
-    });
-    document.getElementById("cfcr-mapa-legenda").querySelectorAll("[data-cat]").forEach((el) => {
-      el.addEventListener("click", () => selecionarUnidadeCfcr(el.dataset.cat));
-    });
 
-    // ---- Termo Firmado por COORPIN — pedido direto: repartir "departamento"
-    // do DEPIN por COORPIN (15ª, 16ª...) SEM trocar o campo departamento em
-    // si (ela confirmou: seção nova, ao lado do que já existe). Mesmo
-    // recorte geográfico (geoRecorte/linhasUnidadeCfcr) do mapa acima, só
-    // que quebrado em Firmado/Não firmado por unidade — clique reaproveita
-    // o mesmo selecionarUnidadeCfcr do mapa (mesma DIRPIN auto-derivada). ----
-    const gruposCoorpin = linhasUnidadeCfcr.map((u) => {
-      const doUnidade = geoRecorte.filter((t) => t.nomeUnidade === u.label);
-      return {
-        label: u.label,
-        valores: {
-          "Firmado": doUnidade.filter((t) => t.termoFirmado).length,
-          "Não firmado": doUnidade.filter((t) => !t.termoFirmado).length,
-        },
-      };
+    if (modoVisualGeoCfcr === "mapa") {
+      document.getElementById("cfcr-geo-visual").innerHTML = linhasUnidadeCfcr.length
+        ? mapaCoorpinSVG(linhasUnidadeCfcr, {
+            destacarFn: (l) => (filtros.nomeUnidade ? l.label === filtros.nomeUnidade : filtros.dirpin ? l.dirpin === filtros.dirpin : false),
+            formatarTotal: (l) => `${l.total} termo(s)`,
+          })
+        : `<p class="dash-chart-hint">Nenhum termo de Cooperação Técnica com COORPIN cadastrada neste recorte.</p>`;
+      document.getElementById("cfcr-geo-legenda").innerHTML = legendaMapaUnidadeHTML(linhasUnidadeCfcr, (l) => filtros.nomeUnidade === l.label);
+    } else {
+      document.getElementById("cfcr-geo-visual").innerHTML = gruposCoorpin.length
+        ? barraHorizontalEmpilhadaSVG(gruposCoorpin, SEGMENTOS_FIRMADO_CFCR, {
+            formatarValor: (v) => v.toLocaleString("pt-BR"),
+            formatarEixoTick: (v) => Math.round(v).toLocaleString("pt-BR"),
+            selecionado: filtros.nomeUnidade,
+          })
+        : `<p class="dash-chart-hint">Nenhum termo de Cooperação Técnica com COORPIN cadastrada neste recorte.</p>`;
+      document.getElementById("cfcr-geo-legenda").innerHTML = "";
+    }
+    document.getElementById("cfcr-filtro-dirpin").value = filtros.dirpin;
+    document.getElementById("cfcr-geo-visual").querySelectorAll("[data-cat]").forEach((el) => {
+      el.addEventListener("click", () => selecionarUnidadeCfcr(el.dataset.cat));
     });
-    document.getElementById("cfcr-coorpin").innerHTML = gruposCoorpin.length
-      ? barraHorizontalEmpilhadaSVG(gruposCoorpin, SEGMENTOS_FIRMADO_CFCR, {
-          formatarValor: (v) => v.toLocaleString("pt-BR"),
-          formatarEixoTick: (v) => Math.round(v).toLocaleString("pt-BR"),
-          selecionado: filtros.nomeUnidade,
-        })
-      : `<p class="dash-chart-hint">Nenhum termo de Cooperação Técnica com COORPIN cadastrada neste recorte.</p>`;
-    document.getElementById("cfcr-coorpin").querySelectorAll("[data-cat]").forEach((el) => {
+    document.getElementById("cfcr-geo-legenda").querySelectorAll("[data-cat]").forEach((el) => {
       el.addEventListener("click", () => selecionarUnidadeCfcr(el.dataset.cat));
     });
 
     // ---- Prazos e Criticidade: mesma lógica de faixa de contratos.service.js
     // (≤30/31–60/61–90/>90), calculada ao vivo em cfcr.service.js — não a
     // faixa que a planilha congelou na data de processamento dela. ----
-    const criticidadeRecorte = termosTodos.filter((t) => bateFiltro(t, "criticidade"));
+    const criticidadeRecorte = termosTCT.filter((t) => bateFiltro(t, "criticidade"));
     const criticidadeLinhas = agruparValorObrasPorCampo(criticidadeRecorte, (t) => t.faixaCriticidade, () => 1, "Não aplicável")
       .map((l) => ({ label: l.label, valor: l.total }))
       .sort((a, b) => (CFCR_CRITICIDADE_INFO[a.label]?.ordem || 99) - (CFCR_CRITICIDADE_INFO[b.label]?.ordem || 99));
@@ -11068,7 +11116,7 @@ async function carregarCfcrPortal(portalSlug) {
     // filtro (serviço, criticidade "Acima de 90 dias", departamento
     // qualquer...) precisa revelar a lista por trás do número, não só o
     // recorte "Mais Urgentes" acima. ----
-    document.getElementById("cfcr-detalhamento-contagem").textContent = `${filtrada.length.toLocaleString("pt-BR")} de ${termosTodos.length.toLocaleString("pt-BR")} termo(s)`;
+    document.getElementById("cfcr-detalhamento-contagem").textContent = `${filtrada.length.toLocaleString("pt-BR")} de ${termosTCT.length.toLocaleString("pt-BR")} termo(s)`;
     document.getElementById("cfcr-detalhamento").innerHTML = filtrada.length
       ? `<table class="dash-tabela">
           <thead><tr><th>MUNICÍPIO / PARCEIRO</th><th>TIPO</th><th>DEPARTAMENTO</th><th>STATUS</th><th>PRAZO</th><th>RECURSO FINANCEIRO</th><th>OBJETO</th><th>PROCESSO SEI</th></tr></thead>
@@ -11089,15 +11137,59 @@ async function carregarCfcrPortal(portalSlug) {
           }).join("")}</tbody>
         </table>`
       : `<p class="dash-chart-hint">Nenhum termo neste recorte.</p>`;
+
+    // ---- A Classificar (GDG) — sub-aba própria (pedido direto: revisão
+    // do PDF, os 30 não entram mais na Visão Geral). Escopo pequeno demais
+    // pra justificar o motor de 8 chaves do TCT — filtro local, só por
+    // status, independente de `filtros`. ----
+    const todosAC = termosTodos.filter((t) => t.tipo === TIPO_A_CLASSIFICAR_CFCR);
+    const acRecorte = filtroStatusAC ? todosAC.filter((t) => t.status === filtroStatusAC) : todosAC;
+    const firmadosAC = todosAC.filter((t) => t.termoFirmado).length;
+    document.getElementById("cfcr-ac-kpis").innerHTML = `
+      <div class="kpi-card"><div class="kpi-cabeca">${kpiIcone("predio")}<div class="kpi-label">Total</div></div><div class="kpi-value">${todosAC.length.toLocaleString("pt-BR")}</div></div>
+      <div class="kpi-card"><div class="kpi-cabeca">${kpiIcone("selo")}<div class="kpi-label">Termo Firmado</div></div><div class="kpi-value">${firmadosAC.toLocaleString("pt-BR")}</div></div>
+      <div class="kpi-card"><div class="kpi-cabeca">${kpiIcone("alerta")}<div class="kpi-label">Não Firmado</div></div><div class="kpi-value">${(todosAC.length - firmadosAC).toLocaleString("pt-BR")}</div></div>
+    `;
+
+    const statusLinhasAC = agruparValorObrasPorCampo(todosAC, (t) => t.status, () => 1, "(sem status)")
+      .map((l) => ({ label: l.label, valor: l.total, cor: corStatusCfcr(l.label) }))
+      .sort((a, b) => (CFCR_STATUS_INFO[a.label]?.ordem || 99) - (CFCR_STATUS_INFO[b.label]?.ordem || 99));
+    document.getElementById("cfcr-ac-status").innerHTML = statusLinhasAC.length
+      ? donutCfcrSVG(statusLinhasAC, filtroStatusAC)
+      : `<p class="dash-chart-hint">Nenhum termo.</p>`;
+    document.getElementById("cfcr-ac-status").querySelectorAll("[data-cat]").forEach((el) => {
+      el.addEventListener("click", () => {
+        filtroStatusAC = filtroStatusAC === el.dataset.cat ? "" : el.dataset.cat;
+        atualizar();
+      });
+    });
+
+    document.getElementById("cfcr-ac-detalhamento-contagem").textContent = `${acRecorte.length.toLocaleString("pt-BR")} de ${todosAC.length.toLocaleString("pt-BR")} termo(s)`;
+    document.getElementById("cfcr-ac-detalhamento").innerHTML = acRecorte.length
+      ? `<table class="dash-tabela">
+          <thead><tr><th>PARCEIRO</th><th>DEPARTAMENTO</th><th>STATUS</th><th>PRAZO</th><th>RECURSO FINANCEIRO</th><th>OBJETO</th><th>PROCESSO SEI</th></tr></thead>
+          <tbody>${acRecorte.map((t) => {
+            const prazoAC = prazoCelulaCfcr(t);
+            const tituloRepasseAC = [t.recursoFinanceiroOriginal, t.repasseObservacao].filter(Boolean).join(" — ");
+            return `<tr>
+              <td>${escapeHTML(t.participe)}</td>
+              <td>${escapeHTML(t.departamento)}</td>
+              <td><span style="color:${corStatusCfcr(t.status)};font-weight:700">${escapeHTML(t.status)}</span></td>
+              <td style="color:${prazoAC.cor}">${escapeHTML(prazoAC.texto)}</td>
+              <td title="${escapeAttr(tituloRepasseAC)}">${escapeHTML(t.temRepasse)}</td>
+              <td style="max-width:280px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${escapeAttr(t.objeto || "")}">${escapeHTML(t.objeto || "—")}</td>
+              <td>${escapeHTML(t.processoSei || "—")}</td>
+            </tr>`;
+          }).join("")}</tbody>
+        </table>`
+      : `<p class="dash-chart-hint">Nenhum termo neste recorte.</p>`;
   }
 
   // Clique delegado UMA vez, nos containers estáveis (não recriados a cada
   // atualizar()) — mesmo padrão já usado em CEIRF/Manutenção/Contratos.
   document.getElementById("cfcr-kpis").addEventListener("click", (ev) => {
     const btnFirmado = ev.target.closest("[data-kpi-firmado]");
-    if (btnFirmado) { filtros.firmado = filtros.firmado === btnFirmado.dataset.kpiFirmado ? "" : btnFirmado.dataset.kpiFirmado; atualizar(); return; }
-    const btnTipo = ev.target.closest("[data-kpi-tipo]");
-    if (btnTipo) { filtros.tipo = filtros.tipo === btnTipo.dataset.kpiTipo ? "" : btnTipo.dataset.kpiTipo; atualizar(); }
+    if (btnFirmado) { filtros.firmado = filtros.firmado === btnFirmado.dataset.kpiFirmado ? "" : btnFirmado.dataset.kpiFirmado; atualizar(); }
   });
   document.getElementById("cfcr-status").addEventListener("click", (ev) => {
     const alvo = ev.target.closest("[data-cat]");
@@ -11132,6 +11224,12 @@ async function carregarCfcrPortal(portalSlug) {
   document.getElementById("cfcr-filtro-dirpin").addEventListener("change", (ev) => {
     filtros.dirpin = ev.target.value;
     filtros.nomeUnidade = "";
+    atualizar();
+  });
+  document.getElementById("cfcr-geo-visual-toggle").addEventListener("click", (ev) => {
+    const btn = ev.target.closest("[data-modo-visual]");
+    if (!btn) return;
+    modoVisualGeoCfcr = btn.dataset.modoVisual;
     atualizar();
   });
   document.getElementById("cfcr-criticidade").addEventListener("click", (ev) => {
