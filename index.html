@@ -10208,12 +10208,14 @@ const ROTULOS_STATUS_CEIRF = {
   "A INICIAR": "A Iniciar", "PARALISADA": "Paralisada", "SUPRIMIDA": "Suprimida",
 };
 function normalizarStatusCeirf(v) { return v ? (ROTULOS_STATUS_CEIRF[v] || v) : v; }
-// Pedido direto dela ("obra" é o termo generalista pro painel inteiro,
-// manutenção/reforma são TIPOS de obra) — a planilha-fonte usa "OBRA" pra
-// dizer especificamente "construção nova" (em oposição a "REFORMA"), o que
-// colide com "Obra" virando o guarda-chuva do painel. Rótulo de exibição
-// só — o valor bruto continua "OBRA" no filtro/banco.
-const ROTULOS_TIPO_INTERVENCAO_CEIRF = { "OBRA": "Obra Nova", "REFORMA": "Reforma" };
+// Pedido direto dela, refinado numa 2ª rodada: "obra" é o termo
+// generalista do painel inteiro — construção e reforma são TIPOS de obra,
+// nenhum dos dois "é mais obra" que o outro ("obra de reforma é uma
+// obra, obra de construção é um tipo de obra"). Por isso o valor de
+// exibição vira "Construção" (paralelo a "Reforma"), nunca "Obra Nova" —
+// não repete a palavra "Obra" dentro do nome de um tipo específico.
+// Rótulo de exibição só — o valor bruto continua "OBRA" no filtro/banco.
+const ROTULOS_TIPO_INTERVENCAO_CEIRF = { "OBRA": "Construção", "REFORMA": "Reforma" };
 function normalizarTipoIntervencaoCeirf(v) { return v ? (ROTULOS_TIPO_INTERVENCAO_CEIRF[v] || v) : v; }
 const DIMENSOES_CEIRF = [
   // Pedido direto: "Status pode ser status ou como está o andamento?" —
