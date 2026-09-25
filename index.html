@@ -10368,19 +10368,19 @@ async function carregarObrasPortal(portalSlug) {
               <button class="dash-toggle-btn${modoVisualFinanceiro === "treemap" ? " active" : ""}" data-modo-visual="treemap" title="Bloco = tamanho do valor">MAPA DE ÁRVORE</button>
             </div>
           </div>
-          <p class="dash-chart-hint">Obra e manutenção são registros diferentes na planilha-fonte — nem toda unidade com manutenção tem valor de obra, e vice-versa — por isso cada uma tem seu próprio cartão abaixo.</p>
-          <p class="dash-chart-hint">Esta quebra por Diretoria Regional usa o valor registrado em cada unidade individualmente — menos completo que o Controle CEIRF/Manutenção PC, que não têm campo de Diretoria Regional pra cruzar — por isso a soma aqui fica abaixo dos cartões "Valor Total da Obra/Manutenção" lá em cima, que vêm das bases completas.</p>
-          <div class="dash-toggle">${botaoEntenderDadosHTML("financeiro", "por que os dois valores de obra/manutenção não batem")}</div>
+          <p class="dash-chart-hint">Construção e manutenção são dois TIPOS de obra (não duas coisas separadas) — os registros vêm de bases diferentes na planilha-fonte, e nem toda unidade com manutenção tem valor de construção, e vice-versa — por isso cada tipo tem seu próprio cartão abaixo.</p>
+          <p class="dash-chart-hint">Esta quebra por Diretoria Regional usa o valor registrado em cada unidade individualmente — menos completo que o Controle CEIRF/Manutenção PC, que não têm campo de Diretoria Regional pra cruzar — por isso a soma aqui fica abaixo dos cartões "Valor Total de Obra (Construção/Manutenção)" lá em cima, que vêm das bases completas.</p>
+          <div class="dash-toggle">${botaoEntenderDadosHTML("financeiro", "por que os dois valores de obra não batem")}</div>
           <div id="obras-entender-financeiro" style="margin-top:10px" hidden></div>
         </div>
         <div class="dash-charts" style="grid-template-columns:1fr 1fr">
           <div class="dash-chart-box">
-            <h4>Obra</h4>
+            <h4>Obra — Construção</h4>
             <p class="dash-chart-hint" id="obras-valor-obra-hint"></p>
             <div id="obras-valor-obra"></div>
           </div>
           <div class="dash-chart-box">
-            <h4>Manutenção</h4>
+            <h4>Obra — Manutenção</h4>
             <p class="dash-chart-hint" id="obras-valor-manutencao-hint"></p>
             <p class="dash-chart-hint">Valor PARCIAL: a fonte bruta de manutenção tem mais ordens de serviço do que as que deu pra vincular com segurança a uma unidade específica — o restante foi gasto, mas não sei em qual unidade exata.</p>
             <div id="obras-valor-manutencao"></div>
@@ -10404,7 +10404,7 @@ async function carregarObrasPortal(portalSlug) {
       <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:8px">
         <div>
           <h3 style="margin:0 0 4px;text-transform:uppercase;letter-spacing:.05em;font-size:1.05rem">Manutenção PC</h3>
-          <p class="dash-chart-hint" style="margin:0">Base própria (115 ordens de serviço de manutenção predial, transcrição completa — Salvador/RMS + Interior) — universo completo, a mesma base do cartão "Valor Total da Manutenção" na Visão Geral. Diferente do cartão "Unidades com Manutenção Registrada" (esse sim é a fatia vinculada a uma unidade específica).</p>
+          <p class="dash-chart-hint" style="margin:0">Base própria (115 ordens de serviço de manutenção predial, transcrição completa — Salvador/RMS + Interior) — universo completo, a mesma base do cartão "Valor Total de Obra (Manutenção)" na Visão Geral. Diferente do cartão "Unidades com Manutenção Registrada" (esse sim é a fatia vinculada a uma unidade específica).</p>
         </div>
         <div class="dash-toggle" id="manut-regiao-seg">
           <button class="dash-toggle-btn active" data-val="">TODAS</button>
@@ -10921,8 +10921,8 @@ async function carregarObrasPortal(portalSlug) {
 
     document.getElementById("obras-kpis").innerHTML = `
       <div class="kpi-card"><div class="kpi-cabeca">${kpiIcone("predio")}<div class="kpi-label">Unidades</div></div><div class="kpi-value">${filtrada.length.toLocaleString("pt-BR")}</div></div>
-      <div class="kpi-card kpi-clicavel" data-acao-obras-kpi="ceirf" title="Clique pra ver o detalhe no Controle CEIRF" style="cursor:pointer"><div class="kpi-cabeca">${kpiIcone("moeda")}<div class="kpi-label">Valor Total da Obra</div></div><div class="kpi-value">R$ ${formatarMoedaCompacta(valorObraCeirf)}</div><div class="kpi-valor-exato">${formatarMoedaBR(valorObraCeirf)} — ${ceirfAmpliado.length} intervenções do Controle CEIRF (escopo ampliado)</div></div>
-      <div class="kpi-card kpi-clicavel" data-acao-obras-kpi="manutencao" title="Clique pra ver o detalhe em Manutenção PC" style="cursor:pointer"><div class="kpi-cabeca">${kpiIcone("moeda")}<div class="kpi-label">Valor Total da Manutenção</div></div><div class="kpi-value">R$ ${formatarMoedaCompacta(valorManutencaoPC)}</div><div class="kpi-valor-exato">${formatarMoedaBR(valorManutencaoPC)} — ${manutencaoTodas.length} ordens de serviço (Manutenção PC, universo completo)</div></div>
+      <div class="kpi-card kpi-clicavel" data-acao-obras-kpi="ceirf" title="Clique pra ver o detalhe no Controle CEIRF" style="cursor:pointer"><div class="kpi-cabeca">${kpiIcone("moeda")}<div class="kpi-label">Valor Total de Obra (Construção)</div></div><div class="kpi-value">R$ ${formatarMoedaCompacta(valorObraCeirf)}</div><div class="kpi-valor-exato">${formatarMoedaBR(valorObraCeirf)} — ${ceirfAmpliado.length} intervenções do Controle CEIRF (escopo ampliado)</div></div>
+      <div class="kpi-card kpi-clicavel" data-acao-obras-kpi="manutencao" title="Clique pra ver o detalhe em Manutenção PC" style="cursor:pointer"><div class="kpi-cabeca">${kpiIcone("moeda")}<div class="kpi-label">Valor Total de Obra (Manutenção)</div></div><div class="kpi-value">R$ ${formatarMoedaCompacta(valorManutencaoPC)}</div><div class="kpi-valor-exato">${formatarMoedaBR(valorManutencaoPC)} — ${manutencaoTodas.length} ordens de serviço (Manutenção PC, universo completo)</div></div>
       <div class="kpi-card kpi-clicavel" data-acao-obras-kpi="ceirf" title="Clique pra ver o detalhe no Controle CEIRF" style="cursor:pointer"><div class="kpi-cabeca">${kpiIcone("obras")}<div class="kpi-label">Obras Em Execução</div></div><div class="kpi-value">${emExecucaoCeirf.toLocaleString("pt-BR")}</div><div class="kpi-valor-exato">de ${ceirfAmpliado.length} intervenções (Controle CEIRF)</div></div>
       <div class="kpi-card kpi-clicavel" data-acao-obras-kpi="ceirf" title="Clique pra ver o detalhe no Controle CEIRF" style="cursor:pointer"><div class="kpi-cabeca">${kpiIcone("selo")}<div class="kpi-label">% Obras Concluídas</div></div><div class="kpi-value">${percentualConcluidasCeirf === null ? "—" : (percentualConcluidasCeirf * 100).toLocaleString("pt-BR", { maximumFractionDigits: 1 }) + "%"}</div><div class="kpi-valor-exato">${concluidasCeirf} de ${ceirfAmpliado.length} intervenções (Controle CEIRF)</div></div>
       <div class="kpi-card"><div class="kpi-cabeca">${kpiIcone("obras")}<div class="kpi-label">Unidades com Manutenção Registrada</div></div><div class="kpi-value">${percentualComManutencao === null ? "—" : (percentualComManutencao * 100).toLocaleString("pt-BR", { maximumFractionDigits: 1 }) + "%"}</div><div class="kpi-valor-exato">${comValorManutencao.length} de ${filtrada.length} unidades</div></div>
@@ -11032,12 +11032,13 @@ function montarPainelEntenderFinanceiroObras(unidades, ceirfAmpliado, manutencao
     "",
     { rotuloCentro: "UNIDADES" }
   );
-  return `<h4>Entender os Dados — Valores de Obra e Manutenção</h4>
-    <p class="dash-chart-hint"><strong>Os cartões "Valor Total da Obra" (${formatarMoedaBR(valorObraCeirf)}) e "Valor Total da Manutenção" (${formatarMoedaBR(valorManutencaoPC)}) lá em cima são os números certos</strong> — vêm do Controle CEIRF (${ceirfAmpliado.length} intervenções) e da Manutenção PC (${manutencaoTodas.length} ordens), bases próprias, completas e conferidas contra o PDF oficial.</p>
+  return `<h4>Entender os Dados — Valores de Obra (Construção e Manutenção)</h4>
+    <p class="dash-chart-hint">Construção e manutenção são dois TIPOS de obra, não duas coisas separadas — por isso os dois cartões abaixo levam "Obra" no nome.</p>
+    <p class="dash-chart-hint"><strong>Os cartões "Valor Total de Obra (Construção)" (${formatarMoedaBR(valorObraCeirf)}) e "Valor Total de Obra (Manutenção)" (${formatarMoedaBR(valorManutencaoPC)}) lá em cima são os números certos</strong> — vêm do Controle CEIRF (${ceirfAmpliado.length} intervenções) e da Manutenção PC (${manutencaoTodas.length} ordens), bases próprias, completas e conferidas contra o PDF oficial.</p>
     <p class="dash-chart-hint">Já o gráfico "Financeiro por Diretoria Regional" abaixo usa os campos <code>valorDaObra</code>/<code>valorDaManutencao</code> de cada Unidade Policial — preenchidos por um cruzamento automático por SIMILARIDADE DE TEXTO contra a planilha original, que não pega todo mundo:</p>
     <div style="display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start;margin-top:8px">
-      <div style="max-width:200px"><p class="dash-chart-hint" style="font-weight:600;text-align:center">Obra</p>${donutObra}</div>
-      <div style="max-width:200px"><p class="dash-chart-hint" style="font-weight:600;text-align:center">Manutenção</p>${donutManutencao}</div>
+      <div style="max-width:200px"><p class="dash-chart-hint" style="font-weight:600;text-align:center">Obra — Construção</p>${donutObra}</div>
+      <div style="max-width:200px"><p class="dash-chart-hint" style="font-weight:600;text-align:center">Obra — Manutenção</p>${donutManutencao}</div>
       <div style="flex:1;min-width:220px">
         <p class="dash-chart-hint">Por isso a soma do gráfico por Diretoria Regional fica sempre ABAIXO dos cartões de cima — não é dado perdido, é um cruzamento imperfeito sobre um universo menor (${unidades.length} unidades no total).</p>
       </div>
