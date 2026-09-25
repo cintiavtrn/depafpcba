@@ -946,6 +946,10 @@ const ICONS = {
   ampliar: "<svg viewBox=\"0 0 64 64\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"6\" stroke-linecap=\"square\" stroke-linejoin=\"miter\" xmlns=\"http://www.w3.org/2000/svg\"><polyline points=\"6,22 6,6 22,6\" /><polyline points=\"42,6 58,6 58,22\" /><polyline points=\"58,42 58,58 42,58\" /><polyline points=\"22,58 6,58 6,42\" /></svg>",
   fechar: "<svg viewBox=\"0 0 64 64\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"6\" stroke-linecap=\"square\" stroke-linejoin=\"miter\" xmlns=\"http://www.w3.org/2000/svg\"><line x1=\"12\" y1=\"12\" x2=\"52\" y2=\"52\" /><line x1=\"52\" y1=\"12\" x2=\"12\" y2=\"52\" /></svg>",
   informacao: "<svg viewBox=\"0 0 64 64\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"square\" stroke-linejoin=\"miter\" xmlns=\"http://www.w3.org/2000/svg\"><circle cx=\"32\" cy=\"32\" r=\"24\" /><line x1=\"32\" y1=\"28\" x2=\"32\" y2=\"44\" /><circle cx=\"32\" cy=\"18\" r=\"2.5\" fill=\"currentColor\" stroke=\"none\" /></svg>",
+  // Pedido direto: "não fosse esses ícones de emoji e sim algo mais ícones
+  // profissionais como implementamos" — mesmo raciocínio de download/upload/
+  // ampliar/fechar/informacao acima, pro 🔍 de "Entender os Dados".
+  lupa: "<svg viewBox=\"0 0 64 64\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"square\" stroke-linejoin=\"miter\" xmlns=\"http://www.w3.org/2000/svg\"><circle cx=\"27\" cy=\"27\" r=\"17\" /><line x1=\"39\" y1=\"39\" x2=\"56\" y2=\"56\" /></svg>",
   link: "<svg viewBox=\"0 0 64 64\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linejoin=\"miter\" xmlns=\"http://www.w3.org/2000/svg\"><rect x=\"6\" y=\"22\" width=\"24\" height=\"20\" transform=\"rotate(-28 18 32)\" /><rect x=\"34\" y=\"22\" width=\"24\" height=\"20\" transform=\"rotate(-28 46 32)\" /></svg>",
   estrela_cheia: "<svg viewBox=\"0 0 64 64\" fill=\"currentColor\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linejoin=\"miter\" xmlns=\"http://www.w3.org/2000/svg\"><polygon points=\"32,6 38,23 57,24 42,35 47,53 32,43 17,53 22,35 7,24 26,23\" /></svg>",
   estrela_vazia: "<svg viewBox=\"0 0 64 64\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"3\" stroke-linejoin=\"miter\" xmlns=\"http://www.w3.org/2000/svg\"><polygon points=\"32,6 38,23 57,24 42,35 47,53 32,43 17,53 22,35 7,24 26,23\" /></svg>",
@@ -4451,6 +4455,38 @@ function kpiIcone(chaveIcone, cor) {
 // ícones — ★, ⓘ — pedem um pixel a mais/menos pra centralizar no olho).
 function iconeInline(chaveIcone, tamanho = 14, deslocar = -3) {
   return `<span style="display:inline-flex;width:${tamanho}px;height:${tamanho}px;vertical-align:${deslocar}px;flex:none">${ICONS[chaveIcone]}</span>`;
+}
+
+// Botão padrão "Entender os Dados" — reaproveitado em qualquer painel (CFCR,
+// CPG-Contratos, Painel de Obras...). `chave` liga no data-entender-toggle
+// que o listener de cada painel escuta; `texto` é só a parte depois do
+// travessão (o rótulo "ENTENDER OS DADOS" já vem fixo, pra ficar igual em
+// todo canto do sistema).
+function botaoEntenderDadosHTML(chave, texto) {
+  return `<button type="button" class="dash-toggle-btn" data-entender-toggle="${escapeAttr(chave)}">${iconeInline("lupa", 12, -2)} ENTENDER OS DADOS — ${escapeHTML(texto)}</button>`;
+}
+
+// Liga todo botão "Entender os Dados" de um painel ao respectivo painel
+// explicativo (lazy: só monta na 1ª vez que abre). Reaproveitado por
+// qualquer painel que use botaoEntenderDadosHTML — `montadores` é um mapa
+// chave -> função sem argumento que retorna o HTML do painel; o alvo em tela
+// é sempre `${prefixo}-entender-${chave}`. `active` no botão (mesmo
+// vocabulário visual do dash-toggle) marca "aberto".
+function ativarBotoesEntenderDados(prefixo, montadores) {
+  document.querySelectorAll("[data-entender-toggle]").forEach((btn) => {
+    const chave = btn.dataset.entenderToggle;
+    if (!(chave in montadores)) return;
+    btn.addEventListener("click", () => {
+      const painelAlvo = document.getElementById(`${prefixo}-entender-${chave}`);
+      if (!painelAlvo) return;
+      if (!painelAlvo.dataset.montado) {
+        painelAlvo.innerHTML = montadores[chave]();
+        painelAlvo.dataset.montado = "1";
+      }
+      painelAlvo.hidden = !painelAlvo.hidden;
+      btn.classList.toggle("active", !painelAlvo.hidden);
+    });
+  });
 }
 
 // Pedido direto: "cria ícones para cada área gestora e cada categoria... e
@@ -8863,9 +8899,15 @@ function renderPorDimensaoContratos(lista, cfg, unidadeGestoraAtiva) {
         <div class="kpi-card"><div class="kpi-cabeca">${kpiIcone("predio")}<div class="kpi-label">Contratos com Unidade Cadastrada</div></div><div class="kpi-value">${contratosComUnidade.length}</div></div>
         <div class="kpi-card kpi-clicavel" data-compartilhados title="Clique pra ver quais são — cada um atende mais de uma DIRPIN ao mesmo tempo" style="--kpi-cor:var(--crit-alto);cursor:pointer;${filtroApenasCompartilhados ? "outline:2px solid var(--crit-alto);outline-offset:-2px" : ""}"><div class="kpi-cabeca">${kpiIcone("alerta")}<div class="kpi-label">Compartilhados entre DIRPIN</div></div><div class="kpi-value">${compartilhados}</div></div>
       </div>
-      <p class="dash-chart-hint" style="margin-top:4px">${exclusivos} contrato(s) atende(m) uma DIRPIN só — os outros ${compartilhados} atendem mais de uma (por isso a soma dos filtros de DIRPIN acima passa de ${contratosComUnidade.length}). Útil saber antes de montar relatório ou apresentação com esse corte.</p>` : ""}
+      <p class="dash-chart-hint" style="margin-top:4px">${exclusivos} contrato(s) atende(m) uma DIRPIN só — os outros ${compartilhados} atendem mais de uma (por isso a soma dos filtros de DIRPIN acima passa de ${contratosComUnidade.length}). Útil saber antes de montar relatório ou apresentação com esse corte.</p>
+      <div class="dash-toggle" style="margin-top:6px">${botaoEntenderDadosHTML("compartilhados", "por que a soma das DIRPIN passa do total de contratos")}</div>
+      <div id="contratos-entender-compartilhados" style="margin-top:10px" hidden></div>` : ""}
       ${p !== "area" ? "" : `<div class="dash-chart-box" id="${p}-grafico-unidade-caixa" style="margin-top:16px;border-left:4px solid var(--dourado);background:color-mix(in srgb, var(--dourado) 7%, transparent)">
-        <h4>Distribuição Geográfica</h4>
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">
+          <h4 style="margin-bottom:0">Distribuição Geográfica</h4>
+          <div class="dash-toggle">${botaoEntenderDadosHTML("geografia", "por que nem todo contrato vira um ponto no mapa")}</div>
+        </div>
+        <div id="contratos-entender-geografia" style="margin:10px 0" hidden></div>
         ${!contratosComUnidade.length ? `
         <!-- Pedido direto (crítica externa que ela trouxe, aprovada via
         pergunta direta): mostrar mapa/barras/Salvador pra um recorte SEM
@@ -8896,6 +8938,13 @@ function renderPorDimensaoContratos(lista, cfg, unidadeGestoraAtiva) {
         <div id="${p}-legenda-mapa-unidade"></div>`}
       </div>`}
     `;
+    // Antes do "return" cedo (sem unidade nenhuma) — o botão "geografia"
+    // sempre existe quando p==="area" (mesmo no ramo sem dado), então liga
+    // aqui, não depois do return.
+    ativarBotoesEntenderDados("contratos", {
+      compartilhados: () => montarPainelEntenderCompartilhadosContratos(listaCompleta),
+      geografia: () => montarPainelEntenderGeografiaContratos(listaCompleta),
+    });
     // Fora de "Por Área Gestora", a caixa "Distribuição Geográfica" não
     // existe mais (pedido dela: o mapa virou modo de visualização da
     // tabela "Setor Demandante" em Categoria/Gestor/Fiscal/Analista — ver
@@ -10321,6 +10370,8 @@ async function carregarObrasPortal(portalSlug) {
           </div>
           <p class="dash-chart-hint">Obra e manutenção são registros diferentes na planilha-fonte — nem toda unidade com manutenção tem valor de obra, e vice-versa — por isso cada uma tem seu próprio cartão abaixo.</p>
           <p class="dash-chart-hint">Esta quebra por Diretoria Regional usa o valor registrado em cada unidade individualmente — menos completo que o Controle CEIRF/Manutenção PC, que não têm campo de Diretoria Regional pra cruzar — por isso a soma aqui fica abaixo dos cartões "Valor Total da Obra/Manutenção" lá em cima, que vêm das bases completas.</p>
+          <div class="dash-toggle">${botaoEntenderDadosHTML("financeiro", "por que os dois valores de obra/manutenção não batem")}</div>
+          <div id="obras-entender-financeiro" style="margin-top:10px" hidden></div>
         </div>
         <div class="dash-charts" style="grid-template-columns:1fr 1fr">
           <div class="dash-chart-box">
@@ -10947,9 +10998,50 @@ async function carregarObrasPortal(portalSlug) {
     desenharDetalhe();
   }
 
+  // Pedido direto dela ("o valor de manutenção é o que está na aba
+  // manutenção... o valor de obra é os 290 milhões que está em CEIRF...
+  // verificar isso") — mesma lógica do comentário de atualizar() acima,
+  // reaproveitada aqui num painel fixo (não depende do filtro do momento).
+  ativarBotoesEntenderDados("obras", {
+    financeiro: () => montarPainelEntenderFinanceiroObras(unidades, ceirfAmpliado, manutencaoTodas),
+  });
+
   atualizar();
   atualizarCeirf();
   atualizarManutencao();
+}
+
+function montarPainelEntenderFinanceiroObras(unidades, ceirfAmpliado, manutencaoTodas) {
+  const valorObraCeirf = ceirfAmpliado.reduce((a, r) => a + (r.valorGlobal || 0), 0);
+  const valorManutencaoPC = manutencaoTodas.reduce((a, r) => a + (r.valorOrcado || 0), 0);
+  const comValorObra = unidades.filter((u) => u.valorDaObra != null).length;
+  const comValorManutencao = unidades.filter((u) => u.valorDaManutencao != null).length;
+  const donutObra = donutCfcrSVG(
+    [
+      { label: "Com valorDaObra preenchido (cruzamento por texto)", valor: comValorObra, cor: "var(--cfcr-ok)" },
+      { label: "Sem esse campo", valor: unidades.length - comValorObra, cor: "var(--cfcr-neutro)" },
+    ],
+    "",
+    { rotuloCentro: "UNIDADES" }
+  );
+  const donutManutencao = donutCfcrSVG(
+    [
+      { label: "Com valorDaManutencao preenchido (cruzamento por texto)", valor: comValorManutencao, cor: "var(--cfcr-ok)" },
+      { label: "Sem esse campo", valor: unidades.length - comValorManutencao, cor: "var(--cfcr-neutro)" },
+    ],
+    "",
+    { rotuloCentro: "UNIDADES" }
+  );
+  return `<h4>Entender os Dados — Valores de Obra e Manutenção</h4>
+    <p class="dash-chart-hint"><strong>Os cartões "Valor Total da Obra" (${formatarMoedaBR(valorObraCeirf)}) e "Valor Total da Manutenção" (${formatarMoedaBR(valorManutencaoPC)}) lá em cima são os números certos</strong> — vêm do Controle CEIRF (${ceirfAmpliado.length} intervenções) e da Manutenção PC (${manutencaoTodas.length} ordens), bases próprias, completas e conferidas contra o PDF oficial.</p>
+    <p class="dash-chart-hint">Já o gráfico "Financeiro por Diretoria Regional" abaixo usa os campos <code>valorDaObra</code>/<code>valorDaManutencao</code> de cada Unidade Policial — preenchidos por um cruzamento automático por SIMILARIDADE DE TEXTO contra a planilha original, que não pega todo mundo:</p>
+    <div style="display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start;margin-top:8px">
+      <div style="max-width:200px"><p class="dash-chart-hint" style="font-weight:600;text-align:center">Obra</p>${donutObra}</div>
+      <div style="max-width:200px"><p class="dash-chart-hint" style="font-weight:600;text-align:center">Manutenção</p>${donutManutencao}</div>
+      <div style="flex:1;min-width:220px">
+        <p class="dash-chart-hint">Por isso a soma do gráfico por Diretoria Regional fica sempre ABAIXO dos cartões de cima — não é dado perdido, é um cruzamento imperfeito sobre um universo menor (${unidades.length} unidades no total).</p>
+      </div>
+    </div>`;
 }
 
 // ---------- CFCR: Termos de Cooperação (Municipais e Congêneres) ----------
@@ -11282,6 +11374,66 @@ function montarPainelEntenderAClassificarCfcr(todosAC, termosTCT) {
     </div>`;
 }
 
+// ---- CPG - Contratos — mesmos 2 helpers (donutCfcrSVG/vennTresConjuntosSVG)
+// reaproveitados aqui apesar do nome "Cfcr": são genéricos, só nasceram lá
+// primeiro. `listaCompleta` = lista da área/categoria ANTES do filtro de
+// DIRPIN/COORPIN (ver renderFiltroUnidade) — é o universo fixo de
+// referência dela mesma ("18+13+12+16+10=69 vs 52 contratos").
+function montarPainelEntenderCompartilhadosContratos(listaCompleta) {
+  const comUnidade = listaCompleta.filter((c) => (c.unidades || []).length > 0);
+  const compartilhados = comUnidade.filter((c) => new Set(c.unidades.map((u) => u.dirpin)).size > 1);
+  const exclusivos = comUnidade.length - compartilhados.length;
+  const donut = donutCfcrSVG(
+    [
+      { label: "Exclusivos (atende 1 DIRPIN só)", valor: exclusivos, cor: "var(--cfcr-ok)" },
+      { label: "Compartilhados (mais de 1 DIRPIN)", valor: compartilhados.length, cor: "var(--cfcr-bad)" },
+    ],
+    "",
+    { rotuloCentro: "CONTRATOS" }
+  );
+  const contagemDirpin = new Map();
+  for (const c of comUnidade) for (const d of new Set(c.unidades.map((u) => u.dirpin))) contagemDirpin.set(d, (contagemDirpin.get(d) || 0) + 1);
+  const top3 = [...contagemDirpin.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3).map(([d]) => d);
+  let vennHTML = "";
+  if (top3.length === 3) {
+    const cores = ["var(--cfcr-info)", "var(--cfcr-laranja)", "var(--cfcr-roxo)"];
+    const conjuntos = top3.map((d, i) => ({
+      label: d,
+      cor: cores[i],
+      membros: new Set(comUnidade.filter((c) => c.unidades.some((u) => u.dirpin === d)).map((c) => c.id)),
+    }));
+    vennHTML = `<p class="dash-chart-hint">Exemplo real com as 3 DIRPIN com mais contratos:</p><div style="max-width:320px;margin:8px auto">${vennTresConjuntosSVG(conjuntos)}</div>`;
+  }
+  return `<h4>Entender os Dados — Compartilhados entre DIRPIN</h4>
+    <div style="display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start">
+      <div style="max-width:220px">${donut}</div>
+      <div style="flex:1;min-width:260px">
+        <p class="dash-chart-hint">Um contrato de alimentação, correio ou outro serviço abrangente pode atender MAIS de uma DIRPIN ao mesmo tempo — por isso a soma dos cartões/barras por DIRPIN passa do total de contratos com unidade cadastrada (${comUnidade.length}). Não é filtro quebrado: é contrato que serve mais de um lugar.</p>
+        ${vennHTML}
+      </div>
+    </div>`;
+}
+
+function montarPainelEntenderGeografiaContratos(listaCompleta) {
+  const comUnidade = listaCompleta.filter((c) => (c.unidades || []).length > 0);
+  const semUnidade = listaCompleta.length - comUnidade.length;
+  const donut = donutCfcrSVG(
+    [
+      { label: "Com COORPIN cadastrada (ponto real no mapa)", valor: comUnidade.length, cor: "var(--cfcr-ok)" },
+      { label: 'Sem unidade (agregado em "Salvador — outras áreas")', valor: semUnidade, cor: "var(--cfcr-neutro)" },
+    ],
+    "",
+    { rotuloCentro: "CONTRATOS" }
+  );
+  return `<h4>Entender os Dados — Distribuição Geográfica</h4>
+    <div style="display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start">
+      <div style="max-width:220px">${donut}</div>
+      <div style="flex:1;min-width:260px">
+        <p class="dash-chart-hint">Só a DEPIN cadastra unidade regional (COORPIN) hoje — os outros ${semUnidade.toLocaleString("pt-BR")} contrato(s) desta área não têm essa informação, e entram juntos em "Salvador (outras áreas)" no mapa/barras (a maioria dessas áreas é coordenação central do estado, então Salvador é a melhor aproximação sem inventar dado que a planilha não tem).</p>
+      </div>
+    </div>`;
+}
+
 async function carregarCfcrPortal(portalSlug) {
   const painel = document.getElementById("tab-cfcr");
   painel.innerHTML = `<p class="tela-intro">Carregando os termos de cooperação...</p>`;
@@ -11320,7 +11472,7 @@ async function carregarCfcrPortal(portalSlug) {
     <p class="tela-intro">Termos de Cooperação Técnica · DEPIN · DEPOM · DPMCV — clique em qualquer cartão, fatia ou barra pra isolar o recorte em todas as seções ao mesmo tempo. Parcerias institucionais do GDG (ainda não confirmadas como Congênere) ficam na aba "A Classificar", à parte.</p>
     <div id="cfcr-chips"></div>
     <div class="kpi-row" id="cfcr-kpis" style="margin-bottom:16px"></div>
-    <div class="dash-toggle" style="margin-bottom:16px"><button type="button" class="dash-toggle-btn" data-entender-toggle="universo">🔍 ENTENDER OS DADOS — o que é 418, o que é 30, por que não somam 448 em lugar nenhum</button></div>
+    <div class="dash-toggle" style="margin-bottom:16px">${botaoEntenderDadosHTML("universo", "o que é 418, o que é 30, por que não somam 448 em lugar nenhum")}</div>
     <div class="dash-chart-box" id="cfcr-entender-universo" style="margin-bottom:16px" hidden></div>
     <div class="tabs" id="cfcr-subtabs" style="margin-bottom:14px">
       ${SUBABAS_CFCR.map((s, i) => `<button type="button" class="tab-btn${i === 0 ? " active" : ""}" data-subtab-cfcr="${s.chave}">${s.rotulo}</button>`).join("")}
@@ -11372,7 +11524,7 @@ async function carregarCfcrPortal(portalSlug) {
           <p class="dash-chart-hint" id="cfcr-servicos-cobertura" style="font-weight:600"></p>
           <div id="cfcr-servicos"></div>
           <p class="dash-chart-hint" id="cfcr-servicos-sem-dado"></p>
-          <div class="dash-toggle" style="margin-top:10px"><button type="button" class="dash-toggle-btn" data-entender-toggle="servicos">🔍 ENTENDER OS DADOS — por que um município pode contar em mais de uma barra</button></div>
+          <div class="dash-toggle" style="margin-top:10px">${botaoEntenderDadosHTML("servicos", "por que um município pode contar em mais de uma barra")}</div>
           <div id="cfcr-entender-servicos" style="margin-top:10px" hidden></div>
         </div>
         <div class="dash-chart-box">
@@ -11407,7 +11559,7 @@ async function carregarCfcrPortal(portalSlug) {
         </div>
         <div id="cfcr-geo-visual"></div>
         <div id="cfcr-geo-legenda"></div>
-        <div class="dash-toggle" style="margin-top:10px"><button type="button" class="dash-toggle-btn" data-entender-toggle="territorio">🔍 ENTENDER OS DADOS — por que o mapa mostra menos que 418</button></div>
+        <div class="dash-toggle" style="margin-top:10px">${botaoEntenderDadosHTML("territorio", "por que o mapa mostra menos que 418")}</div>
         <div id="cfcr-entender-territorio" style="margin-top:10px" hidden></div>
       </div>
     </div>
@@ -11415,7 +11567,7 @@ async function carregarCfcrPortal(portalSlug) {
     <div id="cfcr-sub-aclassificar" hidden>
       <p class="dash-chart-hint">Estrutura diferente dos Termos de Cooperação Técnica — parcerias institucionais (não municipais), sem lista de serviços própria, e ainda não confirmadas como "Congênere" propriamente dito (ver Detalhamento abaixo).</p>
       <div class="kpi-row" id="cfcr-ac-kpis" style="margin-bottom:16px"></div>
-      <div class="dash-toggle" style="margin-bottom:16px"><button type="button" class="dash-toggle-btn" data-entender-toggle="aclassificar">🔍 ENTENDER OS DADOS — por que isso nunca entra no total de 418</button></div>
+      <div class="dash-toggle" style="margin-bottom:16px">${botaoEntenderDadosHTML("aclassificar", "por que isso nunca entra no total de 418")}</div>
       <div class="dash-chart-box" id="cfcr-entender-aclassificar" style="margin-bottom:16px" hidden></div>
       <div class="dash-chart-box">
         <h4>Distribuição por Status<small class="dash-chart-hint" style="display:block;margin-top:4px">Clique numa fatia ou na legenda pra isolar aquele status.</small></h4>
@@ -12056,23 +12208,12 @@ async function carregarCfcrPortal(portalSlug) {
   // Pedido direto: botão "Entender os Dados" abre um painel com diagrama —
   // computa a partir do universo FIXO (termosTodos/termosTCT), não do
   // recorte filtrado no momento, porque explica a estrutura dos dados, não
-  // "o que sobrou depois do filtro". Lazy: só monta na 1ª vez que abre
-  // (dataset.montado evita remontar toda vez que clica pra fechar/abrir).
-  document.querySelectorAll("[data-entender-toggle]").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      const chave = btn.dataset.entenderToggle;
-      const painelAlvo = document.getElementById(`cfcr-entender-${chave}`);
-      if (!painelAlvo) return;
-      if (!painelAlvo.dataset.montado) {
-        if (chave === "universo") painelAlvo.innerHTML = montarPainelEntenderUniversoCfcr(termosTodos, termosTCT);
-        else if (chave === "servicos") painelAlvo.innerHTML = montarPainelEntenderServicosCfcr(termosTCT);
-        else if (chave === "territorio") painelAlvo.innerHTML = montarPainelEntenderTerritorioCfcr(termosTCT);
-        else if (chave === "aclassificar") painelAlvo.innerHTML = montarPainelEntenderAClassificarCfcr(termosTodos.filter((t) => t.tipo === TIPO_A_CLASSIFICAR_CFCR), termosTCT);
-        painelAlvo.dataset.montado = "1";
-      }
-      painelAlvo.hidden = !painelAlvo.hidden;
-      btn.textContent = btn.textContent.startsWith("🔼") ? btn.textContent.replace("🔼", "🔍") : btn.textContent.replace("🔍", "🔼");
-    });
+  // "o que sobrou depois do filtro".
+  ativarBotoesEntenderDados("cfcr", {
+    universo: () => montarPainelEntenderUniversoCfcr(termosTodos, termosTCT),
+    servicos: () => montarPainelEntenderServicosCfcr(termosTCT),
+    territorio: () => montarPainelEntenderTerritorioCfcr(termosTCT),
+    aclassificar: () => montarPainelEntenderAClassificarCfcr(termosTodos.filter((t) => t.tipo === TIPO_A_CLASSIFICAR_CFCR), termosTCT),
   });
 
   atualizar();
