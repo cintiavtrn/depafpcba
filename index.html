@@ -11288,13 +11288,17 @@ function vennTresConjuntosSVG(conjuntos) {
   });
   const r = 78, cA = [118, 106], cB = [182, 106], cC = [150, 166];
   const num = (v, x, y, tam = 13) => `<text x="${x}" y="${y}" text-anchor="middle" font-family="monospace" font-size="${tam}" font-weight="700" fill="var(--carvao)">${v.toLocaleString("pt-BR")}</text>`;
-  return `<svg viewBox="0 0 300 250" xmlns="http://www.w3.org/2000/svg">
+  // Pedido direto ("melhorar o diagrama de venn... tá muito confusa a
+  // visualização" + "aqui cortou um pouco a palavra"): os 3 rótulos ficavam
+  // escritos EM CIMA dos círculos (colidindo com o traço) e o de baixo
+  // vazava do viewBox quando quebrava em 2 linhas. Tirei o texto de dentro
+  // do desenho — agora o SVG só tem círculo + número — e o nome de cada
+  // conjunto vira legenda embaixo (mesmo componente donut-legenda/donut-leg
+  // do donut, cor do quadradinho = cor do círculo), sem risco de corte.
+  const svg = `<svg viewBox="0 20 300 230" xmlns="http://www.w3.org/2000/svg">
     <circle cx="${cA[0]}" cy="${cA[1]}" r="${r}" fill="${A.cor}" fill-opacity="0.32" stroke="${A.cor}" stroke-width="1.5" />
     <circle cx="${cB[0]}" cy="${cB[1]}" r="${r}" fill="${B.cor}" fill-opacity="0.32" stroke="${B.cor}" stroke-width="1.5" />
     <circle cx="${cC[0]}" cy="${cC[1]}" r="${r}" fill="${C.cor}" fill-opacity="0.32" stroke="${C.cor}" stroke-width="1.5" />
-    ${textoSVG(A.label, 62, 42, { maxChars: 15, anchor: "middle", fontSize: 9, peso: 700 })}
-    ${textoSVG(B.label, 238, 42, { maxChars: 15, anchor: "middle", fontSize: 9, peso: 700 })}
-    ${textoSVG(C.label, 150, 242, { maxChars: 15, anchor: "middle", fontSize: 9, peso: 700 })}
     ${num(apenasA, 78, 92)}
     ${num(apenasB, 222, 92)}
     ${num(apenasC, 150, 210)}
@@ -11303,6 +11307,8 @@ function vennTresConjuntosSVG(conjuntos) {
     ${num(bc, 200, 150, 12)}
     ${num(abc, 150, 122, 12)}
   </svg>`;
+  const legenda = conjuntos.map((c) => `<div class="donut-leg" style="cursor:default"><span class="sw" style="background:${c.cor}"></span><span class="lg-nome">${escapeHTML(c.label)}</span></div>`).join("");
+  return `${svg}<div class="donut-legenda">${legenda}</div>`;
 }
 
 // ---- Painéis "Entender os Dados" — lazy: só computam/desenham na 1ª vez
@@ -11479,19 +11485,32 @@ function abrirRelatorioImprimivel(titulo, corpoHTML) {
      definidas aqui, o texto das fatias fica preto sem contraste ou some. */
   :root { --carvao: #22262E; --paper: #FAFAF8; }
   * { box-sizing: border-box; }
+  /* Sem isso, o navegador some com toda cor de FUNDO ao imprimir/gerar PDF
+     por padrão (a opção "Gráficos de segundo plano" do diálogo de impressão
+     vem desmarcada) — a legenda do donut/venn e a barra preenchida usam
+     background pra mostrar a cor, então ficavam sem cor nenhuma (achado
+     dela: "na legenda tá sem cor"). O preenchimento do SVG (fatia do donut,
+     círculo do venn) não depende disso — é desenho, não CSS. */
+  * { -webkit-print-color-adjust: exact; print-color-adjust: exact; color-adjust: exact; }
   body { font-family: 'Segoe UI', Arial, sans-serif; color: #22262E; background: #fff; margin: 0; padding: 24px; max-width: 900px; margin: 0 auto; }
   h1 { font-size: 26px; margin: 4px 0 2px; color: #2B5CA8; }
   h2 { font-size: 15px; margin: 26px 0 2px; border-top: 2px solid #22262E; padding-top: 10px; }
   h2:first-of-type { border-top: none; padding-top: 0; margin-top: 6px; }
   h3 { font-size: 12.5px; margin: 2px 0 12px; color: #5B6478; font-weight: 600; }
-  p { font-size: 11px; line-height: 1.55; margin: 4px 0; }
-  .rel-topo { font-size: 10px; color: #8A8F9C; margin-bottom: 14px; }
+  p { font-size: 11px; line-height: 1.55; margin: 4px 0; text-align: justify; }
+  .rel-topo { font-size: 10px; color: #8A8F9C; margin-bottom: 14px; text-align: left; }
   .rel-kpis { display: flex; gap: 10px; margin: 12px 0 16px; flex-wrap: wrap; }
   .rel-kpi { border: 1.5px solid #ccc; border-radius: 8px; padding: 10px 12px; flex: 1; min-width: 120px; text-align: center; }
   .rel-kpi .valor { font-size: 21px; font-weight: 700; }
   .rel-kpi .rotulo { font-size: 8.5px; color: #5B6478; text-transform: uppercase; letter-spacing: .03em; }
   .rel-caixa { border: 1px solid #D8D6CC; border-radius: 8px; padding: 10px 14px; margin: 10px 0; }
-  table { width: 100%; border-collapse: collapse; font-size: 10px; margin: 8px 0; }
+  /* table-layout fixed + word-break: sem isso um valor comprido (processo
+     SEI, nome de empresa, rótulo de unidade) força a tabela inteira pra
+     além da margem da página — achado dela duas vezes ("a margem tá
+     passando"). Com fixed, a coluna estoura pra dentro (quebra linha),
+     nunca pra fora (não respeita @page). */
+  table { width: 100%; border-collapse: collapse; font-size: 10px; margin: 8px 0; table-layout: fixed; }
+  th, td { word-wrap: break-word; overflow-wrap: break-word; }
   th { background: #22262E; color: #fff; text-align: left; padding: 5px 7px; }
   td { padding: 5px 7px; border-bottom: 1px solid #E4E2D8; }
   tr:nth-child(even) td { background: #F4F3EE; }
@@ -11501,13 +11520,21 @@ function abrirRelatorioImprimivel(titulo, corpoHTML) {
   .rel-bar-rotulo { width: 38%; max-width: 200px; text-align: right; flex: none; }
   .rel-bar-trilha { flex: 1; min-width: 40px; background: #F0EFE9; border-radius: 3px; height: 14px; position: relative; }
   .rel-bar-preenchido { background: #2B5CA8; height: 100%; border-radius: 3px; }
-  .rel-bar-valor { width: 34px; flex: none; font-weight: 600; }
+  .rel-bar-valor { min-width: 34px; width: auto; flex: none; font-weight: 600; white-space: nowrap; padding-left: 4px; }
   svg { max-width: 100%; height: auto; }
   .donut-legenda { display: flex; flex-direction: column; gap: 2px; margin-top: 10px; border-top: 1px solid #E4E2D8; padding-top: 8px; }
   .donut-leg { display: flex; align-items: flex-start; gap: 8px; background: none; border: none; padding: 3px 0; font-family: 'Segoe UI', Arial, sans-serif; font-size: 10.5px; color: #22262E; text-align: left; }
-  .donut-leg .sw { width: 10px; height: 10px; flex: none; border: 1px solid #22262E; margin-top: 2px; }
-  .donut-leg .lg-nome { flex: 1; line-height: 1.3; }
+  .donut-leg .sw { display: inline-block; width: 10px; height: 10px; flex: none; border: 1px solid #22262E; margin-top: 2px; }
+  .donut-leg .lg-nome { flex: 1; line-height: 1.3; text-align: left; }
   .donut-leg .lg-pct { color: #8A8F9C; }
+  /* "Leitura Gerencial" — pedido direto: "adiciona no relatório em termos de
+     gerenciamento o que esse KPI indica, o que esse gráfico desenha, o que
+     posso usar pra responder as coisas mais comuns da área". Tag como
+     etiqueta separada (não "Leitura gerencial:" em frase) pra não cair na
+     regra dela de nada de dois-pontos dramatizando. */
+  .rel-leitura { background: #F4F3EE; border-left: 3px solid #2B5CA8; border-radius: 4px; padding: 8px 12px; margin: 8px 0; }
+  .rel-leitura-tag { display: block; font-size: 8.5px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: #2B5CA8; margin-bottom: 3px; }
+  .rel-leitura p { margin: 0; }
   .no-print { }
   @media print { .no-print { display: none; } }
 </style></head>
@@ -11526,6 +11553,26 @@ function relBarraHTML(rotulo, valor, max, cor) {
 
 function relKpiHTML(valor, rotulo, cor) {
   return `<div class="rel-kpi" style="border-color:${cor}"><div class="valor" style="color:${cor}">${valor}</div><div class="rotulo">${escapeHTML(rotulo)}</div></div>`;
+}
+
+// Mesma barra de relBarraHTML, mas com o valor em moeda (a coluna de valor
+// fixa em 34px de relBarraHTML só cabe número curto — "R$ 121,7 milhões"
+// precisa de largura livre). Pedido direto: "por valor eu acho em qual
+// categoria se gasta mais, acho importante isso" — complementa a barra por
+// QUANTIDADE de contrato (já existia) com uma por VALOR, porque as duas
+// ordens não batem necessariamente.
+function relBarraMoedaHTML(rotulo, valor, max, cor, moedaCompacta) {
+  const pct = max ? Math.max(2, (valor / max) * 100) : 0;
+  return `<div class="rel-bar-linha"><div class="rel-bar-rotulo">${escapeHTML(rotulo)}</div><div class="rel-bar-trilha"><div class="rel-bar-preenchido" style="width:${pct}%;background:${cor}"></div></div><div class="rel-bar-valor" style="width:auto;min-width:70px">${moedaCompacta(valor)}</div></div>`;
+}
+
+// Pedido direto: "as vezes as pessoas pedem BI, pedem visuais, mas nao
+// entendem de graficos... adiciona a malicia, em termos de gerenciamento o
+// que esse KPI indica, o que esse grafico desenha, o que posso usar pra
+// responder as coisas mais comuns da area" — uma caixa curta depois do
+// gráfico/KPI, ligando o número à pergunta de gestão que ele responde.
+function relLeituraHTML(texto) {
+  return `<div class="rel-leitura"><span class="rel-leitura-tag">Leitura Gerencial</span><p>${texto}</p></div>`;
 }
 
 // Mesma sequência do relatório em PDF que ela pediu (universo -> detalhe),
@@ -11598,8 +11645,8 @@ function montarRelatorioCfcr(termosTodos, termosTCT) {
 
   return `
     <h1>CFCR</h1>
-    <h3>Termos de Cooperação Técnica — Relatório de acompanhamento, DEPAF / Polícia Civil da Bahia</h3>
-    <p class="rel-topo">Números direto do banco de produção, gerado em ${agora}.</p>
+    <h3>Termos de Cooperação Técnica · Relatório de acompanhamento, DEPAF / Polícia Civil da Bahia</h3>
+    <p class="rel-topo">Números direto do banco de produção, gerado em ${agora}. Cada vez que este relatório é aberto, ele lê o banco na hora, então um novo download no dia seguinte já traz qualquer dado atualizado desde então.</p>
 
     <div class="rel-secao">
       <h2>1. Visão Geral</h2>
@@ -11615,6 +11662,7 @@ function montarRelatorioCfcr(termosTodos, termosTCT) {
           <p>Os ${termosTCT.length} termos correspondem a ${nomesUnicos.size} municípios únicos${termosTCT.length !== nomesUnicos.size ? " (algum município aparece mais de uma vez, por termo renovado sem a linha antiga sair da planilha-fonte)" : ""}.</p>
         </div>
       </div>
+      ${relLeituraHTML(`Este gráfico responde a pergunta mais comum de reunião, quantos municípios estão com o termo em dia agora e quantos precisam de ação. Cada termo VENCIDO representa um município sem cobertura garantida de limpeza, manutenção ou abastecimento, então a fatia vermelha é o primeiro lugar pra cobrar renovação.`)}
     </div>
 
     <div class="rel-secao">
@@ -11623,7 +11671,8 @@ function montarRelatorioCfcr(termosTodos, termosTCT) {
       ${maisUrgentes.length ? `<table><thead><tr><th>MUNICÍPIO</th><th>DEPARTAMENTO</th><th>DIAS VENCIDO</th><th>PROCESSO SEI</th></tr></thead>
         <tbody>${maisUrgentes.map((u) => `<tr><td>${escapeHTML(u.participe)}</td><td>${escapeHTML(u.departamento)}</td><td style="color:${COR.bad};font-weight:600">${u.dias} dias</td><td>${escapeHTML(u.processoSei || "—")}</td></tr>`).join("")}</tbody></table>`
         : `<p>Nenhum termo VIGENTE com prazo já expirado neste momento.</p>`}
-      <p style="color:#5B6478">Provável atraso de atualização na planilha-fonte — a renovação já aconteceu na prática, mas a planilha ainda não foi atualizada.</p>
+      <p style="color:#5B6478">Provável atraso de atualização na planilha-fonte. A renovação já aconteceu na prática, mas a planilha ainda não foi atualizada.</p>
+      ${relLeituraHTML(`Esta tabela mostra por onde começar a cobrança, os municípios que a planilha ainda marca como vigentes mas cuja data de fim já passou. É a lista pra confirmar antes de qualquer reunião, junto ao departamento responsável, se a renovação já saiu ou se o município realmente ficou sem cobertura.`)}
     </div>
 
     <div class="rel-secao">
@@ -11631,6 +11680,7 @@ function montarRelatorioCfcr(termosTodos, termosTCT) {
       <p>${termosTCT.length} município(s) no total. ${municipiosComServico} prestam pelo menos 1 serviço. Juntos, somam ${totalOferecimentos.toLocaleString("pt-BR")} oferecimento(s) em ${servOrdenado.length} tipo(s) diferentes (${semNenhumServico} município(s) sem nenhum dado de serviço preenchido).</p>
       <div>${top8.map(([nome, v]) => relBarraHTML(nome, v, maxServ, v < termosTCT.length * 0.3 ? COR.bad : COR.info)).join("")}</div>
       ${vennHTML ? `<h3 style="margin-top:16px">Sobreposição real entre os 3 serviços mais prestados</h3><div style="max-width:340px">${vennHTML}</div>` : ""}
+      ${relLeituraHTML(`As barras mostram quais serviços a maioria dos municípios já contrata e quais ainda são raros, útil pra decidir onde vale priorizar expansão. O diagrama mostra que os 3 serviços mais comuns andam quase sempre juntos, então encontrar um deles num município normalmente é sinal de que os outros dois também estão presentes.`)}
     </div>
 
     <div class="rel-secao">
@@ -11638,9 +11688,10 @@ function montarRelatorioCfcr(termosTodos, termosTCT) {
       <div class="rel-linha">
         <div style="max-width:220px">${donutTerritorio}</div>
         <div style="flex:1;min-width:260px">
-          <p>${comCoorpin} termo(s) têm COORPIN (unidade regional) reconhecida. ${semCoorpin} termo(s) não têm essa informação — só a DEPIN cadastra esse dado hoje.</p>
+          <p>${comCoorpin} termo(s) têm COORPIN (unidade regional) reconhecida. ${semCoorpin} termo(s) não têm essa informação. Só a DEPIN cadastra esse dado hoje.</p>
         </div>
       </div>
+      ${relLeituraHTML(`Mostra a cobertura territorial real do serviço, região por região, em vez de só o total geral. Serve pra saber se uma COORPIN específica está com mais termos vencidos que as outras, uma leitura que o total sozinho esconde.`)}
     </div>
 
     <div class="rel-secao">
@@ -11653,9 +11704,10 @@ function montarRelatorioCfcr(termosTodos, termosTCT) {
       <div class="rel-linha">
         <div style="max-width:220px">${donutAc}</div>
         <div style="flex:1;min-width:260px">
-          <p>Este universo nunca se mistura com os ${termosTCT.length} TCT em nenhum total ou gráfico deste relatório — estrutura diferente (sem COORPIN, sem lista de serviços, partícipe às vezes reúne mais de uma instituição).</p>
+          <p>Este universo nunca se mistura com os ${termosTCT.length} TCT em nenhum total ou gráfico deste relatório. A estrutura é diferente da dos TCT, sem COORPIN, sem lista de serviços própria, e o partícipe às vezes reúne mais de uma instituição.</p>
         </div>
       </div>
+      ${relLeituraHTML(`Este grupo ainda não está confirmado como termo formal, então serve como fila de triagem, não como indicador de desempenho pronto pra apresentar. Útil pra acompanhar quantas parcerias institucionais aguardam confirmação de status antes de entrarem no total oficial de termos.`)}
     </div>
   `;
 }
@@ -12478,6 +12530,20 @@ function montarRelatorioContratos(resumo, lista, unidadeGestoraTopo) {
   const porSetor = Object.entries(resumo.porUnidade).sort((a, b) => b[1] - a[1]);
   const maxSetor = porSetor.length ? porSetor[0][1] : 1;
 
+  // Pedido direto: "por valor eu acho em qual categoria se gasta mais, acho
+  // importante isso" — até aqui só existia distribuição por QUANTIDADE de
+  // contrato. Quantidade e valor não seguem a mesma ordem necessariamente
+  // (uma área pode ter poucos contratos e ainda concentrar a maior parte do
+  // dinheiro), por isso os dois ficam lado a lado.
+  const valorPorUG = {};
+  for (const c of lista) { const chave = unidadeGestoraTopo(c); valorPorUG[chave] = (valorPorUG[chave] || 0) + (c.valorGlobalAtual || 0); }
+  const maxValorUG = Math.max(...ordemUG.map((k) => valorPorUG[k] || 0), 1);
+
+  const valorPorSetor = {};
+  for (const c of lista) { const chave = c.unidadeGestora || "(sem unidade)"; valorPorSetor[chave] = (valorPorSetor[chave] || 0) + (c.valorGlobalAtual || 0); }
+  const porSetorValor = Object.entries(valorPorSetor).sort((a, b) => b[1] - a[1]);
+  const maxSetorValor = porSetorValor.length ? porSetorValor[0][1] : 1;
+
   const comUnidade = lista.filter((c) => (c.unidades || []).length > 0);
   const compartilhados = comUnidade.filter((c) => new Set(c.unidades.map((u) => u.dirpin)).size > 1);
   const contagemDirpin = new Map();
@@ -12492,8 +12558,8 @@ function montarRelatorioContratos(resumo, lista, unidadeGestoraTopo) {
 
   return `
     <h1>CPG</h1>
-    <h3>Controle de Prazos e Garantias — Relatório de acompanhamento, DEPAF / Polícia Civil da Bahia</h3>
-    <p class="rel-topo">Números direto do banco de produção, gerado em ${agora}.</p>
+    <h3>Controle de Prazos e Garantias · Relatório de acompanhamento, DEPAF / Polícia Civil da Bahia</h3>
+    <p class="rel-topo">Números direto do banco de produção, gerado em ${agora}. Sempre que este relatório é aberto, ele lê o dado do momento, não é um arquivo fixo, então uma abertura amanhã, com a planilha atualizada, já traz os números novos, só muda a data aqui em cima.</p>
 
     <div class="rel-secao">
       <h2>1. Visão Geral</h2>
@@ -12503,9 +12569,11 @@ function montarRelatorioContratos(resumo, lista, unidadeGestoraTopo) {
         ${relKpiHTML(moedaCompacta(resumo.valorGlobalAtualTotal), "Valor Global Atual", COR.roxo)}
         ${relKpiHTML(resumo.qtdUnidadesBeneficiadas ?? "—", "Unidades Beneficiadas", COR.neutro)}
       </div>
+      <p style="color:#5B6478">As ${resumo.qtdUnidadesBeneficiadas ?? 0} unidades beneficiadas contam só as unidades COORPIN vinculadas a contrato da DEPIN, porque só a DEPIN cadastra essa informação hoje. Os contratos da DEPAF atendem outras estruturas (sedes, delegacias, unidades administrativas) que não entram nessa contagem, então este número não representa quem a instituição atende no total, só a parte que tem unidade regional cadastrada.</p>
       <div>${ordemCrit.filter((n) => resumo.porCriticidade[n]).map((n) => relBarraHTML(n, resumo.porCriticidade[n], maxCrit, corCrit[n])).join("")}</div>
       <p>"Em gestão ativa" reúne todos menos os ${resumo.qtdVencidos} Vencido. Contrato vencido sem renovação registrada saiu da gestão ativa de hoje, mesmo continuando no histórico do sistema.</p>
       <p>${resumo.qtdTotalAditivos} aditivos no total, média de ${resumo.mediaAditivosPorContrato?.toFixed(1)} por contrato.</p>
+      ${relLeituraHTML(`O total de contratos e o valor global atual respondem a pergunta de quanto a instituição tem comprometido agora. As barras de criticidade acima mostram quantos contratos pedem atenção nos próximos 30, 60 ou 90 dias, útil pra planejar a renovação com antecedência em vez de correr atrás no vencimento.`)}
     </div>
 
     <div class="rel-secao">
@@ -12515,6 +12583,7 @@ function montarRelatorioContratos(resumo, lista, unidadeGestoraTopo) {
         <tbody>${maisVencidos.map((c) => `<tr><td>${escapeHTML(c.numeroContrato)}</td><td>${escapeHTML(c.empresa)}</td><td>${escapeHTML(c.unidadeGestora || "—")}</td><td style="color:${COR.vencido};font-weight:600">${Math.abs(c.diasParaVencer)} dias</td><td>${moedaCompacta(c.valorGlobalAtual)}</td></tr>`).join("")}</tbody></table>`
         : `<p>Nenhum contrato vencido neste momento.</p>`}
       <p>${resumo.qtdAVencer} contrato(s) estão em "A Vencer" (vencimento em até 90 dias), ainda em vigor, mas candidatos a entrar nesta lista em breve.</p>
+      ${relLeituraHTML(`A lista mostra os contratos vencidos há mais tempo sem renovação registrada. Serve pra saber quais fornecedores estão em situação de maior risco contratual, os primeiros a verificar antes de qualquer auditoria ou cobrança de renovação.`)}
     </div>
 
     <div class="rel-secao">
@@ -12522,36 +12591,47 @@ function montarRelatorioContratos(resumo, lista, unidadeGestoraTopo) {
       <div class="rel-kpis">
         ${relKpiHTML(moedaCompacta(resumo.valorGlobalInicialTotal), "Valor Global Inicial", COR.neutro)}
         ${relKpiHTML(moedaCompacta(resumo.valorGlobalAtualTotal), "Valor Global Atual", COR.roxo)}
-        ${relKpiHTML(moedaCompacta(resumo.valorAtualNaoVencidosTotal), "Atual — Só Gestão Ativa", COR.baixo)}
+        ${relKpiHTML(moedaCompacta(resumo.valorAtualNaoVencidosTotal), "Atual (Só Gestão Ativa)", COR.baixo)}
       </div>
       <p>O valor atual (${moeda(resumo.valorGlobalAtualTotal)}) já reflete ${resumo.qtdTotalAditivos} aditivos lançados sobre os ${resumo.qtdContratos} contratos, em relação ao valor inicial de ${moeda(resumo.valorGlobalInicialTotal)}, quando os contratos foram assinados.</p>
       ${resumo.percentualComGarantia != null ? `<p>${(resumo.percentualComGarantia * 100).toFixed(0)}% dos contratos com garantia contratual preenchida exigem garantia (percentual calculado só sobre quem tem o campo preenchido).</p>` : ""}
+      ${relLeituraHTML(`Compara o valor assinado originalmente com o valor atual depois dos aditivos, mostrando o quanto os contratos cresceram desde a assinatura. Serve pra entender se o orçamento comprometido está subindo mais rápido do que o previsto, e se o ritmo de aditivo pede uma revisão de planejamento.`)}
     </div>
 
     <div class="rel-secao">
       <h2>4. Distribuição por Unidade Gestora</h2>
       <p>As 5 áreas gestoras previstas no sistema são DEPAF, DEPIN, DPSV - Saúde, ACADEPOL e DEPOM. Hoje só DEPAF e DEPIN têm contrato cadastrado.</p>
+      <h3 style="margin-top:10px">Por quantidade de contrato</h3>
       <div>${ordemUG.map((n) => relBarraHTML(n, porUG[n].total, Math.max(...ordemUG.map((k) => porUG[k].total)), COR.info)).join("")}</div>
+      <h3 style="margin-top:14px">Por valor global atual</h3>
+      <div>${ordemUG.map((n) => relBarraMoedaHTML(n, valorPorUG[n] || 0, maxValorUG, COR.roxo, moedaCompacta)).join("")}</div>
       <h3 style="margin-top:14px">Contratos vencidos por unidade gestora</h3>
       <div>${ordemUG.map((n) => relBarraHTML(`${n} (${(porUG[n].vencidos / porUG[n].total * 100).toFixed(0)}%)`, porUG[n].vencidos, Math.max(...ordemUG.map((k) => porUG[k].vencidos), 1), COR.vencido)).join("")}</div>
       <p>${maiorPctVencido} tem a maior proporção de contratos vencidos, ${porUG[maiorPctVencido].vencidos} de ${porUG[maiorPctVencido].total} contratos (${(porUG[maiorPctVencido].vencidos / porUG[maiorPctVencido].total * 100).toFixed(0)}%).</p>
+      ${relLeituraHTML(`As barras por quantidade mostram quantos contratos cada área tem, mas as barras por valor mostram onde o dinheiro está de fato concentrado, e as duas ordens não precisam bater. Uma área pode ter poucos contratos e ainda assim responder pela maior parte do valor total, e é essa comparação entre quantidade e valor que revela isso. A barra de vencidos aponta pra onde direcionar cobrança primeiro.`)}
     </div>
 
     <div class="rel-secao">
       <h2>5. Distribuição por Setor Demandante</h2>
-      <p>Recorte mais fino que a Unidade Gestora — cada setor abaixo pertence a DEPAF ou DEPIN. ${porSetor.length} setores demandantes diferentes têm contrato próprio.</p>
+      <p>Recorte mais fino que a Unidade Gestora. Cada setor abaixo pertence a DEPAF ou DEPIN. ${porSetor.length} setores demandantes diferentes têm contrato próprio.</p>
+      <h3 style="margin-top:10px">Por quantidade de contrato</h3>
       <div>${porSetor.map(([n, v]) => relBarraHTML(n, v, maxSetor, v >= 10 ? COR.info : v >= 4 ? COR.laranja : COR.neutro)).join("")}</div>
+      <h3 style="margin-top:14px">Por valor global atual</h3>
+      <div>${porSetorValor.map(([n, v]) => relBarraMoedaHTML(n, v, maxSetorValor, COR.roxo, moedaCompacta)).join("")}</div>
+      ${porSetorValor.length ? `<p>${porSetorValor[0][0]} concentra o maior valor entre os setores demandantes, ${moedaCompacta(porSetorValor[0][1])}.</p>` : ""}
+      ${relLeituraHTML(`Esse recorte mais fino ajuda a identificar qual setor específico dentro de DEPAF ou DEPIN concentra mais contratos e mais valor, útil pra saber quem procurar primeiro numa dúvida operacional ou numa pergunta de auditoria sobre gasto por área.`)}
     </div>
 
     <div class="rel-secao">
       <h2>6. Compartilhados entre DIRPIN</h2>
-      <p>Só a DEPIN — a DEPIN tem contrato de alimentação, correio e outros serviços abrangentes que servem mais de uma DIRPIN ao mesmo tempo.</p>
+      <p>Só a DEPIN tem contrato de alimentação, correio e outros serviços abrangentes que servem mais de uma DIRPIN ao mesmo tempo.</p>
       <div class="rel-kpis">
         ${relKpiHTML(comUnidade.length - compartilhados.length, "Exclusivos (1 DIRPIN só)", COR.baixo)}
         ${relKpiHTML(compartilhados.length, "Compartilhados (mais de 1)", COR.vencido)}
       </div>
       ${vennHTML ? `<h3>Exemplo real: as 3 DIRPIN com mais contratos</h3><div style="max-width:340px">${vennHTML}</div>` : ""}
       <p>${comUnidade.length} contrato(s) da DEPIN têm unidade regional cadastrada. A soma por DIRPIN passa desse total porque um contrato compartilhado conta em cada DIRPIN que atende.</p>
+      ${relLeituraHTML(`Mostra quais contratos atendem mais de uma DIRPIN ao mesmo tempo, então um problema nesse contrato (atraso, rescisão, renovação parada) afeta várias regiões de uma vez só. Serve pra medir o risco de depender de um fornecedor único cobrindo uma área grande.`)}
     </div>
   `;
 }
