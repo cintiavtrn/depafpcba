@@ -7784,6 +7784,432 @@ const COORPIN_GEO = {
 // mudar de cor toda vez que o filtro reordena a lista.
 const CORES_DIRPIN = { Leste: TONS[0], Norte: TONS[1], Sul: TONS[2], Sudoeste: TONS[3], "Oeste/Chapada": TONS[4], [CHAVE_OUTRAS_AREAS]: "var(--crit-neutro)" };
 
+// Pedido direto: comparar quantidade de serviço (ex. litros de gasolina) "por
+// extensão territorial" — área em km² de cada município da Bahia, fonte IBGE
+// (Malha Municipal Digital 2025, ela forneceu o shapefile diretamente:
+// BA_Municipios_2025). Chave = t.participe EXATAMENTE como vem do banco
+// (maiúsculo, com "(SEDE)" quando aplicável) — 415 dos 417 municípios TCT
+// batem; os 2 que faltam ("1º DT PORTO SEGURO" e "2ª DE ARRAIAL D'AJUDA
+// porto Seguro") são DISTRITOS de Porto Seguro, não município próprio no
+// IBGE — ficam de fora de propósito (ver usarAreaCfcr), não é dado perdido.
+const MUNICIPIO_AREA_KM2_CFCR = {
+  "ABARÉ": 1604.923,
+  "ABAÍRA": 538.679,
+  "ACAJUTIBA": 181.475,
+  "ADUSTINA": 629.1,
+  "AGUA FRIA": 742.775,
+  "AIQUARA": 167.877,
+  "ALAGOINHAS (SEDE)": 707.836,
+  "ALCOBAÇA": 1477.929,
+  "ALMADINA": 245.236,
+  "AMARGOSA": 431.654,
+  "AMÉLIA RODRIGUES": 166.872,
+  "AMÉRICA DOURADA": 822.373,
+  "ANAGÉ": 1899.685,
+  "ANDARAÍ": 1589.786,
+  "ANDORINHA": 1362.386,
+  "ANGICAL": 1530.643,
+  "ANGUERA": 187.84,
+  "ANTAS": 326.36,
+  "ANTONIO CARDOSO": 293.53,
+  "ANTONIO GONÇALVES": 345.282,
+  "APORÁ": 479.262,
+  "APUAREMA": 150.83,
+  "ARACATU": 1489.804,
+  "ARACI": 1496.246,
+  "ARAMARI": 368.947,
+  "ARATACA": 435.962,
+  "ARATUÍPE": 174.012,
+  "ARAÇAS": 474.577,
+  "AURELINO LEAL": 445.394,
+  "BAIANÓPOLIS": 3321.752,
+  "BAIXA GRANDE": 967.515,
+  "BANZAÊ": 409.508,
+  "BARRA": 11428.112,
+  "BARRA DA ESTIVA": 1657.414,
+  "BARRA DO CHOÇA": 765.931,
+  "BARRA DO MENDES": 1436.299,
+  "BARRA DO ROCHA": 214.411,
+  "BARREIRAS (SEDE)": 8059.305,
+  "BARRO ALTO": 414.506,
+  "BARRO PRETO": 201.585,
+  "BARROCAS": 207.297,
+  "BELMONTE": 1920.631,
+  "BELO CAMPO": 772.757,
+  "BIRITINGA": 553.762,
+  "BOA NOVA": 848.857,
+  "BOA VISTA DO TUPIM": 2972.112,
+  "BOM JESUS DA LAPA (SEDE)": 4114.493,
+  "BOM JESUS DA SERRA": 467.907,
+  "BONINAL": 896.857,
+  "BONITO": 791.276,
+  "BOQUIRA": 1426.233,
+  "BOTUPORÁ": 627.613,
+  "BREJOLÂNDIA": 2247.207,
+  "BREJÕES": 518.566,
+  "BROTAS DE MACAÚBAS": 2520.811,
+  "BRUMADO (SEDE)": 2207.613,
+  "BUERAREMA": 219.487,
+  "BURITIRAMA": 4046.741,
+  "CAATIBA": 512.436,
+  "CABACEIRAS DO PARAGUAÇU": 222.027,
+  "CACHOEIRA": 394.893,
+  "CACULÉ": 610.47,
+  "CAETANOS": 767.144,
+  "CAETITÉ": 2651.537,
+  "CAFARNAUM": 643.666,
+  "CAIRÚ": 448.846,
+  "CALDAS DO CIPÓ": 168.33,
+  "CALDEIRÃO GRANDE": 458.311,
+  "CAMACÃ": 584.848,
+  "CAMAMU": 839.702,
+  "CAMAÇARI": 785.421,
+  "CAMPO ALEGRE DE LOURDES": 2914.573,
+  "CAMPO FORMOSO": 7161.83,
+  "CANARANA": 579.726,
+  "CANAVIEIRAS": 1334.279,
+  "CANDEAL": 447.577,
+  "CANDEIAS": 251.808,
+  "CANDIBA": 433.642,
+  "CANSANÇÃO": 1351.891,
+  "CANUDOS": 3564.627,
+  "CANÁPOLIS": 460.388,
+  "CAPELA DO ALTO ALEGRE": 629.585,
+  "CAPIM GROSSO": 464.776,
+  "CARAVELAS": 2375.525,
+  "CARAÍBAS": 805.629,
+  "CARDEAL DA SILVA": 293.456,
+  "CARINHANHA": 2525.512,
+  "CASA NOVA": 9648.942,
+  "CASTRO ALVES": 713.789,
+  "CATOLÂNDIA": 702.504,
+  "CATU": 426.956,
+  "CATURAMA": 716.254,
+  "CAÉM": 540.909,
+  "CENTRAL": 566.975,
+  "CHORROCHÓ": 3005.319,
+  "COARACI": 274.501,
+  "COCOS": 10138.25,
+  "CONCEIÇÃO DA FEIRA": 164.799,
+  "CONCEIÇÃO DO ALMEIDA": 284.837,
+  "CONCEIÇÃO DO COITÉ": 1015.249,
+  "CONCEIÇÃO DO JACUÍPE": 114.869,
+  "CONDE": 931.106,
+  "CONTENDAS DO SINCORÁ": 977.455,
+  "CORAÇÃO DE MARIA": 378.421,
+  "CORDEIROS": 523.64,
+  "CORIBE": 2665.141,
+  "CORONEL JOÃO SÁ": 797.434,
+  "CORRENTINA": 11504.316,
+  "COTEGIPE": 4282.775,
+  "CRAVOLÂNDIA": 182.518,
+  "CRISOPOLIS": 636.609,
+  "CRISTÓPOLIS": 1052.839,
+  "CRUZ DAS ALMAS": 139.118,
+  "CURAÇÁ": 5950.614,
+  "CÂNDIDO SALES": 1169.814,
+  "CÍCERO DANTAS": 817.023,
+  "DIAS D' ÁVILA": 183.759,
+  "DOM BASÍLIO": 689.513,
+  "DOM MACÊDO COSTA": 94.778,
+  "DÁRIO MEIRA": 413.637,
+  "ELÍSIO MEDRADO": 179.329,
+  "ENCRUZILHADA": 1890.133,
+  "ENTRE RIOS": 1187.767,
+  "ESPLANADA": 1299.356,
+  "EUCLIDES DA CUNHA (SEDE)": 2025.368,
+  "EUNAPOLIS (SEDE)": 1425.979,
+  "FATIMA": 368.342,
+  "FEIRA DA MATA": 1176.504,
+  "FEIRA DE SANTANA (SEDE)": 1304.427,
+  "FILADELFIA": 579.687,
+  "FIRMINO ALVES": 172.353,
+  "FLORESTA AZUL": 321.013,
+  "FORMOSA DO RIO PRETO": 15634.328,
+  "GANDÚ": 229.66,
+  "GAVIÃO": 384.592,
+  "GENTIO DO OURO": 3817.946,
+  "GLÓRIA": 1566.609,
+  "GONGOGI": 202.194,
+  "GOV. MANGABEIRA": 106.848,
+  "GUAJERÚ": 871.975,
+  "GUANAMBI (SEDE)": 1272.367,
+  "GUARATINGA": 2189.404,
+  "HELIÓPOLIS": 314.669,
+  "IAÇU": 2342.497,
+  "IBIASSUCÊ": 483.27,
+  "IBICARAÍ": 230.953,
+  "IBICOARA": 817.355,
+  "IBICUÍ": 1139.378,
+  "IBIPEBA": 1382.009,
+  "IBIPITANGA": 954.373,
+  "IBIQUERA": 698.245,
+  "IBIRAPITANGA": 472.664,
+  "IBIRAPUÃ": 770.866,
+  "IBIRATAIA": 318.129,
+  "IBITIARA": 1834.003,
+  "IBITITÁ": 573.033,
+  "IBOTIRAMA": 1740.113,
+  "ICHU": 138.016,
+  "IGAPORÃ": 836.561,
+  "IGRAPIÚNA": 591.312,
+  "IGUAÍ": 860.223,
+  "ILHEUS (SEDE)": 1588.556,
+  "INHAMBUPE": 1082.283,
+  "IPECAETÁ": 372.565,
+  "IPIAÚ": 280.454,
+  "IPIRÁ": 3105.285,
+  "IPUPIARA": 1055.76,
+  "IRAJUBA": 459.047,
+  "IRAMAIA": 1708.114,
+  "IRAQUARA": 991.821,
+  "IRARÁ": 267.88,
+  "IRECE (SEDE)": 319.175,
+  "ITABELA": 924.914,
+  "ITABERABA (SEDE)": 2386.387,
+  "ITABUNA (SEDE)": 401.028,
+  "ITACARÉ": 726.265,
+  "ITAETÊ": 1331.822,
+  "ITAGI": 310.621,
+  "ITAGIMIRIM": 876.791,
+  "ITAGUAÇU DA BAHIA": 4310.255,
+  "ITAJUÍPE": 270.752,
+  "ITAJÚ DO COLÔNIA": 1226.908,
+  "ITAMARAJÚ": 2360.584,
+  "ITAMARI": 143.479,
+  "ITAMBÉ": 1534.58,
+  "ITANAGRA": 533.632,
+  "ITANHÉM": 1394.174,
+  "ITAPARICA": 121.373,
+  "ITAPEBI": 1031.879,
+  "ITAPETINGA (SEDE)": 1651.158,
+  "ITAPICURÚ": 1557.688,
+  "ITAPITANGA": 420.664,
+  "ITAPÉ": 452.716,
+  "ITAQUARA": 344.093,
+  "ITARANTIM": 1674.03,
+  "ITATIM": 547.509,
+  "ITIRUÇÚ": 322.243,
+  "ITIÚBA": 1650.592,
+  "ITORORÓ": 313.839,
+  "ITUAÇÚ": 1199.374,
+  "ITUBERÁ": 415.428,
+  "IUIÚ": 1535.229,
+  "JABORANDI": 9955.111,
+  "JACARACI": 1332.42,
+  "JACOBINA (SEDE)": 2192.906,
+  "JAGUAQUARA": 924.512,
+  "JAGUARARÍ": 2466.009,
+  "JAGUARIPE": 863.424,
+  "JANDAIRA": 640.772,
+  "JEQUIÉ (SEDE)": 2969.039,
+  "JEREMOABO": 4267.489,
+  "JIQUIRIÇÁ": 238.66,
+  "JITAÚNA": 262.05,
+  "JOÃO DOURADO": 913.258,
+  "JUAZEIRO (SEDE)": 6721.592,
+  "JUCURUÇÚ": 1457.656,
+  "JUSSARA": 1355.173,
+  "JUSSARÍ": 327.998,
+  "JUSSIAPE": 589.763,
+  "LAFAIETE COUTINHO": 498.11,
+  "LAGOA REAL": 912.22,
+  "LAJE": 449.835,
+  "LAJEDINHO": 846.728,
+  "LAJEDO DO TABOCAL": 382.937,
+  "LAJEDÃO": 624.77,
+  "LAMARÃO": 189.26,
+  "LAPÃO": 642.882,
+  "LAURO DE FREITAS": 57.942,
+  "LENÇÓIS": 1282.981,
+  "LICÍNIO DE ALMEIDA": 856.626,
+  "LIVRAMENTO DE N. SENHORA": 1952.51,
+  "LUÍS EDUARDO MAGALHÃES": 4033.04,
+  "MACAJUBA": 701.17,
+  "MACARANÍ": 1210.106,
+  "MACAÚBAS": 2459.102,
+  "MACURURÉ": 2545.857,
+  "MADRE DE DEUS": 33.032,
+  "MAETINGA": 614.834,
+  "MAIQUINIQUE": 588.296,
+  "MAIRÍ": 906.679,
+  "MALHADA": 1971.632,
+  "MALHADA DE PEDRAS": 550.82,
+  "MANOEL VITORINO": 2201.763,
+  "MANSIDÃO": 3129.588,
+  "MARACÁS": 2413.27,
+  "MARAGOGIPE": 437.61,
+  "MARAÚ": 848.885,
+  "MARCIONIÍLIO SOUZA": 1099.284,
+  "MASCOTE": 742.689,
+  "MATA DE SÃO JOÃO": 605.169,
+  "MATINA": 773.852,
+  "MEDEIROS NETO": 1314.108,
+  "MIGUEL CALMON": 1599.673,
+  "MILAGRES": 420.357,
+  "MIRANGABA": 1751.777,
+  "MIRANTE": 1172.861,
+  "MONTE SANTO": 3034.196,
+  "MORPARÁ": 2093.86,
+  "MORRO DO CHAPÉU": 5745.765,
+  "MORTUGABA": 528.214,
+  "MUCUGÊ": 2462.689,
+  "MUCURÍ": 1787.422,
+  "MULUNGÚ DO MORRO": 646.621,
+  "MUNDO NOVO": 1491.989,
+  "MUNIZ FERREIRA": 104.54,
+  "MUQUÉM DO SÃO FRANCISCO": 3852.11,
+  "MURITIBA": 86.311,
+  "MUTUÍPE": 275.854,
+  "NAZARÉ": 278.63,
+  "NILO PEÇANHA": 388.936,
+  "NORDESTINA": 465.407,
+  "NOVA CANAÃ": 804.617,
+  "NOVA FATIMA": 346.785,
+  "NOVA IBIÁ": 203.2,
+  "NOVA ITARANA": 475.381,
+  "NOVA REDENÇÃO": 565.356,
+  "NOVA SOURE": 966.993,
+  "NOVA VIÇOSA": 1316.398,
+  "NOVO HORIZONTE": 627.5,
+  "NOVO TRIUNFO": 299.125,
+  "OLINDINA": 637.316,
+  "OLIVEIRA DOS BREJINHOS": 3313.435,
+  "OURIÇANGAS": 156.982,
+  "OUROLÂNDIA": 1544.985,
+  "PALMAS DO MONTE ALTO": 2559.973,
+  "PALMEIRAS": 737.797,
+  "PARAMIRIM": 1087.067,
+  "PARATINGA": 2624.998,
+  "PARIPIRANGA": 442.186,
+  "PAU BRASIL": 626.306,
+  "PAULO AFONSO": 1544.388,
+  "PAULO AFONSO (SEDE)": 1544.388,
+  "PEDRO ALEXANDRE": 889.572,
+  "PEDRÃO": 158.487,
+  "PIATÃ": 1825.855,
+  "PILÃO ARACADO": 11597.932,
+  "PINDAI": 628.469,
+  "PINDOBAÇU": 495.845,
+  "PINTADAS": 647.144,
+  "PIRAÍ DO NORTE": 193.427,
+  "PIRIPÁ": 504.396,
+  "PIRITIBA": 980.331,
+  "PLANALTINO": 955.454,
+  "PLANALTO": 769.001,
+  "POJUCA": 314.931,
+  "PONTO NOVO": 530.143,
+  "PORTO SEGURO": 2285.734,
+  "POTIRAGUÁ": 1111.567,
+  "POÇÕES": 937.856,
+  "PRADO": 1692.1,
+  "PRESD. TANCREDO NEVES": 441.82,
+  "PRESIDENTE DUTRA": 232.064,
+  "PRESIDENTE JÂNIO QUADROS": 1208.566,
+  "PÉ DE SERRA": 596.772,
+  "QUEIMADAS": 2011.06,
+  "QUIJINGUE": 1380.798,
+  "QUIXABEIRA": 366.387,
+  "RAFAEL JAMBEIRO": 1090.552,
+  "REMANSO": 4571.634,
+  "RETIROLÂNDIA": 242.331,
+  "RIACHO DE SANTANA": 3183.361,
+  "RIACHÃO DAS NEVES": 5969.305,
+  "RIACHÃO DO JACUÍPE": 1155.417,
+  "RIBEIRA DO AMPARO": 666.036,
+  "RIBEIRA DO POMBAL": 1228.125,
+  "RIBEIRÃO DO LARGO": 1363.7,
+  "RIO DE CONTAS": 1115.252,
+  "RIO DO ANTONIO": 779.046,
+  "RIO DO PIRES": 656.223,
+  "RIO REAL": 739.776,
+  "RODELAS": 2207.159,
+  "RUY BARBOSA": 1991.772,
+  "SALINAS DA MARGARIDA": 150.569,
+  "SANTA BARBARA": 347.021,
+  "SANTA BRÍGIDA": 934.46,
+  "SANTA CRUZ CABRÁLIA": 1462.958,
+  "SANTA CRUZ DA VITÓRIA": 284.083,
+  "SANTA INÊS": 374.526,
+  "SANTA LUZ": 1623.445,
+  "SANTA LUZIA": 824.473,
+  "SANTA MARIA DA VITORIA (SEDE)": 1984.91,
+  "SANTA RITA DE CÁSSIA": 6030.491,
+  "SANTA TERESINHA": 719.258,
+  "SANTANA": 1909.353,
+  "SANTANOPOLIS": 222.686,
+  "SANTO AMARO (SEDE)": 494.502,
+  "SANTO ANTONIO DE JESUS (SEDE)": 261.74,
+  "SANTO ESTEVÃO": 360.334,
+  "SAPEAÇÚ": 131.218,
+  "SAUBARA": 166.428,
+  "SAÚDE": 509.098,
+  "SEABRA (SEDE)": 2402.17,
+  "SEBASTIÃO LARANJEIRAS": 1982.037,
+  "SENHOR DO BONFIM (SEDE)": 789.36,
+  "SENTO SÉ": 11980.158,
+  "SERRA DO RAMALHO": 2341.701,
+  "SERRA DOURADA": 1592.249,
+  "SERRA PRETA": 595.294,
+  "SERRINHA (SEDE)": 583.311,
+  "SERROLÂNDIA": 322.021,
+  "SIMÕES FILHO": 201.529,
+  "SOBRADINHO": 1359.08,
+  "SOUTO SOARES": 1026.638,
+  "SÁTIRO DIAS": 949.223,
+  "SÃO DESIDÉRIO": 15158.737,
+  "SÃO DOMINGOS": 289.963,
+  "SÃO FELIPE": 222.407,
+  "SÃO FRANCISCO DO CONDE": 269.737,
+  "SÃO FÉLIX": 103.226,
+  "SÃO FÉLIX DO CORIBE": 1751.671,
+  "SÃO GABRIEL": 1146.054,
+  "SÃO GONÇALO DOS CAMPOS": 294.768,
+  "SÃO JOSÉ DA VITÓRIA": 127.925,
+  "SÃO JOSÉ DO JACUÍPE": 362.365,
+  "SÃO MIGUEL DAS MATAS": 230.906,
+  "SÃO SEBASTIÃO DO PASSÉ": 536.678,
+  "SÍTIO DO MATO": 1627.804,
+  "SÍTIO DO QUINTO": 656.837,
+  "TABOCAS DO BREJO VELHO": 1437.188,
+  "TANHAÇÚ": 1277.514,
+  "TANQUE NOVO": 729.516,
+  "TANQUINHO": 243.838,
+  "TAPIRAMUTÁ": 714.691,
+  "TEIXEIRA DE FRETAS (SEDE)": 1165.618,
+  "TEODORO SAMPAIO": 244.613,
+  "TEOFILÂNDIA": 351.892,
+  "TEOLÂNDIA": 289.782,
+  "TERRA NOVA": 193.241,
+  "TREMEDAL": 2017.644,
+  "TUCANO": 2198.237,
+  "UAUÁ": 3060.865,
+  "UBAITABA": 181.102,
+  "UBATÃ": 177.643,
+  "UBAÍRA": 663.892,
+  "UIBAÍ": 545.297,
+  "UMBURANAS": 1775.633,
+  "UNA": 1126.733,
+  "URANDI": 902.402,
+  "URUÇUCA": 510.097,
+  "UTINGA": 633.761,
+  "VALENTE": 394.877,
+  "VALENÇA (SEDE)": 1123.975,
+  "VARZEDO": 221.399,
+  "VERA CRUZ": 297.537,
+  "VEREDA": 782.159,
+  "VITÓRIA DA CONQUISTA": 3254.186,
+  "VITÓRIA DA CONQUISTA (SEDE)": 3254.186,
+  "VÁRZEA DA ROÇA": 468.407,
+  "VÁRZEA DO POÇO": 206.478,
+  "VÁRZEA NOVA": 1225.088,
+  "WAGNER": 522.37,
+  "WANDERLEY": 2920.579,
+  "WENCESLAU GUIMARÃES": 655.056,
+  "XIQUE-XIQUE": 5079.659,
+  "ÉRICO CARDOSO": 735.249,
+};
+
 function mapaCoorpinSVG(linhas, opcoes = {}) {
   // Pedido direto: "quando filtramos por região da DIRPIN tem que
   // destacar no mapa, só isso, assim como na barra" — `selecionado`
@@ -10594,6 +11020,48 @@ function rotularPeriodicidadeCfcr(s) {
   return texto || "—";
 }
 
+// Pedido direto: comparar proporcionalmente quantidade de serviço entre
+// municípios (ex. "50L" vs "2000L" de combustível) — só extrai quando o
+// texto tem número + unidade reconhecida (L/litros), nunca chuta uma
+// quantidade que não está escrita. periodicidade: só marca quando o
+// PRÓPRIO texto declara ("semana"/"semanal", "mensal"/"mês") — a maioria
+// dos registros não declara nenhuma, e nesse caso fica null (valor bruto
+// único, sem projeção — ver projetarQuantidadeVigenciaCfcr).
+function extrairQuantidadeLitrosCfcr(texto) {
+  if (!texto) return null;
+  const m = texto.match(/([\d.]+)\s*(?:l\b|litros?)/i);
+  if (!m) return null;
+  const valor = parseInt(m[1].replace(/\./g, ""), 10);
+  if (!Number.isFinite(valor) || valor <= 0) return null;
+  const periodicidade = /semana/i.test(texto) ? "semana" : /mensal|\bm[eê]s\b/i.test(texto) ? "mes" : null;
+  return { valor, unidade: "L", periodicidade };
+}
+
+// Aproximação PROVISÓRIA, combinada direto com ela: não existe data de
+// início de vigência em lugar nenhum (nem banco, nem planilha-fonte — só
+// fim_vigencia_data) e a busca pela data exata de assinatura no Diário
+// Oficial (doweb.ba.gov.br) não teve êxito (conexão recusada). Solução
+// combinada: usar o ANO do processo SEI (ex. "020.18589.2024...." → 2024,
+// 1º de janeiro) como proxy do início — todo valor projetado sai marcado
+// aproximado:true, e a UI SEMPRE mostra o texto original junto (nunca
+// substitui, só complementa) — exatamente como ela pediu.
+function anoProcessoSeiCfcr(processoSei) {
+  const m = (processoSei || "").match(/\.(\d{4})\./);
+  return m ? parseInt(m[1], 10) : null;
+}
+
+function projetarQuantidadeVigenciaCfcr(extracao, termo) {
+  if (!extracao || !extracao.periodicidade || !termo.fimVigenciaData) return null;
+  const ano = anoProcessoSeiCfcr(termo.processoSei);
+  if (!ano) return null;
+  const inicio = Date.UTC(ano, 0, 1);
+  const fim = new Date(termo.fimVigenciaData).getTime();
+  const dias = (fim - inicio) / 86400000;
+  if (!(dias > 0)) return null;
+  const ciclos = extracao.periodicidade === "semana" ? dias / 7 : dias / 30.44;
+  return { total: Math.round(extracao.valor * ciclos), aproximado: true };
+}
+
 // Cores por status — paleta própria dela (--cfcr-*), não a rampa --crit-*
 // do resto do sistema (pedido direto: "as cores estão aí inclusive... usar
 // as cores do mockup como estão"). ordem: define a ordem de leitura do
@@ -10773,6 +11241,17 @@ async function carregarCfcrPortal(portalSlug) {
           <div class="tabela-rolavel" style="max-height:360px" id="cfcr-servico-detalhe"></div>
         </div>
       </div>
+      <div class="dash-chart-box" style="margin-top:14px" id="cfcr-quantidade-box" hidden>
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">
+          <h4 style="margin-bottom:0">Comparativo de Quantidade<small class="dash-chart-hint" style="display:block;margin-top:4px" id="cfcr-quantidade-hint"></small></h4>
+          <div class="dash-toggle" id="cfcr-quantidade-toggle">
+            <button type="button" class="dash-toggle-btn active" data-modo-qtd="bruto">VALOR / MUNICÍPIO</button>
+            <button type="button" class="dash-toggle-btn" data-modo-qtd="area">POR KM² (TERRITÓRIO)</button>
+          </div>
+        </div>
+        <div id="cfcr-quantidade-chart"></div>
+        <p class="dash-chart-hint" id="cfcr-quantidade-nota"></p>
+      </div>
       <div class="dash-chart-box" style="margin-top:14px">
         <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">
           <h4 style="margin-bottom:0">Distribuição Territorial<small class="dash-chart-hint" style="display:block;margin-top:4px" id="cfcr-geo-hint"></small></h4>
@@ -10849,6 +11328,9 @@ async function carregarCfcrPortal(portalSlug) {
   // Estado do toggle LISTA/MAPA da Distribuição Territorial — mesmo nível
   // de `filtros`, sobrevive entre chamadas de atualizar().
   let modoVisualGeoCfcr = "mapa";
+  // Estado do toggle VALOR/POR KM² do Comparativo de Quantidade (Serviços
+  // Prestados) — mesmo padrão do toggle acima.
+  let modoQuantidadeCfcr = "bruto";
   // Filtro local da sub-aba "A Classificar (GDG)" — separado de `filtros`
   // de propósito (escopo pequeno, 30 registros, não precisa do motor de
   // 8 chaves do TCT).
@@ -11045,10 +11527,11 @@ async function carregarCfcrPortal(portalSlug) {
     // (já filtrado por tudo o mais). Só faz sentido depois de escolher um
     // serviço em "Serviços Prestados" — sem isso, "com que frequência" não
     // tem contexto nenhum (frequência de QUAL serviço?). ----
+    let linhasDetalheServico = [];
     if (!filtros.servico) {
       document.getElementById("cfcr-servico-detalhe").innerHTML = `<p class="dash-chart-hint">Clique num serviço em "Serviços Prestados" pra ver aqui quais municípios prestam e com qual periodicidade/quantidade.</p>`;
     } else {
-      const linhasDetalheServico = servicoRecorte
+      linhasDetalheServico = servicoRecorte
         .map((t) => ({ t, s: (t.servicos || []).find((s) => s.servicoNome === filtros.servico && servicoOferecido(s)) }))
         .filter((x) => x.s)
         .sort((a, b) => a.t.participe.localeCompare(b.t.participe, "pt-BR"));
@@ -11062,6 +11545,86 @@ async function carregarCfcrPortal(portalSlug) {
             </tr>`).join("")}</tbody>
           </table>`
         : `<p class="dash-chart-hint">Nenhum município presta este serviço neste recorte.</p>`;
+    }
+
+    // ---- Comparativo de Quantidade — pedido direto dela: "se a gente
+    // conseguisse comparar proporcionalmente entre os municípios e
+    // posteriormente acrescentar por extensão territorial seria ótimo".
+    // Só aparece quando o serviço selecionado tem extrator de quantidade
+    // reconhecido — hoje só "Abastecimento de viaturas" (litros de
+    // combustível têm unidade clara na maioria dos registros; outros
+    // serviços com número solto, tipo "Manutenção de viaturas", ficam de
+    // fora de propósito porque não dá pra saber se o número é
+    // viatura/atendimento/vez sem arriscar errar o conceito).
+    const EXTRATORES_QUANTIDADE_CFCR = { "Abastecimento de viaturas": extrairQuantidadeLitrosCfcr };
+    const boxQtd = document.getElementById("cfcr-quantidade-box");
+    const extratorQtd = EXTRATORES_QUANTIDADE_CFCR[filtros.servico];
+    if (!filtros.servico || !extratorQtd) {
+      boxQtd.hidden = true;
+    } else {
+      const linhasQtd = linhasDetalheServico
+        .map(({ t, s }) => {
+          const extracao = extratorQtd(s.valorRegistrado);
+          if (!extracao) return null;
+          const projecao = projetarQuantidadeVigenciaCfcr(extracao, t);
+          const valorFinal = projecao ? projecao.total : extracao.valor;
+          const area = MUNICIPIO_AREA_KM2_CFCR[t.participe] || null;
+          return {
+            municipio: t.participe,
+            valorFinal,
+            aproximado: !!projecao,
+            porArea: area ? valorFinal / area : null,
+            textoOriginal: s.valorRegistrado || "",
+          };
+        })
+        .filter(Boolean);
+
+      if (!linhasQtd.length) {
+        boxQtd.hidden = true;
+      } else {
+        boxQtd.hidden = false;
+        const semNumero = linhasDetalheServico.length - linhasQtd.length;
+        document.getElementById("cfcr-quantidade-hint").textContent =
+          `${linhasQtd.length} de ${linhasDetalheServico.length} município(s) com quantidade numérica reconhecida no texto${semNumero ? ` (${semNumero} sem número reconhecido ficam de fora aqui, mas continuam na tabela acima)` : ""}.`;
+        document.querySelectorAll("#cfcr-quantidade-toggle [data-modo-qtd]").forEach((b) => {
+          b.classList.toggle("active", b.dataset.modoQtd === modoQuantidadeCfcr);
+        });
+
+        const temAproximado = linhasQtd.some((l) => l.aproximado);
+        const avisoAproximado = temAproximado
+          ? ` <strong>*</strong> = quantidade com periodicidade declarada no texto (ex. "por semana"), projetada pela vigência do termo. Como não existe data de início de vigência nos dados (só a de fim) e não foi possível confirmar a data exata de assinatura no Diário Oficial, o início usado é uma APROXIMAÇÃO (ano do processo SEI, 1º de janeiro) — tratar como estimativa, não valor exato.`
+          : "";
+
+        if (modoQuantidadeCfcr === "area") {
+          const comArea = linhasQtd.filter((l) => l.porArea !== null);
+          const semArea = linhasQtd.length - comArea.length;
+          const barras = comArea
+            .map((l) => ({ label: `${l.municipio}${l.aproximado ? " *" : ""}`, valor: l.porArea, textoOriginal: l.textoOriginal }))
+            .sort((a, b) => b.valor - a.valor);
+          document.getElementById("cfcr-quantidade-chart").innerHTML = barras.length
+            ? barraHorizontalComEixoSVG(barras, {
+                formatarValor: (v) => `${v.toLocaleString("pt-BR", { maximumFractionDigits: 2 })} L/km²`,
+                formatarEixoTick: (v) => v.toLocaleString("pt-BR", { maximumFractionDigits: 1 }),
+                cor: () => "var(--cfcr-info)",
+                rotuloExtra: (c) => `("${c.textoOriginal}")`,
+              })
+            : `<p class="dash-chart-hint">Nenhum destes municípios tem área cadastrada.</p>`;
+          document.getElementById("cfcr-quantidade-nota").innerHTML =
+            `Litros divididos pela área do município (km², malha IBGE 2025) — maior barra = mais litros por km² de território coberto, não necessariamente "município que mais recebe".${semArea ? ` ${semArea} município(s) sem área cadastrada (é distrito, não município reconhecido pelo IBGE) ficam de fora só neste modo.` : ""}${avisoAproximado}`;
+        } else {
+          const barras = linhasQtd
+            .map((l) => ({ label: `${l.municipio}${l.aproximado ? " *" : ""}`, valor: l.valorFinal, textoOriginal: l.textoOriginal }))
+            .sort((a, b) => b.valor - a.valor);
+          document.getElementById("cfcr-quantidade-chart").innerHTML = barraHorizontalComEixoSVG(barras, {
+            formatarValor: (v) => `${v.toLocaleString("pt-BR")} L`,
+            formatarEixoTick: (v) => Math.round(v).toLocaleString("pt-BR"),
+            cor: () => "var(--cfcr-info)",
+            rotuloExtra: (c) => `("${c.textoOriginal}")`,
+          });
+          document.getElementById("cfcr-quantidade-nota").innerHTML =
+            `Passe o mouse numa barra pra ver o texto original declarado.${avisoAproximado}`;
+        }
+      }
     }
 
     // ---- Distribuição Territorial — pedido direto (revisão do PDF):
@@ -11328,6 +11891,12 @@ async function carregarCfcrPortal(portalSlug) {
     const btn = ev.target.closest("[data-modo-visual]");
     if (!btn) return;
     modoVisualGeoCfcr = btn.dataset.modoVisual;
+    atualizar();
+  });
+  document.getElementById("cfcr-quantidade-toggle").addEventListener("click", (ev) => {
+    const btn = ev.target.closest("[data-modo-qtd]");
+    if (!btn) return;
+    modoQuantidadeCfcr = btn.dataset.modoQtd;
     atualizar();
   });
   document.getElementById("cfcr-criticidade").addEventListener("click", (ev) => {
