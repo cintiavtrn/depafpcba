@@ -11624,6 +11624,26 @@ function montarRelatorioCfcr(termosTodos, termosTCT) {
   const comCoorpin = termosTCT.filter((t) => t.nomeUnidade).length;
   const semCoorpin = termosTCT.length - comCoorpin;
 
+  // Mesmo cálculo do painel ao vivo (Geografia e Serviços -> "Cobertura
+  // Atual por COORPIN") — pedido direto dela: "e vc modificou o relatorio
+  // pra aparecer isso também?". Diferente de comCoorpin/semCoorpin acima
+  // (todo termo histórico com COORPIN, firmado ou não), aqui conta só
+  // município(s) com termo VIGENTE agora, por COORPIN — sem filtro nenhum,
+  // porque o relatório é sempre a base cheia.
+  const municipiosVigentesPorUnidadeRel = new Map();
+  for (const t of termosTCT) {
+    if (t.status !== "VIGENTE" || !t.nomeUnidade) continue;
+    const set = municipiosVigentesPorUnidadeRel.get(t.nomeUnidade) || new Set();
+    set.add(t.participe);
+    municipiosVigentesPorUnidadeRel.set(t.nomeUnidade, set);
+  }
+  const coberturaAtualLinhasRel = [...new Set(termosTCT.filter((t) => t.nomeUnidade).map((t) => t.nomeUnidade))]
+    .map((nome) => ({ nome, valor: municipiosVigentesPorUnidadeRel.get(nome)?.size || 0 }))
+    .sort((a, b) => a.valor - b.valor || rotularUnidadeCfcr(a.nome).localeCompare(rotularUnidadeCfcr(b.nome)));
+  const coorpinsZeradasRel = coberturaAtualLinhasRel.filter((l) => l.valor === 0);
+  const coorpinsCriticasRel = coberturaAtualLinhasRel.filter((l) => l.valor === 1).length;
+  const maxCoberturaRel = Math.max(...coberturaAtualLinhasRel.map((l) => l.valor), 1);
+
   const acFirmados = ac.filter((t) => t.termoFirmado).length;
   const acStatusCount = new Map();
   for (const t of ac) acStatusCount.set(t.status, (acStatusCount.get(t.status) || 0) + 1);
@@ -11695,7 +11715,10 @@ function montarRelatorioCfcr(termosTodos, termosTCT) {
           <p>${comCoorpin} termo(s) têm COORPIN (unidade regional) reconhecida. ${semCoorpin} termo(s) não têm essa informação. Só a DEPIN cadastra esse dado hoje.</p>
         </div>
       </div>
-      ${relLeituraHTML(`Mostra a cobertura territorial real do serviço, região por região, em vez de só o total geral. Serve pra saber se uma COORPIN específica está com mais termos vencidos que as outras, uma leitura que o total sozinho esconde.`)}
+      <h3 style="margin-top:14px">Cobertura atual por COORPIN, só termos VIGENTE</h3>
+      <p>Diferente do gráfico acima (todo termo já cadastrado com COORPIN, firmado ou não, vencido ou não), esta lista conta só município(s) diferentes com termo VIGENTE agora, por COORPIN.${coorpinsZeradasRel.length ? ` ${coorpinsZeradasRel.length} COORPIN está sem nenhum município sustentando ela neste momento: ${coorpinsZeradasRel.map((l) => rotularUnidadeCfcr(l.nome)).join(", ")}.` : " Nenhuma COORPIN está sem pelo menos 1 município vigente agora."}${coorpinsCriticasRel ? ` Mais ${coorpinsCriticasRel} COORPIN depende de um único município.` : ""}</p>
+      <div>${coberturaAtualLinhasRel.map((l) => relBarraHTML(rotularUnidadeCfcr(l.nome), l.valor, maxCoberturaRel, l.valor === 0 ? COR.bad : l.valor === 1 ? COR.warn : COR.ok)).join("")}</div>
+      ${relLeituraHTML(`A rosca acima mostra o histórico (quem já teve termo com essa COORPIN algum dia), mas a lista de barras mostra quem está sustentando ela agora. Uma barra vermelha significa que aquela COORPIN ficou sem nenhum município ativo, mesmo que o histórico pareça normal, e é a primeira COORPIN a cobrar renovação.`)}
     </div>
 
     <div class="rel-secao">
