@@ -10876,7 +10876,17 @@ async function carregarObrasPortal(portalSlug) {
   // "Concluída" faria a caixa de Status Construtivo desabar pra 1 barra só,
   // em vez de continuar mostrando as 5 com a escolhida em destaque).
   function bateFiltro(u, ignorar) {
-    return DIMENSOES_OBRAS.every((d) => d.chave === ignorar || !filtros[d.chave] || valorEfetivoDimensao(d, u) === filtros[d.chave]);
+    return DIMENSOES_OBRAS.every((d) => {
+      if (d.chave === ignorar || !filtros[d.chave]) return true;
+      // "(sem diretoria)" é um rótulo SINTÉTICO só do gráfico "Financeiro
+      // por Diretoria Regional" (agruparValorObrasPorCampo, mais abaixo) —
+      // não existe como valor bruto de verdade em nenhuma unidade, então
+      // clicar naquela barra precisa bater contra "sem diretoria cadastrada"
+      // (valor vazio), não contra a string literal "(sem diretoria)".
+      // Achado dela: clicar ali filtrava e sempre dava 0 de 588 unidades.
+      if (d.chave === "diretoriaRegional" && filtros[d.chave] === "(sem diretoria)") return !valorEfetivoDimensao(d, u);
+      return valorEfetivoDimensao(d, u) === filtros[d.chave];
+    });
   }
 
   function atualizar() {
@@ -10987,8 +10997,11 @@ async function carregarObrasPortal(portalSlug) {
       : barraOuTabelaSVG(paraValorManutencao, opcoesVisualValor);
     adicionarControlesGrafico(document.getElementById("obras-valor-obra"));
     adicionarControlesGrafico(document.getElementById("obras-valor-manutencao"));
-    ligarTooltipUnidades(document.getElementById("obras-valor-obra"), (rotulo) => unidadesParaDiretoria.filter((u) => valorEfetivoDimensao(dimDiretoria, u) === rotulo && u.valorDaObra != null));
-    ligarTooltipUnidades(document.getElementById("obras-valor-manutencao"), (rotulo) => unidadesParaDiretoria.filter((u) => valorEfetivoDimensao(dimDiretoria, u) === rotulo && u.valorDaManutencao != null));
+    // Mesmo cuidado do bateFiltro acima: "(sem diretoria)" é rótulo
+    // sintético, não bate igual valor bruto.
+    const bateRotuloDiretoria = (u, rotulo) => rotulo === "(sem diretoria)" ? !valorEfetivoDimensao(dimDiretoria, u) : valorEfetivoDimensao(dimDiretoria, u) === rotulo;
+    ligarTooltipUnidades(document.getElementById("obras-valor-obra"), (rotulo) => unidadesParaDiretoria.filter((u) => bateRotuloDiretoria(u, rotulo) && u.valorDaObra != null));
+    ligarTooltipUnidades(document.getElementById("obras-valor-manutencao"), (rotulo) => unidadesParaDiretoria.filter((u) => bateRotuloDiretoria(u, rotulo) && u.valorDaManutencao != null));
 
     // Busca de texto combina COM o cross-filter (recorte primeiro, texto
     // depois) — digitar um nome dentro de um recorte já isolado continua
