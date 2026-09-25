@@ -1350,7 +1350,7 @@ function barraHorizontalComEixoSVG(categorias, opcoes = {}) {
   // cor: string (cor única pra todas as barras, como sempre foi) OU função
   // (c) => cor (uma cor por categoria — CFCR precisa disso pro "Motivo da
   // Pendência", onde cada barra usa a MESMA cor do status equivalente).
-  const { formatarValor = (v) => "R$ " + formatarMoedaCompacta(v), formatarEixoTick = (v) => "R$ " + formatarEixo(v), cor = "var(--tinta)", selecionado = "", rotularDiagonal = false, rotuloExtra = null } = opcoes;
+  const { formatarValor = (v) => "R$ " + formatarMoedaCompacta(v), formatarEixoTick = (v) => "R$ " + formatarEixo(v), cor = "var(--tinta)", selecionado = "", rotularDiagonal = false, rotuloExtra = null, formatarRotulo = (c) => c.label } = opcoes;
   const corDe = typeof cor === "function" ? cor : () => cor;
   const MAX_ROTULO = 22;
   const padL = 150, padR = 14, padT = 4, alturaEixoX = rotularDiagonal ? 34 : 24;
@@ -1360,7 +1360,10 @@ function barraHorizontalComEixoSVG(categorias, opcoes = {}) {
   // só cabe rótulo de 1 linha — mesmo ajuste já usado em outro gráfico
   // horizontal deste arquivo (linhasDoTexto + rowH proporcional ao maior
   // rótulo quebrado).
-  const maxLinhasRotulo = Math.max(1, ...categorias.map((c) => linhasDoTexto(c.label, MAX_ROTULO)));
+  // formatarRotulo (opcional): mesmo mecanismo de barraHorizontalEmpilhadaSVG
+  // — mostra um texto amigável (ex. rotularUnidadeCfcr) sem mexer em
+  // c.label, que continua sendo a chave crua usada em data-cat pro clique.
+  const maxLinhasRotulo = Math.max(1, ...categorias.map((c) => linhasDoTexto(formatarRotulo(c), MAX_ROTULO)));
   const rowH = Math.max(26, maxLinhasRotulo * 12 + 10);
   const w = padL + larguraPlot + padR;
   const baseY = padT + categorias.length * rowH;
@@ -1384,11 +1387,12 @@ function barraHorizontalComEixoSVG(categorias, opcoes = {}) {
     const y = padT + i * rowH;
     const dim = selecionado && selecionado !== c.label;
     const largura = maxV ? larguraPlot * (c.valor / maxV) : 0;
-    const rotulo = textoSVG(c.label, padL - 8, y + rowH / 2, { maxChars: MAX_ROTULO, anchor: "end", fontSize: 9, alturaLinha: 11, peso: selecionado === c.label ? 700 : 400 });
+    const rotuloTexto = formatarRotulo(c);
+    const rotulo = textoSVG(rotuloTexto, padL - 8, y + rowH / 2, { maxChars: MAX_ROTULO, anchor: "end", fontSize: 9, alturaLinha: 11, peso: selecionado === c.label ? 700 : 400 });
     barras += `<g data-cat="${escapeAttr(c.label)}" style="cursor:pointer" opacity="${dim ? 0.4 : 1}">
       <rect class="area-hit" x="0" y="${y.toFixed(1)}" width="${w}" height="${rowH}" fill="transparent" />
       ${rotulo}
-      <rect x="${padL}" y="${(y + 4).toFixed(1)}" width="${Math.max(largura, 1.5).toFixed(1)}" height="${(rowH - 8).toFixed(1)}" fill="${corDe(c)}"><title>${escapeHTML(c.label)}: ${formatarValor(c.valor)}${rotuloExtra ? ` ${escapeHTML(rotuloExtra(c))}` : ""}</title></rect>
+      <rect x="${padL}" y="${(y + 4).toFixed(1)}" width="${Math.max(largura, 1.5).toFixed(1)}" height="${(rowH - 8).toFixed(1)}" fill="${corDe(c)}"><title>${escapeHTML(rotuloTexto)}: ${formatarValor(c.valor)}${rotuloExtra ? ` ${escapeHTML(rotuloExtra(c))}` : ""}</title></rect>
     </g>`;
   });
   return `<svg viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg">${grade}${barras}${eixoX}</svg>`;
@@ -11841,6 +11845,11 @@ async function carregarCfcrPortal(portalSlug) {
         <div class="dash-toggle" style="margin-top:10px">${botaoEntenderDadosHTML("territorio", "por que o mapa mostra menos que 418")}</div>
         <div id="cfcr-entender-territorio" style="margin-top:10px" hidden></div>
       </div>
+      <div class="dash-chart-box" style="margin-top:14px">
+        <h4>Cobertura Atual por COORPIN<small class="dash-chart-hint" style="display:block;margin-top:4px">Município(s) diferentes com termo VIGENTE agora, por COORPIN. Não é o total histórico, esse já está no gráfico acima. Uma COORPIN com barra vermelha está sem nenhum município sustentando ela neste momento, mesmo que já tenha tido termo algum dia. Clique numa barra pra ver, em "Serviços Prestados pelos Municípios" mais acima nesta mesma aba, quais serviços esse conjunto de municípios oferece (considerando todos os termos dela, não só os vigentes).</small></h4>
+        <p class="dash-chart-hint" id="cfcr-cobertura-atual-resumo" style="font-weight:600"></p>
+        <div id="cfcr-cobertura-atual"></div>
+      </div>
     </div>
 
     <div id="cfcr-sub-aclassificar" hidden>
@@ -12264,6 +12273,50 @@ async function carregarCfcrPortal(portalSlug) {
       el.addEventListener("click", () => selecionarUnidadeCfcr(el.dataset.cat));
     });
     document.getElementById("cfcr-geo-legenda").querySelectorAll("[data-cat]").forEach((el) => {
+      el.addEventListener("click", () => selecionarUnidadeCfcr(el.dataset.cat));
+    });
+
+    // ---- Cobertura Atual por COORPIN — pedido direto dela, depois de
+    // reunião: "quais municípios estão desassistidos" virou, na conversa,
+    // "qual COORPIN está desassistida" (a pergunta que a equipe realmente
+    // quer responder é regional, não por município isolado). Diferente do
+    // gráfico "Distribuição Territorial" acima (que conta TODO termo com
+    // COORPIN, firmado ou não, vencido ou não — histórico), este conta só
+    // município(s) com termo VIGENTE agora — por isso ignora o filtro de
+    // status (sempre trava em VIGENTE, senão a pergunta "quem tá
+    // sustentando ISSO agora" perderia sentido se alguém filtrasse por
+    // VENCIDO em outro cartão da tela) mas continua respeitando os outros
+    // filtros ativos (departamento, motivo, repasse etc.) e a DIRPIN
+    // escolhida acima, pro cross-filter continuar coerente com o resto da
+    // aba. Reaproveita selecionarUnidadeCfcr — clicar numa barra aqui
+    // também filtra Serviços Prestados, Detalhamento e todo o resto,
+    // igual clicar no mapa/lista acima.
+    const coberturaAtualRecorte = termosTCT.filter((t) => t.nomeUnidade && bateFiltroExceto(t, ["dirpin", "nomeUnidade", "status"]));
+    const municipiosVigentesPorUnidade = new Map();
+    for (const t of coberturaAtualRecorte) {
+      if (t.status !== "VIGENTE") continue;
+      const set = municipiosVigentesPorUnidade.get(t.nomeUnidade) || new Set();
+      set.add(t.participe);
+      municipiosVigentesPorUnidade.set(t.nomeUnidade, set);
+    }
+    const coberturaAtualLinhas = [...new Set(coberturaAtualRecorte.map((t) => t.nomeUnidade))]
+      .map((nome) => ({ label: nome, valor: municipiosVigentesPorUnidade.get(nome)?.size || 0 }))
+      .sort((a, b) => a.valor - b.valor || rotularUnidadeCfcr(a.label).localeCompare(rotularUnidadeCfcr(b.label)));
+    const coorpinsZeradas = coberturaAtualLinhas.filter((l) => l.valor === 0).length;
+    const coorpinsCriticas = coberturaAtualLinhas.filter((l) => l.valor === 1).length;
+    document.getElementById("cfcr-cobertura-atual-resumo").textContent = coberturaAtualLinhas.length
+      ? `${coorpinsZeradas} COORPIN sem nenhum município vigente agora${coorpinsCriticas ? `, mais ${coorpinsCriticas} sustentada por 1 único município` : ""}, de ${coberturaAtualLinhas.length} COORPIN neste recorte.`
+      : "";
+    document.getElementById("cfcr-cobertura-atual").innerHTML = coberturaAtualLinhas.length
+      ? barraHorizontalComEixoSVG(coberturaAtualLinhas, {
+          formatarValor: (v) => `${v} município(s)`,
+          formatarEixoTick: (v) => Math.round(v).toLocaleString("pt-BR"),
+          cor: (c) => (c.valor === 0 ? "var(--cfcr-bad)" : c.valor === 1 ? "var(--cfcr-warn)" : "var(--cfcr-ok)"),
+          selecionado: filtros.nomeUnidade,
+          formatarRotulo: (c) => rotularUnidadeCfcr(c.label),
+        })
+      : `<p class="dash-chart-hint">Nenhum termo de Cooperação Técnica com COORPIN cadastrada neste recorte.</p>`;
+    document.getElementById("cfcr-cobertura-atual").querySelectorAll("[data-cat]").forEach((el) => {
       el.addEventListener("click", () => selecionarUnidadeCfcr(el.dataset.cat));
     });
 
