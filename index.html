@@ -11457,6 +11457,209 @@ function montarPainelEntenderGeografiaContratos(listaCompleta) {
     </div>`;
 }
 
+// Pedido direto: "onde vc vai colocar informações pra esse relatório ser
+// baixado? tem que ser logo em cima na primeira página aberta" — abre uma
+// aba nova com um documento HTML autocontido (sem depender do CSS/JS do
+// resto do site) pronto pra Ctrl+P / "Salvar como PDF". Sempre com o dado
+// do momento (nunca precisa eu regenerar nada manualmente). `corpoHTML` é
+// quem monta o conteúdo — este helper só cuida da casca (estilo de
+// impressão, botão de imprimir, abrir a aba).
+function abrirRelatorioImprimivel(titulo, corpoHTML) {
+  const win = window.open("", "_blank");
+  if (!win) {
+    toastErro("O navegador bloqueou a nova aba — permita pop-ups pra este site e tente de novo.");
+    return;
+  }
+  const html = `<!DOCTYPE html>
+<html lang="pt-BR"><head><meta charset="UTF-8"><title>${escapeHTML(titulo)}</title>
+<style>
+  @page { size: A4; margin: 16mm 14mm; }
+  /* donutCfcrSVG/vennTresConjuntosSVG (reaproveitados aqui) usam
+     var(--carvao)/var(--paper) direto no fill do SVG — sem essas variáveis
+     definidas aqui, o texto das fatias fica preto sem contraste ou some. */
+  :root { --carvao: #22262E; --paper: #FAFAF8; }
+  * { box-sizing: border-box; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; color: #22262E; background: #fff; margin: 0; padding: 24px; max-width: 900px; margin: 0 auto; }
+  h1 { font-size: 26px; margin: 4px 0 2px; color: #2B5CA8; }
+  h2 { font-size: 15px; margin: 26px 0 2px; border-top: 2px solid #22262E; padding-top: 10px; }
+  h2:first-of-type { border-top: none; padding-top: 0; margin-top: 6px; }
+  h3 { font-size: 12.5px; margin: 2px 0 12px; color: #5B6478; font-weight: 600; }
+  p { font-size: 11px; line-height: 1.55; margin: 4px 0; }
+  .rel-topo { font-size: 10px; color: #8A8F9C; margin-bottom: 14px; }
+  .rel-kpis { display: flex; gap: 10px; margin: 12px 0 16px; flex-wrap: wrap; }
+  .rel-kpi { border: 1.5px solid #ccc; border-radius: 8px; padding: 10px 12px; flex: 1; min-width: 120px; text-align: center; }
+  .rel-kpi .valor { font-size: 21px; font-weight: 700; }
+  .rel-kpi .rotulo { font-size: 8.5px; color: #5B6478; text-transform: uppercase; letter-spacing: .03em; }
+  .rel-caixa { border: 1px solid #D8D6CC; border-radius: 8px; padding: 10px 14px; margin: 10px 0; }
+  table { width: 100%; border-collapse: collapse; font-size: 10px; margin: 8px 0; }
+  th { background: #22262E; color: #fff; text-align: left; padding: 5px 7px; }
+  td { padding: 5px 7px; border-bottom: 1px solid #E4E2D8; }
+  tr:nth-child(even) td { background: #F4F3EE; }
+  .rel-linha { display: flex; gap: 18px; align-items: flex-start; flex-wrap: wrap; margin: 8px 0; }
+  .rel-secao { page-break-inside: avoid; margin-bottom: 4px; }
+  .rel-bar-linha { display: flex; align-items: center; gap: 8px; margin: 3px 0; font-size: 10px; }
+  .rel-bar-rotulo { width: 38%; max-width: 200px; text-align: right; flex: none; }
+  .rel-bar-trilha { flex: 1; min-width: 40px; background: #F0EFE9; border-radius: 3px; height: 14px; position: relative; }
+  .rel-bar-preenchido { background: #2B5CA8; height: 100%; border-radius: 3px; }
+  .rel-bar-valor { width: 34px; flex: none; font-weight: 600; }
+  svg { max-width: 100%; height: auto; }
+  .donut-legenda { display: flex; flex-direction: column; gap: 2px; margin-top: 10px; border-top: 1px solid #E4E2D8; padding-top: 8px; }
+  .donut-leg { display: flex; align-items: flex-start; gap: 8px; background: none; border: none; padding: 3px 0; font-family: 'Segoe UI', Arial, sans-serif; font-size: 10.5px; color: #22262E; text-align: left; }
+  .donut-leg .sw { width: 10px; height: 10px; flex: none; border: 1px solid #22262E; margin-top: 2px; }
+  .donut-leg .lg-nome { flex: 1; line-height: 1.3; }
+  .donut-leg .lg-pct { color: #8A8F9C; }
+  .no-print { }
+  @media print { .no-print { display: none; } }
+</style></head>
+<body>
+  <button class="no-print" onclick="window.print()" style="margin-bottom:18px;padding:9px 18px;font-size:13px;background:#22262E;color:#fff;border:none;border-radius:6px;cursor:pointer">Imprimir / Salvar como PDF</button>
+  ${corpoHTML}
+</body></html>`;
+  win.document.write(html);
+  win.document.close();
+}
+
+function relBarraHTML(rotulo, valor, max, cor) {
+  const pct = max ? Math.max(2, (valor / max) * 100) : 0;
+  return `<div class="rel-bar-linha"><div class="rel-bar-rotulo">${escapeHTML(rotulo)}</div><div class="rel-bar-trilha"><div class="rel-bar-preenchido" style="width:${pct}%;background:${cor}"></div></div><div class="rel-bar-valor">${valor.toLocaleString("pt-BR")}</div></div>`;
+}
+
+function relKpiHTML(valor, rotulo, cor) {
+  return `<div class="rel-kpi" style="border-color:${cor}"><div class="valor" style="color:${cor}">${valor}</div><div class="rotulo">${escapeHTML(rotulo)}</div></div>`;
+}
+
+// Mesma sequência do relatório em PDF que ela pediu (universo -> detalhe),
+// só que montada com o dado do MOMENTO — reaproveita donutCfcrSVG/
+// vennTresConjuntosSVG já existentes, com cor em hexadecimal literal (não
+// var(--cfcr-*), que só existe no CSS do site, não no documento novo).
+function montarRelatorioCfcr(termosTodos, termosTCT) {
+  const COR = { ok: "#1E7D45", bad: "#B23A2F", warn: "#C98A12", info: "#2B5CA8", neutro: "#8A8F9C", laranja: "#ED7D31", roxo: "#7C5CBF" };
+  const agora = new Date().toLocaleDateString("pt-BR");
+  const ac = termosTodos.filter((t) => t.tipo === TIPO_A_CLASSIFICAR_CFCR);
+  const oferecido = (s) => s.periodicidade !== "Não disponibiliza" && s.especificado;
+
+  const firmados = termosTCT.filter((t) => t.termoFirmado).length;
+  const statusCount = new Map();
+  for (const t of termosTCT) statusCount.set(t.status, (statusCount.get(t.status) || 0) + 1);
+  const nomesUnicos = new Set(termosTCT.map((t) => t.participe));
+
+  const hoje = new Date();
+  const maisUrgentes = termosTCT
+    .filter((t) => t.status === "VIGENTE" && t.fimVigenciaData && new Date(t.fimVigenciaData) < hoje)
+    .map((t) => ({ participe: t.participe, departamento: t.departamento, dias: Math.floor((hoje - new Date(t.fimVigenciaData)) / 86400000), processoSei: t.processoSei }))
+    .sort((a, b) => b.dias - a.dias)
+    .slice(0, 8);
+
+  const contagemServico = new Map();
+  for (const t of termosTCT) for (const s of t.servicos || []) {
+    if (!oferecido(s)) continue;
+    contagemServico.set(s.servicoNome, (contagemServico.get(s.servicoNome) || 0) + 1);
+  }
+  const servOrdenado = [...contagemServico.entries()].sort((a, b) => b[1] - a[1]);
+  const top8 = servOrdenado.slice(0, 8);
+  const maxServ = top8.length ? top8[0][1] : 1;
+  const municipiosComServico = termosTCT.filter((t) => (t.servicos || []).some(oferecido)).length;
+  const totalOferecimentos = servOrdenado.reduce((a, [, v]) => a + v, 0);
+  const semNenhumServico = termosTCT.filter((t) => (t.servicos || []).length === 0).length;
+
+  const top3 = servOrdenado.slice(0, 3).map(([nome]) => nome);
+  let vennHTML = "";
+  if (top3.length === 3) {
+    const cores = [COR.info, COR.laranja, COR.roxo];
+    const conjuntos = top3.map((nome, i) => ({ label: nome, cor: cores[i], membros: new Set(termosTCT.filter((t) => (t.servicos || []).some((s) => s.servicoNome === nome && oferecido(s))).map((t) => t.participe)) }));
+    vennHTML = vennTresConjuntosSVG(conjuntos);
+  }
+
+  const comCoorpin = termosTCT.filter((t) => t.nomeUnidade).length;
+  const semCoorpin = termosTCT.length - comCoorpin;
+
+  const acFirmados = ac.filter((t) => t.termoFirmado).length;
+  const acStatusCount = new Map();
+  for (const t of ac) acStatusCount.set(t.status, (acStatusCount.get(t.status) || 0) + 1);
+
+  const donutStatus = donutCfcrSVG(
+    [{ label: "VIGENTE", valor: statusCount.get("VIGENTE") || 0, cor: COR.ok },
+     { label: "VENCIDO", valor: statusCount.get("VENCIDO") || 0, cor: COR.bad },
+     { label: "EM CONSTRUÇÃO", valor: statusCount.get("EM CONSTRUÇÃO") || 0, cor: COR.warn }],
+    "", { rotuloCentro: "TERMOS" }
+  );
+  const donutTerritorio = donutCfcrSVG(
+    [{ label: "Com COORPIN", valor: comCoorpin, cor: COR.ok }, { label: "Sem COORPIN", valor: semCoorpin, cor: COR.neutro }],
+    "", { rotuloCentro: "TCT" }
+  );
+  const donutAc = donutCfcrSVG(
+    [{ label: "VIGENTE", valor: acStatusCount.get("VIGENTE") || 0, cor: COR.ok },
+     { label: "VENCIDO", valor: acStatusCount.get("VENCIDO") || 0, cor: COR.bad },
+     { label: "EM CONSTRUÇÃO", valor: acStatusCount.get("EM CONSTRUÇÃO") || 0, cor: COR.warn },
+     { label: "INDETERMINADO", valor: acStatusCount.get("INDETERMINADO") || 0, cor: COR.info },
+     { label: "SEM INFORMAÇÃO", valor: acStatusCount.get("SEM INFORMAÇÃO") || 0, cor: COR.neutro }],
+    "", { rotuloCentro: "GDG" }
+  );
+
+  return `
+    <h1>CFCR</h1>
+    <h3>Termos de Cooperação Técnica — Relatório de acompanhamento, DEPAF / Polícia Civil da Bahia</h3>
+    <p class="rel-topo">Números direto do banco de produção, gerado em ${agora}.</p>
+
+    <div class="rel-secao">
+      <h2>1. Visão Geral</h2>
+      <div class="rel-kpis">
+        ${relKpiHTML(termosTCT.length, "Total de Termos (TCT)", COR.info)}
+        ${relKpiHTML(firmados, "Termo Firmado", COR.ok)}
+        ${relKpiHTML(termosTCT.length - firmados, "Não Firmado", COR.bad)}
+        ${relKpiHTML(nomesUnicos.size, "Municípios Únicos", COR.neutro)}
+      </div>
+      <div class="rel-linha">
+        <div style="max-width:220px">${donutStatus}</div>
+        <div style="flex:1;min-width:260px">
+          <p>Os ${termosTCT.length} termos correspondem a ${nomesUnicos.size} municípios únicos${termosTCT.length !== nomesUnicos.size ? " (algum município aparece mais de uma vez, por termo renovado sem a linha antiga sair da planilha-fonte)" : ""}.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="rel-secao">
+      <h2>2. Prazos e Pendências</h2>
+      <h3>Termos marcados VIGENTE com prazo já expirado</h3>
+      ${maisUrgentes.length ? `<table><thead><tr><th>MUNICÍPIO</th><th>DEPARTAMENTO</th><th>DIAS VENCIDO</th><th>PROCESSO SEI</th></tr></thead>
+        <tbody>${maisUrgentes.map((u) => `<tr><td>${escapeHTML(u.participe)}</td><td>${escapeHTML(u.departamento)}</td><td style="color:${COR.bad};font-weight:600">${u.dias} dias</td><td>${escapeHTML(u.processoSei || "—")}</td></tr>`).join("")}</tbody></table>`
+        : `<p>Nenhum termo VIGENTE com prazo já expirado neste momento.</p>`}
+      <p style="color:#5B6478">Provável atraso de atualização na planilha-fonte — a renovação já aconteceu na prática, mas a planilha ainda não foi atualizada.</p>
+    </div>
+
+    <div class="rel-secao">
+      <h2>3. Serviços Prestados</h2>
+      <p>${termosTCT.length} município(s) no total. ${municipiosComServico} prestam pelo menos 1 serviço. Juntos, somam ${totalOferecimentos.toLocaleString("pt-BR")} oferecimento(s) em ${servOrdenado.length} tipo(s) diferentes (${semNenhumServico} município(s) sem nenhum dado de serviço preenchido).</p>
+      <div>${top8.map(([nome, v]) => relBarraHTML(nome, v, maxServ, v < termosTCT.length * 0.3 ? COR.bad : COR.info)).join("")}</div>
+      ${vennHTML ? `<h3 style="margin-top:16px">Sobreposição real entre os 3 serviços mais prestados</h3><div style="max-width:340px">${vennHTML}</div>` : ""}
+    </div>
+
+    <div class="rel-secao">
+      <h2>4. Distribuição Territorial</h2>
+      <div class="rel-linha">
+        <div style="max-width:220px">${donutTerritorio}</div>
+        <div style="flex:1;min-width:260px">
+          <p>${comCoorpin} termo(s) têm COORPIN (unidade regional) reconhecida. ${semCoorpin} termo(s) não têm essa informação — só a DEPIN cadastra esse dado hoje.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="rel-secao">
+      <h2>5. A Classificar (GDG)</h2>
+      <div class="rel-kpis">
+        ${relKpiHTML(ac.length, "Registros (GDG)", COR.roxo)}
+        ${relKpiHTML(acFirmados, "Com Vigência Definida", COR.ok)}
+        ${relKpiHTML(ac.length - acFirmados, "Sem Vigência Definida", COR.neutro)}
+      </div>
+      <div class="rel-linha">
+        <div style="max-width:220px">${donutAc}</div>
+        <div style="flex:1;min-width:260px">
+          <p>Este universo nunca se mistura com os ${termosTCT.length} TCT em nenhum total ou gráfico deste relatório — estrutura diferente (sem COORPIN, sem lista de serviços, partícipe às vezes reúne mais de uma instituição).</p>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
 async function carregarCfcrPortal(portalSlug) {
   const painel = document.getElementById("tab-cfcr");
   painel.innerHTML = `<p class="tela-intro">Carregando os termos de cooperação...</p>`;
@@ -11492,6 +11695,7 @@ async function carregarCfcrPortal(portalSlug) {
   ];
 
   painel.innerHTML = `
+    <div style="display:flex;justify-content:flex-end;margin-bottom:10px"><button type="button" class="dash-toggle-btn" id="cfcr-baixar-relatorio">${iconeInline("download", 12, -2)} BAIXAR RELATÓRIO (PDF)</button></div>
     <p class="tela-intro">Termos de Cooperação Técnica · DEPIN · DEPOM · DPMCV — clique em qualquer cartão, fatia ou barra pra isolar o recorte em todas as seções ao mesmo tempo. Parcerias institucionais do GDG (ainda não confirmadas como Congênere) ficam na aba "A Classificar", à parte.</p>
     <div id="cfcr-chips"></div>
     <div class="kpi-row" id="cfcr-kpis" style="margin-bottom:16px"></div>
@@ -12238,8 +12442,118 @@ async function carregarCfcrPortal(portalSlug) {
     territorio: () => montarPainelEntenderTerritorioCfcr(termosTCT),
     aclassificar: () => montarPainelEntenderAClassificarCfcr(termosTodos.filter((t) => t.tipo === TIPO_A_CLASSIFICAR_CFCR), termosTCT),
   });
+  document.getElementById("cfcr-baixar-relatorio").addEventListener("click", () => {
+    abrirRelatorioImprimivel("CFCR — Relatório de Termos de Cooperação Técnica", montarRelatorioCfcr(termosTodos, termosTCT));
+  });
 
   atualizar();
+}
+
+// Mesma sequência do relatório em PDF que ela pediu — reaproveita `resumo`
+// (já vem pronto da API, mesma lógica de negócio de resumoContratos()) e
+// `lista` (contratos já enriquecidos). `unidadeGestoraTopo` é a função já
+// definida em carregarContratosPortal — reaproveitada aqui, não duplicada.
+function montarRelatorioContratos(resumo, lista, unidadeGestoraTopo) {
+  const COR = { vencido: "#C00000", critico: "#E74C3C", alto: "#ED7D31", medio: "#FFC000", baixo: "#70AD47", neutro: "#A6A6A6", info: "#2B5CA8", roxo: "#7C5CBF", laranja: "#ED7D31" };
+  const agora = new Date().toLocaleDateString("pt-BR");
+  const moeda = (v) => v == null ? "—" : "R$ " + v.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const moedaCompacta = (v) => v == null ? "—" : v >= 1e6 ? `R$ ${(v / 1e6).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} milhões` : v >= 1e3 ? `R$ ${Math.round(v / 1e3)} mil` : moeda(v);
+
+  const maisVencidos = lista.filter((c) => c.statusVigencia === "Vencido").sort((a, b) => a.diasParaVencer - b.diasParaVencer).slice(0, 8);
+
+  const ordemCrit = ["Vencido", "Crítico (≤30 dias)", "Alto (31–60 dias)", "Médio (61–90 dias)", "Baixo (>90 dias)", "A Contratar"];
+  const corCrit = { "Vencido": COR.vencido, "Crítico (≤30 dias)": COR.critico, "Alto (31–60 dias)": COR.alto, "Médio (61–90 dias)": COR.medio, "Baixo (>90 dias)": COR.baixo, "A Contratar": COR.neutro };
+  const maxCrit = Math.max(...ordemCrit.map((n) => resumo.porCriticidade[n] || 0), 1);
+
+  const porUG = {};
+  for (const c of lista) {
+    const chave = unidadeGestoraTopo(c);
+    porUG[chave] ??= { total: 0, vencidos: 0 };
+    porUG[chave].total += 1;
+    if (c.statusVigencia === "Vencido") porUG[chave].vencidos += 1;
+  }
+  const ordemUG = Object.keys(porUG).sort((a, b) => porUG[b].total - porUG[a].total);
+  const maiorPctVencido = ordemUG.reduce((a, b) => (porUG[a].vencidos / porUG[a].total) > (porUG[b].vencidos / porUG[b].total) ? a : b);
+
+  const porSetor = Object.entries(resumo.porUnidade).sort((a, b) => b[1] - a[1]);
+  const maxSetor = porSetor.length ? porSetor[0][1] : 1;
+
+  const comUnidade = lista.filter((c) => (c.unidades || []).length > 0);
+  const compartilhados = comUnidade.filter((c) => new Set(c.unidades.map((u) => u.dirpin)).size > 1);
+  const contagemDirpin = new Map();
+  for (const c of comUnidade) for (const d of new Set(c.unidades.map((u) => u.dirpin))) contagemDirpin.set(d, (contagemDirpin.get(d) || 0) + 1);
+  const top3Dirpin = [...contagemDirpin.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3).map(([d]) => d);
+  let vennHTML = "";
+  if (top3Dirpin.length === 3) {
+    const cores = [COR.info, COR.laranja, COR.roxo];
+    const conjuntos = top3Dirpin.map((d, i) => ({ label: d, cor: cores[i], membros: new Set(comUnidade.filter((c) => c.unidades.some((u) => u.dirpin === d)).map((c) => c.id)) }));
+    vennHTML = vennTresConjuntosSVG(conjuntos);
+  }
+
+  return `
+    <h1>CPG</h1>
+    <h3>Controle de Prazos e Garantias — Relatório de acompanhamento, DEPAF / Polícia Civil da Bahia</h3>
+    <p class="rel-topo">Números direto do banco de produção, gerado em ${agora}.</p>
+
+    <div class="rel-secao">
+      <h2>1. Visão Geral</h2>
+      <div class="rel-kpis">
+        ${relKpiHTML(resumo.qtdContratos, "Total de Contratos", COR.info)}
+        ${relKpiHTML(resumo.qtdNaoVencidos, "Em Gestão Ativa", COR.baixo)}
+        ${relKpiHTML(moedaCompacta(resumo.valorGlobalAtualTotal), "Valor Global Atual", COR.roxo)}
+        ${relKpiHTML(resumo.qtdUnidadesBeneficiadas ?? "—", "Unidades Beneficiadas", COR.neutro)}
+      </div>
+      <div>${ordemCrit.filter((n) => resumo.porCriticidade[n]).map((n) => relBarraHTML(n, resumo.porCriticidade[n], maxCrit, corCrit[n])).join("")}</div>
+      <p>"Em gestão ativa" reúne todos menos os ${resumo.qtdVencidos} Vencido. Contrato vencido sem renovação registrada saiu da gestão ativa de hoje, mesmo continuando no histórico do sistema.</p>
+      <p>${resumo.qtdTotalAditivos} aditivos no total, média de ${resumo.mediaAditivosPorContrato?.toFixed(1)} por contrato.</p>
+    </div>
+
+    <div class="rel-secao">
+      <h2>2. Prazos e Pendências</h2>
+      <h3>Os contratos mais vencidos, sem renovação registrada</h3>
+      ${maisVencidos.length ? `<table><thead><tr><th>CONTRATO</th><th>EMPRESA</th><th>UNIDADE</th><th>DIAS VENCIDO</th><th>VALOR</th></tr></thead>
+        <tbody>${maisVencidos.map((c) => `<tr><td>${escapeHTML(c.numeroContrato)}</td><td>${escapeHTML(c.empresa)}</td><td>${escapeHTML(c.unidadeGestora || "—")}</td><td style="color:${COR.vencido};font-weight:600">${Math.abs(c.diasParaVencer)} dias</td><td>${moedaCompacta(c.valorGlobalAtual)}</td></tr>`).join("")}</tbody></table>`
+        : `<p>Nenhum contrato vencido neste momento.</p>`}
+      <p>${resumo.qtdAVencer} contrato(s) estão em "A Vencer" (vencimento em até 90 dias), ainda em vigor, mas candidatos a entrar nesta lista em breve.</p>
+    </div>
+
+    <div class="rel-secao">
+      <h2>3. Financeiro</h2>
+      <div class="rel-kpis">
+        ${relKpiHTML(moedaCompacta(resumo.valorGlobalInicialTotal), "Valor Global Inicial", COR.neutro)}
+        ${relKpiHTML(moedaCompacta(resumo.valorGlobalAtualTotal), "Valor Global Atual", COR.roxo)}
+        ${relKpiHTML(moedaCompacta(resumo.valorAtualNaoVencidosTotal), "Atual — Só Gestão Ativa", COR.baixo)}
+      </div>
+      <p>O valor atual (${moeda(resumo.valorGlobalAtualTotal)}) já reflete ${resumo.qtdTotalAditivos} aditivos lançados sobre os ${resumo.qtdContratos} contratos, em relação ao valor inicial de ${moeda(resumo.valorGlobalInicialTotal)}, quando os contratos foram assinados.</p>
+      ${resumo.percentualComGarantia != null ? `<p>${(resumo.percentualComGarantia * 100).toFixed(0)}% dos contratos com garantia contratual preenchida exigem garantia (percentual calculado só sobre quem tem o campo preenchido).</p>` : ""}
+    </div>
+
+    <div class="rel-secao">
+      <h2>4. Distribuição por Unidade Gestora</h2>
+      <p>As 5 áreas gestoras previstas no sistema são DEPAF, DEPIN, DPSV - Saúde, ACADEPOL e DEPOM. Hoje só DEPAF e DEPIN têm contrato cadastrado.</p>
+      <div>${ordemUG.map((n) => relBarraHTML(n, porUG[n].total, Math.max(...ordemUG.map((k) => porUG[k].total)), COR.info)).join("")}</div>
+      <h3 style="margin-top:14px">Contratos vencidos por unidade gestora</h3>
+      <div>${ordemUG.map((n) => relBarraHTML(`${n} (${(porUG[n].vencidos / porUG[n].total * 100).toFixed(0)}%)`, porUG[n].vencidos, Math.max(...ordemUG.map((k) => porUG[k].vencidos), 1), COR.vencido)).join("")}</div>
+      <p>${maiorPctVencido} tem a maior proporção de contratos vencidos, ${porUG[maiorPctVencido].vencidos} de ${porUG[maiorPctVencido].total} contratos (${(porUG[maiorPctVencido].vencidos / porUG[maiorPctVencido].total * 100).toFixed(0)}%).</p>
+    </div>
+
+    <div class="rel-secao">
+      <h2>5. Distribuição por Setor Demandante</h2>
+      <p>Recorte mais fino que a Unidade Gestora — cada setor abaixo pertence a DEPAF ou DEPIN. ${porSetor.length} setores demandantes diferentes têm contrato próprio.</p>
+      <div>${porSetor.map(([n, v]) => relBarraHTML(n, v, maxSetor, v >= 10 ? COR.info : v >= 4 ? COR.laranja : COR.neutro)).join("")}</div>
+    </div>
+
+    <div class="rel-secao">
+      <h2>6. Compartilhados entre DIRPIN</h2>
+      <p>Só a DEPIN — a DEPIN tem contrato de alimentação, correio e outros serviços abrangentes que servem mais de uma DIRPIN ao mesmo tempo.</p>
+      <div class="rel-kpis">
+        ${relKpiHTML(comUnidade.length - compartilhados.length, "Exclusivos (1 DIRPIN só)", COR.baixo)}
+        ${relKpiHTML(compartilhados.length, "Compartilhados (mais de 1)", COR.vencido)}
+      </div>
+      ${vennHTML ? `<h3>Exemplo real: as 3 DIRPIN com mais contratos</h3><div style="max-width:340px">${vennHTML}</div>` : ""}
+      <p>${comUnidade.length} contrato(s) da DEPIN têm unidade regional cadastrada. A soma por DIRPIN passa desse total porque um contrato compartilhado conta em cada DIRPIN que atende.</p>
+    </div>
+  `;
 }
 
 async function carregarContratosPortal(portalSlug) {
@@ -12361,6 +12675,7 @@ async function carregarContratosPortal(portalSlug) {
   // área, cai num perfil com abas temáticas), pedido direto depois de ela
   // usar aquele painel e comparar com este.
   painel.innerHTML = `
+    <div style="display:flex;justify-content:flex-end;margin-bottom:10px"><button type="button" class="dash-toggle-btn" id="contratos-baixar-relatorio">${iconeInline("download", 12, -2)} BAIXAR RELATÓRIO (PDF)</button></div>
     ${UNIDADES_GESTORAS_DISPONIVEIS.length > 1 ? `
     <div class="dash-filtros" style="margin-bottom:12px">
       <div class="dash-filtro" style="flex:1;min-width:0">
@@ -12483,6 +12798,10 @@ async function carregarContratosPortal(portalSlug) {
   });
 
   montarAbas(lista, resumo);
+
+  document.getElementById("contratos-baixar-relatorio").addEventListener("click", () => {
+    abrirRelatorioImprimivel("CPG - Contratos — Relatório de Prazos e Garantias", montarRelatorioContratos(resumo, lista, unidadeGestoraTopo));
+  });
 
   const seletorUnidadeGestora = document.getElementById("contratos-filtro-unidade-gestora");
   const linhaFiltroDirpin = document.getElementById("contratos-filtro-dirpin-linha");
