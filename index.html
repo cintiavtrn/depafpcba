@@ -11147,6 +11147,141 @@ function donutCfcrSVG(categorias, selecionado, opcoes = {}) {
   return `<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">${fatias}${rotulosFatia}<text x="${cx}" y="${(cy - 3).toFixed(1)}" text-anchor="middle" font-family="'Space Grotesk',sans-serif" font-size="${totalFontSize}" font-weight="700" fill="var(--carvao)">${escapeHTML(totalTexto)}</text><text x="${cx}" y="${(cy + 13).toFixed(1)}" text-anchor="middle" font-family="monospace" font-size="7.5" letter-spacing="1.5" fill="var(--carvao)" fill-opacity="0.6">${escapeHTML(rotuloCentro)}</text></svg><div class="donut-legenda">${legenda}</div>`;
 }
 
+// Pedido direto: "eu fiquei pensando se nós não poderíamos manter esses
+// gráficos e tabelas do jeito que tá mas acrescentar um próprio diagrama de
+// venn pra entender os dados... criar um botão assim e aí a pessoa clica em
+// entender dados e aí aparece os diagramas" — substitui o PDF avulso que eu
+// tinha preparado antes: mesmo conteúdo, mas embutido no painel, no mesmo
+// estilo visual (não é download, é um painel que abre/fecha). Diagrama
+// ESQUEMÁTICO (círculos de tamanho fixo, não proporcional à área) — o Venn
+// de verdade (proporcional) é coisa de biblioteca de geometria, e aqui o
+// que importa é a pessoa entender QUE existe sobreposição e quanto, não a
+// área exata do desenho.
+function vennTresConjuntosSVG(conjuntos) {
+  const [A, B, C] = conjuntos;
+  const universo = new Set([...A.membros, ...B.membros, ...C.membros]);
+  let apenasA = 0, apenasB = 0, apenasC = 0, ab = 0, ac = 0, bc = 0, abc = 0;
+  universo.forEach((x) => {
+    const a = A.membros.has(x), b = B.membros.has(x), c = C.membros.has(x);
+    if (a && b && c) abc++;
+    else if (a && b) ab++;
+    else if (a && c) ac++;
+    else if (b && c) bc++;
+    else if (a) apenasA++;
+    else if (b) apenasB++;
+    else apenasC++;
+  });
+  const r = 78, cA = [118, 106], cB = [182, 106], cC = [150, 166];
+  const num = (v, x, y, tam = 13) => `<text x="${x}" y="${y}" text-anchor="middle" font-family="monospace" font-size="${tam}" font-weight="700" fill="var(--carvao)">${v.toLocaleString("pt-BR")}</text>`;
+  return `<svg viewBox="0 0 300 250" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="${cA[0]}" cy="${cA[1]}" r="${r}" fill="${A.cor}" fill-opacity="0.32" stroke="${A.cor}" stroke-width="1.5" />
+    <circle cx="${cB[0]}" cy="${cB[1]}" r="${r}" fill="${B.cor}" fill-opacity="0.32" stroke="${B.cor}" stroke-width="1.5" />
+    <circle cx="${cC[0]}" cy="${cC[1]}" r="${r}" fill="${C.cor}" fill-opacity="0.32" stroke="${C.cor}" stroke-width="1.5" />
+    ${textoSVG(A.label, 62, 42, { maxChars: 15, anchor: "middle", fontSize: 9, peso: 700 })}
+    ${textoSVG(B.label, 238, 42, { maxChars: 15, anchor: "middle", fontSize: 9, peso: 700 })}
+    ${textoSVG(C.label, 150, 242, { maxChars: 15, anchor: "middle", fontSize: 9, peso: 700 })}
+    ${num(apenasA, 78, 92)}
+    ${num(apenasB, 222, 92)}
+    ${num(apenasC, 150, 210)}
+    ${num(ab, 150, 76, 12)}
+    ${num(ac, 100, 150, 12)}
+    ${num(bc, 200, 150, 12)}
+    ${num(abc, 150, 122, 12)}
+  </svg>`;
+}
+
+// ---- Painéis "Entender os Dados" — lazy: só computam/desenham na 1ª vez
+// que a pessoa abre (não precisam re-renderizar a cada atualizar(), porque
+// explicam a ESTRUTURA fixa dos dados, não o recorte filtrado no momento —
+// mesmo raciocínio do PDF que virou isso: números de referência estáveis).
+function montarPainelEntenderUniversoCfcr(termosTodos, termosTCT) {
+  const totalGDG = termosTodos.length - termosTCT.length;
+  const donut = donutCfcrSVG(
+    [
+      { label: "Termos de Cooperação Técnica (TCT)", valor: termosTCT.length, cor: "var(--cfcr-info)" },
+      { label: "A Classificar (GDG)", valor: totalGDG, cor: "var(--cfcr-roxo)" },
+    ],
+    "",
+    { rotuloCentro: "REGISTROS" }
+  );
+  const nomesUnicos = new Set(termosTCT.map((t) => t.participe));
+  const duplicados = termosTCT.length - nomesUnicos.size;
+  return `<h4>Entender os Dados — Universo Total</h4>
+    <div style="display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start">
+      <div style="max-width:220px">${donut}</div>
+      <div style="flex:1;min-width:260px">
+        <p class="dash-chart-hint"><strong>"Total de Termos (TCT)" e "+ Parcerias a Classificar (GDG)" são dois conjuntos que NUNCA se cruzam</strong> — todo registro é de um tipo ou do outro. Por isso "Total de Termos" nunca soma 448: as abas Visão Geral e Geografia e Serviços só olham pros ${termosTCT.length.toLocaleString("pt-BR")} TCT; os ${totalGDG} GDG ficam isolados na aba "A Classificar", à parte, porque estruturalmente são outra coisa (sem COORPIN, sem lista de serviços, parceria institucional em vez de município).</p>
+        ${duplicados > 0 ? `<p class="dash-chart-hint">Achado à parte: ${termosTCT.length.toLocaleString("pt-BR")} termos TCT ≠ ${nomesUnicos.size.toLocaleString("pt-BR")} municípios únicos — ${duplicados} município(s) aparece(m) 2x nos dados (ex. ITAGI: um termo VENCIDO antigo + um VIGENTE novo, mesma cidade, processos SEI diferentes — foi renovado e a linha velha não saiu da planilha-fonte).</p>` : ""}
+      </div>
+    </div>`;
+}
+
+function montarPainelEntenderServicosCfcr(termosTCT) {
+  // servicoOferecido é local de carregarCfcrPortal (não visível aqui, função
+  // top-level) — mesma regra reescrita direto pra não depender de escopo
+  // alheio: s.periodicidade !== "Não disponibiliza" && s.especificado.
+  const oferecido = (s) => s.periodicidade !== "Não disponibiliza" && s.especificado;
+  const contagem = new Map();
+  for (const t of termosTCT) for (const s of t.servicos || []) {
+    if (!oferecido(s)) continue;
+    contagem.set(s.servicoNome, (contagem.get(s.servicoNome) || 0) + 1);
+  }
+  const top3 = [...contagem.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3).map(([nome]) => nome);
+  if (top3.length < 3) return `<p class="dash-chart-hint">Poucos serviços diferentes prestados neste conjunto de dados pra montar um exemplo de cruzamento.</p>`;
+  const cores = ["var(--cfcr-info)", "var(--cfcr-laranja)", "var(--cfcr-roxo)"];
+  const conjuntos = top3.map((nome, i) => ({
+    label: nome,
+    cor: cores[i],
+    membros: new Set(termosTCT.filter((t) => (t.servicos || []).some((s) => s.servicoNome === nome && oferecido(s))).map((t) => t.participe)),
+  }));
+  const semNenhum = termosTCT.filter((t) => (t.servicos || []).length === 0).length;
+  return `<h4>Entender os Dados — Serviços Prestados</h4>
+    <p class="dash-chart-hint">Diferente de Status (uma partição — cada termo cabe numa fatia só), um mesmo município pode marcar VÁRIOS serviços — por isso a soma das 12 barras é maior que o nº de municípios. Exemplo real com os 3 serviços mais prestados (${termosTCT.length.toLocaleString("pt-BR")} termos TCT no total, ${semNenhum.toLocaleString("pt-BR")} sem nenhum dado de serviço preenchido):</p>
+    <div style="max-width:340px;margin:8px auto">${vennTresConjuntosSVG(conjuntos)}</div>
+    <p class="dash-chart-hint">Cada número é quantos municípios caem SÓ naquela combinação — o do meio (interseção dos 3) conta uma vez só, não em cada círculo separado. A tabela "Quem Presta e Com Que Frequência", ao lado, é sempre um recorte de 1 serviço por vez — clique numa barra em "Serviços Prestados" pra ver o detalhe.</p>`;
+}
+
+function montarPainelEntenderTerritorioCfcr(termosTCT) {
+  const comCoorpin = termosTCT.filter((t) => t.nomeUnidade).length;
+  const semCoorpin = termosTCT.length - comCoorpin;
+  const donut = donutCfcrSVG(
+    [
+      { label: "Com COORPIN reconhecida (entra no mapa)", valor: comCoorpin, cor: "var(--cfcr-ok)" },
+      { label: "Sem COORPIN (fora do mapa)", valor: semCoorpin, cor: "var(--cfcr-neutro)" },
+    ],
+    "",
+    { rotuloCentro: "TCT" }
+  );
+  return `<h4>Entender os Dados — Distribuição Territorial</h4>
+    <div style="display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start">
+      <div style="max-width:220px">${donut}</div>
+      <div style="flex:1;min-width:260px">
+        <p class="dash-chart-hint">Só entra no mapa/lista de COORPIN quem tem a região reconhecida no texto original — ${semCoorpin.toLocaleString("pt-BR")} termo(s) não têm, então ficam de fora SÓ deste mapa/lista (continuam contados normalmente em Status, Firmado, Detalhamento etc.).</p>
+        <p class="dash-chart-hint">LISTA e MAPA acima são a MESMA base de ${comCoorpin.toLocaleString("pt-BR")} — só duas formas de olhar o mesmo dado (é um toggle, não dois universos diferentes).</p>
+      </div>
+    </div>`;
+}
+
+function montarPainelEntenderAClassificarCfcr(todosAC, termosTCT) {
+  const donut = donutCfcrSVG(
+    [
+      { label: "A Classificar (GDG)", valor: todosAC.length, cor: "var(--cfcr-roxo)" },
+      { label: "Termos de Cooperação Técnica (TCT)", valor: termosTCT.length, cor: "var(--cfcr-info)" },
+    ],
+    "",
+    { rotuloCentro: "REGISTROS" }
+  );
+  const multiParticipe = todosAC.filter((t) => /[,;]|\be\b/.test(t.participe)).length;
+  return `<h4>Entender os Dados — A Classificar (GDG)</h4>
+    <div style="display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start">
+      <div style="max-width:220px">${donut}</div>
+      <div style="flex:1;min-width:260px">
+        <p class="dash-chart-hint">Este universo de ${todosAC.length} registros NUNCA se mistura com os ${termosTCT.length.toLocaleString("pt-BR")} TCT em nenhum cartão do painel — nem no total, nem nos gráficos. A única ponte é o cartão "+ Parcerias a Classificar (GDG)" na Visão Geral, que leva direto pra esta aba ao clicar.</p>
+        <p class="dash-chart-hint">Estrutura diferente do TCT: sem COORPIN, sem lista de serviços (objeto em texto livre)${multiParticipe ? `, e partícipe às vezes é mais de uma instituição junta (contra sempre 1 único município nos TCT)` : ""} — por isso "Com Vigência Definida"/"Sem Vigência Definida" (não "Termo Firmado"): ainda não temos certeza se estes registros são termos formais.</p>
+      </div>
+    </div>`;
+}
+
 async function carregarCfcrPortal(portalSlug) {
   const painel = document.getElementById("tab-cfcr");
   painel.innerHTML = `<p class="tela-intro">Carregando os termos de cooperação...</p>`;
@@ -11185,6 +11320,8 @@ async function carregarCfcrPortal(portalSlug) {
     <p class="tela-intro">Termos de Cooperação Técnica · DEPIN · DEPOM · DPMCV — clique em qualquer cartão, fatia ou barra pra isolar o recorte em todas as seções ao mesmo tempo. Parcerias institucionais do GDG (ainda não confirmadas como Congênere) ficam na aba "A Classificar", à parte.</p>
     <div id="cfcr-chips"></div>
     <div class="kpi-row" id="cfcr-kpis" style="margin-bottom:16px"></div>
+    <div class="dash-toggle" style="margin-bottom:16px"><button type="button" class="dash-toggle-btn" data-entender-toggle="universo">🔍 ENTENDER OS DADOS — o que é 418, o que é 30, por que não somam 448 em lugar nenhum</button></div>
+    <div class="dash-chart-box" id="cfcr-entender-universo" style="margin-bottom:16px" hidden></div>
     <div class="tabs" id="cfcr-subtabs" style="margin-bottom:14px">
       ${SUBABAS_CFCR.map((s, i) => `<button type="button" class="tab-btn${i === 0 ? " active" : ""}" data-subtab-cfcr="${s.chave}">${s.rotulo}</button>`).join("")}
     </div>
@@ -11235,6 +11372,8 @@ async function carregarCfcrPortal(portalSlug) {
           <p class="dash-chart-hint" id="cfcr-servicos-cobertura" style="font-weight:600"></p>
           <div id="cfcr-servicos"></div>
           <p class="dash-chart-hint" id="cfcr-servicos-sem-dado"></p>
+          <div class="dash-toggle" style="margin-top:10px"><button type="button" class="dash-toggle-btn" data-entender-toggle="servicos">🔍 ENTENDER OS DADOS — por que um município pode contar em mais de uma barra</button></div>
+          <div id="cfcr-entender-servicos" style="margin-top:10px" hidden></div>
         </div>
         <div class="dash-chart-box">
           <h4>Quem Presta e Com Que Frequência<small class="dash-chart-hint" style="display:block;margin-top:4px">Detalhe do serviço selecionado ao lado — clique num serviço em "Serviços Prestados" pra ver aqui quais municípios prestam e com qual periodicidade/quantidade.</small></h4>
@@ -11268,12 +11407,16 @@ async function carregarCfcrPortal(portalSlug) {
         </div>
         <div id="cfcr-geo-visual"></div>
         <div id="cfcr-geo-legenda"></div>
+        <div class="dash-toggle" style="margin-top:10px"><button type="button" class="dash-toggle-btn" data-entender-toggle="territorio">🔍 ENTENDER OS DADOS — por que o mapa mostra menos que 418</button></div>
+        <div id="cfcr-entender-territorio" style="margin-top:10px" hidden></div>
       </div>
     </div>
 
     <div id="cfcr-sub-aclassificar" hidden>
       <p class="dash-chart-hint">Estrutura diferente dos Termos de Cooperação Técnica — parcerias institucionais (não municipais), sem lista de serviços própria, e ainda não confirmadas como "Congênere" propriamente dito (ver Detalhamento abaixo).</p>
       <div class="kpi-row" id="cfcr-ac-kpis" style="margin-bottom:16px"></div>
+      <div class="dash-toggle" style="margin-bottom:16px"><button type="button" class="dash-toggle-btn" data-entender-toggle="aclassificar">🔍 ENTENDER OS DADOS — por que isso nunca entra no total de 418</button></div>
+      <div class="dash-chart-box" id="cfcr-entender-aclassificar" style="margin-bottom:16px" hidden></div>
       <div class="dash-chart-box">
         <h4>Distribuição por Status<small class="dash-chart-hint" style="display:block;margin-top:4px">Clique numa fatia ou na legenda pra isolar aquele status.</small></h4>
         <div id="cfcr-ac-status"></div>
@@ -11908,6 +12051,28 @@ async function carregarCfcrPortal(portalSlug) {
   document.getElementById("cfcr-prioridade").addEventListener("click", (ev) => {
     const linha = ev.target.closest("tr[title]");
     if (linha) linha.scrollIntoView?.({ behavior: "smooth", block: "center" });
+  });
+
+  // Pedido direto: botão "Entender os Dados" abre um painel com diagrama —
+  // computa a partir do universo FIXO (termosTodos/termosTCT), não do
+  // recorte filtrado no momento, porque explica a estrutura dos dados, não
+  // "o que sobrou depois do filtro". Lazy: só monta na 1ª vez que abre
+  // (dataset.montado evita remontar toda vez que clica pra fechar/abrir).
+  document.querySelectorAll("[data-entender-toggle]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const chave = btn.dataset.entenderToggle;
+      const painelAlvo = document.getElementById(`cfcr-entender-${chave}`);
+      if (!painelAlvo) return;
+      if (!painelAlvo.dataset.montado) {
+        if (chave === "universo") painelAlvo.innerHTML = montarPainelEntenderUniversoCfcr(termosTodos, termosTCT);
+        else if (chave === "servicos") painelAlvo.innerHTML = montarPainelEntenderServicosCfcr(termosTCT);
+        else if (chave === "territorio") painelAlvo.innerHTML = montarPainelEntenderTerritorioCfcr(termosTCT);
+        else if (chave === "aclassificar") painelAlvo.innerHTML = montarPainelEntenderAClassificarCfcr(termosTodos.filter((t) => t.tipo === TIPO_A_CLASSIFICAR_CFCR), termosTCT);
+        painelAlvo.dataset.montado = "1";
+      }
+      painelAlvo.hidden = !painelAlvo.hidden;
+      btn.textContent = btn.textContent.startsWith("🔼") ? btn.textContent.replace("🔼", "🔍") : btn.textContent.replace("🔍", "🔼");
+    });
   });
 
   atualizar();
