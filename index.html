@@ -10058,12 +10058,12 @@ function tabelaCeirfHTML(linhas) {
   if (!linhas.length) return `<p class="tela-intro">Nenhuma intervenção neste recorte.</p>`;
   const ordenadas = [...linhas].sort((a, b) => (b.valorGlobal || 0) - (a.valorGlobal || 0));
   return `<table class="dash-tabela">
-    <thead><tr><th>MUNICÍPIO</th><th>ETAPA</th><th>OBRA OU REFORMA</th><th>STATUS</th><th>VALOR GLOBAL</th></tr></thead>
+    <thead><tr><th>MUNICÍPIO</th><th>ETAPA</th><th>TIPO DE INTERVENÇÃO</th><th>STATUS</th><th>VALOR GLOBAL</th></tr></thead>
     <tbody>${ordenadas.map((r) => `
       <tr>
         <td>${escapeHTML(r.municipio || "—")}</td>
         <td>${escapeHTML(r.etapa || "—")}</td>
-        <td>${escapeHTML(r.tipoIntervencao || "—")}</td>
+        <td>${escapeHTML(normalizarTipoIntervencaoCeirf(r.tipoIntervencao) || "—")}</td>
         <td>${escapeHTML(normalizarStatusCeirf(r.status) || "—")}</td>
         <td class="num">${r.valorGlobal != null ? "R$ " + formatarMoedaCompacta(r.valorGlobal) : "—"}</td>
       </tr>`).join("")}</tbody>
@@ -10208,12 +10208,19 @@ const ROTULOS_STATUS_CEIRF = {
   "A INICIAR": "A Iniciar", "PARALISADA": "Paralisada", "SUPRIMIDA": "Suprimida",
 };
 function normalizarStatusCeirf(v) { return v ? (ROTULOS_STATUS_CEIRF[v] || v) : v; }
+// Pedido direto dela ("obra" é o termo generalista pro painel inteiro,
+// manutenção/reforma são TIPOS de obra) — a planilha-fonte usa "OBRA" pra
+// dizer especificamente "construção nova" (em oposição a "REFORMA"), o que
+// colide com "Obra" virando o guarda-chuva do painel. Rótulo de exibição
+// só — o valor bruto continua "OBRA" no filtro/banco.
+const ROTULOS_TIPO_INTERVENCAO_CEIRF = { "OBRA": "Obra Nova", "REFORMA": "Reforma" };
+function normalizarTipoIntervencaoCeirf(v) { return v ? (ROTULOS_TIPO_INTERVENCAO_CEIRF[v] || v) : v; }
 const DIMENSOES_CEIRF = [
   // Pedido direto: "Status pode ser status ou como está o andamento?" —
   // mantém o rótulo curto (Status) com o hint explicando a pergunta que
   // responde, em vez de um título mais longo.
   { chave: "status", campo: (r) => normalizarStatusCeirf(r.status), rotulo: "Status", colunaRotulo: "STATUS", containerId: "ceirf-status", hint: "Como está o andamento de cada intervenção — do início (A Iniciar) até em uso (Inaugurada). Passe o mouse numa fatia pra ver valor em R$ e quantidade juntos.", tipo: "rosca" },
-  { chave: "tipoIntervencao", campo: (r) => r.tipoIntervencao, rotulo: "Obra ou Reforma", colunaRotulo: "TIPO DE INTERVENÇÃO", containerId: "ceirf-tipo", tipo: "barraEixo", cor: "var(--terracota)" },
+  { chave: "tipoIntervencao", campo: (r) => normalizarTipoIntervencaoCeirf(r.tipoIntervencao), rotulo: "Tipo de Intervenção", colunaRotulo: "TIPO DE INTERVENÇÃO", containerId: "ceirf-tipo", tipo: "barraEixo", cor: "var(--terracota)" },
   // Coluna empilhada (colunaEmpilhadaSVG, nova) — "o gradiente por etapa"
   // pedido direto, com eixo Y de valor e as 3 cores próprias (não o azul/
   // dourado/rosa do painel de referência: oliva=entregue, mostarda=
