@@ -12670,7 +12670,7 @@ function montarRelatorioContratos(resumo, lista, unidadeGestoraTopo) {
         ${relKpiHTML(moedaCompacta(resumo.valorGlobalAtualTotal), "Valor Global Atual", COR.roxo)}
         ${relKpiHTML(moedaCompacta(resumo.valorAtualNaoVencidosTotal), "Atual (Só Gestão Ativa)", COR.baixo)}
       </div>
-      <p>O valor atual (${moeda(resumo.valorGlobalAtualTotal)}) já reflete ${resumo.qtdTotalAditivos} aditivos lançados sobre os ${resumo.qtdContratos} contratos, em relação ao valor inicial de ${moeda(resumo.valorGlobalInicialTotal)}, quando os contratos foram assinados.</p>
+      <p>O valor atual (${moeda(resumo.valorGlobalAtualTotal)}) já reflete ${resumo.qtdTotalAditivos} aditivos lançados sobre os ${resumo.qtdContratos} contratos, em relação ao valor inicial registrado de ${moeda(resumo.valorGlobalInicialTotal)} (na assinatura, pro DEPAF; na última atualização de valor detectada, pra DEPIN, que não distingue os dois na planilha-fonte).</p>
       ${resumo.percentualComGarantia != null ? `<p>${(resumo.percentualComGarantia * 100).toFixed(0)}% dos contratos com garantia contratual preenchida exigem garantia (percentual calculado só sobre quem tem o campo preenchido).</p>` : ""}
       ${relLeituraHTML(`Compara o valor assinado originalmente com o valor atual depois dos aditivos, mostrando o quanto os contratos cresceram desde a assinatura. Serve pra entender se o orçamento comprometido está subindo mais rápido do que o previsto, e se o ritmo de aditivo pede uma revisão de planejamento.`)}
     </div>
