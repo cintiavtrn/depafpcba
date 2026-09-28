@@ -7304,6 +7304,7 @@ function renderOperacionalContratos(lista, portalSlug) {
         <div class="dado">${selecionado ? pillCriticidade(selecionado.criticidade) : `<div class="valor">--</div>`}<div class="rotulo">Criticidade Selecionada</div></div>
         <div class="dado"><div class="valor">${selecionado ? escapeHTML(selecionado.garantiaExigida || "—") : "--"}</div><div class="rotulo">Garantia Exigida</div></div>
         <div class="dado"><div class="valor">${selecionado ? escapeHTML(selecionado.garantiaExigida === "Sim" ? (selecionado.garantiaForma || "—") : "—") : "--"}</div><div class="rotulo">Forma de Garantia</div></div>
+        ${selecionado?.quantidadeContratada != null ? `<div class="dado"><div class="valor">${selecionado.quantidadeContratada.toLocaleString("pt-BR")}</div><div class="rotulo">${escapeHTML(selecionado.unidadeContratada || "Quantidade Contratada")}</div></div>` : ""}
       </div>`;
 
     document.getElementById("op-kpis").innerHTML = `
