@@ -4920,6 +4920,35 @@ function agruparTopContratosPorValor(lista, n = 10) {
     .map((c) => ({ label: `${c.numeroContrato} — ${c.empresa}`, total: c.valorGlobalAtual, id: c.id }));
 }
 
+// Achado dela: o cartão "Valor Global Atual Total" mostra uma seta ▲/▼ de
+// variação (vs inicial), mas clicar nele levava pro "Top 10 Maiores
+// Contratos" — que é ordenado por valor ABSOLUTO, não por quem mudou. Um
+// contrato gigante sem nenhuma variação aparecia lá; um contrato pequeno
+// que dobrou de valor não aparecia em lugar nenhum. Esta função responde a
+// pergunta que o cartão de fato promete: quais contratos específicos
+// tiveram valorGlobalAtual diferente de valorGlobalInicial, ordenados pelo
+// tamanho da mudança em R$ (não por valor final) — pro DEPAF isso é desde
+// a assinatura; pra DEPIN, desde a última sincronização (ver
+// seed-contratos-depin.js, valorGlobalInicial lá não é "na assinatura").
+function agruparContratosComVariacaoDeValor(lista, n = 10) {
+  return [...lista]
+    .filter((c) => c.valorGlobalInicial != null && c.valorGlobalAtual != null && c.valorGlobalInicial !== c.valorGlobalAtual)
+    .map((c) => {
+      const delta = c.valorGlobalAtual - c.valorGlobalInicial;
+      return {
+        label: `${c.numeroContrato} — ${c.empresa}`,
+        total: Math.abs(delta),
+        delta,
+        pct: c.valorGlobalInicial ? (delta / c.valorGlobalInicial) * 100 : null,
+        valorInicial: c.valorGlobalInicial,
+        valorAtual: c.valorGlobalAtual,
+        id: c.id,
+      };
+    })
+    .sort((a, b) => b.total - a.total)
+    .slice(0, n);
+}
+
 // Soma o valor de TODOS os contratos da mesma empresa antes de ordenar —
 // sem isso um fornecedor com 3 contratos médios ficaria escondido atrás de
 // um só contrato grande de outra empresa, quando na prática ele é quem mais
@@ -6138,6 +6167,10 @@ function renderGerencialContratos(lista, resumo) {
         <div id="ger-top-fornecedores"></div>
       </div>
     </div>
+    <div class="dash-chart-box" id="ger-variacao-valor-caixa">
+      <h4>Contratos com Variação de Valor<small class="dash-chart-hint" style="display:block;margin-top:4px">Quem mudou de valor de verdade, não quem tem o maior valor — ordenado pela diferença em R$. Passe o mouse pra ver de quanto pra quanto.</small></h4>
+      <div id="ger-variacao-valor"></div>
+    </div>
     <div class="kpi-row" style="margin-top:2px;grid-template-columns:repeat(auto-fit,minmax(180px,1fr))" id="ger-rodape"></div>
   `;
 
@@ -6251,10 +6284,13 @@ function renderGerencialContratos(lista, resumo) {
     const card = ev.target.closest("[data-status]");
     if (card) return selecionarStatusKpi(card.dataset.status);
     // "Valor Global Atual Total" não isola nada (não tem um "subconjunto"
-    // óbvio pra filtrar) — clicar leva direto pro gráfico que já responde
-    // "quais são os maiores", em vez de ficar sem destino nenhum.
+    // óbvio pra filtrar) — clicar leva direto pro gráfico que responde a
+    // pergunta que a seta ▲/▼ do próprio cartão levanta ("quem variou"),
+    // não pro Top 10 por valor absoluto (achado dela: contrato gigante sem
+    // variação nenhuma aparecia lá, e um pequeno que dobrou de valor não
+    // aparecia em lugar nenhum).
     const acao = ev.target.closest("[data-acao]");
-    if (acao?.dataset.acao === "top-contratos") rolarEDestacar("ger-top-contratos");
+    if (acao?.dataset.acao === "variacao-valor") rolarEDestacar("ger-variacao-valor-caixa");
   });
   // O rodapé (Qtd A Contratar, Contratos Garantia Exigida) fica lá embaixo
   // da página — exatamente por isso esses dois cartões são os que mais
@@ -6495,7 +6531,7 @@ function renderGerencialContratos(lista, resumo) {
         <div class="kpi-card kpi-clicavel" data-status="Vencido" title="Clique pra ver quais são" style="--kpi-cor:var(--crit-vencido);cursor:pointer;${filtroStatusKpi === "Vencido" ? "outline:2px solid var(--crit-vencido);outline-offset:-2px" : ""}"><div class="kpi-cabeca">${kpiIcone("relogio")}<div class="kpi-label">Qtd Contratos Vencidos</div></div><div class="kpi-value">${qtdVencidos.toLocaleString("pt-BR")}</div></div>
         <div class="kpi-card kpi-clicavel" data-status="A Vencer" title="Clique pra ver quais são" style="--kpi-cor:var(--crit-alto);cursor:pointer;${filtroStatusKpi === "A Vencer" ? "outline:2px solid var(--crit-alto);outline-offset:-2px" : ""}"><div class="kpi-cabeca">${kpiIcone("relogio")}<div class="kpi-label">Qtd Contratos A Vencer</div></div><div class="kpi-value">${qtdAVencer.toLocaleString("pt-BR")}</div></div>
         <div class="kpi-card"><div class="kpi-cabeca">${kpiIcone("moeda")}<div class="kpi-label">Valor Global Inicial Total</div></div><div class="kpi-value">R$ ${formatarMoedaCompacta(valorInicial)}</div><div class="kpi-valor-exato">${formatarMoedaBR(valorInicial)}</div></div>
-        <div class="kpi-card kpi-clicavel" data-acao="top-contratos" title="Clique pra ver os maiores contratos" style="cursor:pointer"><div class="kpi-cabeca">${kpiIcone("moeda")}<div class="kpi-label">Valor Global Atual Total</div></div><div class="kpi-value">R$ ${formatarMoedaCompacta(valorAtual)}</div><div class="kpi-valor-exato">${formatarMoedaBR(valorAtual)}</div><div class="kpi-delta ${deltaClasse}">${deltaTexto}</div></div>
+        <div class="kpi-card kpi-clicavel" data-acao="variacao-valor" title="Clique pra ver quais contratos variaram de valor" style="cursor:pointer"><div class="kpi-cabeca">${kpiIcone("moeda")}<div class="kpi-label">Valor Global Atual Total</div></div><div class="kpi-value">R$ ${formatarMoedaCompacta(valorAtual)}</div><div class="kpi-valor-exato">${formatarMoedaBR(valorAtual)}</div><div class="kpi-delta ${deltaClasse}">${deltaTexto}</div></div>
       </div>`;
 
     // Tabela combinada: aparece sempre que QUALQUER filtro de recorte estiver
@@ -6721,6 +6757,16 @@ function renderGerencialContratos(lista, resumo) {
         limite: 20,
       }
     );
+    const variacaoValor = agruparContratosComVariacaoDeValor(filtrada, 10);
+    document.getElementById("ger-variacao-valor").innerHTML = variacaoValor.length
+      ? barraContagemHorizontalSVG(variacaoValor, {
+          formatarValor: (v) => "R$ " + formatarMoedaCompacta(v),
+          rotuloExtra: (l) => l.delta >= 0 ? "▲" : "▼",
+          tituloTooltip: (l) => `${l.label}: ${l.delta >= 0 ? "subiu" : "caiu"} ${formatarMoedaBR(Math.abs(l.delta))}${l.pct !== null ? ` (${Math.abs(l.pct).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%)` : ""} — de ${formatarMoedaBR(l.valorInicial)} pra ${formatarMoedaBR(l.valorAtual)}`,
+          limite: 20,
+        })
+      : `<p class="dash-chart-hint">Nenhum contrato deste recorte teve o valor mudado desde a última sincronização.</p>`;
+    ligarTooltipLinhas(document.getElementById("ger-variacao-valor"), porId);
     adicionarControlesGrafico(document.getElementById("ger-barra"));
     adicionarControlesGrafico(document.getElementById("ger-setor"));
     adicionarControlesGrafico(document.getElementById("ger-tipo"));
@@ -7452,7 +7498,7 @@ function renderResumoRapido(lista, resumo) {
           <div class="kpi-cabeca">${kpiIcone("relogio")}<div class="kpi-label">Não Vencidos <span class="kpi-info" title="Quantos ainda estão de fato em vigor — o total de cima menos os já vencidos. Pra responder 'quantos contratos essa unidade gere hoje', é este número, não o total bruto.">${iconeInline("informacao", 11, -1)}</span></div></div>
           <div class="kpi-value">${resumo.qtdNaoVencidos.toLocaleString("pt-BR")}</div>
         </div>
-        <div class="kpi-card kpi-clicavel" data-resumo-ir="gerencial-valor" title="Clique pra ver os maiores contratos" style="cursor:pointer">
+        <div class="kpi-card kpi-clicavel" data-resumo-ir="gerencial-valor" title="Clique pra ver quais contratos variaram de valor" style="cursor:pointer">
           <div class="kpi-cabeca">${kpiIcone("moeda")}<div class="kpi-label">Valor Atual Total <span class="kpi-info" title="Soma do Valor Global Atual de todos os contratos — já considerando as renovações marcadas manualmente, mesmo antes da planilha ser reimportada.">${iconeInline("informacao", 11, -1)}</span></div></div>
           <div class="kpi-value">R$ ${formatarMoedaCompacta(resumo.valorGlobalAtualTotal)}</div>
           <div class="kpi-valor-exato">${formatarMoedaBR(resumo.valorGlobalAtualTotal)}</div>
@@ -7504,8 +7550,10 @@ function renderResumoRapido(lista, resumo) {
   // em "Por Área Gestora"/"Por Categoria" (gráficos, divisões temáticas,
   // tudo). Qtd Contratos abre a lista completa (mesmo cartão "Qtd
   // Contratos" clicável que existe dentro do Gerencial); Valor Atual rola
-  // até o Top 10 Maiores Contratos lá dentro (mesmo cartão "Valor Global
-  // Atual Total" clicável de lá). O listener fica no container (não se
+  // até "Contratos com Variação de Valor" lá dentro (mesmo cartão "Valor
+  // Global Atual Total" clicável de lá — achado dela: ia pro Top 10 por
+  // valor absoluto, que não responde "quem variou"). O listener fica no
+  // container (não se
   // refaz a cada desenhar()), então continua funcionando depois de trocar
   // o toggle. O `if` de baixo existe porque, desde o seletor de Unidade
   // Gestora, esta função passou a rodar MAIS de uma vez por carregamento
@@ -7524,7 +7572,7 @@ function renderResumoRapido(lista, resumo) {
       if (cardIr.dataset.resumoIr === "gerencial-todos") {
         document.querySelector('#contratos-sub-gerencial [data-status="Todos"]')?.dispatchEvent(new Event("click", { bubbles: true }));
       } else if (cardIr.dataset.resumoIr === "gerencial-valor") {
-        document.querySelector('#contratos-sub-gerencial [data-acao="top-contratos"]')?.dispatchEvent(new Event("click", { bubbles: true }));
+        document.querySelector('#contratos-sub-gerencial [data-acao="variacao-valor"]')?.dispatchEvent(new Event("click", { bubbles: true }));
       }
       return;
     }
