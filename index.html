@@ -12191,6 +12191,23 @@ async function carregarCfcrPortal(portalSlug) {
       b.classList.toggle("active", b.dataset.modoStatus === modoStatusGeoCfcr);
     });
     const servicoRecorte = termosTCT.filter((t) => bateFiltro(t, "servico") && (modoStatusGeoCfcr !== "vigente" || t.status === "VIGENTE"));
+    // Achado dela, confirmado nos dados: termo VENCIDO quase nunca tem
+    // serviço preenchido (167 de 169 sem nenhum dado — ninguém atualiza a
+    // planilha de um termo que já venceu). Contar "serviços prestados" no
+    // histórico completo não é serviço prestado de verdade, é só a
+    // ausência de dado maquiada de zero — "a visualização precisa
+    // refletir isso e não ser um retorno de serviços prestados porque não
+    // tem como saber". No modo histórico, as duas caixas de serviço saem
+    // do ar e explicam o motivo, em vez de mostrar um gráfico
+    // tecnicamente correto mas enganoso.
+    let linhasDetalheServico = [];
+    if (modoStatusGeoCfcr === "historico") {
+      const semDadoHistorico = servicoRecorte.filter((t) => (t.servicos || []).length === 0).length;
+      document.getElementById("cfcr-servicos").innerHTML = `<p class="dash-chart-hint">Não dá pra saber quais serviços cada município oferecia quando o termo já venceu — ${semDadoHistorico.toLocaleString("pt-BR")} de ${servicoRecorte.length.toLocaleString("pt-BR")} termo(s) deste recorte não têm nenhum dado de serviço preenchido (ninguém atualiza a planilha de um termo já vencido). O que dá pra afirmar com segurança é só "esse município teve termo e hoje não tem" — essa lista está na tabela "Municípios Sem Termo Vigente" mais abaixo. Troque pra "Só Vigente" pra ver o detalhe de serviço de quem está ativo agora.</p>`;
+      document.getElementById("cfcr-servicos-cobertura").textContent = "";
+      document.getElementById("cfcr-servicos-sem-dado").textContent = "";
+      document.getElementById("cfcr-servico-detalhe").innerHTML = `<p class="dash-chart-hint">Detalhe de serviço só existe pra quem está VIGENTE agora — troque o alternador lá em cima.</p>`;
+    } else {
     const contagemServico = new Map();
     for (const t of servicoRecorte) {
       for (const s of t.servicos || []) {
@@ -12246,7 +12263,6 @@ async function carregarCfcrPortal(portalSlug) {
     // (já filtrado por tudo o mais). Só faz sentido depois de escolher um
     // serviço em "Serviços Prestados" — sem isso, "com que frequência" não
     // tem contexto nenhum (frequência de QUAL serviço?). ----
-    let linhasDetalheServico = [];
     if (!filtros.servico) {
       document.getElementById("cfcr-servico-detalhe").innerHTML = `<p class="dash-chart-hint">Clique num serviço em "Serviços Prestados" pra ver aqui quais municípios prestam e com qual periodicidade/quantidade.</p>`;
     } else {
@@ -12265,6 +12281,7 @@ async function carregarCfcrPortal(portalSlug) {
           </table>`
         : `<p class="dash-chart-hint">Nenhum município presta este serviço neste recorte.</p>`;
     }
+    }
 
     // ---- Comparativo de Quantidade — pedido direto dela: "se a gente
     // conseguisse comparar proporcionalmente entre os municípios e
@@ -12278,7 +12295,7 @@ async function carregarCfcrPortal(portalSlug) {
     const EXTRATORES_QUANTIDADE_CFCR = { "Abastecimento de viaturas": extrairQuantidadeLitrosCfcr };
     const boxQtd = document.getElementById("cfcr-quantidade-box");
     const extratorQtd = EXTRATORES_QUANTIDADE_CFCR[filtros.servico];
-    if (!filtros.servico || !extratorQtd) {
+    if (modoStatusGeoCfcr === "historico" || !filtros.servico || !extratorQtd) {
       boxQtd.hidden = true;
     } else {
       const linhasQtd = linhasDetalheServico
