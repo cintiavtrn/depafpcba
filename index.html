@@ -11919,7 +11919,7 @@ async function carregarCfcrPortal(portalSlug) {
       </div>
       <div class="dash-chart-box" style="margin-top:14px">
         <h4>Cobertura Atual por COORPIN<small class="dash-chart-hint" style="display:block;margin-top:4px">Município(s) diferentes com termo VIGENTE agora, por COORPIN. Não é o total histórico, esse já está no gráfico acima. Uma COORPIN com barra vermelha está sem nenhum município sustentando ela neste momento, mesmo que já tenha tido termo algum dia. Clique numa barra pra ver, em "Serviços Prestados pelos Municípios" mais acima nesta mesma aba, quais serviços esse conjunto de municípios oferece (considerando todos os termos dela, não só os vigentes).</small></h4>
-        <p class="dash-chart-hint" id="cfcr-cobertura-atual-resumo" style="font-weight:600"></p>
+        <div class="kpi-row" id="cfcr-cobertura-atual-kpis" style="margin-bottom:12px"></div>
         <div id="cfcr-cobertura-atual"></div>
       </div>
     </div>
@@ -12376,8 +12376,13 @@ async function carregarCfcrPortal(portalSlug) {
       .sort((a, b) => a.valor - b.valor || rotularUnidadeCfcr(a.label).localeCompare(rotularUnidadeCfcr(b.label)));
     const coorpinsZeradas = coberturaAtualLinhas.filter((l) => l.valor === 0).length;
     const coorpinsCriticas = coberturaAtualLinhas.filter((l) => l.valor === 1).length;
-    document.getElementById("cfcr-cobertura-atual-resumo").textContent = coberturaAtualLinhas.length
-      ? `${coorpinsZeradas} COORPIN sem nenhum município vigente agora${coorpinsCriticas ? `, mais ${coorpinsCriticas} sustentada por 1 único município` : ""}, de ${coberturaAtualLinhas.length} COORPIN neste recorte.`
+    const coorpinsBoas = coberturaAtualLinhas.length - coorpinsZeradas - coorpinsCriticas;
+    document.getElementById("cfcr-cobertura-atual-kpis").innerHTML = coberturaAtualLinhas.length
+      ? `
+      <div class="kpi-card" style="--kpi-cor:var(--cfcr-bad)"><div class="kpi-cabeca">${kpiIcone("alerta")}<div class="kpi-label">COORPIN Desassistida</div></div><div class="kpi-value">${coorpinsZeradas.toLocaleString("pt-BR")}</div></div>
+      <div class="kpi-card" style="--kpi-cor:var(--cfcr-warn)"><div class="kpi-cabeca">${kpiIcone("relogio")}<div class="kpi-label">Sustentada por 1 Município</div></div><div class="kpi-value">${coorpinsCriticas.toLocaleString("pt-BR")}</div></div>
+      <div class="kpi-card" style="--kpi-cor:var(--cfcr-ok)"><div class="kpi-cabeca">${kpiIcone("escudo")}<div class="kpi-label">Com Boa Cobertura (2+)</div></div><div class="kpi-value">${coorpinsBoas.toLocaleString("pt-BR")}</div></div>
+      `
       : "";
     document.getElementById("cfcr-cobertura-atual").innerHTML = coberturaAtualLinhas.length
       ? barraHorizontalComEixoSVG(coberturaAtualLinhas, {
