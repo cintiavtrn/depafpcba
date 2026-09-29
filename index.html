@@ -756,8 +756,9 @@ select:focus-visible,input:focus-visible{
       <button type="submit" class="btn-primario" style="width:100%">ENTRAR</button>
     </form>
     <p id="login-senha-status" class="font-mono" style="text-align:center;margin-top:10px;font-size:var(--fs-ui-sm);color:#9AA3B2"></p>
-    <p style="text-align:center;margin-top:8px">
+    <p id="p-links-login-senha" style="text-align:center;margin-top:8px;display:flex;justify-content:center;gap:14px;flex-wrap:wrap">
       <button type="button" id="btn-ir-cadastro" style="background:none;border:none;font:inherit;color:var(--tinta);text-decoration:underline;cursor:pointer;font-family:'IBM Plex Mono',monospace;font-size:var(--fs-ui-sm)">Não tem conta? Cadastre-se</button>
+      <button type="button" id="btn-ir-esqueci-senha" style="background:none;border:none;font:inherit;color:var(--tinta);text-decoration:underline;cursor:pointer;font-family:'IBM Plex Mono',monospace;font-size:var(--fs-ui-sm)">Esqueceu a senha?</button>
     </p>
 
     <form id="form-cadastro" class="dash-filtros" style="flex-direction:column" hidden>
@@ -770,6 +771,27 @@ select:focus-visible,input:focus-visible{
     <p id="p-ir-login-senha" style="text-align:center;margin-top:8px" hidden>
       <button type="button" id="btn-ir-login-senha" style="background:none;border:none;font:inherit;color:var(--tinta);text-decoration:underline;cursor:pointer;font-family:'IBM Plex Mono',monospace;font-size:var(--fs-ui-sm)">Já tem conta? Entrar</button>
     </p>
+
+    <!-- Pedido direto: "e se ela esqueceu senha como ela redefine?" — só
+         existia reset feito à mão por um admin no banco. Fluxo clássico:
+         pede o e-mail aqui, back-end manda um link de uso único (válido 1h)
+         se aquele e-mail tiver conta com senha; o link cai no formulário
+         de baixo, que só aparece com "?redefinir=TOKEN" na URL. -->
+    <form id="form-esqueci-senha" class="dash-filtros" style="flex-direction:column" hidden>
+      <div class="dash-filtro"><input type="email" id="esqueci-senha-email" placeholder="seu.nome@pcivil.ba.gov.br" required autocomplete="username" /></div>
+      <button type="submit" class="btn-primario" style="width:100%">ENVIAR LINK DE REDEFINIÇÃO</button>
+    </form>
+    <p id="esqueci-senha-status" class="font-mono" style="text-align:center;margin-top:10px;font-size:var(--fs-ui-sm);color:#9AA3B2"></p>
+    <p id="p-voltar-login-de-esqueci" style="text-align:center;margin-top:8px" hidden>
+      <button type="button" id="btn-voltar-login-de-esqueci" style="background:none;border:none;font:inherit;color:var(--tinta);text-decoration:underline;cursor:pointer;font-family:'IBM Plex Mono',monospace;font-size:var(--fs-ui-sm)">Voltar pro login</button>
+    </p>
+
+    <form id="form-redefinir-senha" class="dash-filtros" style="flex-direction:column" hidden>
+      <p class="font-mono" style="text-align:center;font-size:var(--fs-ui-sm);color:#9AA3B2;margin:0 0 4px">Escolha sua nova senha</p>
+      <div class="dash-filtro"><input type="password" id="redefinir-senha-nova" placeholder="Nova senha (mín. 8 caracteres)" required minlength="8" autocomplete="new-password" /></div>
+      <button type="submit" class="btn-primario" style="width:100%">REDEFINIR SENHA</button>
+    </form>
+    <p id="redefinir-senha-status" class="font-mono" style="text-align:center;margin-top:10px;font-size:var(--fs-ui-sm);color:#9AA3B2"></p>
   </div>
 </section>
 
@@ -2153,11 +2175,11 @@ async function aoSubmeterCadastro(ev) {
 }
 document.getElementById("form-cadastro").addEventListener("submit", aoSubmeterCadastro);
 
-// Alterna entre os dois formulários — só um visível por vez, pra não
-// confundir "entrar" com "criar conta" na mesma tela.
+// Alterna entre os formulários — só um visível por vez, pra não confundir
+// "entrar", "criar conta" e "esqueci a senha" na mesma tela.
 document.getElementById("btn-ir-cadastro").addEventListener("click", () => {
   document.getElementById("form-login-senha").hidden = true;
-  document.getElementById("btn-ir-cadastro").closest("p").hidden = true;
+  document.getElementById("p-links-login-senha").hidden = true;
   document.getElementById("login-senha-status").textContent = "";
   document.getElementById("form-cadastro").hidden = false;
   document.getElementById("p-ir-login-senha").hidden = false;
@@ -2167,8 +2189,80 @@ document.getElementById("btn-ir-login-senha").addEventListener("click", () => {
   document.getElementById("p-ir-login-senha").hidden = true;
   document.getElementById("cadastro-status").textContent = "";
   document.getElementById("form-login-senha").hidden = false;
-  document.getElementById("btn-ir-cadastro").closest("p").hidden = false;
+  document.getElementById("p-links-login-senha").hidden = false;
 });
+document.getElementById("btn-ir-esqueci-senha").addEventListener("click", () => {
+  document.getElementById("form-login-senha").hidden = true;
+  document.getElementById("p-links-login-senha").hidden = true;
+  document.getElementById("login-senha-status").textContent = "";
+  document.getElementById("form-esqueci-senha").hidden = false;
+  document.getElementById("p-voltar-login-de-esqueci").hidden = false;
+});
+document.getElementById("btn-voltar-login-de-esqueci").addEventListener("click", () => {
+  document.getElementById("form-esqueci-senha").hidden = true;
+  document.getElementById("p-voltar-login-de-esqueci").hidden = true;
+  document.getElementById("esqueci-senha-status").textContent = "";
+  document.getElementById("form-login-senha").hidden = false;
+  document.getElementById("p-links-login-senha").hidden = false;
+});
+
+async function aoSubmeterEsqueciSenha(ev) {
+  ev.preventDefault();
+  const status = document.getElementById("esqueci-senha-status");
+  status.textContent = "Enviando...";
+  try {
+    const resultado = await apiFetch("/api/auth/esqueci-senha", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: document.getElementById("esqueci-senha-email").value }),
+    });
+    document.getElementById("form-esqueci-senha").hidden = true;
+    status.textContent = resultado.mensagem;
+  } catch (erro) {
+    status.textContent = erro.message;
+  }
+}
+document.getElementById("form-esqueci-senha").addEventListener("submit", aoSubmeterEsqueciSenha);
+
+// Clique no link do e-mail de redefinição cai aqui com "?redefinir=TOKEN" na
+// URL — igual ao de ativação, mas este precisa de um formulário (a pessoa
+// escolhe a senha nova), não só confirmar automaticamente. Token some do
+// front tirado da URL do mesmo jeito, mesmo motivo (não ficar em
+// histórico/favoritos com uma credencial dentro).
+let TOKEN_REDEFINICAO_SENHA = null;
+(function verificarLinkDeRedefinicao() {
+  const params = new URLSearchParams(location.search);
+  const token = params.get("redefinir");
+  if (!token) return;
+  history.replaceState(null, "", location.pathname);
+  TOKEN_REDEFINICAO_SENHA = token;
+  document.getElementById("form-login-senha").hidden = true;
+  document.getElementById("p-links-login-senha").hidden = true;
+  document.getElementById("form-cadastro").hidden = true;
+  document.getElementById("form-esqueci-senha").hidden = true;
+  document.getElementById("form-redefinir-senha").hidden = false;
+})();
+
+async function aoSubmeterRedefinirSenha(ev) {
+  ev.preventDefault();
+  const status = document.getElementById("redefinir-senha-status");
+  if (!TOKEN_REDEFINICAO_SENHA) { status.textContent = "Link inválido — peça um novo em \"Esqueceu a senha?\"."; return; }
+  status.textContent = "Redefinindo...";
+  try {
+    const resultado = await apiFetch("/api/auth/redefinir-senha", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token: TOKEN_REDEFINICAO_SENHA, novaSenha: document.getElementById("redefinir-senha-nova").value }),
+    });
+    document.getElementById("form-redefinir-senha").hidden = true;
+    status.textContent = `${resultado.mensagem} Entre pelo formulário acima com e-mail e senha.`;
+    document.getElementById("form-login-senha").hidden = false;
+    document.getElementById("p-links-login-senha").hidden = false;
+  } catch (erro) {
+    status.textContent = erro.message;
+  }
+}
+document.getElementById("form-redefinir-senha").addEventListener("submit", aoSubmeterRedefinirSenha);
 
 // Clique no link do e-mail de confirmação cai aqui com "?ativar=TOKEN" na
 // URL. Independe de estar logado ou não — quem clica normalmente ainda nem
