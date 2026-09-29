@@ -12113,6 +12113,23 @@ function classificarMunicipiosRealCfcr(termosTCT, modo) {
   const semTermo = Object.keys(MAPA_MUNICIPIOS_CFCR.semTermoNm).map((nm) => ({ nome: nm, situacao: "Sem termo", coorpin: null, fim: null, termos: [] }));
   return [...comTermo, ...semTermo];
 }
+// Achado real dela: o mapa mostrava Jacobina (e todo mundo com "(SEDE)" no
+// participe cru, praticamente as 26 sedes de COORPIN) como cinza/"nunca
+// teve termo" — o mapa casa pela chave EXATA do participe cru
+// (MAPA_MUNICIPIOS_CFCR.porParticipe), mas classificarMunicipiosRealCfcr
+// devolve o NOME LIMPO (sem "(SEDE)", Porto Seguro já fundido), que não é
+// a mesma string. Esta função devolve uma linha por PARTICIPE CRU (um
+// grupo pode ter mais de um — ex. Porto Seguro tem 3), todas com a
+// situação já deduplicada do grupo — assim TODO participe do shapefile
+// casa e só fica cinza quem realmente nunca teve termo (os 4 de verdade).
+function municipiosParaMapaCfcr(municipiosReal) {
+  const linhas = [];
+  for (const m of municipiosReal) {
+    if (m.situacao === "Sem termo") continue; // já sai cinza via semTermoNm, não precisa de participe
+    for (const t of m.termos) linhas.push({ participe: t.participe, situacao: m.situacao });
+  }
+  return linhas;
+}
 
 async function carregarCfcrPortal(portalSlug) {
   const painel = document.getElementById("tab-cfcr");
@@ -12324,7 +12341,7 @@ async function carregarCfcrPortal(portalSlug) {
         });
       });
     } else {
-      document.getElementById("cfcr-vg-cobertura-mapa").innerHTML = mapaMunicipiosCfcrSVG(municipiosReal.map((m) => ({ participe: m.nome, temVigente: m.situacao === "Com termo vigente", status: m.situacao === "Só vencido" ? "VENCIDO" : m.situacao === "Só em construção" ? "EM CONSTRUÇÃO" : "VIGENTE" })), {
+      document.getElementById("cfcr-vg-cobertura-mapa").innerHTML = mapaMunicipiosCfcrSVG(municipiosParaMapaCfcr(municipiosReal).map((l) => ({ participe: l.participe, temVigente: l.situacao === "Com termo vigente", status: l.situacao === "Só vencido" ? "VENCIDO" : l.situacao === "Só em construção" ? "EM CONSTRUÇÃO" : "VIGENTE" })), {
         selecionado: "",
         corFn: (m) => (!m ? "var(--cfcr-neutro)" : m.temVigente ? "var(--cfcr-ok)" : m.status === "EM CONSTRUÇÃO" ? "var(--cfcr-warn)" : "var(--cfcr-bad)"),
         tituloFn: (m) => (!m ? "nunca teve termo" : m.temVigente ? "com termo vigente" : m.status === "EM CONSTRUÇÃO" ? "só em construção" : "só vencido"),
@@ -12393,7 +12410,7 @@ async function carregarCfcrPortal(portalSlug) {
       document.getElementById("cfcr-vg-coorpin-leg").innerHTML = [...chavesPresentes].map((s) => { const [k, c] = s.split("|"); return `<span><u style="background:${c}"></u>${escapeHTML(k)}</span>`; }).join("");
     } else {
       document.getElementById("cfcr-vg-coorpin-leg").innerHTML = "";
-      document.getElementById("cfcr-vg-coorpin-mapa").innerHTML = mapaMunicipiosCfcrSVG(municipiosReal.map((m) => ({ participe: m.nome, temVigente: m.situacao === "Com termo vigente", status: m.situacao === "Só vencido" ? "VENCIDO" : m.situacao === "Só em construção" ? "EM CONSTRUÇÃO" : "VIGENTE" })), { selecionado: "" });
+      document.getElementById("cfcr-vg-coorpin-mapa").innerHTML = mapaMunicipiosCfcrSVG(municipiosParaMapaCfcr(municipiosReal).map((l) => ({ participe: l.participe, temVigente: l.situacao === "Com termo vigente", status: l.situacao === "Só vencido" ? "VENCIDO" : l.situacao === "Só em construção" ? "EM CONSTRUÇÃO" : "VIGENTE" })), { selecionado: "" });
     }
   }
   document.getElementById("cfcr-vg-coorpin-modo-toggle").addEventListener("click", (ev) => {
@@ -12523,7 +12540,7 @@ async function carregarCfcrPortal(portalSlug) {
         return linhaComposicaoCfcrHTML(`${rotularUnidadeCfcr(nome)} — ${naoVigente(ms)}/${ms.length}`, nome, partes, { clicavel: true, selecionado: coorpinFiltroSemVig });
       }).join("");
     } else {
-      document.getElementById("cfcr-zz-coorpin-mapa").innerHTML = mapaMunicipiosCfcrSVG(reais.map((m) => ({ participe: m.nome, temVigente: m.situacao === "Com termo vigente", status: m.situacao === "Só vencido" ? "VENCIDO" : m.situacao === "Só em construção" ? "EM CONSTRUÇÃO" : "VIGENTE" })), { selecionado: "" });
+      document.getElementById("cfcr-zz-coorpin-mapa").innerHTML = mapaMunicipiosCfcrSVG(municipiosParaMapaCfcr(reais).map((l) => ({ participe: l.participe, temVigente: l.situacao === "Com termo vigente", status: l.situacao === "Só vencido" ? "VENCIDO" : l.situacao === "Só em construção" ? "EM CONSTRUÇÃO" : "VIGENTE" })), { selecionado: "" });
     }
     document.querySelectorAll("#cfcr-zz-coorpin-lista [data-cat]").forEach((el) => {
       el.addEventListener("click", () => { coorpinFiltroSemVig = coorpinFiltroSemVig === el.dataset.cat ? null : el.dataset.cat; renderSemVigente(); });
