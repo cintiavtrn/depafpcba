@@ -1796,9 +1796,20 @@ async function apiFetch(caminho, opcoes = {}) {
     },
   });
   if (resposta.status === 401) {
-    limparSessao();
-    mostrarTelaLogin("Sua sessão expirou — entre de novo.");
-    throw new Error("Sessão expirada");
+    // Achado direto dela (caso real: login da Tatiane mostrando "sessão
+    // expirou" sem nunca ter existido sessão nenhuma) — 401 também é o
+    // código de "e-mail ou senha incorretos" (loginComSenha) e de "token do
+    // Google inválido" (verificarTokenGoogle), não só de sessão vencida.
+    // Tratar TODO 401 como sessão expirada mentia sobre a causa real bem no
+    // meio da tentativa de login. Só é sessão expirada de fato quando JÁ
+    // havia um token sendo enviado.
+    const corpo = await resposta.json().catch(() => ({}));
+    if (sessao) {
+      limparSessao();
+      mostrarTelaLogin("Sua sessão expirou — entre de novo.");
+      throw new Error("Sessão expirada");
+    }
+    throw new Error(corpo.erro || "Não autorizado.");
   }
   if (!resposta.ok) {
     const corpo = await resposta.json().catch(() => ({}));
@@ -12008,9 +12019,9 @@ async function carregarCfcrPortal(portalSlug) {
         <div class="dash-toggle" style="margin-top:10px">${botaoEntenderDadosHTML("territorio", "por que a soma das barras é menor que 418")}</div>
         <div id="cfcr-entender-territorio" style="margin-top:10px" hidden></div>
       </div>
-      <div class="dash-chart-box" style="margin-top:14px">
+      ${souAdmin() ? `<div class="dash-chart-box" style="margin-top:14px">
         <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">
-          <h4 style="margin-bottom:0">Cobertura Atual por COORPIN<small class="dash-chart-hint" style="display:block;margin-top:4px">Município(s) diferentes com termo VIGENTE agora, por COORPIN — sempre, independente do alternador lá em cima (esta caixa é sobre agora, de propósito). Um bloco vermelho está sem nenhum município sustentando ela neste momento, mesmo que já tenha tido termo algum dia. Clique num bloco/município pra ver, em "Serviços Prestados pelos Municípios" mais acima, quais serviços esse conjunto de municípios oferece (o alternador lá em cima decide se isso conta só os vigentes ou o histórico completo).</small></h4>
+          <h4 style="margin-bottom:0">Cobertura Atual por COORPIN<small class="dash-chart-hint" style="display:block;margin-top:4px">Só admin vê esta caixa — o mapa de status na Visão Geral e "Municípios da Bahia" abaixo já cobrem essa mesma leitura pra quem recebe o link. Município(s) diferentes com termo VIGENTE agora, por COORPIN — sempre, independente do alternador lá em cima. Um bloco vermelho está sem nenhum município sustentando ela neste momento, mesmo que já tenha tido termo algum dia. Clique num bloco/município pra ver, em "Serviços Prestados pelos Municípios" mais acima, quais serviços esse conjunto de municípios oferece (o alternador lá em cima decide se isso conta só os vigentes ou o histórico completo).</small></h4>
           <div class="dash-toggle" id="cfcr-cobertura-visual-toggle">
             <button type="button" class="dash-toggle-btn active" data-modo-cobertura-visual="blocos" title="Um bloco por COORPIN">BLOCOS</button>
             <button type="button" class="dash-toggle-btn" data-modo-cobertura-visual="mapa" title="Mapa real dos 417 municípios">MAPA</button>
@@ -12019,7 +12030,7 @@ async function carregarCfcrPortal(portalSlug) {
         <div class="kpi-row" id="cfcr-cobertura-atual-kpis" style="margin-bottom:12px"></div>
         <div id="cfcr-cobertura-atual"></div>
         <div id="cfcr-cobertura-mapa" hidden style="max-width:460px;margin:0 auto"></div>
-      </div>
+      </div>` : ""}
       <div class="dash-chart-box" style="margin-top:14px" id="cfcr-municipios-vigente-caixa">
         <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">
           <h4 style="margin-bottom:0">Municípios da Bahia: Quem Está Atendido Agora<small class="dash-chart-hint" style="display:block;margin-top:4px">Sempre atual, independente do alternador lá em cima. "Sem Vigente" serve pra Coordenação de Fundos e Repasses saber com quais prefeituras vale entrar em contato pra ver oportunidade de firmar termo novo. Clique num bloco de COORPIN acima pra restringir a essa região.</small></h4>
@@ -12621,60 +12632,68 @@ async function carregarCfcrPortal(portalSlug) {
     // aba. Reaproveita selecionarUnidadeCfcr — clicar numa barra aqui
     // também filtra Serviços Prestados, Detalhamento e todo o resto,
     // igual clicar no mapa/lista acima.
-    const coberturaAtualRecorte = termosTCT.filter((t) => t.nomeUnidade && bateFiltroExceto(t, ["dirpin", "nomeUnidade", "status"]));
-    const municipiosVigentesPorUnidade = new Map();
-    for (const t of coberturaAtualRecorte) {
-      if (t.status !== "VIGENTE") continue;
-      const set = municipiosVigentesPorUnidade.get(t.nomeUnidade) || new Set();
-      set.add(t.participe);
-      municipiosVigentesPorUnidade.set(t.nomeUnidade, set);
-    }
-    const coberturaAtualLinhas = [...new Set(coberturaAtualRecorte.map((t) => t.nomeUnidade))]
-      .map((nome) => ({ label: nome, valor: municipiosVigentesPorUnidade.get(nome)?.size || 0 }))
-      .sort((a, b) => a.valor - b.valor || rotularUnidadeCfcr(a.label).localeCompare(rotularUnidadeCfcr(b.label)));
-    const coorpinsZeradas = coberturaAtualLinhas.filter((l) => l.valor === 0).length;
-    const coorpinsCriticas = coberturaAtualLinhas.filter((l) => l.valor === 1).length;
-    const coorpinsBoas = coberturaAtualLinhas.length - coorpinsZeradas - coorpinsCriticas;
-    document.getElementById("cfcr-cobertura-atual-kpis").innerHTML = coberturaAtualLinhas.length
-      ? `
-      <div class="kpi-card" style="--kpi-cor:var(--cfcr-bad)"><div class="kpi-cabeca">${kpiIcone("alerta")}<div class="kpi-label">COORPIN Desassistida</div></div><div class="kpi-value">${coorpinsZeradas.toLocaleString("pt-BR")}</div></div>
-      <div class="kpi-card" style="--kpi-cor:var(--cfcr-warn)"><div class="kpi-cabeca">${kpiIcone("relogio")}<div class="kpi-label">Sustentada por 1 Município</div></div><div class="kpi-value">${coorpinsCriticas.toLocaleString("pt-BR")}</div></div>
-      <div class="kpi-card" style="--kpi-cor:var(--cfcr-ok)"><div class="kpi-cabeca">${kpiIcone("escudo")}<div class="kpi-label">Com Boa Cobertura (2+)</div></div><div class="kpi-value">${coorpinsBoas.toLocaleString("pt-BR")}</div></div>
-      `
-      : "";
-    // Pedido direto: "esse de barra horizontal é cansativo porque tem que
-    // descer muito" — 26 barras empilhadas obrigava rolar bastante só pra
-    // bater o olho. Virou uma grade de blocos (mesmo raciocínio de um
-    // painel de status): todas as 26 COORPIN cabem sem rolagem, a cor já
-    // entrega a leitura rápida (vermelho/laranja/verde), o número dentro
-    // do bloco é só reforço.
-    document.getElementById("cfcr-cobertura-atual").innerHTML = coberturaAtualLinhas.length
-      ? `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:6px">${coberturaAtualLinhas.map((c) => {
-          const cor = c.valor === 0 ? "var(--cfcr-bad)" : c.valor === 1 ? "var(--cfcr-warn)" : "var(--cfcr-ok)";
-          const dim = filtros.nomeUnidade && filtros.nomeUnidade !== c.label;
-          const marcado = filtros.nomeUnidade === c.label;
-          return `<div data-cat="${escapeAttr(c.label)}" title="${escapeAttr(rotularUnidadeCfcr(c.label))}: ${c.valor} município(s) com termo vigente" style="cursor:pointer;background:${cor};border-radius:6px;padding:8px 4px;text-align:center;opacity:${dim ? 0.35 : 1};${marcado ? "outline:2px solid var(--carvao);outline-offset:-2px;" : ""}">
-            <div style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:1.25rem;color:var(--paper);line-height:1.1">${c.valor}</div>
-            <div style="font-size:.62rem;color:var(--paper);opacity:.9;line-height:1.2;margin-top:3px;font-family:'IBM Plex Mono',monospace">${escapeHTML(c.label)}</div>
-          </div>`;
-        }).join("")}</div>`
-      : `<p class="dash-chart-hint">Nenhum termo de Cooperação Técnica com COORPIN cadastrada neste recorte.</p>`;
-    document.getElementById("cfcr-cobertura-atual").querySelectorAll("[data-cat]").forEach((el) => {
-      el.addEventListener("click", () => selecionarUnidadeCfcr(el.dataset.cat));
-    });
-    document.querySelectorAll("#cfcr-cobertura-visual-toggle [data-modo-cobertura-visual]").forEach((b) => {
-      b.classList.toggle("active", b.dataset.modoCoberturaVisual === modoVisualCoberturaCfcr);
-    });
-    document.getElementById("cfcr-cobertura-atual").hidden = modoVisualCoberturaCfcr !== "blocos";
-    document.getElementById("cfcr-cobertura-mapa").hidden = modoVisualCoberturaCfcr !== "mapa";
-    if (modoVisualCoberturaCfcr === "mapa") {
-      document.getElementById("cfcr-cobertura-mapa").innerHTML = mapaMunicipiosCfcrSVG(municipiosPorParticipe, { selecionado: "" });
-      document.getElementById("cfcr-cobertura-mapa").querySelectorAll("[data-cat]").forEach((el) => {
-        el.addEventListener("click", () => {
-          const alvo = municipiosPorParticipe.find((m) => m.participe === el.dataset.cat);
-          if (alvo?.nomeUnidade) selecionarUnidadeCfcr(alvo.nomeUnidade);
-        });
+    // Pedido direto: "o vigente vs não vigente por COORPIN hoje não mostra
+    // nada de diferente" — depois do Mapa de Status (Visão Geral) e do mapa
+    // de "Municípios da Bahia" (mais abaixo), esta caixa virou redundante
+    // pra quem recebe o link. Continua existindo só pra admin — a caixa
+    // inteira já sai do HTML (${souAdmin() ? ... : ""} lá em cima), então
+    // todo o bloco abaixo só roda se os elementos dela existirem.
+    if (souAdmin()) {
+      const coberturaAtualRecorte = termosTCT.filter((t) => t.nomeUnidade && bateFiltroExceto(t, ["dirpin", "nomeUnidade", "status"]));
+      const municipiosVigentesPorUnidade = new Map();
+      for (const t of coberturaAtualRecorte) {
+        if (t.status !== "VIGENTE") continue;
+        const set = municipiosVigentesPorUnidade.get(t.nomeUnidade) || new Set();
+        set.add(t.participe);
+        municipiosVigentesPorUnidade.set(t.nomeUnidade, set);
+      }
+      const coberturaAtualLinhas = [...new Set(coberturaAtualRecorte.map((t) => t.nomeUnidade))]
+        .map((nome) => ({ label: nome, valor: municipiosVigentesPorUnidade.get(nome)?.size || 0 }))
+        .sort((a, b) => a.valor - b.valor || rotularUnidadeCfcr(a.label).localeCompare(rotularUnidadeCfcr(b.label)));
+      const coorpinsZeradas = coberturaAtualLinhas.filter((l) => l.valor === 0).length;
+      const coorpinsCriticas = coberturaAtualLinhas.filter((l) => l.valor === 1).length;
+      const coorpinsBoas = coberturaAtualLinhas.length - coorpinsZeradas - coorpinsCriticas;
+      document.getElementById("cfcr-cobertura-atual-kpis").innerHTML = coberturaAtualLinhas.length
+        ? `
+        <div class="kpi-card" style="--kpi-cor:var(--cfcr-bad)"><div class="kpi-cabeca">${kpiIcone("alerta")}<div class="kpi-label">COORPIN Desassistida</div></div><div class="kpi-value">${coorpinsZeradas.toLocaleString("pt-BR")}</div></div>
+        <div class="kpi-card" style="--kpi-cor:var(--cfcr-warn)"><div class="kpi-cabeca">${kpiIcone("relogio")}<div class="kpi-label">Sustentada por 1 Município</div></div><div class="kpi-value">${coorpinsCriticas.toLocaleString("pt-BR")}</div></div>
+        <div class="kpi-card" style="--kpi-cor:var(--cfcr-ok)"><div class="kpi-cabeca">${kpiIcone("escudo")}<div class="kpi-label">Com Boa Cobertura (2+)</div></div><div class="kpi-value">${coorpinsBoas.toLocaleString("pt-BR")}</div></div>
+        `
+        : "";
+      // Pedido direto: "esse de barra horizontal é cansativo porque tem que
+      // descer muito" — 26 barras empilhadas obrigava rolar bastante só pra
+      // bater o olho. Virou uma grade de blocos (mesmo raciocínio de um
+      // painel de status): todas as 26 COORPIN cabem sem rolagem, a cor já
+      // entrega a leitura rápida (vermelho/laranja/verde), o número dentro
+      // do bloco é só reforço.
+      document.getElementById("cfcr-cobertura-atual").innerHTML = coberturaAtualLinhas.length
+        ? `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:6px">${coberturaAtualLinhas.map((c) => {
+            const cor = c.valor === 0 ? "var(--cfcr-bad)" : c.valor === 1 ? "var(--cfcr-warn)" : "var(--cfcr-ok)";
+            const dim = filtros.nomeUnidade && filtros.nomeUnidade !== c.label;
+            const marcado = filtros.nomeUnidade === c.label;
+            return `<div data-cat="${escapeAttr(c.label)}" title="${escapeAttr(rotularUnidadeCfcr(c.label))}: ${c.valor} município(s) com termo vigente" style="cursor:pointer;background:${cor};border-radius:6px;padding:8px 4px;text-align:center;opacity:${dim ? 0.35 : 1};${marcado ? "outline:2px solid var(--carvao);outline-offset:-2px;" : ""}">
+              <div style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:1.25rem;color:var(--paper);line-height:1.1">${c.valor}</div>
+              <div style="font-size:.62rem;color:var(--paper);opacity:.9;line-height:1.2;margin-top:3px;font-family:'IBM Plex Mono',monospace">${escapeHTML(c.label)}</div>
+            </div>`;
+          }).join("")}</div>`
+        : `<p class="dash-chart-hint">Nenhum termo de Cooperação Técnica com COORPIN cadastrada neste recorte.</p>`;
+      document.getElementById("cfcr-cobertura-atual").querySelectorAll("[data-cat]").forEach((el) => {
+        el.addEventListener("click", () => selecionarUnidadeCfcr(el.dataset.cat));
       });
+      document.querySelectorAll("#cfcr-cobertura-visual-toggle [data-modo-cobertura-visual]").forEach((b) => {
+        b.classList.toggle("active", b.dataset.modoCoberturaVisual === modoVisualCoberturaCfcr);
+      });
+      document.getElementById("cfcr-cobertura-atual").hidden = modoVisualCoberturaCfcr !== "blocos";
+      document.getElementById("cfcr-cobertura-mapa").hidden = modoVisualCoberturaCfcr !== "mapa";
+      if (modoVisualCoberturaCfcr === "mapa") {
+        document.getElementById("cfcr-cobertura-mapa").innerHTML = mapaMunicipiosCfcrSVG(municipiosPorParticipe, { selecionado: "" });
+        document.getElementById("cfcr-cobertura-mapa").querySelectorAll("[data-cat]").forEach((el) => {
+          el.addEventListener("click", () => {
+            const alvo = municipiosPorParticipe.find((m) => m.participe === el.dataset.cat);
+            if (alvo?.nomeUnidade) selecionarUnidadeCfcr(alvo.nomeUnidade);
+          });
+        });
+      }
     }
 
     // ---- Municípios Sem Termo Vigente — pedido direto: "a ideia da
@@ -12933,7 +12952,9 @@ async function carregarCfcrPortal(portalSlug) {
     modoVisualMunicipiosCfcr = btn.dataset.modoMunicipiosVisual;
     atualizar();
   });
-  document.getElementById("cfcr-cobertura-visual-toggle").addEventListener("click", (ev) => {
+  // ?. — a caixa inteira só existe no DOM pra admin (souAdmin(), lá na
+  // montagem do HTML).
+  document.getElementById("cfcr-cobertura-visual-toggle")?.addEventListener("click", (ev) => {
     const btn = ev.target.closest("[data-modo-cobertura-visual]");
     if (!btn || btn.dataset.modoCoberturaVisual === modoVisualCoberturaCfcr) return;
     modoVisualCoberturaCfcr = btn.dataset.modoCoberturaVisual;
