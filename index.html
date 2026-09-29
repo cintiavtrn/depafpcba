@@ -11927,9 +11927,14 @@ async function carregarCfcrPortal(portalSlug) {
         <div id="cfcr-entender-territorio" style="margin-top:10px" hidden></div>
       </div>
       <div class="dash-chart-box" style="margin-top:14px">
-        <h4>Cobertura Atual por COORPIN<small class="dash-chart-hint" style="display:block;margin-top:4px">Município(s) diferentes com termo VIGENTE agora, por COORPIN — sempre, independente do alternador lá em cima (esta caixa é sobre agora, de propósito). Uma COORPIN com barra vermelha está sem nenhum município sustentando ela neste momento, mesmo que já tenha tido termo algum dia. Clique numa barra pra ver, em "Serviços Prestados pelos Municípios" mais acima, quais serviços esse conjunto de municípios oferece (o alternador lá em cima decide se isso conta só os vigentes ou o histórico completo).</small></h4>
+        <h4>Cobertura Atual por COORPIN<small class="dash-chart-hint" style="display:block;margin-top:4px">Município(s) diferentes com termo VIGENTE agora, por COORPIN — sempre, independente do alternador lá em cima (esta caixa é sobre agora, de propósito). Um bloco vermelho está sem nenhum município sustentando ela neste momento, mesmo que já tenha tido termo algum dia. Clique num bloco pra ver, em "Serviços Prestados pelos Municípios" mais acima, quais serviços esse conjunto de municípios oferece (o alternador lá em cima decide se isso conta só os vigentes ou o histórico completo).</small></h4>
         <div class="kpi-row" id="cfcr-cobertura-atual-kpis" style="margin-bottom:12px"></div>
         <div id="cfcr-cobertura-atual"></div>
+      </div>
+      <div class="dash-chart-box" style="margin-top:14px">
+        <h4>Municípios Sem Termo Vigente — Oportunidade de Contato<small class="dash-chart-hint" style="display:block;margin-top:4px">Quem não tem nenhum termo VIGENTE agora, sempre atual independente do alternador lá em cima. Serve pra Coordenação de Fundos e Repasses saber com quais prefeituras vale entrar em contato pra ver oportunidade de firmar termo novo. Clique num bloco de COORPIN acima pra restringir a essa região.</small></h4>
+        <p class="dash-chart-hint" id="cfcr-municipios-sem-vigente-resumo" style="font-weight:600"></p>
+        <div class="tabela-rolavel" style="max-height:360px" id="cfcr-municipios-sem-vigente"></div>
       </div>
     </div>
 
@@ -12081,12 +12086,24 @@ async function carregarCfcrPortal(portalSlug) {
     const coorpinsTodasComTermoResumo = [...new Set(termosTCT.filter((t) => t.nomeUnidade).map((t) => t.nomeUnidade))];
     const coorpinsDesassistidasResumo = coorpinsTodasComTermoResumo.filter((nome) => !municipiosVigentesPorUnidadeResumo.has(nome)).length;
     const coorpinsAtendidasResumo = coorpinsTodasComTermoResumo.length - coorpinsDesassistidasResumo;
+    // Pedido direto: "em GDG a classificar vc usa acordos congêneres pra
+    // nomenclatura e TCT vc usa municipal" — subtítulo em cada cartão pra
+    // deixar explícito QUE TIPO de termo cada número conta, sem precisar
+    // adivinhar pela sigla.
+    const acRecorteResumo = termosTodos.filter((t) => t.tipo === TIPO_A_CLASSIFICAR_CFCR);
+    const acVigentesResumo = acRecorteResumo.filter((t) => t.status === "VIGENTE").length;
+    // "Não Firmado (explicação rápida do motivo)" — reaproveita a MESMA
+    // contagem por status que "Motivo da Pendência" já usa mais abaixo, só
+    // pega o motivo mais comum pra caber numa linha do cartão.
+    const naoFirmadoRecorteResumo = termosTCT.filter((t) => !t.termoFirmado);
+    const motivoTopoResumo = [...naoFirmadoRecorteResumo.reduce((mapa, t) => mapa.set(t.status, (mapa.get(t.status) || 0) + 1), new Map())]
+      .sort((a, b) => b[1] - a[1])[0];
     document.getElementById("cfcr-kpis").innerHTML = `
-      <div class="kpi-card"><div class="kpi-cabeca">${kpiIcone("predio")}<div class="kpi-label">Total de Termos (TCT)</div></div><div class="kpi-value">${total.toLocaleString("pt-BR")}</div></div>
+      <div class="kpi-card"><div class="kpi-cabeca">${kpiIcone("predio")}<div class="kpi-label">Total de Termos (TCT)<span style="display:block;font-size:.75rem;font-weight:400;color:#8B93A3;margin-top:2px">Municipais · histórico completo</span></div></div><div class="kpi-value">${total.toLocaleString("pt-BR")}</div></div>
       <div class="kpi-card kpi-clicavel" data-kpi-firmado="sim" title="Clique pra isolar" style="--kpi-cor:var(--cfcr-ok);cursor:pointer;${filtros.firmado === "sim" ? "outline:2px solid var(--cfcr-ok);outline-offset:-2px" : ""}"><div class="kpi-cabeca">${kpiIcone("selo")}<div class="kpi-label">Termo Firmado</div></div><div class="kpi-value">${firmados.toLocaleString("pt-BR")} <span style="font-size:.9rem;color:#8B93A3">(${pct(firmados)}%)</span></div></div>
-      <div class="kpi-card kpi-clicavel" data-kpi-firmado="nao" title="Clique pra isolar" style="--kpi-cor:var(--cfcr-bad);cursor:pointer;${filtros.firmado === "nao" ? "outline:2px solid var(--cfcr-bad);outline-offset:-2px" : ""}"><div class="kpi-cabeca">${kpiIcone("alerta")}<div class="kpi-label">Não Firmado</div></div><div class="kpi-value">${naoFirmados.toLocaleString("pt-BR")} <span style="font-size:.9rem;color:#8B93A3">(${pct(naoFirmados)}%)</span></div></div>
-      <div class="kpi-card kpi-clicavel" id="cfcr-kpi-aclassificar" title="Clique pra ver a aba A Classificar (GDG)" style="cursor:pointer"><div class="kpi-cabeca">${kpiIcone("pessoa")}<div class="kpi-label">+ Parcerias a Classificar (GDG)</div></div><div class="kpi-value">${totalAClassificar.toLocaleString("pt-BR")}</div></div>
-      <div class="kpi-card kpi-clicavel" id="cfcr-kpi-cobertura" title="Clique pra ver o detalhe por COORPIN" style="cursor:pointer;--kpi-cor:${coorpinsDesassistidasResumo > 0 ? "var(--cfcr-bad)" : "var(--cfcr-ok)"}"><div class="kpi-cabeca">${kpiIcone("escudo")}<div class="kpi-label">Cobertura Atual por COORPIN</div></div><div class="kpi-value">${coorpinsAtendidasResumo}/${coorpinsTodasComTermoResumo.length} <span style="font-size:.9rem;color:#8B93A3">com município vigente</span></div></div>
+      <div class="kpi-card kpi-clicavel" data-kpi-firmado="nao" title="Clique pra ver quais municípios e o motivo de cada um" style="--kpi-cor:var(--cfcr-bad);cursor:pointer;${filtros.firmado === "nao" ? "outline:2px solid var(--cfcr-bad);outline-offset:-2px" : ""}"><div class="kpi-cabeca">${kpiIcone("alerta")}<div class="kpi-label">Não Firmado</div></div><div class="kpi-value">${naoFirmados.toLocaleString("pt-BR")} <span style="font-size:.9rem;color:#8B93A3">(${pct(naoFirmados)}%)</span></div>${motivoTopoResumo ? `<div style="font-size:.75rem;color:#8B93A3;margin-top:2px">Principal motivo: ${escapeHTML(motivoTopoResumo[0])} (${motivoTopoResumo[1]})</div>` : ""}</div>
+      <div class="kpi-card kpi-clicavel" id="cfcr-kpi-aclassificar" title="Clique pra ver a aba A Classificar (GDG), com participe e departamento de cada um" style="cursor:pointer"><div class="kpi-cabeca">${kpiIcone("pessoa")}<div class="kpi-label">+ Parcerias a Classificar (GDG)<span style="display:block;font-size:.75rem;font-weight:400;color:#8B93A3;margin-top:2px">Acordos congêneres</span></div></div><div class="kpi-value">${totalAClassificar.toLocaleString("pt-BR")} <span style="font-size:.9rem;color:#8B93A3">(${acVigentesResumo} vigente${acVigentesResumo === 1 ? "" : "s"})</span></div></div>
+      <div class="kpi-card kpi-clicavel" id="cfcr-kpi-cobertura" title="Clique pra ver o detalhe por COORPIN" style="cursor:pointer;--kpi-cor:${coorpinsDesassistidasResumo > 0 ? "var(--cfcr-bad)" : "var(--cfcr-ok)"}"><div class="kpi-cabeca">${kpiIcone("escudo")}<div class="kpi-label">Cobertura Atual por COORPIN</div></div><div class="kpi-value">${coorpinsAtendidasResumo}/${coorpinsTodasComTermoResumo.length} <span style="font-size:.9rem;color:#8B93A3">com município vigente</span></div><div style="font-size:.75rem;color:#8B93A3;margin-top:2px">${coorpinsDesassistidasResumo > 0 ? `${coorpinsDesassistidasResumo} COORPIN sem nenhum município vigente` : "nenhuma COORPIN desassistida hoje"}</div></div>
     `;
     document.getElementById("cfcr-kpi-aclassificar").addEventListener("click", () => irParaSubabaCfcr("aclassificar"));
     document.getElementById("cfcr-kpi-cobertura").addEventListener("click", () => irParaSubabaCfcr("geoservicos"));
@@ -12431,18 +12448,67 @@ async function carregarCfcrPortal(portalSlug) {
       <div class="kpi-card" style="--kpi-cor:var(--cfcr-ok)"><div class="kpi-cabeca">${kpiIcone("escudo")}<div class="kpi-label">Com Boa Cobertura (2+)</div></div><div class="kpi-value">${coorpinsBoas.toLocaleString("pt-BR")}</div></div>
       `
       : "";
+    // Pedido direto: "esse de barra horizontal é cansativo porque tem que
+    // descer muito" — 26 barras empilhadas obrigava rolar bastante só pra
+    // bater o olho. Virou uma grade de blocos (mesmo raciocínio de um
+    // painel de status): todas as 26 COORPIN cabem sem rolagem, a cor já
+    // entrega a leitura rápida (vermelho/laranja/verde), o número dentro
+    // do bloco é só reforço.
     document.getElementById("cfcr-cobertura-atual").innerHTML = coberturaAtualLinhas.length
-      ? barraHorizontalComEixoSVG(coberturaAtualLinhas, {
-          formatarValor: (v) => `${v} município(s)`,
-          formatarEixoTick: (v) => Math.round(v).toLocaleString("pt-BR"),
-          cor: (c) => (c.valor === 0 ? "var(--cfcr-bad)" : c.valor === 1 ? "var(--cfcr-warn)" : "var(--cfcr-ok)"),
-          selecionado: filtros.nomeUnidade,
-          formatarRotulo: (c) => rotularUnidadeCfcr(c.label),
-        })
+      ? `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:6px">${coberturaAtualLinhas.map((c) => {
+          const cor = c.valor === 0 ? "var(--cfcr-bad)" : c.valor === 1 ? "var(--cfcr-warn)" : "var(--cfcr-ok)";
+          const dim = filtros.nomeUnidade && filtros.nomeUnidade !== c.label;
+          const marcado = filtros.nomeUnidade === c.label;
+          return `<div data-cat="${escapeAttr(c.label)}" title="${escapeAttr(rotularUnidadeCfcr(c.label))}: ${c.valor} município(s) com termo vigente" style="cursor:pointer;background:${cor};border-radius:6px;padding:8px 4px;text-align:center;opacity:${dim ? 0.35 : 1};${marcado ? "outline:2px solid var(--carvao);outline-offset:-2px;" : ""}">
+            <div style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:1.25rem;color:var(--paper);line-height:1.1">${c.valor}</div>
+            <div style="font-size:.62rem;color:var(--paper);opacity:.9;line-height:1.2;margin-top:3px;font-family:'IBM Plex Mono',monospace">${escapeHTML(c.label)}</div>
+          </div>`;
+        }).join("")}</div>`
       : `<p class="dash-chart-hint">Nenhum termo de Cooperação Técnica com COORPIN cadastrada neste recorte.</p>`;
     document.getElementById("cfcr-cobertura-atual").querySelectorAll("[data-cat]").forEach((el) => {
       el.addEventListener("click", () => selecionarUnidadeCfcr(el.dataset.cat));
     });
+
+    // ---- Municípios Sem Termo Vigente — pedido direto: "a ideia da
+    // Coordenação de Fundos e Repasses é que possa entrar em contato com
+    // prefeituras e ver oportunidade de firmar" — parecido com
+    // coberturaAtualRecorte (ignora status, pra enxergar o histórico de
+    // cada município e decidir se tem vigente entre eles), mas SEM excluir
+    // nomeUnidade — diferente da grade de COORPIN (que precisa ignorar
+    // nomeUnidade pra não ficar circular), esta tabela é por MUNICÍPIO,
+    // então clicar num bloco de COORPIN acima deve restringir a lista, não
+    // ser ignorado. t.diasParaVencer já vem enriquecido do backend (mesmo
+    // campo que "Mais Urgentes" usa), não precisa recalcular data.
+    const municipiosRecorteContato = termosTCT.filter((t) => bateFiltroExceto(t, ["dirpin", "status"]));
+    const porParticipeContato = new Map();
+    for (const t of municipiosRecorteContato) {
+      const lista = porParticipeContato.get(t.participe) || [];
+      lista.push(t);
+      porParticipeContato.set(t.participe, lista);
+    }
+    const municipiosSemVigente = [...porParticipeContato.entries()]
+      .filter(([, termos]) => !termos.some((t) => t.status === "VIGENTE"))
+      .map(([participe, termos]) => {
+        const referencia = [...termos].sort((a, b) => (b.diasParaVencer ?? -Infinity) - (a.diasParaVencer ?? -Infinity))[0];
+        return { participe, nomeUnidade: referencia.nomeUnidade, departamento: referencia.departamento, status: referencia.status, diasParaVencer: referencia.diasParaVencer };
+      })
+      .sort((a, b) => (a.diasParaVencer ?? -Infinity) - (b.diasParaVencer ?? -Infinity));
+    document.getElementById("cfcr-municipios-sem-vigente-resumo").textContent = municipiosRecorteContato.length
+      ? `${municipiosSemVigente.length} município(s) sem nenhum termo vigente agora neste recorte.`
+      : "";
+    document.getElementById("cfcr-municipios-sem-vigente").innerHTML = municipiosSemVigente.length
+      ? `<table class="dash-tabela">
+          <thead><tr><th>MUNICÍPIO</th><th>COORPIN</th><th>DEPARTAMENTO</th><th>STATUS ATUAL</th><th>DIAS</th></tr></thead>
+          <tbody>${municipiosSemVigente.map((m) => `
+            <tr>
+              <td>${escapeHTML(m.participe)}</td>
+              <td>${escapeHTML(rotularUnidadeCfcr(m.nomeUnidade) || "—")}</td>
+              <td>${escapeHTML(m.departamento || "—")}</td>
+              <td style="color:${corStatusCfcr(m.status)};font-weight:600">${escapeHTML(m.status)}</td>
+              <td>${m.diasParaVencer != null ? (m.diasParaVencer < 0 ? `${Math.abs(m.diasParaVencer)} vencido` : `${m.diasParaVencer} a vencer`) : "—"}</td>
+            </tr>`).join("")}</tbody>
+        </table>`
+      : `<p class="dash-chart-hint">Nenhum município sem termo vigente neste recorte — ótimo sinal.</p>`;
 
     // ---- Prazos e Criticidade: mesma lógica de faixa de contratos.service.js
     // (≤30/31–60/61–90/>90), calculada ao vivo em cfcr.service.js — não a
