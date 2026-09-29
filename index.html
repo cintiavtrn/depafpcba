@@ -11873,6 +11873,15 @@ async function carregarCfcrPortal(portalSlug) {
     </div>
 
     <div id="cfcr-sub-geoservicos" hidden>
+      <div class="dash-chart-box" style="margin-bottom:14px">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">
+          <h4 style="margin-bottom:0">O que esta aba mostra<small class="dash-chart-hint" style="display:block;margin-top:4px" id="cfcr-status-escopo-hint"></small></h4>
+          <div class="dash-toggle" id="cfcr-status-escopo-toggle">
+            <button type="button" class="dash-toggle-btn active" data-modo-status="vigente" title="Só termo com status VIGENTE agora">SÓ VIGENTE (AGORA)</button>
+            <button type="button" class="dash-toggle-btn" data-modo-status="historico" title="Todo termo já cadastrado, vigente ou não">HISTÓRICO COMPLETO</button>
+          </div>
+        </div>
+      </div>
       <div class="dash-charts" style="grid-template-columns:1fr 1fr">
         <div class="dash-chart-box">
           <h4>Serviços Prestados pelos Municípios<small class="dash-chart-hint" style="display:block;margin-top:4px">Quantos municípios (do recorte atual) marcam cada serviço — clique pra isolar. Um mesmo município pode prestar mais de um serviço, então a soma das barras é maior que o nº de municípios.</small></h4>
@@ -11918,7 +11927,7 @@ async function carregarCfcrPortal(portalSlug) {
         <div id="cfcr-entender-territorio" style="margin-top:10px" hidden></div>
       </div>
       <div class="dash-chart-box" style="margin-top:14px">
-        <h4>Cobertura Atual por COORPIN<small class="dash-chart-hint" style="display:block;margin-top:4px">Município(s) diferentes com termo VIGENTE agora, por COORPIN. Não é o total histórico, esse já está no gráfico acima. Uma COORPIN com barra vermelha está sem nenhum município sustentando ela neste momento, mesmo que já tenha tido termo algum dia. Clique numa barra pra ver, em "Serviços Prestados pelos Municípios" mais acima nesta mesma aba, quais serviços esse conjunto de municípios oferece (considerando todos os termos dela, não só os vigentes).</small></h4>
+        <h4>Cobertura Atual por COORPIN<small class="dash-chart-hint" style="display:block;margin-top:4px">Município(s) diferentes com termo VIGENTE agora, por COORPIN — sempre, independente do alternador lá em cima (esta caixa é sobre agora, de propósito). Uma COORPIN com barra vermelha está sem nenhum município sustentando ela neste momento, mesmo que já tenha tido termo algum dia. Clique numa barra pra ver, em "Serviços Prestados pelos Municípios" mais acima, quais serviços esse conjunto de municípios oferece (o alternador lá em cima decide se isso conta só os vigentes ou o histórico completo).</small></h4>
         <div class="kpi-row" id="cfcr-cobertura-atual-kpis" style="margin-bottom:12px"></div>
         <div id="cfcr-cobertura-atual"></div>
       </div>
@@ -11980,6 +11989,16 @@ async function carregarCfcrPortal(portalSlug) {
   const termosTCT = termosTodos.filter((t) => t.tipo === TIPO_TCT_CFCR);
 
   const filtros = { status: "", departamento: "", servico: "", dirpin: "", nomeUnidade: "", firmado: "", criticidade: "", recurso: "" };
+  // Achado dela: clicar numa COORPIN no mapa/lista mostrava o total
+  // HISTÓRICO (ex.: Juazeiro, 9 termos), enquanto "Cobertura Atual por
+  // COORPIN" logo abaixo mostrava só 3 (VIGENTE) — duas caixas na mesma
+  // tela com números diferentes pro mesmo lugar, sem nada explicando por
+  // quê. Este alternador escolhe o escopo de status pra Distribuição
+  // Territorial + Serviços Prestados + Quem Presta e Com Que Frequência +
+  // Comparativo de Quantidade, todos juntos — "Cobertura Atual por
+  // COORPIN" fica de fora de propósito (é sempre vigente, esse é o
+  // objetivo dela).
+  let modoStatusGeoCfcr = "vigente";
   // Estado do toggle LISTA/MAPA da Distribuição Territorial — mesmo nível
   // de `filtros`, sobrevive entre chamadas de atualizar().
   let modoVisualGeoCfcr = "mapa";
@@ -12148,7 +12167,13 @@ async function carregarCfcrPortal(portalSlug) {
     // de 100% (ex.: "Alimentação a custodiados" aparecia com ~248, quando
     // na real só ~14 têm algo além de "Não disponibiliza"). Agora só conta
     // quando servicoOferecido(s) é verdade. ----
-    const servicoRecorte = termosTCT.filter((t) => bateFiltro(t, "servico"));
+    document.getElementById("cfcr-status-escopo-hint").textContent = modoStatusGeoCfcr === "vigente"
+      ? "Território, serviços e frequência abaixo consideram só termo VIGENTE agora — desligue pra ver o histórico completo (inclui vencido e em construção)."
+      : "Mostrando o histórico completo (todo termo já cadastrado, vigente ou não) — ligue \"Só Vigente\" pra ver só quem está sustentando cada COORPIN agora.";
+    document.querySelectorAll("#cfcr-status-escopo-toggle [data-modo-status]").forEach((b) => {
+      b.classList.toggle("active", b.dataset.modoStatus === modoStatusGeoCfcr);
+    });
+    const servicoRecorte = termosTCT.filter((t) => bateFiltro(t, "servico") && (modoStatusGeoCfcr !== "vigente" || t.status === "VIGENTE"));
     const contagemServico = new Map();
     for (const t of servicoRecorte) {
       for (const s of t.servicos || []) {
@@ -12311,7 +12336,7 @@ async function carregarCfcrPortal(portalSlug) {
     // dash-toggle + data-modo-visual), em vez de duas seções separadas. A
     // computação (geoRecorte/linhasUnidadeCfcr/gruposCoorpin) é comum aos
     // dois modos — só a chamada de render no fim muda. ----
-    const geoRecorte = termosTCT.filter((t) => t.nomeUnidade && bateFiltroExceto(t, ["dirpin", "nomeUnidade"]));
+    const geoRecorte = termosTCT.filter((t) => t.nomeUnidade && bateFiltroExceto(t, ["dirpin", "nomeUnidade"]) && (modoStatusGeoCfcr !== "vigente" || t.status === "VIGENTE"));
     const linhasUnidadeCfcr = agruparPorUnidade(geoRecorte);
     const gruposCoorpin = linhasUnidadeCfcr.map((u) => {
       const doUnidade = geoRecorte.filter((t) => t.nomeUnidade === u.label);
@@ -12611,6 +12636,12 @@ async function carregarCfcrPortal(portalSlug) {
   document.getElementById("cfcr-filtro-dirpin").addEventListener("change", (ev) => {
     filtros.dirpin = ev.target.value;
     filtros.nomeUnidade = "";
+    atualizar();
+  });
+  document.getElementById("cfcr-status-escopo-toggle").addEventListener("click", (ev) => {
+    const btn = ev.target.closest("[data-modo-status]");
+    if (!btn || btn.dataset.modoStatus === modoStatusGeoCfcr) return;
+    modoStatusGeoCfcr = btn.dataset.modoStatus;
     atualizar();
   });
   document.getElementById("cfcr-geo-visual-toggle").addEventListener("click", (ev) => {
