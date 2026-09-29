@@ -12042,13 +12042,35 @@ async function carregarCfcrPortal(portalSlug) {
     const naoFirmados = total - firmados;
     const totalAClassificar = termosTodos.length - termosTCT.length;
     const pct = (n) => total ? (n / total * 100).toLocaleString("pt-BR", { maximumFractionDigits: 0 }) : "0";
+    // Pedido direto (depois de mostrar "Cobertura Atual por COORPIN" em
+    // Geografia e Serviços): "eles sentiram falta de um cartão lá na Visão
+    // Geral... pra ver se tem COORPIN que não é atendida por nada, dado os
+    // contratos vigentes". Mesmo cálculo (só status VIGENTE, agrupado por
+    // COORPIN), mas SEM aplicar filtro nenhum — igual o cartão "+ Parcerias
+    // a Classificar" ao lado, é uma foto estável do todo, não do recorte
+    // filtrado. Não soma 1 por COORPIN porque a relação não é 1 pra 1 — uma
+    // COORPIN pode ter vários municípios sustentando ela ao mesmo tempo,
+    // por isso o detalhe completo mora em "Cobertura Atual por COORPIN"
+    // (clique leva pra lá), este cartão só avisa se falta alguma.
+    const municipiosVigentesPorUnidadeResumo = new Map();
+    for (const t of termosTCT) {
+      if (t.status !== "VIGENTE" || !t.nomeUnidade) continue;
+      const set = municipiosVigentesPorUnidadeResumo.get(t.nomeUnidade) || new Set();
+      set.add(t.participe);
+      municipiosVigentesPorUnidadeResumo.set(t.nomeUnidade, set);
+    }
+    const coorpinsTodasComTermoResumo = [...new Set(termosTCT.filter((t) => t.nomeUnidade).map((t) => t.nomeUnidade))];
+    const coorpinsDesassistidasResumo = coorpinsTodasComTermoResumo.filter((nome) => !municipiosVigentesPorUnidadeResumo.has(nome)).length;
+    const coorpinsAtendidasResumo = coorpinsTodasComTermoResumo.length - coorpinsDesassistidasResumo;
     document.getElementById("cfcr-kpis").innerHTML = `
       <div class="kpi-card"><div class="kpi-cabeca">${kpiIcone("predio")}<div class="kpi-label">Total de Termos (TCT)</div></div><div class="kpi-value">${total.toLocaleString("pt-BR")}</div></div>
       <div class="kpi-card kpi-clicavel" data-kpi-firmado="sim" title="Clique pra isolar" style="--kpi-cor:var(--cfcr-ok);cursor:pointer;${filtros.firmado === "sim" ? "outline:2px solid var(--cfcr-ok);outline-offset:-2px" : ""}"><div class="kpi-cabeca">${kpiIcone("selo")}<div class="kpi-label">Termo Firmado</div></div><div class="kpi-value">${firmados.toLocaleString("pt-BR")} <span style="font-size:.9rem;color:#8B93A3">(${pct(firmados)}%)</span></div></div>
       <div class="kpi-card kpi-clicavel" data-kpi-firmado="nao" title="Clique pra isolar" style="--kpi-cor:var(--cfcr-bad);cursor:pointer;${filtros.firmado === "nao" ? "outline:2px solid var(--cfcr-bad);outline-offset:-2px" : ""}"><div class="kpi-cabeca">${kpiIcone("alerta")}<div class="kpi-label">Não Firmado</div></div><div class="kpi-value">${naoFirmados.toLocaleString("pt-BR")} <span style="font-size:.9rem;color:#8B93A3">(${pct(naoFirmados)}%)</span></div></div>
       <div class="kpi-card kpi-clicavel" id="cfcr-kpi-aclassificar" title="Clique pra ver a aba A Classificar (GDG)" style="cursor:pointer"><div class="kpi-cabeca">${kpiIcone("pessoa")}<div class="kpi-label">+ Parcerias a Classificar (GDG)</div></div><div class="kpi-value">${totalAClassificar.toLocaleString("pt-BR")}</div></div>
+      <div class="kpi-card kpi-clicavel" id="cfcr-kpi-cobertura" title="Clique pra ver o detalhe por COORPIN" style="cursor:pointer;--kpi-cor:${coorpinsDesassistidasResumo > 0 ? "var(--cfcr-bad)" : "var(--cfcr-ok)"}"><div class="kpi-cabeca">${kpiIcone("escudo")}<div class="kpi-label">Cobertura Atual por COORPIN</div></div><div class="kpi-value">${coorpinsAtendidasResumo}/${coorpinsTodasComTermoResumo.length} <span style="font-size:.9rem;color:#8B93A3">com município vigente</span></div></div>
     `;
     document.getElementById("cfcr-kpi-aclassificar").addEventListener("click", () => irParaSubabaCfcr("aclassificar"));
+    document.getElementById("cfcr-kpi-cobertura").addEventListener("click", () => irParaSubabaCfcr("geoservicos"));
 
     // ---- Distribuição por status (rosca) ----
     const statusRecorte = termosTCT.filter((t) => bateFiltro(t, "status"));
