@@ -11491,11 +11491,21 @@ function kpiSimplesCfcrHTML(valor, rotulo, cor) {
   return `<div class="kpi-card" style="--kpi-cor:${cor || "var(--carvao)"}"><div class="kpi-value">${typeof valor === "number" ? valor.toLocaleString("pt-BR") : valor}</div><div class="kpi-label">${escapeHTML(rotulo)}</div></div>`;
 }
 // partes: [[rótulo, valor, corCSS], ...] — barra 100% empilhada numa linha só.
-function barraComposicaoCfcrHTML(partes) {
+// partes: [rótulo, valor, corCSS, chave?] — chave opcional (default =
+// rótulo) usada como data-cat quando `clicavel`. Pedido direto dela:
+// "eu clico numa parte de uma barra e não faz nada" — segmento E legenda
+// viram clicáveis juntos, mesmo par que o resto do painel já usa
+// (clicar na fatia OU na legenda faz a mesma coisa).
+function barraComposicaoCfcrHTML(partes, opcoes = {}) {
+  const { clicavel = false, selecionado = "" } = opcoes;
   const visiveis = partes.filter((p) => p[1] > 0);
   const total = visiveis.reduce((a, p) => a + p[1], 0) || 1;
-  const barra = visiveis.map((p) => `<i title="${escapeAttr(p[0])}: ${p[1].toLocaleString("pt-BR")}" style="width:${(p[1] / total * 100).toFixed(2)}%;background:${p[2]}"></i>`).join("");
-  const legenda = visiveis.map((p) => `<span><u style="background:${p[2]}"></u>${escapeHTML(p[0])} (${p[1].toLocaleString("pt-BR")})</span>`).join("");
+  const attrsDe = (p) => {
+    const chave = p[3] ?? p[0];
+    return clicavel ? ` data-cat="${escapeAttr(chave)}" role="button" tabindex="0"` : "";
+  };
+  const barra = visiveis.map((p) => `<i title="${escapeAttr(p[0])}: ${p[1].toLocaleString("pt-BR")}"${attrsDe(p)} style="width:${(p[1] / total * 100).toFixed(2)}%;background:${p[2]};opacity:${selecionado && (p[3] ?? p[0]) !== selecionado ? 0.35 : 1}${clicavel ? ";cursor:pointer" : ""}"></i>`).join("");
+  const legenda = visiveis.map((p) => `<span${attrsDe(p)}${clicavel ? ` style="cursor:pointer"` : ""}><u style="background:${p[2]}"></u>${escapeHTML(p[0])} (${p[1].toLocaleString("pt-BR")})</span>`).join("");
   return { barraHTML: `<div class="cfx-comp">${barra}</div>`, legendaHTML: `<div class="cfx-leg">${legenda}</div>` };
 }
 // linhas: [{chave, rotulo, valor}] — lista clicável com mini-barra por linha.
@@ -11507,14 +11517,20 @@ function barraListaCfcrHTML(linhas, selecionado) {
 // clicavel=false vira <div> (só leitura, como Visão Geral); clicavel=true vira
 // <button data-cat> (filtra, como em Sem Termo Vigente).
 function linhaComposicaoCfcrHTML(nome, chave, partes, opcoes = {}) {
-  const { clicavel = false, selecionado = "" } = opcoes;
+  const { clicavel = false, selecionado = "", destaque = null } = opcoes;
   const visiveis = partes.filter((p) => p[1] > 0);
   const total = visiveis.reduce((a, p) => a + p[1], 0) || 1;
   const titulo = visiveis.map((p) => `${p[0]}: ${p[1]}`).join(" · ");
-  const barra = visiveis.map((p) => `<i style="width:${(p[1] / total * 100).toFixed(2)}%;background:${p[2]}"></i>`).join("");
+  // destaque (opcional): pedido direto dela — "eu clico numa parte da
+  // barra e não faz nada" — quando um status/situação está em destaque
+  // (clicado num KPI ou na barra de cobertura), o segmento QUE NÃO é o
+  // escolhido esmaece, em vez de sumir — mantém a proporção visível, só
+  // muda o foco.
+  const barra = visiveis.map((p) => `<i style="width:${(p[1] / total * 100).toFixed(2)}%;background:${p[2]};opacity:${destaque && p[0] !== destaque ? 0.25 : 1}"></i>`).join("");
+  const emValor = destaque ? (partes.find((p) => p[0] === destaque)?.[1] || 0) : total;
   const tag = clicavel ? "button" : "div";
   const attrs = clicavel ? ` type="button" data-cat="${escapeAttr(chave)}" aria-pressed="${chave === selecionado}"` : "";
-  return `<${tag} class="cfx-row${clicavel ? "" : " static"}${clicavel && chave === selecionado ? " active" : ""}"${attrs} title="${escapeAttr(titulo)}"><span>${escapeHTML(nome)}</span><div class="cfx-comp">${barra}</div><em>${total.toLocaleString("pt-BR")}</em></${tag}>`;
+  return `<${tag} class="cfx-row${clicavel ? "" : " static"}${clicavel && chave === selecionado ? " active" : ""}"${attrs} title="${escapeAttr(titulo)}"><span>${escapeHTML(nome)}</span><div class="cfx-comp">${barra}</div><em>${emValor.toLocaleString("pt-BR")}${destaque ? `/${total.toLocaleString("pt-BR")}` : ""}</em></${tag}>`;
 }
 
 // Rosca própria do CFCR — mesma matemática de pieChartSVG (arco donut,
@@ -12135,9 +12151,16 @@ async function carregarCfcrPortal(portalSlug) {
 
     <div id="cfcr-sub-visaogeral">
       <div class="kpi-row" id="cfcr-vg-kpis" style="margin-bottom:16px"></div>
-      <h4>Cobertura dos 417 Municípios da Bahia</h4>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">
+        <h4 style="margin-bottom:0">Cobertura dos 417 Municípios da Bahia</h4>
+        <div class="dash-toggle" id="cfcr-vg-cobertura-visual-toggle">
+          <button type="button" class="dash-toggle-btn active" data-modo-visual="barra">BARRA</button>
+          <button type="button" class="dash-toggle-btn" data-modo-visual="mapa" title="Mapa real dos 417 municípios">MAPA</button>
+        </div>
+      </div>
       <div id="cfcr-vg-cobertura-bar"></div>
       <div id="cfcr-vg-cobertura-leg"></div>
+      <div id="cfcr-vg-cobertura-mapa" hidden style="max-width:460px;margin:10px auto 0"></div>
       <div class="dash-chart-box" style="margin-top:14px">
         <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">
           <h4 style="margin-bottom:0">Por COORPIN</h4>
@@ -12249,23 +12272,76 @@ async function carregarCfcrPortal(portalSlug) {
   const total = termosTCT.length;
   const porStatusTermo = { VIGENTE: 0, VENCIDO: 0, "EM CONSTRUÇÃO": 0 };
   termosTCT.forEach((t) => { porStatusTermo[t.status] = (porStatusTermo[t.status] || 0) + 1; });
-  document.getElementById("cfcr-vg-kpis").innerHTML =
-    kpiSimplesCfcrHTML(total, "termos firmados") +
-    kpiSimplesCfcrHTML(porStatusTermo.VIGENTE, `vigentes (${Math.round(porStatusTermo.VIGENTE / total * 100)}%)`, "var(--cfcr-ok)") +
-    kpiSimplesCfcrHTML(porStatusTermo.VENCIDO, `vencidos (${Math.round(porStatusTermo.VENCIDO / total * 100)}%)`, "var(--cfcr-bad)") +
-    kpiSimplesCfcrHTML(porStatusTermo["EM CONSTRUÇÃO"], "em construção", "var(--cfcr-warn)");
+  // Pedido direto dela: "eu clico em uma parte de uma barra e não faz
+  // nada... ou do cartão" — os 3 cartões de status e os 3 segmentos
+  // correspondentes da barra de cobertura abaixo agora acendem/esmaecem
+  // as barras de "Por COORPIN" pro mesmo status, em vez de só decorar.
+  let destaqueStatusVG = null;
+  const SITUACAO_PARA_STATUS_VG = { "Com termo vigente": "VIGENTE", "Só vencido": "VENCIDO", "Só em construção": "EM CONSTRUÇÃO" };
+  function renderKpisVisaoGeral() {
+    document.getElementById("cfcr-vg-kpis").innerHTML =
+      kpiSimplesCfcrHTML(total, "termos firmados") +
+      `<div class="kpi-card kpi-clicavel" data-status-vg="VIGENTE" title="Clique pra destacar em Por COORPIN" style="--kpi-cor:var(--cfcr-ok);cursor:pointer;${destaqueStatusVG === "VIGENTE" ? "outline:2px solid var(--cfcr-ok);outline-offset:-2px" : ""}"><div class="kpi-value">${porStatusTermo.VIGENTE.toLocaleString("pt-BR")}</div><div class="kpi-label">vigentes (${Math.round(porStatusTermo.VIGENTE / total * 100)}%)</div></div>` +
+      `<div class="kpi-card kpi-clicavel" data-status-vg="VENCIDO" title="Clique pra destacar em Por COORPIN" style="--kpi-cor:var(--cfcr-bad);cursor:pointer;${destaqueStatusVG === "VENCIDO" ? "outline:2px solid var(--cfcr-bad);outline-offset:-2px" : ""}"><div class="kpi-value">${porStatusTermo.VENCIDO.toLocaleString("pt-BR")}</div><div class="kpi-label">vencidos (${Math.round(porStatusTermo.VENCIDO / total * 100)}%)</div></div>` +
+      `<div class="kpi-card kpi-clicavel" data-status-vg="EM CONSTRUÇÃO" title="Clique pra destacar em Por COORPIN" style="--kpi-cor:var(--cfcr-warn);cursor:pointer;${destaqueStatusVG === "EM CONSTRUÇÃO" ? "outline:2px solid var(--cfcr-warn);outline-offset:-2px" : ""}"><div class="kpi-value">${porStatusTermo["EM CONSTRUÇÃO"].toLocaleString("pt-BR")}</div><div class="kpi-label">em construção</div></div>`;
+    document.querySelectorAll("#cfcr-vg-kpis [data-status-vg]").forEach((el) => {
+      el.addEventListener("click", () => {
+        destaqueStatusVG = destaqueStatusVG === el.dataset.statusVg ? null : el.dataset.statusVg;
+        renderKpisVisaoGeral();
+        renderCobertura();
+        renderCoorpinVisaoGeral();
+      });
+    });
+  }
 
   const municipiosReal = classificarMunicipiosRealCfcr(termosTCT, "declarado");
   const covPorSituacao = { "Com termo vigente": 0, "Só vencido": 0, "Só em construção": 0, "Sem termo": 0 };
   municipiosReal.forEach((m) => { covPorSituacao[m.situacao]++; });
-  const { barraHTML: covBar, legendaHTML: covLeg } = barraComposicaoCfcrHTML([
-    ["Com termo vigente", covPorSituacao["Com termo vigente"], "var(--cfcr-ok)"],
-    ["Só vencido", covPorSituacao["Só vencido"], "var(--cfcr-bad)"],
-    ["Só em construção", covPorSituacao["Só em construção"], "var(--cfcr-warn)"],
-    ["Sem termo (Salvador, Condeúba, Taperoá, Itagibá)", covPorSituacao["Sem termo"], "var(--cfcr-neutro)"],
-  ]);
-  document.getElementById("cfcr-vg-cobertura-bar").innerHTML = covBar;
-  document.getElementById("cfcr-vg-cobertura-leg").innerHTML = covLeg;
+  let modoVisualCoberturaVG = "barra";
+  function renderCobertura() {
+    document.querySelectorAll("#cfcr-vg-cobertura-visual-toggle .dash-toggle-btn").forEach((b) => b.classList.toggle("active", b.dataset.modoVisual === modoVisualCoberturaVG));
+    document.getElementById("cfcr-vg-cobertura-bar").hidden = modoVisualCoberturaVG !== "barra";
+    document.getElementById("cfcr-vg-cobertura-leg").hidden = modoVisualCoberturaVG !== "barra";
+    document.getElementById("cfcr-vg-cobertura-mapa").hidden = modoVisualCoberturaVG !== "mapa";
+    if (modoVisualCoberturaVG === "barra") {
+      const selecionadoSituacao = destaqueStatusVG ? Object.keys(SITUACAO_PARA_STATUS_VG).find((k) => SITUACAO_PARA_STATUS_VG[k] === destaqueStatusVG) : "";
+      const { barraHTML: covBar, legendaHTML: covLeg } = barraComposicaoCfcrHTML([
+        ["Com termo vigente", covPorSituacao["Com termo vigente"], "var(--cfcr-ok)"],
+        ["Só vencido", covPorSituacao["Só vencido"], "var(--cfcr-bad)"],
+        ["Só em construção", covPorSituacao["Só em construção"], "var(--cfcr-warn)"],
+        ["Sem termo (Salvador, Condeúba, Taperoá, Itagibá)", covPorSituacao["Sem termo"], "var(--cfcr-neutro)", "Sem termo"],
+      ], { clicavel: true, selecionado: selecionadoSituacao });
+      document.getElementById("cfcr-vg-cobertura-bar").innerHTML = covBar;
+      document.getElementById("cfcr-vg-cobertura-leg").innerHTML = covLeg;
+      [...document.querySelectorAll("#cfcr-vg-cobertura-bar [data-cat], #cfcr-vg-cobertura-leg [data-cat]")].forEach((el) => {
+        el.addEventListener("click", () => {
+          if (el.dataset.cat === "Sem termo") { irParaSubabaCfcr("semvigente"); document.getElementById("cfcr-zz-situacao").value = "Sem termo"; document.getElementById("cfcr-zz-situacao").dispatchEvent(new Event("change", { bubbles: true })); return; }
+          const status = SITUACAO_PARA_STATUS_VG[el.dataset.cat];
+          destaqueStatusVG = destaqueStatusVG === status ? null : status;
+          renderKpisVisaoGeral();
+          renderCobertura();
+          renderCoorpinVisaoGeral();
+        });
+      });
+    } else {
+      document.getElementById("cfcr-vg-cobertura-mapa").innerHTML = mapaMunicipiosCfcrSVG(municipiosReal.map((m) => ({ participe: m.nome, temVigente: m.situacao === "Com termo vigente", status: m.situacao === "Só vencido" ? "VENCIDO" : m.situacao === "Só em construção" ? "EM CONSTRUÇÃO" : "VIGENTE" })), {
+        selecionado: "",
+        corFn: (m) => (!m ? "var(--cfcr-neutro)" : m.temVigente ? "var(--cfcr-ok)" : m.status === "EM CONSTRUÇÃO" ? "var(--cfcr-warn)" : "var(--cfcr-bad)"),
+        tituloFn: (m) => (!m ? "nunca teve termo" : m.temVigente ? "com termo vigente" : m.status === "EM CONSTRUÇÃO" ? "só em construção" : "só vencido"),
+        legendaItens: [
+          { cor: "var(--cfcr-ok)", rotulo: "Com termo vigente" },
+          { cor: "var(--cfcr-bad)", rotulo: "Só vencido" },
+          { cor: "var(--cfcr-warn)", rotulo: "Só em construção" },
+        ],
+      });
+    }
+  }
+  document.getElementById("cfcr-vg-cobertura-visual-toggle").addEventListener("click", (ev) => {
+    const btn = ev.target.closest("[data-modo-visual]");
+    if (!btn || btn.dataset.modoVisual === modoVisualCoberturaVG) return;
+    modoVisualCoberturaVG = btn.dataset.modoVisual;
+    renderCobertura();
+  });
   // Teaser cruzado — pedido implícito do painel de referência: avisa aqui
   // mesmo, na Visão Geral, e leva direto pra aba "Sem Termo Vigente".
   if (!document.getElementById("cfcr-vg-zz-go")) {
@@ -12273,6 +12349,8 @@ async function carregarCfcrPortal(portalSlug) {
     document.getElementById("cfcr-vg-cobertura-leg").insertAdjacentHTML("afterend", `<div class="dash-chart-hint" style="margin-top:10px"><b>${semVigenteHoje.toLocaleString("pt-BR")}</b> dos ${municipiosReal.length} municípios não têm nenhum termo vigente hoje. <button type="button" class="dash-toggle-btn" id="cfcr-vg-zz-go" style="margin-left:6px">VER QUAIS SÃO</button></div>`);
     document.getElementById("cfcr-vg-zz-go").addEventListener("click", () => irParaSubabaCfcr("semvigente"));
   }
+  renderKpisVisaoGeral();
+  renderCobertura();
 
   let modoCoorpinCfcr = "declarado", modoVisualCoorpinCfcr = "barras";
   function coorpinComposicaoLinhas(modo) {
@@ -12298,11 +12376,18 @@ async function carregarCfcrPortal(portalSlug) {
   function renderCoorpinVisaoGeral() {
     document.querySelectorAll("#cfcr-vg-coorpin-modo-toggle .dash-toggle-btn").forEach((b) => b.classList.toggle("active", b.dataset.modo === modoCoorpinCfcr));
     document.querySelectorAll("#cfcr-vg-coorpin-visual-toggle .dash-toggle-btn").forEach((b) => b.classList.toggle("active", b.dataset.modoVisual === modoVisualCoorpinCfcr));
-    const linhas = coorpinComposicaoLinhas(modoCoorpinCfcr);
+    let linhas = coorpinComposicaoLinhas(modoCoorpinCfcr);
+    // Quando um status está em destaque (clicado num KPI/segmento acima),
+    // reordena pra quem tem MAIS daquele status aparecer primeiro — muda
+    // a pergunta de "qual COORPIN tem mais termos" pra "qual COORPIN tem
+    // mais vencido (ou vigente, ou em construção)".
+    if (destaqueStatusVG) {
+      linhas = [...linhas].sort((a, b) => (b.partes.find((p) => p[0] === destaqueStatusVG)?.[1] || 0) - (a.partes.find((p) => p[0] === destaqueStatusVG)?.[1] || 0));
+    }
     document.getElementById("cfcr-vg-coorpin-lista").hidden = modoVisualCoorpinCfcr !== "barras";
     document.getElementById("cfcr-vg-coorpin-mapa").hidden = modoVisualCoorpinCfcr !== "mapa";
     if (modoVisualCoorpinCfcr === "barras") {
-      document.getElementById("cfcr-vg-coorpin-lista").innerHTML = linhas.map((l) => linhaComposicaoCfcrHTML(rotularUnidadeCfcr(l.nome), l.nome, l.partes)).join("");
+      document.getElementById("cfcr-vg-coorpin-lista").innerHTML = linhas.map((l) => linhaComposicaoCfcrHTML(rotularUnidadeCfcr(l.nome), l.nome, l.partes, { destaque: destaqueStatusVG })).join("");
       const chavesPresentes = new Set();
       linhas.forEach((l) => l.partes.forEach((p) => { if (p[1] > 0) chavesPresentes.add(p[0] + "|" + p[2]); }));
       document.getElementById("cfcr-vg-coorpin-leg").innerHTML = [...chavesPresentes].map((s) => { const [k, c] = s.split("|"); return `<span><u style="background:${c}"></u>${escapeHTML(k)}</span>`; }).join("");
@@ -12350,7 +12435,7 @@ async function carregarCfcrPortal(portalSlug) {
         if (!servicoOferecidoCfcr(s)) continue;
         contagem.set(s.servicoNome, (contagem.get(s.servicoNome) || 0) + 1);
         if (!porObjeto.has(s.servicoNome)) porObjeto.set(s.servicoNome, []);
-        porObjeto.get(s.servicoNome).push([t, s.periodicidade]);
+        porObjeto.get(s.servicoNome).push([t, rotularPeriodicidadeCfcr(s)]);
       }
     }
     if (objetoSelecionadoCfcr && !contagem.has(objetoSelecionadoCfcr)) objetoSelecionadoCfcr = null;
@@ -12385,7 +12470,7 @@ async function carregarCfcrPortal(portalSlug) {
     resultado.innerHTML = termosDoMunicipio.length
       ? termosDoMunicipio.map((t) => {
           const objetos = (t.servicos || []).filter(servicoOferecidoCfcr);
-          return `<div class="dash-chart-box" style="margin-bottom:10px"><b>${escapeHTML(t.participe)}</b> <span class="tag" style="display:inline-block;padding:1px 8px;border-radius:10px;font-size:12px;font-weight:600;color:#fff;background:${corStatusCfcr(t.status)}">${escapeHTML(t.status)}</span><br><small style="color:#8B93A3">${escapeHTML(t.departamento)} · ${escapeHTML(rotularUnidadeCfcr(t.nomeUnidade) || "—")}${t.fimVigenciaData ? " · fim: " + new Date(t.fimVigenciaData).toLocaleDateString("pt-BR") : ""}</small>${objetos.length ? `<ul style="margin:8px 0 0;padding-left:18px">${objetos.map((s) => `<li><b>${escapeHTML(s.servicoNome)}:</b> ${escapeHTML(s.periodicidade)}</li>`).join("")}</ul>` : `<p class="dash-chart-hint" style="margin:8px 0 0">Nenhum objeto registrado para este termo.</p>`}</div>`;
+          return `<div class="dash-chart-box" style="margin-bottom:10px"><b>${escapeHTML(t.participe)}</b> <span class="tag" style="display:inline-block;padding:1px 8px;border-radius:10px;font-size:12px;font-weight:600;color:#fff;background:${corStatusCfcr(t.status)}">${escapeHTML(t.status)}</span><br><small style="color:#8B93A3">${escapeHTML(t.departamento)} · ${escapeHTML(rotularUnidadeCfcr(t.nomeUnidade) || "—")}${t.fimVigenciaData ? " · fim: " + new Date(t.fimVigenciaData).toLocaleDateString("pt-BR") : ""}</small>${objetos.length ? `<ul style="margin:8px 0 0;padding-left:18px">${objetos.map((s) => `<li><b>${escapeHTML(s.servicoNome)}:</b> ${escapeHTML(rotularPeriodicidadeCfcr(s))}</li>`).join("")}</ul>` : `<p class="dash-chart-hint" style="margin:8px 0 0">Nenhum objeto registrado para este termo.</p>`}</div>`;
         }).join("")
       : (todosMunicipiosNomes.some((m) => normalizarBusca(m) === q) ? `<div class="dash-chart-box"><p class="dash-chart-hint">Sem termo nesta planilha.</p></div>` : `<p class="dash-chart-hint">Nenhum município com esse nome.</p>`);
   });
