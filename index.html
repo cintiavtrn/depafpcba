@@ -11440,6 +11440,17 @@ const CFCR_CRITICIDADE_INFO = {
   "Não aplicável": { cor: "var(--cfcr-neutro)", ordem: 6 },
 };
 function corCriticidadeCfcr(faixa) { return (CFCR_CRITICIDADE_INFO[faixa] || {}).cor || "var(--crit-neutro)"; }
+// Pedido direto: "deveria ser a vencer, vencendo em x, vencendo em y" — só
+// o RÓTULO de exibição muda (mesmo padrão de rotularUnidadeCfcr); a chave
+// crua continua "Até 30 dias" etc. porque é o valor que vem do backend
+// (t.faixaCriticidade) e é usado pra filtrar, não só pra mostrar.
+const ROTULO_CRITICIDADE_CFCR = {
+  "Até 30 dias": "Vencendo em até 30 dias",
+  "31 a 60 dias": "Vencendo em 31 a 60 dias",
+  "61 a 90 dias": "Vencendo em 61 a 90 dias",
+  "Acima de 90 dias": "A Vencer (mais de 90 dias)",
+};
+function rotularCriticidadeCfcr(faixa) { return ROTULO_CRITICIDADE_CFCR[faixa] || faixa; }
 
 // Célula "PRAZO" da tabela de detalhamento — resume status+prazo num texto
 // só, colorido: fora de VIGENTE mostra o próprio status (é a informação
@@ -11589,10 +11600,10 @@ function montarPainelEntenderServicosCfcr(termosTCT) {
     membros: new Set(termosTCT.filter((t) => (t.servicos || []).some((s) => s.servicoNome === nome && oferecido(s))).map((t) => t.participe)),
   }));
   const semNenhum = termosTCT.filter((t) => (t.servicos || []).length === 0).length;
-  return `<h4>Entender os Dados — Serviços Prestados</h4>
-    <p class="dash-chart-hint">Diferente de Status (uma partição — cada termo cabe numa fatia só), um mesmo município pode marcar VÁRIOS serviços — por isso a soma das 12 barras é maior que o nº de municípios. Exemplo real com os 3 serviços mais prestados (${termosTCT.length.toLocaleString("pt-BR")} termos TCT no total, ${semNenhum.toLocaleString("pt-BR")} sem nenhum dado de serviço preenchido):</p>
+  return `<h4>Entender os Dados — Objetos Acordados</h4>
+    <p class="dash-chart-hint">Diferente de Status (uma partição — cada termo cabe numa fatia só), um mesmo município pode marcar VÁRIOS objetos acordados — por isso a soma das 12 barras é maior que o nº de municípios. Exemplo real com os 3 objetos mais acordados (${termosTCT.length.toLocaleString("pt-BR")} termos TCT no total, ${semNenhum.toLocaleString("pt-BR")} sem nenhum objeto acordado preenchido):</p>
     <div style="max-width:340px;margin:8px auto">${vennTresConjuntosSVG(conjuntos)}</div>
-    <p class="dash-chart-hint">Cada número é quantos municípios caem SÓ naquela combinação — o do meio (interseção dos 3) conta uma vez só, não em cada círculo separado. A tabela "Quem Presta e Com Que Frequência", ao lado, é sempre um recorte de 1 serviço por vez — clique numa barra em "Serviços Prestados" pra ver o detalhe.</p>`;
+    <p class="dash-chart-hint">Cada número é quantos municípios caem SÓ naquela combinação — o do meio (interseção dos 3) conta uma vez só, não em cada círculo separado. A tabela "Detalhamento por Município e Periodicidade", ao lado, é sempre um recorte de 1 objeto por vez — clique numa barra em "Objetos Acordados" pra ver o detalhe.</p>`;
 }
 
 function montarPainelEntenderTerritorioCfcr(termosTCT) {
@@ -11910,7 +11921,7 @@ function montarRelatorioCfcr(termosTodos, termosTCT) {
     <div class="rel-secao">
       <h2>1. Visão Geral</h2>
       <div class="rel-kpis">
-        ${relKpiHTML(termosTCT.length, "Total de Termos (TCT)", COR.info)}
+        ${relKpiHTML(termosTCT.length, "Total de Termos Municipais (TCT)", COR.info)}
         ${relKpiHTML(firmados, "Termo Firmado", COR.ok)}
         ${relKpiHTML(termosTCT.length - firmados, "Não Firmado", COR.bad)}
         ${relKpiHTML(nomesUnicos.size, "Municípios Únicos", COR.neutro)}
@@ -11935,11 +11946,11 @@ function montarRelatorioCfcr(termosTodos, termosTCT) {
     </div>
 
     <div class="rel-secao">
-      <h2>3. Serviços Prestados</h2>
-      <p>${termosTCT.length} termo(s) no total (correspondendo a ${nomesUnicos.size} municípios únicos). ${municipiosComServico} termo(s) preenchem pelo menos 1 serviço. Juntos, somam ${totalOferecimentos.toLocaleString("pt-BR")} oferecimento(s) em ${servOrdenado.length} tipo(s) diferentes (${semNenhumServico} termo(s) sem nenhum dado de serviço preenchido).</p>
+      <h2>3. Objetos Acordados</h2>
+      <p>${termosTCT.length} termo(s) no total (correspondendo a ${nomesUnicos.size} municípios únicos). ${municipiosComServico} termo(s) preenchem pelo menos 1 objeto acordado. Juntos, somam ${totalOferecimentos.toLocaleString("pt-BR")} oferecimento(s) em ${servOrdenado.length} tipo(s) diferentes (${semNenhumServico} termo(s) sem nenhum objeto acordado preenchido).</p>
       <div>${top8.map(([nome, v]) => relBarraHTML(nome, v, maxServ, v < termosTCT.length * 0.3 ? COR.bad : COR.info)).join("")}</div>
-      ${vennHTML ? `<h3 style="margin-top:16px">Sobreposição real entre os 3 serviços mais prestados</h3><div style="max-width:340px">${vennHTML}</div>` : ""}
-      ${relLeituraHTML(`As barras mostram quais serviços a maioria dos municípios já contrata e quais ainda são raros, útil pra decidir onde vale priorizar expansão. O diagrama mostra que os 3 serviços mais comuns andam quase sempre juntos, então encontrar um deles num município normalmente é sinal de que os outros dois também estão presentes.`)}
+      ${vennHTML ? `<h3 style="margin-top:16px">Sobreposição real entre os 3 objetos mais acordados</h3><div style="max-width:340px">${vennHTML}</div>` : ""}
+      ${relLeituraHTML(`As barras mostram quais objetos a maioria dos municípios já tem acordado e quais ainda são raros, útil pra decidir onde vale priorizar expansão. O diagrama mostra que os 3 objetos mais comuns andam quase sempre juntos, então encontrar um deles num município normalmente é sinal de que os outros dois também estão presentes.`)}
     </div>
 
     <div class="rel-secao">
@@ -12038,20 +12049,16 @@ async function carregarCfcrPortal(portalSlug) {
         <h4>Mapa de Status por Município<small class="dash-chart-hint" style="display:block;margin-top:4px">Mesmo mapa da aba Geografia e Serviços, agora colorido pelo status de cada município (referência: o termo VIGENTE se houver, senão o mais recente) — clique num município pra isolar aquele status, igual clicar na rosca acima.</small></h4>
         <div id="cfcr-status-mapa" style="max-width:460px;margin:0 auto"></div>
       </div>
-      <div class="dash-charts" style="grid-template-columns:1fr 1fr;margin-top:14px">
-        <div class="dash-chart-box">
-          <h4>Motivo da Pendência<small class="dash-chart-hint" style="display:block;margin-top:4px">Só os termos NÃO firmados — clique numa barra (mesmo filtro de Status).</small></h4>
-          <div id="cfcr-motivo"></div>
-        </div>
-        <div class="dash-chart-box">
-          <h4>Repasse Financeiro<small class="dash-chart-hint" style="display:block;margin-top:4px">Sim/Não/Não informado — clique numa barra pra isolar. O texto original da planilha aparece no hover da coluna RECURSO FINANCEIRO do Detalhamento, mais abaixo.</small></h4>
-          <div id="cfcr-recurso"></div>
-        </div>
-      </div>
       <div class="dash-chart-box" style="margin-top:14px">
-        <h4>Prazos e Criticidade<small class="dash-chart-hint" style="display:block;margin-top:4px">Só termos VIGENTE com data de fim válida — quanto falta pra vencer, na mesma escala de urgência usada em CPG-Contratos (≤30 / 31–60 / 61–90 / acima de 90 dias). Clique numa barra pra isolar.</small></h4>
+        <h4>Motivo da Pendência<small class="dash-chart-hint" style="display:block;margin-top:4px">Só os termos NÃO firmados — clique numa barra (mesmo filtro de Status).</small></h4>
+        <div id="cfcr-motivo"></div>
+      </div>
+      <div class="dash-chart-box" style="margin-top:14px" id="cfcr-criticidade-box">
+        <h4>Prazos e Criticidade<small class="dash-chart-hint" style="display:block;margin-top:4px">Só termos VIGENTE com data de fim válida — quanto falta pra vencer, na mesma escala de urgência usada em CPG-Contratos. Clique numa barra pra isolar.</small></h4>
         <div id="cfcr-criticidade"></div>
-        <p class="dash-chart-hint" id="cfcr-criticidade-penhasco"></p>
+      </div>
+      <div class="dash-chart-box" style="margin-top:14px" id="cfcr-criticidade-sei-box" hidden>
+        <h4>Vencidos sem Processo SEI</h4>
         <p class="dash-chart-hint" id="cfcr-criticidade-sei"></p>
       </div>
       <div class="dash-chart-box" style="margin-top:14px">
@@ -12078,7 +12085,7 @@ async function carregarCfcrPortal(portalSlug) {
       </div>
       <div class="dash-charts" style="grid-template-columns:1fr 1fr">
         <div class="dash-chart-box">
-          <h4>Serviços Prestados pelos Municípios<small class="dash-chart-hint" style="display:block;margin-top:4px">Quantos municípios (do recorte atual) marcam cada serviço — clique pra isolar. Um mesmo município pode prestar mais de um serviço, então a soma das barras é maior que o nº de municípios.</small></h4>
+          <h4>Objetos Acordados pelos Municípios<small class="dash-chart-hint" style="display:block;margin-top:4px">Quantos municípios (do recorte atual) marcam cada objeto acordado — clique pra isolar. Um mesmo município pode ter mais de um objeto acordado, então a soma das barras é maior que o nº de municípios.</small></h4>
           <p class="dash-chart-hint" id="cfcr-servicos-cobertura" style="font-weight:600"></p>
           <div id="cfcr-servicos"></div>
           <p class="dash-chart-hint" id="cfcr-servicos-sem-dado"></p>
@@ -12086,7 +12093,7 @@ async function carregarCfcrPortal(portalSlug) {
           <div id="cfcr-entender-servicos" style="margin-top:10px" hidden></div>
         </div>
         <div class="dash-chart-box">
-          <h4>Quem Presta e Com Que Frequência<small class="dash-chart-hint" style="display:block;margin-top:4px">Detalhe do serviço selecionado ao lado — clique num serviço em "Serviços Prestados" pra ver aqui quais municípios prestam e com qual periodicidade/quantidade.</small></h4>
+          <h4>Detalhamento por Município e Periodicidade<small class="dash-chart-hint" style="display:block;margin-top:4px">Detalhe do objeto acordado selecionado ao lado — clique num objeto em "Objetos Acordados" pra ver aqui quais municípios têm esse objeto e com qual periodicidade/quantidade.</small></h4>
           <div class="tabela-rolavel" style="max-height:360px" id="cfcr-servico-detalhe"></div>
         </div>
       </div>
@@ -12209,7 +12216,7 @@ async function carregarCfcrPortal(portalSlug) {
   // aqui dentro (já é fixo).
   const termosTCT = termosTodos.filter((t) => t.tipo === TIPO_TCT_CFCR);
 
-  const filtros = { status: "", departamento: "", servico: "", dirpin: "", nomeUnidade: "", firmado: "", criticidade: "", recurso: "" };
+  const filtros = { status: "", departamento: "", servico: "", dirpin: "", nomeUnidade: "", firmado: "", criticidade: "" };
   // Achado dela: clicar numa COORPIN no mapa/lista mostrava o total
   // HISTÓRICO (ex.: Juazeiro, 9 termos), enquanto "Cobertura Atual por
   // COORPIN" logo abaixo mostrava só 3 (VIGENTE) — duas caixas na mesma
@@ -12248,13 +12255,12 @@ async function carregarCfcrPortal(portalSlug) {
       && (ignorar.has("dirpin") || !filtros.dirpin || t.dirpin === filtros.dirpin)
       && (ignorar.has("nomeUnidade") || !filtros.nomeUnidade || t.nomeUnidade === filtros.nomeUnidade)
       && (ignorar.has("firmado") || !filtros.firmado || (filtros.firmado === "sim" ? t.termoFirmado : !t.termoFirmado))
-      && (ignorar.has("criticidade") || !filtros.criticidade || t.faixaCriticidade === filtros.criticidade)
-      && (ignorar.has("recurso") || !filtros.recurso || t.temRepasse === filtros.recurso);
+      && (ignorar.has("criticidade") || !filtros.criticidade || t.faixaCriticidade === filtros.criticidade);
   }
   function bateFiltro(t, ignorar) { return bateFiltroExceto(t, ignorar ? [ignorar] : []); }
   function filtrar() { return termosTCT.filter((t) => bateFiltro(t, null)); }
 
-  const ROTULOS_FILTRO_CFCR = { status: "status", departamento: "departamento", servico: "serviço", dirpin: "DIRPIN", nomeUnidade: "unidade", firmado: "termo firmado", criticidade: "prazo", recurso: "repasse financeiro" };
+  const ROTULOS_FILTRO_CFCR = { status: "status", departamento: "departamento", servico: "objeto acordado", dirpin: "DIRPIN", nomeUnidade: "unidade", firmado: "termo firmado", criticidade: "prazo" };
   function valorFiltroExibicao(chave) {
     if (chave === "firmado") return filtros.firmado === "sim" ? "sim" : "não";
     if (chave === "nomeUnidade") return rotularUnidadeCfcr(filtros.nomeUnidade);
@@ -12331,12 +12337,12 @@ async function carregarCfcrPortal(portalSlug) {
     const municipiosVigentesResumo = new Set(termosTCT.filter((t) => t.status === "VIGENTE").map((t) => t.participe)).size;
     const totalMunicipiosResumo = new Set(termosTCT.map((t) => t.participe)).size;
     document.getElementById("cfcr-kpis").innerHTML = `
-      <div class="kpi-card"><div class="kpi-cabeca">${kpiIcone("predio")}<div class="kpi-label">Total de Termos (TCT)<span style="display:block;font-size:.75rem;font-weight:400;color:#8B93A3;margin-top:2px">Municipais · histórico completo</span></div></div><div class="kpi-value">${total.toLocaleString("pt-BR")}</div></div>
+      <div class="kpi-card"><div class="kpi-cabeca">${kpiIcone("predio")}<div class="kpi-label">Total de Termos Municipais<span style="display:block;font-size:.75rem;font-weight:400;color:#8B93A3;margin-top:2px">TCT · histórico completo, conta termo, não município</span></div></div><div class="kpi-value">${total.toLocaleString("pt-BR")}</div></div>
       <div class="kpi-card kpi-clicavel" data-kpi-firmado="sim" title="Clique pra isolar" style="--kpi-cor:var(--cfcr-ok);cursor:pointer;${filtros.firmado === "sim" ? "outline:2px solid var(--cfcr-ok);outline-offset:-2px" : ""}"><div class="kpi-cabeca">${kpiIcone("selo")}<div class="kpi-label">Termo Firmado</div></div><div class="kpi-value">${firmados.toLocaleString("pt-BR")} <span style="font-size:.9rem;color:#8B93A3">(${pct(firmados)}%)</span></div></div>
       <div class="kpi-card kpi-clicavel" data-kpi-firmado="nao" title="Clique pra ver quais municípios e o motivo de cada um" style="--kpi-cor:var(--cfcr-bad);cursor:pointer;${filtros.firmado === "nao" ? "outline:2px solid var(--cfcr-bad);outline-offset:-2px" : ""}"><div class="kpi-cabeca">${kpiIcone("alerta")}<div class="kpi-label">Não Firmado</div></div><div class="kpi-value">${naoFirmados.toLocaleString("pt-BR")} <span style="font-size:.9rem;color:#8B93A3">(${pct(naoFirmados)}%)</span></div>${motivoTopoResumo ? `<div style="font-size:.75rem;color:#8B93A3;margin-top:2px">Principal motivo: ${escapeHTML(motivoTopoResumo[0])} (${motivoTopoResumo[1]})</div>` : ""}</div>
       <div class="kpi-card kpi-clicavel" id="cfcr-kpi-aclassificar" title="Clique pra ver a aba A Classificar (GDG), com participe e departamento de cada um" style="cursor:pointer"><div class="kpi-cabeca">${kpiIcone("pessoa")}<div class="kpi-label">+ Parcerias a Classificar (GDG)<span style="display:block;font-size:.75rem;font-weight:400;color:#8B93A3;margin-top:2px">Acordos congêneres</span></div></div><div class="kpi-value">${totalAClassificar.toLocaleString("pt-BR")} <span style="font-size:.9rem;color:#8B93A3">(${acVigentesResumo} vigente${acVigentesResumo === 1 ? "" : "s"})</span></div></div>
       <div class="kpi-card kpi-clicavel" id="cfcr-kpi-cobertura" title="Clique pra ver o detalhe por COORPIN" style="cursor:pointer;--kpi-cor:${coorpinsDesassistidasResumo > 0 ? "var(--cfcr-bad)" : "var(--cfcr-ok)"}"><div class="kpi-cabeca">${kpiIcone("escudo")}<div class="kpi-label">Cobertura Atual por COORPIN</div></div><div class="kpi-value">${coorpinsAtendidasResumo}/${coorpinsTodasComTermoResumo.length} <span style="font-size:.9rem;color:#8B93A3">com município vigente</span></div><div style="font-size:.75rem;color:#8B93A3;margin-top:2px">${coorpinsDesassistidasResumo > 0 ? `${coorpinsDesassistidasResumo} COORPIN sem nenhum município vigente` : "nenhuma COORPIN desassistida hoje"}</div></div>
-      <div class="kpi-card kpi-clicavel" id="cfcr-kpi-municipios-vigente" title="Clique pra ver a lista completa, dos dois lados" style="cursor:pointer"><div class="kpi-cabeca">${kpiIcone("predio")}<div class="kpi-label">Municípios da Bahia Atendidos</div></div><div class="kpi-value">${municipiosVigentesResumo}/${totalMunicipiosResumo} <span style="font-size:.9rem;color:#8B93A3">com termo vigente</span></div><div style="font-size:.75rem;color:#8B93A3;margin-top:2px">${(totalMunicipiosResumo - municipiosVigentesResumo).toLocaleString("pt-BR")} sem nenhum termo vigente agora</div></div>
+      <div class="kpi-card kpi-clicavel" id="cfcr-kpi-municipios-vigente" title="Clique pra ver a lista completa, dos dois lados" style="cursor:pointer"><div class="kpi-cabeca">${kpiIcone("predio")}<div class="kpi-label">Municípios da Bahia Atendidos<span style="display:block;font-size:.75rem;font-weight:400;color:#8B93A3;margin-top:2px">Universo de ${totalMunicipiosResumo} municípios diferentes — não é o total de termos acima</span></div></div><div class="kpi-value">${municipiosVigentesResumo}/${totalMunicipiosResumo} <span style="font-size:.9rem;color:#8B93A3">com termo vigente</span></div><div style="font-size:.75rem;color:#8B93A3;margin-top:2px">${(totalMunicipiosResumo - municipiosVigentesResumo).toLocaleString("pt-BR")} sem nenhum termo vigente agora</div></div>
     `;
     document.getElementById("cfcr-kpi-aclassificar").addEventListener("click", () => irParaSubabaCfcr("aclassificar"));
     document.getElementById("cfcr-kpi-cobertura").addEventListener("click", () => irParaSubabaCfcr("geoservicos"));
@@ -12432,22 +12438,6 @@ async function carregarCfcrPortal(portalSlug) {
         })
       : `<p class="dash-chart-hint">Nenhum termo não firmado neste recorte.</p>`;
 
-    // ---- Repasse Financeiro — campo já categorizado na planilha modelo v2
-    // (Sim/Não/Não informado), substitui o antigo texto cru. Mesmo
-    // mecanismo de clique-pra-isolar de todo o resto do painel. ----
-    const recursoRecorte = termosTCT.filter((t) => bateFiltro(t, "recurso"));
-    const recursoLinhas = agruparValorObrasPorCampo(recursoRecorte, (t) => t.temRepasse, () => 1, "Não informado")
-      .map((l) => ({ label: l.label, valor: l.total }))
-      .sort((a, b) => b.valor - a.valor);
-    document.getElementById("cfcr-recurso").innerHTML = recursoLinhas.length
-      ? barraHorizontalComEixoSVG(recursoLinhas, {
-          formatarValor: (v) => v.toLocaleString("pt-BR"),
-          formatarEixoTick: (v) => Math.round(v).toLocaleString("pt-BR"),
-          cor: "var(--cfcr-info)",
-          selecionado: filtros.recurso,
-        })
-      : `<p class="dash-chart-hint">Nenhum termo neste recorte.</p>`;
-
     // ---- Serviços prestados pelos municípios — achado direto dela,
     // cruzado com a planilha ORIGINAL (ela mandou): cada município tem uma
     // linha pra CADA um dos 11 serviços, mesmo quando não oferece nada
@@ -12475,10 +12465,10 @@ async function carregarCfcrPortal(portalSlug) {
     let linhasDetalheServico = [];
     if (modoStatusGeoCfcr === "historico") {
       const semDadoHistorico = servicoRecorte.filter((t) => (t.servicos || []).length === 0).length;
-      document.getElementById("cfcr-servicos").innerHTML = `<p class="dash-chart-hint">Não dá pra saber quais serviços cada município oferecia quando o termo já venceu — ${semDadoHistorico.toLocaleString("pt-BR")} de ${servicoRecorte.length.toLocaleString("pt-BR")} termo(s) deste recorte não têm nenhum dado de serviço preenchido (ninguém atualiza a planilha de um termo já vencido). O que dá pra afirmar com segurança é só "esse município teve termo e hoje não tem" — essa lista está na tabela "Municípios Sem Termo Vigente" mais abaixo. Troque pra "Só Vigente" pra ver o detalhe de serviço de quem está ativo agora.</p>`;
+      document.getElementById("cfcr-servicos").innerHTML = `<p class="dash-chart-hint">Não dá pra saber quais objetos cada município tinha acordado quando o termo já venceu — ${semDadoHistorico.toLocaleString("pt-BR")} de ${servicoRecorte.length.toLocaleString("pt-BR")} termo(s) deste recorte não têm nenhum objeto acordado preenchido (ninguém atualiza a planilha de um termo já vencido). O que dá pra afirmar com segurança é só "esse município teve termo e hoje não tem" — essa lista está na tabela "Municípios da Bahia" mais abaixo. Troque pra "Só Vigente" pra ver o detalhe de objeto de quem está ativo agora.</p>`;
       document.getElementById("cfcr-servicos-cobertura").textContent = "";
       document.getElementById("cfcr-servicos-sem-dado").textContent = "";
-      document.getElementById("cfcr-servico-detalhe").innerHTML = `<p class="dash-chart-hint">Detalhe de serviço só existe pra quem está VIGENTE agora — troque o alternador lá em cima.</p>`;
+      document.getElementById("cfcr-servico-detalhe").innerHTML = `<p class="dash-chart-hint">Detalhe de objeto acordado só existe pra quem está VIGENTE agora — troque o alternador lá em cima.</p>`;
     } else {
     const contagemServico = new Map();
     for (const t of servicoRecorte) {
@@ -12512,7 +12502,7 @@ async function carregarCfcrPortal(portalSlug) {
     const municipiosComServico = servicoRecorte.filter((t) => (t.servicos || []).some(servicoOferecido)).length;
     const totalOferecimentos = servicoLinhas.reduce((a, l) => a + l.valor, 0);
     document.getElementById("cfcr-servicos-cobertura").textContent = servicoRecorte.length
-      ? `${servicoRecorte.length.toLocaleString("pt-BR")} termo(s) no recorte · ${municipiosComServico.toLocaleString("pt-BR")} preenchem pelo menos 1 serviço · juntos, somam ${totalOferecimentos.toLocaleString("pt-BR")} oferecimento(s) em ${servicoLinhas.length.toLocaleString("pt-BR")} tipo(s) de serviço diferentes (um mesmo termo conta em mais de uma barra quando presta mais de um serviço).`
+      ? `${servicoRecorte.length.toLocaleString("pt-BR")} termo(s) no recorte · ${municipiosComServico.toLocaleString("pt-BR")} preenchem pelo menos 1 objeto acordado · juntos, somam ${totalOferecimentos.toLocaleString("pt-BR")} oferecimento(s) em ${servicoLinhas.length.toLocaleString("pt-BR")} tipo(s) de objeto diferentes (um mesmo termo conta em mais de uma barra quando tem mais de um objeto acordado).`
       : "";
 
     // Achado direto dela, cruzado com a planilha original: um município
@@ -12523,7 +12513,7 @@ async function carregarCfcrPortal(portalSlug) {
     // respondeu" pareciam a mesma coisa.
     const semNenhumDadoServico = servicoRecorte.filter((t) => (t.servicos || []).length === 0).length;
     document.getElementById("cfcr-servicos-sem-dado").textContent = semNenhumDadoServico
-      ? `${semNenhumDadoServico.toLocaleString("pt-BR")} de ${servicoRecorte.length.toLocaleString("pt-BR")} termo(s) do recorte não preencheram nenhum dado de serviço (nem "Não disponibiliza") — a cobertura acima é calculada só sobre quem respondeu.`
+      ? `${semNenhumDadoServico.toLocaleString("pt-BR")} de ${servicoRecorte.length.toLocaleString("pt-BR")} termo(s) do recorte não preencheram nenhum objeto acordado (nem "Não disponibiliza") — a cobertura acima é calculada só sobre quem respondeu.`
       : "";
 
     // ---- Quem Presta e Com Que Frequência — pedido direto dela: "pegar
@@ -12536,7 +12526,7 @@ async function carregarCfcrPortal(portalSlug) {
     // serviço em "Serviços Prestados" — sem isso, "com que frequência" não
     // tem contexto nenhum (frequência de QUAL serviço?). ----
     if (!filtros.servico) {
-      document.getElementById("cfcr-servico-detalhe").innerHTML = `<p class="dash-chart-hint">Clique num serviço em "Serviços Prestados" pra ver aqui quais municípios prestam e com qual periodicidade/quantidade.</p>`;
+      document.getElementById("cfcr-servico-detalhe").innerHTML = `<p class="dash-chart-hint">Clique num objeto em "Objetos Acordados" pra ver aqui quais municípios têm esse objeto e com qual periodicidade/quantidade.</p>`;
     } else {
       linhasDetalheServico = servicoRecorte
         .map((t) => ({ t, s: (t.servicos || []).find((s) => s.servicoNome === filtros.servico && servicoOferecido(s)) }))
@@ -12804,9 +12794,22 @@ async function carregarCfcrPortal(portalSlug) {
       b.classList.toggle("active", b.dataset.modoMunicipiosVisual === modoVisualMunicipiosCfcr);
     });
     const municipiosNaTela = modoMunicipiosVigenteCfcr === "sem" ? municipiosSemVigente : municipiosComVigente;
+    // Pedido direto dela: "no universo de 170 diga em resumo que são tantos
+    // em construção, tantos vencidos, quantos indeterminada" — sem isso,
+    // "170 sem vigente" parecia um bloco só, escondendo que a maioria é
+    // VENCIDO de verdade (perdeu o termo) e uma minoria é só EM CONSTRUÇÃO
+    // (nunca chegou a vigorar ainda, situação bem diferente).
+    const resumoStatusSemVigente = () => {
+      const contagem = new Map();
+      for (const m of municipiosSemVigente) contagem.set(m.status, (contagem.get(m.status) || 0) + 1);
+      const partes = [...contagem.entries()]
+        .sort((a, b) => (CFCR_STATUS_INFO[a[0]]?.ordem || 99) - (CFCR_STATUS_INFO[b[0]]?.ordem || 99))
+        .map(([status, n]) => `${n} ${status.toLowerCase()}`);
+      return partes.length ? ` (${partes.join(", ")})` : "";
+    };
     document.getElementById("cfcr-municipios-sem-vigente-resumo").textContent = municipiosRecorteContato.length
       ? modoMunicipiosVigenteCfcr === "sem"
-        ? `${municipiosSemVigente.length} de ${municipiosPorParticipe.length} município(s) deste recorte sem nenhum termo vigente agora.`
+        ? `${municipiosSemVigente.length} de ${municipiosPorParticipe.length} município(s) deste recorte sem nenhum termo vigente agora${resumoStatusSemVigente()}.`
         : `${municipiosComVigente.length} de ${municipiosPorParticipe.length} município(s) deste recorte atendidos por termo vigente agora.`
       : "";
     document.getElementById("cfcr-municipios-sem-vigente").hidden = modoVisualMunicipiosCfcr !== "tabela";
@@ -12834,38 +12837,41 @@ async function carregarCfcrPortal(portalSlug) {
       });
     }
 
-    // ---- Prazos e Criticidade: mesma lógica de faixa de contratos.service.js
-    // (≤30/31–60/61–90/>90), calculada ao vivo em cfcr.service.js — não a
-    // faixa que a planilha congelou na data de processamento dela. ----
+    // ---- Prazos e Criticidade: mesma lógica de faixa de contratos.service.js,
+    // calculada ao vivo em cfcr.service.js — não a faixa que a planilha
+    // congelou na data de processamento dela. Pedido direto, confirmado nos
+    // dados (0 de 247 vigentes vencem nos próximos 90 dias): os 3 baldes do
+    // meio (até 30/31–60/61–90) NUNCA têm nada hoje — não é "painel
+    // quebrado num dia ruim", é estrutural. Em vez de mostrar um gráfico
+    // que é sempre a mesma barra única, some com ele enquanto isso for
+    // verdade — volta sozinho no dia em que algum termo entrar numa faixa
+    // de verdade.
     const criticidadeRecorte = termosTCT.filter((t) => bateFiltro(t, "criticidade"));
     const criticidadeLinhas = agruparValorObrasPorCampo(criticidadeRecorte, (t) => t.faixaCriticidade, () => 1, "Não aplicável")
       .map((l) => ({ label: l.label, valor: l.total }))
       .sort((a, b) => (CFCR_CRITICIDADE_INFO[a.label]?.ordem || 99) - (CFCR_CRITICIDADE_INFO[b.label]?.ordem || 99));
-    document.getElementById("cfcr-criticidade").innerHTML = criticidadeLinhas.length
-      ? barraHorizontalComEixoSVG(criticidadeLinhas, {
-          formatarValor: (v) => v.toLocaleString("pt-BR"),
-          formatarEixoTick: (v) => Math.round(v).toLocaleString("pt-BR"),
-          cor: (c) => corCriticidadeCfcr(c.label),
-          selecionado: filtros.criticidade,
-        })
-      : `<p class="dash-chart-hint">Nenhum termo neste recorte.</p>`;
-
-    // Achado direto dela, confirmado nos dados: a distribuição de
-    // vencimento não é uma rampa suave — é um "penhasco" (ou já venceu, ou
-    // tranquilo por 3+ meses). Sem esse texto, um dia em que os 3 baldes
-    // do meio (≤30/31–60/61–90) ficam vazios passa impressão de painel
-    // quebrado, não de portfólio saudável.
     const proximoVencimento = criticidadeRecorte.filter((t) => t.status === "VIGENTE" && t.diasParaVencer !== null && t.diasParaVencer >= 0 && t.diasParaVencer <= 90).length;
-    document.getElementById("cfcr-criticidade-penhasco").textContent = proximoVencimento === 0 && criticidadeRecorte.length
-      ? "Nenhum termo vence nos próximos 90 dias — os vigentes restantes estão tranquilos por mais tempo (o que aparecer em \"Até 30 dias\" acima são só os já vencidos mas ainda marcados VIGENTE, cobertos em \"Mais Urgentes\" abaixo)."
-      : "";
+    document.getElementById("cfcr-criticidade-box").hidden = proximoVencimento === 0;
+    if (proximoVencimento > 0) {
+      document.getElementById("cfcr-criticidade").innerHTML = criticidadeLinhas.length
+        ? barraHorizontalComEixoSVG(criticidadeLinhas, {
+            formatarValor: (v) => v.toLocaleString("pt-BR"),
+            formatarEixoTick: (v) => Math.round(v).toLocaleString("pt-BR"),
+            cor: (c) => corCriticidadeCfcr(c.label),
+            formatarRotulo: (c) => rotularCriticidadeCfcr(c.label),
+            selecionado: filtros.criticidade,
+          })
+        : `<p class="dash-chart-hint">Nenhum termo neste recorte.</p>`;
+    }
 
     // Achado direto dela, confirmado nos dados: entre os vencidos, uns têm
     // processo SEI (só não foram renovados) e outros nunca tiveram
     // processo nenhum aberto — sinal de severidade que hoje se perde numa
-    // cor só ("Vencido").
+    // cor só ("Vencido"). Independente do "penhasco" acima — vale mesmo
+    // quando a caixa de criticidade está escondida.
     const vencidosRecorte = criticidadeRecorte.filter((t) => t.status === "VENCIDO");
     const vencidosSemSei = vencidosRecorte.filter((t) => !t.processoSei || String(t.processoSei).trim().toUpperCase() === "SEM PROCESSO");
+    document.getElementById("cfcr-criticidade-sei-box").hidden = !vencidosRecorte.length;
     document.getElementById("cfcr-criticidade-sei").textContent = vencidosRecorte.length
       ? `Entre os vencidos deste recorte, ${Math.round(vencidosSemSei.length / vencidosRecorte.length * 100)}% (${vencidosSemSei.length.toLocaleString("pt-BR")} de ${vencidosRecorte.length.toLocaleString("pt-BR")}) nunca tiveram processo SEI aberto — os demais têm processo, só não foram renovados.`
       : "";
@@ -13015,12 +13021,6 @@ async function carregarCfcrPortal(portalSlug) {
     const alvo = ev.target.closest("[data-cat]");
     if (!alvo) return;
     filtros.servico = filtros.servico === alvo.dataset.cat ? "" : alvo.dataset.cat;
-    atualizar();
-  });
-  document.getElementById("cfcr-recurso").addEventListener("click", (ev) => {
-    const alvo = ev.target.closest("[data-cat]");
-    if (!alvo) return;
-    filtros.recurso = filtros.recurso === alvo.dataset.cat ? "" : alvo.dataset.cat;
     atualizar();
   });
   document.getElementById("cfcr-filtro-dirpin").addEventListener("change", (ev) => {
