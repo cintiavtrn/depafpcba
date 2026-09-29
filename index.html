@@ -11823,7 +11823,7 @@ function relLeituraHTML(texto) {
 // só que montada com o dado do MOMENTO — reaproveita donutCfcrSVG/
 // vennTresConjuntosSVG já existentes, com cor em hexadecimal literal (não
 // var(--cfcr-*), que só existe no CSS do site, não no documento novo).
-function montarRelatorioCfcr(termosTodos, termosTCT) {
+function montarRelatorioCfcr(termosTodos, termosTCT, notaRecorte = null) {
   const COR = { ok: "#1E7D45", bad: "#B23A2F", warn: "#C98A12", info: "#2B5CA8", neutro: "#8A8F9C", laranja: "#ED7D31", roxo: "#7C5CBF" };
   const agora = new Date().toLocaleDateString("pt-BR");
   const ac = termosTodos.filter((t) => t.tipo === TIPO_A_CLASSIFICAR_CFCR);
@@ -11918,6 +11918,7 @@ function montarRelatorioCfcr(termosTodos, termosTCT) {
     <h1>CFCR</h1>
     <h3>Termos de Cooperação Técnica · Relatório de acompanhamento, DEPAF / Polícia Civil da Bahia</h3>
     <p class="rel-topo">Números direto do banco de produção, gerado em ${agora}. Cada vez que este relatório é aberto, ele lê o banco na hora, então um novo download no dia seguinte já traz qualquer dado atualizado desde então.</p>
+    ${notaRecorte ? `<p class="rel-topo" style="font-weight:600;color:#B23A2F">Recorte filtrado — este PDF reflete só ${escapeHTML(notaRecorte)}, não o universo completo de termos. As seções 1 a 4 usam esse recorte; a seção 5 (A Classificar/GDG) é sempre o universo cheio, já que não tem filtro aqui.</p>` : ""}
 
     <div class="rel-secao">
       <h2>1. Visão Geral</h2>
@@ -12024,8 +12025,18 @@ async function carregarCfcrPortal(portalSlug) {
   ];
 
   painel.innerHTML = `
-    <div style="display:flex;justify-content:flex-end;margin-bottom:10px"><button type="button" class="dash-toggle-btn" id="cfcr-baixar-relatorio">${iconeInline("download", 12, -2)} BAIXAR RELATÓRIO (PDF)</button></div>
+    <div style="display:flex;justify-content:flex-end;gap:8px;margin-bottom:10px;flex-wrap:wrap">
+      <button type="button" class="dash-toggle-btn" id="cfcr-baixar-relatorio">${iconeInline("download", 12, -2)} BAIXAR RELATÓRIO COMPLETO (PDF)</button>
+      <button type="button" class="dash-toggle-btn" id="cfcr-baixar-recorte" title="Só o que está filtrado agora (cartões/fatias/barras clicados)">${iconeInline("download", 12, -2)} BAIXAR SÓ O RECORTE ATUAL (PDF)</button>
+    </div>
     <p class="tela-intro">Termos de Cooperação Técnica · DEPIN · DEPOM · DPMCV — clique em qualquer cartão, fatia ou barra pra isolar o recorte em todas as seções ao mesmo tempo. Parcerias institucionais do GDG (ainda não confirmadas como Congênere) ficam na aba "CFCR - Acordos Congêneres", ao lado.</p>
+    <div class="dash-filtros" style="margin-bottom:14px">
+      <div class="dash-filtro" style="flex:1;min-width:260px">
+        <label>BUSCAR MUNICÍPIO (Ex.: "Anguera tem o quê?")</label>
+        <input type="text" id="cfcr-busca-input" placeholder="Nome do município, COORPIN, departamento, objeto ou processo SEI..." />
+      </div>
+    </div>
+    <div id="cfcr-busca-resultado"></div>
     <div id="cfcr-chips"></div>
     <div class="kpi-row" id="cfcr-kpis" style="margin-bottom:16px"></div>
     <div class="dash-toggle" style="margin-bottom:16px">${botaoEntenderDadosHTML("universo", "o que é 418, o que é 30, por que não somam 448 em lugar nenhum")}</div>
@@ -12991,6 +13002,64 @@ async function carregarCfcrPortal(portalSlug) {
   });
   document.getElementById("cfcr-baixar-relatorio").addEventListener("click", () => {
     abrirRelatorioImprimivel("CFCR — Relatório de Termos de Cooperação Técnica", montarRelatorioCfcr(termosTodos, termosTCT));
+  });
+  // Pedido direto: "se eu quiser exportar um relatório só de vencidos aí
+  // filtra lá embaixo em Visão Geral, mas e aí?" — o botão de cima sempre
+  // gerava o universo inteiro, mesmo com fatia/cartão/barra isolados na
+  // tela. Este reaproveita o MESMO gerador de PDF, só troca termosTCT pelo
+  // recorte já filtrado (filtrar(), a mesma função que todo o resto da
+  // tela usa) e adiciona um aviso no topo do PDF dizendo qual filtro tava
+  // ativo, pra não parecer o universo inteiro por engano.
+  document.getElementById("cfcr-baixar-recorte").addEventListener("click", () => {
+    const ativos = Object.keys(filtros)
+      .filter((chave) => filtros[chave])
+      .map((chave) => `${ROTULOS_FILTRO_CFCR[chave]}: ${valorFiltroExibicao(chave)}`);
+    if (!ativos.length) {
+      mostrarToast('Nenhum filtro ativo agora — clique num cartão, fatia, barra ou ponto pra isolar um recorte antes de baixar, ou use "BAIXAR RELATÓRIO COMPLETO (PDF)" pro universo inteiro.', "erro");
+      return;
+    }
+    abrirRelatorioImprimivel("CFCR — Recorte Filtrado", montarRelatorioCfcr(termosTodos, filtrar(), ativos.join(", ")));
+  });
+
+  // ---- Buscar Município — pedido direto: "o município Anguera tem o quê?
+  // precisamos de um jeito de responder rápido" — mesmo padrão de
+  // ligarBuscaContratos (busca À PARTE, não mexe em nenhum filtro/gráfico
+  // da tela), mas devolve o objeto acordado de cada termo direto na
+  // própria linha do resultado, porque isso já é a resposta completa —
+  // sem precisar de outro clique pra abrir mais nada.
+  function indiceBuscaCfcr(t) {
+    const campos = [
+      t.participe, t.departamento, t.nomeUnidade, t.status, t.processoSei,
+      ...(t.servicos || []).map((s) => s.servicoNome),
+    ];
+    return normalizarBusca(campos.filter(Boolean).join(" ␟"));
+  }
+  const indexadoCfcr = termosTCT.map((t) => ({ t, indice: indiceBuscaCfcr(t) }));
+  document.getElementById("cfcr-busca-input").addEventListener("input", (ev) => {
+    const bruto = ev.target.value.trim();
+    const termoBusca = normalizarBusca(bruto);
+    const resultado = document.getElementById("cfcr-busca-resultado");
+    if (!termoBusca) { resultado.innerHTML = ""; return; }
+    const encontrados = indexadoCfcr.filter((x) => x.indice.includes(termoBusca)).map((x) => x.t);
+    resultado.innerHTML = `
+      <div class="dash-chart-box" style="margin-bottom:14px">
+        <h4>Resultado da busca</h4>
+        <p class="dash-chart-hint">${encontrados.length} termo(s) encontrado(s) pra "${escapeHTML(bruto)}" — em município, COORPIN, departamento, status, processo SEI ou objeto acordado. Não mexe nos filtros do resto da tela.</p>
+        ${encontrados.length ? `<div class="tabela-rolavel" style="max-height:360px"><table class="dash-tabela">
+          <thead><tr><th>MUNICÍPIO</th><th>COORPIN</th><th>DEPARTAMENTO</th><th>STATUS</th><th>OBJETOS ACORDADOS</th><th>PROCESSO SEI</th></tr></thead>
+          <tbody>${encontrados.map((t) => {
+            const objetos = (t.servicos || []).filter((s) => s.periodicidade !== "Não disponibiliza" && s.especificado).map((s) => s.servicoNome);
+            return `<tr>
+              <td>${escapeHTML(nomeMunicipioLimpo(t.participe).nome)}</td>
+              <td>${escapeHTML(rotularUnidadeCfcr(t.nomeUnidade) || "—")}</td>
+              <td>${escapeHTML(t.departamento)}</td>
+              <td style="color:${corStatusCfcr(t.status)};font-weight:700">${escapeHTML(t.status)}</td>
+              <td style="max-width:260px">${objetos.length ? escapeHTML(objetos.join(", ")) : "—"}</td>
+              <td>${escapeHTML(t.processoSei || "—")}</td>
+            </tr>`;
+          }).join("")}</tbody>
+        </table></div>` : ""}
+      </div>`;
   });
 
   atualizar();
