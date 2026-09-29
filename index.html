@@ -11146,6 +11146,17 @@ function rotularUnidadeCfcr(nomeUnidade) {
   return m ? `${m[1]} COORPIN — ${m[2]}` : nomeUnidade;
 }
 
+// Achado dela: 1 partícipe vem gravado como "1º DT PORTO SEGURO" em vez do
+// nome limpo do município — "invés de escrever a DT, escrever o município
+// ou distrito... aí uma observação que é a DT". Pra quem vai USAR a lista
+// pra contatar a prefeitura (o objetivo do cartão 247/417 é achar
+// oportunidade), o nome que importa é a cidade, não o código da delegacia
+// territorial — a DT vira observação à parte, não o nome principal.
+function nomeMunicipioLimpo(participe) {
+  const m = String(participe || "").match(/^(\d+º?\s*DT)\s+(.+)$/i);
+  return m ? { nome: m[2].trim(), observacao: m[1].trim() } : { nome: participe, observacao: null };
+}
+
 // Balde catch-all do seed pra texto que não é frequência real nem "x"/
 // "não disponibiliza" (ver reclassificarPeriodicidade em seed-cfcr.js).
 const PERIODICIDADE_QUANTIDADE_CFCR = "Quantidade informada (sem periodicidade)";
@@ -12545,10 +12556,11 @@ async function carregarCfcrPortal(portalSlug) {
       const referencia = temVigente
         ? termos.find((t) => t.status === "VIGENTE")
         : [...termos].sort((a, b) => (b.diasParaVencer ?? -Infinity) - (a.diasParaVencer ?? -Infinity))[0];
-      return { participe, temVigente, nomeUnidade: referencia.nomeUnidade, departamento: referencia.departamento, status: referencia.status, diasParaVencer: referencia.diasParaVencer };
+      const { nome, observacao } = nomeMunicipioLimpo(participe);
+      return { participe, nome, observacao, temVigente, nomeUnidade: referencia.nomeUnidade, departamento: referencia.departamento, status: referencia.status, diasParaVencer: referencia.diasParaVencer };
     });
     const municipiosSemVigente = municipiosPorParticipe.filter((m) => !m.temVigente).sort((a, b) => (a.diasParaVencer ?? -Infinity) - (b.diasParaVencer ?? -Infinity));
-    const municipiosComVigente = municipiosPorParticipe.filter((m) => m.temVigente).sort((a, b) => a.participe.localeCompare(b.participe, "pt-BR"));
+    const municipiosComVigente = municipiosPorParticipe.filter((m) => m.temVigente).sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
     document.querySelectorAll("#cfcr-municipios-vigente-toggle [data-modo-municipios]").forEach((b) => {
       b.classList.toggle("active", b.dataset.modoMunicipios === modoMunicipiosVigenteCfcr);
       b.textContent = b.dataset.modoMunicipios === "sem" ? `SEM VIGENTE (${municipiosSemVigente.length})` : `COM VIGENTE (${municipiosComVigente.length})`;
@@ -12561,10 +12573,10 @@ async function carregarCfcrPortal(portalSlug) {
       : "";
     document.getElementById("cfcr-municipios-sem-vigente").innerHTML = municipiosNaTela.length
       ? `<table class="dash-tabela">
-          <thead><tr><th>MUNICÍPIO</th><th>COORPIN</th><th>DEPARTAMENTO</th><th>STATUS ATUAL</th><th>DIAS</th></tr></thead>
+          <thead><tr><th>MUNICÍPIO OU DISTRITO</th><th>COORPIN</th><th>DEPARTAMENTO</th><th>STATUS ATUAL</th><th>DIAS</th></tr></thead>
           <tbody>${municipiosNaTela.map((m) => `
             <tr>
-              <td>${escapeHTML(m.participe)}</td>
+              <td>${escapeHTML(m.nome)}${m.observacao ? ` <span style="color:#8B93A3;font-size:.85em">(${escapeHTML(m.observacao)})</span>` : ""}</td>
               <td>${escapeHTML(rotularUnidadeCfcr(m.nomeUnidade) || "—")}</td>
               <td>${escapeHTML(m.departamento || "—")}</td>
               <td style="color:${corStatusCfcr(m.status)};font-weight:600">${escapeHTML(m.status)}</td>
@@ -12696,7 +12708,7 @@ async function carregarCfcrPortal(portalSlug) {
       .map((l) => ({ label: l.label, valor: l.total, cor: corStatusCfcr(l.label) }))
       .sort((a, b) => (CFCR_STATUS_INFO[a.label]?.ordem || 99) - (CFCR_STATUS_INFO[b.label]?.ordem || 99));
     document.getElementById("cfcr-ac-status").innerHTML = statusLinhasAC.length
-      ? donutCfcrSVG(statusLinhasAC, filtroStatusAC)
+      ? donutCfcrSVG(statusLinhasAC, filtroStatusAC, { rotuloCentro: "CONGÊNERES" })
       : `<p class="dash-chart-hint">Nenhum registro.</p>`;
     document.getElementById("cfcr-ac-status").querySelectorAll("[data-cat]").forEach((el) => {
       el.addEventListener("click", () => {
