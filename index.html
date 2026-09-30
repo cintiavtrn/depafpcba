@@ -12012,7 +12012,7 @@ function montarRelatorioCfcr(termosTodos, termosTCT, notaRecorte = null) {
           <p>Os ${termosTCT.length} termos cobrem ${municipiosComTermo} município(s) da Bahia — um mesmo município pode ter mais de um termo (um por departamento: DEPIN, DEPOM, DPMCV), por isso a contagem de termos acima e a de municípios abaixo não precisam bater.</p>
         </div>
       </div>
-      ${relLeituraHTML(`Este gráfico conta TERMOS, não municípios — um município com termo vigente em dois departamentos entra duas vezes aqui. Pra saber quantos municípios de fato estão cobertos, use a cobertura logo abaixo, que conta cada município uma única vez.`)}
+      ${relLeituraHTML(`Este gráfico conta TERMOS, não municípios — um município com termo vigente em dois departamentos entra duas vezes aqui. Pra saber quantos municípios de fato estão cobertos, use a cobertura logo abaixo, que conta cada município uma única vez. ${explicarDiferencaTermoMunicipioCfcr(municipiosReal)}`)}
 
       <h3 style="margin-top:18px">Cobertura dos 417 Municípios da Bahia</h3>
       <div class="rel-linha">
@@ -12180,6 +12180,33 @@ function tituloMapaMunicipioCfcr(m) {
   const rotuloSituacao = m.situacao === "Com termo vigente" ? "com termo vigente" : m.situacao === "Só em construção" ? "só em construção" : "só vencido";
   return `${m.totalTermos} termo(s) — ${rotuloSituacao}`;
 }
+// Pedido direto dela, depois de continuar sem entender só com a frase
+// genérica "um município pode ter mais de um termo": mostrar OS
+// MUNICÍPIOS de verdade responsáveis pela diferença entre "termos" e
+// "municípios", recalculado a cada carga (nunca hardcoded), pra quem
+// acessar entender sem precisar perguntar de novo. Dois casos existem:
+// (1) o mesmo município com 2+ termos do MESMO status (ex.: Porto Seguro
+// com 3 termos vigentes) infla a contagem de termos sem virar município
+// novo; (2) o município tem um termo vigente E outro vencido (deptos
+// diferentes) — o vigente garante a cobertura do município, mas o termo
+// vencido continua contando no total de termos vencidos.
+function explicarDiferencaTermoMunicipioCfcr(municipiosReal) {
+  const ROTULO_STATUS = { VIGENTE: "vigentes", VENCIDO: "vencidos", "EM CONSTRUÇÃO": "em construção", "DATA INVÁLIDA": "com data inválida" };
+  const multiTermo = municipiosReal.filter((m) => m.totalTermos > 1);
+  if (!multiTermo.length) return "";
+  const mesmoStatus = [];
+  const statusMisto = [];
+  for (const m of multiTermo) {
+    const statuses = m.termos.map(statusPelaDataCfcr);
+    const distintos = [...new Set(statuses)];
+    if (distintos.length === 1) mesmoStatus.push(`${m.nome} (${m.totalTermos} termos ${ROTULO_STATUS[distintos[0]] || distintos[0].toLowerCase()})`);
+    else statusMisto.push(m.nome);
+  }
+  const partes = [];
+  if (mesmoStatus.length) partes.push(`${mesmoStatus.join(", ")} ${mesmoStatus.length > 1 ? "têm" : "tem"} mais de um termo com o mesmo status — conta várias vezes no total de termos, mas é 1 só município.`);
+  if (statusMisto.length) partes.push(`${statusMisto.join(", ")} ${statusMisto.length > 1 ? "têm" : "tem"} termo vigente e termo vencido ao mesmo tempo (departamentos diferentes) — o vigente garante a cobertura do município, mas o termo vencido continua contando no total de termos vencidos.`);
+  return partes.join(" ");
+}
 
 async function carregarCfcrPortal(portalSlug) {
   const painel = document.getElementById("tab-cfcr");
@@ -12205,7 +12232,8 @@ async function carregarCfcrPortal(portalSlug) {
       <button type="button" class="dash-toggle-btn" id="cfcr-baixar-relatorio">${iconeInline("download", 12, -2)} BAIXAR RELATÓRIO (PDF)</button>
     </div>
     <p class="tela-intro">Termos de Cooperação Técnica · DEPIN · DEPOM · DPMCV. Parcerias institucionais do GDG (acordos congêneres) ficam na aba "CFCR - Acordos Congêneres", ao lado.</p>
-    <p class="dash-chart-hint">Critério de situação: pela <b>data de término da vigência</b> informada na planilha, não pelo status declarado na coluna original. Os cartões de "termos" contam cada termo (um por departamento); a "Cobertura dos 417 Municípios" conta cada município uma única vez — por isso os dois números não precisam bater.</p>
+    <p class="dash-chart-hint">Critério de situação: pela <b>data de término da vigência</b> informada na planilha — recalculado sozinho toda vez que a página carrega, sem precisar de ninguém marcar nada (igual em Contratos). Não é o status declarado na coluna original da planilha.</p>
+    <p class="dash-chart-hint">Os cartões de "termos" contam cada termo (um por departamento); a "Cobertura dos 417 Municípios" conta cada município uma única vez — por isso os dois números não precisam bater. <span id="cfcr-termo-municipio-diff"></span></p>
     <div class="dash-filtros" style="margin-bottom:14px">
       <div class="dash-filtro" style="flex:1;min-width:260px">
         <label>BUSCAR MUNICÍPIO (Ex.: "Anguera tem o quê?")</label>
@@ -12382,6 +12410,7 @@ async function carregarCfcrPortal(portalSlug) {
   const municipiosReal = classificarMunicipiosRealCfcr(termosTCT);
   const covPorSituacao = { "Com termo vigente": 0, "Só vencido": 0, "Só em construção": 0, "Sem termo": 0 };
   municipiosReal.forEach((m) => { covPorSituacao[m.situacao]++; });
+  document.getElementById("cfcr-termo-municipio-diff").textContent = explicarDiferencaTermoMunicipioCfcr(municipiosReal);
   let modoVisualCoberturaVG = "barra";
   function renderCobertura() {
     document.querySelectorAll("#cfcr-vg-cobertura-visual-toggle .dash-toggle-btn").forEach((b) => b.classList.toggle("active", b.dataset.modoVisual === modoVisualCoberturaVG));
