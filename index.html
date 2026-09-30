@@ -11632,6 +11632,32 @@ function vennTresConjuntosSVG(conjuntos) {
   return `${svg}<div class="donut-legenda">${legenda}</div>`;
 }
 
+// Mesmo idioma visual de vennTresConjuntosSVG, só com 2 conjuntos — usado
+// pra explicar visualmente "com termo vigente" x "tem termo vencido" (CFCR),
+// dois conjuntos que SE CRUZAM (um município pode ter os dois ao mesmo
+// tempo, um termo de cada, em departamentos diferentes).
+function vennDoisConjuntosSVG(A, B) {
+  const universo = new Set([...A.membros, ...B.membros]);
+  let apenasA = 0, apenasB = 0, ab = 0;
+  universo.forEach((x) => {
+    const a = A.membros.has(x), b = B.membros.has(x);
+    if (a && b) ab++;
+    else if (a) apenasA++;
+    else apenasB++;
+  });
+  const r = 74, cA = [122, 110], cB = [188, 110];
+  const num = (v, x, y, tam = 16) => `<text x="${x}" y="${y}" text-anchor="middle" font-family="monospace" font-size="${tam}" font-weight="700" fill="var(--carvao)">${v.toLocaleString("pt-BR")}</text>`;
+  const svg = `<svg viewBox="0 20 310 200" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="${cA[0]}" cy="${cA[1]}" r="${r}" fill="${A.cor}" fill-opacity="0.32" stroke="${A.cor}" stroke-width="1.5" />
+    <circle cx="${cB[0]}" cy="${cB[1]}" r="${r}" fill="${B.cor}" fill-opacity="0.32" stroke="${B.cor}" stroke-width="1.5" />
+    ${num(apenasA, 88, 114)}
+    ${num(apenasB, 222, 114)}
+    ${num(ab, 155, 114, 14)}
+  </svg>`;
+  const legenda = [A, B].map((c) => `<div class="donut-leg" style="cursor:default"><span class="sw" style="background:${c.cor}"></span><span class="lg-nome">${escapeHTML(c.label)}</span></div>`).join("");
+  return `${svg}<div class="donut-legenda">${legenda}</div>`;
+}
+
 // ---- Painéis "Entender os Dados" — lazy: só computam/desenham na 1ª vez
 // que a pessoa abre (não precisam re-renderizar a cada atualizar(), porque
 // explicam a ESTRUTURA fixa dos dados, não o recorte filtrado no momento —
@@ -12022,6 +12048,7 @@ function montarRelatorioCfcr(termosTodos, termosTCT, notaRecorte = null) {
         </div>
       </div>
       ${relLeituraHTML(`Esta é a pergunta de gestão de verdade: quantos dos 417 municípios da Bahia estão cobertos agora. ${semVigenteHoje.length} município(s) não têm nenhum termo vigente hoje — detalhados na seção 3.`)}
+      <div class="rel-caixa">${montarPainelComoLerCfcr(municipiosReal)}</div>
     </div>
 
     <div class="rel-secao">
@@ -12118,7 +12145,11 @@ function duracaoCfcr(inicio, fim) {
 function vigenciaTempoCfcr(m) {
   const hoje = new Date();
   if (m.situacao === "Sem termo") return ["—", "nunca teve termo"];
-  const D = m.fim ? m.fim.toLocaleDateString("pt-BR") : null;
+  // formatarDataBR (não m.fim.toLocaleDateString direto): fimVigenciaData
+  // vem como meia-noite UTC — sem forçar timeZone:"UTC" na formatação, o
+  // navegador em horário de Brasília (UTC-3) mostra o dia ANTERIOR ao
+  // gravado no banco (achado dela: "31/07" virando "30/07" na tela).
+  const D = m.fim ? formatarDataBR(m.fim) : null;
   if (m.situacao === "Com termo vigente") {
     if (!m.fim) return [m.dataInvalida ? "data inválida" : "sem data válida", "—"];
     return m.fim < hoje ? [`até ${D}`, "data já passou (revisar)"] : [`até ${D}`, `faltam ${duracaoCfcr(hoje, m.fim)}`];
@@ -12207,6 +12238,40 @@ function explicarDiferencaTermoMunicipioCfcr(municipiosReal) {
   if (statusMisto.length) partes.push(`${statusMisto.join(", ")} ${statusMisto.length > 1 ? "têm" : "tem"} termo vigente e termo vencido ao mesmo tempo (departamentos diferentes) — o vigente garante a cobertura do município, mas o termo vencido continua contando no total de termos vencidos.`);
   return partes.join(" ");
 }
+// "Lupa" Entender os Dados — pedido direto dela depois de conferir linha a
+// linha na planilha original e finalmente entender a conta: diagrama de
+// Venn "com termo vigente" × "tem termo vencido" (dois conjuntos que SE
+// CRUZAM), com a tabela dos casos concretos de sobreposição — sempre
+// recalculado dos dados de agora, nunca hardcoded, pra sobreviver a
+// qualquer atualização da base.
+function montarPainelComoLerCfcr(municipiosReal) {
+  const comVigente = municipiosReal.filter((m) => m.situacao === "Com termo vigente");
+  const A = { label: "Com termo vigente hoje", cor: "var(--cfcr-ok)", membros: new Set(comVigente.map((m) => m.nome)) };
+  const temVencido = municipiosReal.filter((m) => m.termos.some((t) => statusPelaDataCfcr(t) === "VENCIDO"));
+  const B = { label: "Tem algum termo vencido", cor: "var(--cfcr-bad)", membros: new Set(temVencido.map((m) => m.nome)) };
+  const sobrepostos = comVigente.filter((m) => B.membros.has(m.nome));
+  const soVencido = municipiosReal.filter((m) => m.situacao === "Só vencido").length;
+  const emConstrucao = municipiosReal.filter((m) => m.situacao === "Só em construção").length;
+  const semTermo = municipiosReal.filter((m) => m.situacao === "Sem termo").length;
+  const semVigenteHoje = soVencido + emConstrucao + semTermo;
+  const dataTxt = (t) => (t.fimVigenciaData ? formatarDataBR(t.fimVigenciaData) : "—");
+  return `<h4>Como ler: vigente × vencido</h4>
+    <div style="display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start">
+      <div style="max-width:290px">${vennDoisConjuntosSVG(A, B)}</div>
+      <div style="flex:1;min-width:280px">
+        <p class="dash-chart-hint">Verde: município com pelo menos 1 termo vigente hoje (${A.membros.size}). Vermelho: município com algum termo vencido (${B.membros.size}), mesmo que também tenha um vigente. Quem está nos dois (${sobrepostos.length}) tem um termo de cada, em departamentos diferentes — o vigente garante a cobertura, mas o vencido continua pesando no total de termos vencidos lá em cima.</p>
+        ${sobrepostos.length ? `<div class="tabela-rolavel"><table class="dash-tabela" style="margin-top:8px">
+          <thead><tr><th>MUNICÍPIO</th><th>TERMO VENCIDO</th><th>TERMO VIGENTE</th></tr></thead>
+          <tbody>${sobrepostos.map((m) => {
+            const venc = m.termos.find((t) => statusPelaDataCfcr(t) === "VENCIDO");
+            const vig = m.termos.find((t) => statusPelaDataCfcr(t) === "VIGENTE");
+            return `<tr><td>${escapeHTML(m.nome)}</td><td>${escapeHTML(venc.departamento)}, fim ${dataTxt(venc)}</td><td>${escapeHTML(vig.departamento)}, fim ${dataTxt(vig)}</td></tr>`;
+          }).join("")}</tbody>
+        </table></div>` : ""}
+        <p class="dash-chart-hint" style="margin-top:8px"><b>${semVigenteHoje}</b> município(s) sem termo vigente hoje = ${municipiosReal.length} municípios − ${A.membros.size} cobertos (${soVencido} só com vencido + ${emConstrucao} só em construção + ${semTermo} nunca firmaram).</p>
+      </div>
+    </div>`;
+}
 
 async function carregarCfcrPortal(portalSlug) {
   const painel = document.getElementById("tab-cfcr");
@@ -12247,6 +12312,8 @@ async function carregarCfcrPortal(portalSlug) {
 
     <div id="cfcr-sub-visaogeral">
       <div class="kpi-row" id="cfcr-vg-kpis" style="margin-bottom:16px"></div>
+      <div class="dash-toggle" style="margin-bottom:10px">${botaoEntenderDadosHTML("comoler", "vigente × vencido não bater não é erro")}</div>
+      <div id="cfcr-entender-comoler" style="margin-bottom:16px" hidden></div>
       <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">
         <h4 style="margin-bottom:0">Cobertura dos 417 Municípios da Bahia</h4>
         <div class="dash-toggle" id="cfcr-vg-cobertura-visual-toggle">
@@ -12411,6 +12478,7 @@ async function carregarCfcrPortal(portalSlug) {
   const covPorSituacao = { "Com termo vigente": 0, "Só vencido": 0, "Só em construção": 0, "Sem termo": 0 };
   municipiosReal.forEach((m) => { covPorSituacao[m.situacao]++; });
   document.getElementById("cfcr-termo-municipio-diff").textContent = explicarDiferencaTermoMunicipioCfcr(municipiosReal);
+  ativarBotoesEntenderDados("cfcr", { comoler: () => montarPainelComoLerCfcr(municipiosReal) });
   let modoVisualCoberturaVG = "barra";
   function renderCobertura() {
     document.querySelectorAll("#cfcr-vg-cobertura-visual-toggle .dash-toggle-btn").forEach((b) => b.classList.toggle("active", b.dataset.modoVisual === modoVisualCoberturaVG));
@@ -12635,7 +12703,7 @@ async function carregarCfcrPortal(portalSlug) {
       ? termosDoMunicipio.map((t) => {
           const objetos = (t.servicos || []).filter(servicoOferecidoCfcr);
           const statusData = statusPelaDataCfcr(t);
-          return `<div class="dash-chart-box" style="margin-bottom:10px"><b>${escapeHTML(t.participe)}</b> <span class="tag" style="display:inline-block;padding:1px 8px;border-radius:10px;font-size:12px;font-weight:600;color:#fff;background:${corStatusPelaDataCfcr(statusData)}">${escapeHTML(statusData)}</span><br><small style="color:#8B93A3">${escapeHTML(t.departamento)} · ${escapeHTML(rotularUnidadeCfcr(t.nomeUnidade) || "—")}${t.fimVigenciaData ? " · fim: " + new Date(t.fimVigenciaData).toLocaleDateString("pt-BR") : ""}</small>${objetos.length ? `<ul style="margin:8px 0 0;padding-left:18px">${objetos.map((s) => `<li><b>${escapeHTML(s.servicoNome)}:</b> ${escapeHTML(rotularPeriodicidadeCfcr(s))}</li>`).join("")}</ul>` : `<p class="dash-chart-hint" style="margin:8px 0 0">Nenhum objeto registrado para este termo.</p>`}</div>`;
+          return `<div class="dash-chart-box" style="margin-bottom:10px"><b>${escapeHTML(t.participe)}</b> <span class="tag" style="display:inline-block;padding:1px 8px;border-radius:10px;font-size:12px;font-weight:600;color:#fff;background:${corStatusPelaDataCfcr(statusData)}">${escapeHTML(statusData)}</span><br><small style="color:#8B93A3">${escapeHTML(t.departamento)} · ${escapeHTML(rotularUnidadeCfcr(t.nomeUnidade) || "—")}${t.fimVigenciaData ? " · fim: " + formatarDataBR(t.fimVigenciaData) : ""}</small>${objetos.length ? `<ul style="margin:8px 0 0;padding-left:18px">${objetos.map((s) => `<li><b>${escapeHTML(s.servicoNome)}:</b> ${escapeHTML(rotularPeriodicidadeCfcr(s))}</li>`).join("")}</ul>` : `<p class="dash-chart-hint" style="margin:8px 0 0">Nenhum objeto registrado para este termo.</p>`}</div>`;
         }).join("")
       : (todosMunicipiosNomes.some((m) => normalizarBusca(m) === q) ? `<div class="dash-chart-box"><p class="dash-chart-hint">Sem termo nesta planilha.</p></div>` : `<p class="dash-chart-hint">Nenhum município com esse nome.</p>`);
   });
@@ -12928,9 +12996,9 @@ async function carregarCfcrAcordosPortal(portalSlug) {
 
   document.getElementById("cfcr-gd-vencimentos").innerHTML =
     G.filter((r) => r.dias !== null && r.dias >= 0).sort((a, b) => a.dias - b.dias)
-      .map((r) => `<tr><td>${escapeHTML(r.parceiros.join(", "))}</td><td>${escapeHTML(new Date(r.fimVigenciaData).toLocaleDateString("pt-BR"))}</td><td>${r.dias}</td><td>${FAIXA_VENCIMENTO_CFCR(r.dias)}</td></tr>`).join("") +
+      .map((r) => `<tr><td>${escapeHTML(r.parceiros.join(", "))}</td><td>${escapeHTML(formatarDataBR(r.fimVigenciaData))}</td><td>${r.dias}</td><td>${FAIXA_VENCIMENTO_CFCR(r.dias)}</td></tr>`).join("") +
     G.filter((r) => r.status === "VENCIDO")
-      .map((r) => `<tr><td>${escapeHTML(r.parceiros.join(", "))}</td><td>${r.fimVigenciaData ? escapeHTML(new Date(r.fimVigenciaData).toLocaleDateString("pt-BR")) : "—"}</td><td>—</td><td><span style="color:${corStatusCfcr("VENCIDO")};font-weight:700">VENCIDO</span></td></tr>`).join("");
+      .map((r) => `<tr><td>${escapeHTML(r.parceiros.join(", "))}</td><td>${escapeHTML(formatarDataBR(r.fimVigenciaData))}</td><td>—</td><td><span style="color:${corStatusCfcr("VENCIDO")};font-weight:700">VENCIDO</span></td></tr>`).join("");
 
   function renderTabela() {
     const statusF = document.getElementById("cfcr-gd-status-filtro").value;
@@ -12939,7 +13007,7 @@ async function carregarCfcrAcordosPortal(portalSlug) {
     document.getElementById("cfcr-gd-tabela").innerHTML = L.length
       ? L.map((r) => {
           const tituloRepasse = [r.recursoFinanceiroOriginal, r.repasseObservacao].filter(Boolean).join(" — ");
-          return `<tr><td>${escapeHTML(r.participe)}<br><small style="color:#8B93A3">${escapeHTML(r.departamento)}</small></td><td>${escapeHTML(r.objeto || "—")}<br><small style="color:#8B93A3">${escapeHTML(r.tema)}</small></td><td><span style="color:${corStatusCfcr(r.status)};font-weight:700">${escapeHTML(r.status)}</span><br><small style="color:#8B93A3">${r.fimVigenciaData ? escapeHTML(new Date(r.fimVigenciaData).toLocaleDateString("pt-BR")) : "—"}</small></td><td title="${escapeAttr(tituloRepasse)}">${escapeHTML(r.temRepasse)}</td></tr>`;
+          return `<tr><td>${escapeHTML(r.participe)}<br><small style="color:#8B93A3">${escapeHTML(r.departamento)}</small></td><td>${escapeHTML(r.objeto || "—")}<br><small style="color:#8B93A3">${escapeHTML(r.tema)}</small></td><td><span style="color:${corStatusCfcr(r.status)};font-weight:700">${escapeHTML(r.status)}</span><br><small style="color:#8B93A3">${escapeHTML(formatarDataBR(r.fimVigenciaData))}</small></td><td title="${escapeAttr(tituloRepasse)}">${escapeHTML(r.temRepasse)}</td></tr>`;
         }).join("")
       : `<tr><td colspan="4"><small>Nenhum acordo neste recorte.</small></td></tr>`;
   }
