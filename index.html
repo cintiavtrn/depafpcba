@@ -11905,17 +11905,25 @@ function montarRelatorioCfcr(termosTodos, termosTCT, notaRecorte = null) {
   const ac = termosTodos.filter((t) => t.tipo === TIPO_A_CLASSIFICAR_CFCR);
   const oferecido = (s) => s.periodicidade !== "Não disponibiliza" && s.especificado;
 
-  const firmados = termosTCT.filter((t) => t.termoFirmado).length;
-  const statusCount = new Map();
-  for (const t of termosTCT) statusCount.set(t.status, (statusCount.get(t.status) || 0) + 1);
-  const nomesUnicos = new Set(termosTCT.map((t) => t.participe));
+  // Situação calculada pela data de término da vigência informada na
+  // planilha (mesmo critério do painel ao vivo, ver statusPelaDataCfcr) —
+  // pedido direto dela: "vamos usar só data fim... isso é um erro de quem
+  // me mandou a planilha e eu não devo escalar o erro. vou informar
+  // somente o critério." Não compara mais com o status declarado na coluna
+  // original nem lista divergência nenhuma.
+  const porStatusTermo = { VIGENTE: 0, VENCIDO: 0, "EM CONSTRUÇÃO": 0 };
+  termosTCT.forEach((t) => { const s = statusPelaDataCfcr(t); porStatusTermo[s] = (porStatusTermo[s] || 0) + 1; });
 
-  const hoje = new Date();
-  const maisUrgentes = termosTCT
-    .filter((t) => t.status === "VIGENTE" && t.fimVigenciaData && new Date(t.fimVigenciaData) < hoje)
-    .map((t) => ({ participe: t.participe, departamento: t.departamento, dias: Math.floor((hoje - new Date(t.fimVigenciaData)) / 86400000), processoSei: t.processoSei }))
-    .sort((a, b) => b.dias - a.dias)
-    .slice(0, 8);
+  // Município "de verdade" (dedup por geometria do IBGE, ver
+  // classificarMunicipiosRealCfcr) — mesmo cálculo do painel ao vivo, não
+  // mais a contagem antiga por PARTICIPE cru (que dava 417 só por
+  // coincidência, com Porto Seguro/Paulo Afonso/Vitória da Conquista
+  // inflando e Salvador/Condeúba/Taperoá/Itagibá zerando).
+  const municipiosReal = classificarMunicipiosRealCfcr(termosTCT);
+  const covPorSituacao = { "Com termo vigente": 0, "Só vencido": 0, "Só em construção": 0, "Sem termo": 0 };
+  municipiosReal.forEach((m) => covPorSituacao[m.situacao]++);
+  const municipiosComTermo = municipiosReal.length - covPorSituacao["Sem termo"];
+  const semVigenteHoje = municipiosReal.filter((m) => m.situacao !== "Com termo vigente");
 
   const contagemServico = new Map();
   for (const t of termosTCT) for (const s of t.servicos || []) {
@@ -11937,28 +11945,18 @@ function montarRelatorioCfcr(termosTodos, termosTCT, notaRecorte = null) {
     vennHTML = vennTresConjuntosSVG(conjuntos);
   }
 
+  // Por COORPIN — município(s) sem termo vigente hoje (mesma lógica de
+  // "Sem Termo Vigente" no painel ao vivo), não mais "quem tem 0 município
+  // vigente" isolado (métrica antiga, sobre termosTCT cru sem dedup).
+  const porCoorpin = new Map();
+  municipiosReal.filter((m) => m.coorpin).forEach((m) => { if (!porCoorpin.has(m.coorpin)) porCoorpin.set(m.coorpin, []); porCoorpin.get(m.coorpin).push(m); });
+  const naoVigente = (arr) => arr.filter((m) => m.situacao !== "Com termo vigente").length;
+  const coberturaPorCoorpinRel = [...porCoorpin.entries()]
+    .map(([nome, ms]) => ({ nome, total: ms.length, naoVigente: naoVigente(ms) }))
+    .sort((a, b) => b.naoVigente - a.naoVigente || rotularUnidadeCfcr(a.nome).localeCompare(rotularUnidadeCfcr(b.nome)));
+  const maxNaoVigenteCoorpin = Math.max(...coberturaPorCoorpinRel.map((l) => l.naoVigente), 1);
   const comCoorpin = termosTCT.filter((t) => t.nomeUnidade).length;
   const semCoorpin = termosTCT.length - comCoorpin;
-
-  // Mesmo cálculo do painel ao vivo (Geografia e Serviços -> "Cobertura
-  // Atual por COORPIN") — pedido direto dela: "e vc modificou o relatorio
-  // pra aparecer isso também?". Diferente de comCoorpin/semCoorpin acima
-  // (todo termo histórico com COORPIN, firmado ou não), aqui conta só
-  // município(s) com termo VIGENTE agora, por COORPIN — sem filtro nenhum,
-  // porque o relatório é sempre a base cheia.
-  const municipiosVigentesPorUnidadeRel = new Map();
-  for (const t of termosTCT) {
-    if (t.status !== "VIGENTE" || !t.nomeUnidade) continue;
-    const set = municipiosVigentesPorUnidadeRel.get(t.nomeUnidade) || new Set();
-    set.add(t.participe);
-    municipiosVigentesPorUnidadeRel.set(t.nomeUnidade, set);
-  }
-  const coberturaAtualLinhasRel = [...new Set(termosTCT.filter((t) => t.nomeUnidade).map((t) => t.nomeUnidade))]
-    .map((nome) => ({ nome, valor: municipiosVigentesPorUnidadeRel.get(nome)?.size || 0 }))
-    .sort((a, b) => a.valor - b.valor || rotularUnidadeCfcr(a.nome).localeCompare(rotularUnidadeCfcr(b.nome)));
-  const coorpinsZeradasRel = coberturaAtualLinhasRel.filter((l) => l.valor === 0);
-  const coorpinsCriticasRel = coberturaAtualLinhasRel.filter((l) => l.valor === 1).length;
-  const maxCoberturaRel = Math.max(...coberturaAtualLinhasRel.map((l) => l.valor), 1);
 
   const acFirmados = ac.filter((t) => t.termoFirmado).length;
   const acStatusCount = new Map();
@@ -11972,14 +11970,17 @@ function montarRelatorioCfcr(termosTodos, termosTCT, notaRecorte = null) {
   });
 
   const donutStatus = donutCfcrSVG(
-    [{ label: "VIGENTE", valor: statusCount.get("VIGENTE") || 0, cor: COR.ok },
-     { label: "VENCIDO", valor: statusCount.get("VENCIDO") || 0, cor: COR.bad },
-     { label: "EM CONSTRUÇÃO", valor: statusCount.get("EM CONSTRUÇÃO") || 0, cor: COR.warn }],
+    [{ label: "VIGENTE", valor: porStatusTermo.VIGENTE, cor: COR.ok },
+     { label: "VENCIDO", valor: porStatusTermo.VENCIDO, cor: COR.bad },
+     { label: "EM CONSTRUÇÃO", valor: porStatusTermo["EM CONSTRUÇÃO"], cor: COR.warn }],
     "", { rotuloCentro: "TERMOS" }
   );
-  const donutTerritorio = donutCfcrSVG(
-    [{ label: "Com COORPIN", valor: comCoorpin, cor: COR.ok }, { label: "Fora do Escopo (não DEPIN)", valor: semCoorpin, cor: COR.neutro }],
-    "", { rotuloCentro: "TCT" }
+  const donutCobertura = donutCfcrSVG(
+    [{ label: "Com termo vigente", valor: covPorSituacao["Com termo vigente"], cor: COR.ok },
+     { label: "Só vencido", valor: covPorSituacao["Só vencido"], cor: COR.bad },
+     { label: "Só em construção", valor: covPorSituacao["Só em construção"], cor: COR.warn },
+     { label: "Nunca teve termo", valor: covPorSituacao["Sem termo"], cor: COR.neutro }],
+    "", { rotuloCentro: "MUNICÍPIOS" }
   );
   const donutAc = donutCfcrSVG(
     [{ label: "VIGENTE", valor: acStatusCount.get("VIGENTE") || 0, cor: COR.ok },
@@ -11994,55 +11995,61 @@ function montarRelatorioCfcr(termosTodos, termosTCT, notaRecorte = null) {
     <h1>CFCR</h1>
     <h3>Termos de Cooperação Técnica · Relatório de acompanhamento, DEPAF / Polícia Civil da Bahia</h3>
     <p class="rel-topo">Números direto do banco de produção, gerado em ${agora}. Cada vez que este relatório é aberto, ele lê o banco na hora, então um novo download no dia seguinte já traz qualquer dado atualizado desde então.</p>
+    <p class="rel-topo">Critério de situação: pela <b>data de término da vigência</b> informada na planilha, não pelo status declarado na coluna original — um termo sem status EM CONSTRUÇÃO com data de fim no futuro conta como VIGENTE, no passado conta como VENCIDO.</p>
     ${notaRecorte ? `<p class="rel-topo" style="font-weight:600;color:#B23A2F">Recorte filtrado — este PDF reflete só ${escapeHTML(notaRecorte)}, não o universo completo de termos. As seções 1 a 4 usam esse recorte; a seção 5 (A Classificar/GDG) é sempre o universo cheio, já que não tem filtro aqui.</p>` : ""}
 
     <div class="rel-secao">
       <h2>1. Visão Geral</h2>
       <div class="rel-kpis">
-        ${relKpiHTML(termosTCT.length, "Total de Termos Municipais (TCT)", COR.info)}
-        ${relKpiHTML(firmados, "Termo Firmado", COR.ok)}
-        ${relKpiHTML(termosTCT.length - firmados, "Não Firmado", COR.bad)}
-        ${relKpiHTML(nomesUnicos.size, "Municípios Únicos", COR.neutro)}
+        ${relKpiHTML(termosTCT.length, "Termos Municipais (TCT)", COR.info)}
+        ${relKpiHTML(porStatusTermo.VIGENTE, "Termos Vigentes", COR.ok)}
+        ${relKpiHTML(porStatusTermo.VENCIDO, "Termos Vencidos", COR.bad)}
+        ${relKpiHTML(porStatusTermo["EM CONSTRUÇÃO"], "Termos em Construção", COR.warn)}
       </div>
       <div class="rel-linha">
         <div style="max-width:220px">${donutStatus}</div>
         <div style="flex:1;min-width:260px">
-          <p>Os ${termosTCT.length} termos correspondem a ${nomesUnicos.size} municípios únicos${termosTCT.length !== nomesUnicos.size ? " (algum município aparece mais de uma vez, por termo renovado sem a linha antiga sair da planilha-fonte)" : ""}.</p>
+          <p>Os ${termosTCT.length} termos cobrem ${municipiosComTermo} município(s) da Bahia — um mesmo município pode ter mais de um termo (um por departamento: DEPIN, DEPOM, DPMCV), por isso a contagem de termos acima e a de municípios abaixo não precisam bater.</p>
         </div>
       </div>
-      ${relLeituraHTML(`Este gráfico responde a pergunta mais comum de reunião, quantos municípios estão com o termo em dia agora e quantos precisam de ação. Cada termo VENCIDO representa um município sem cobertura garantida de limpeza, manutenção ou abastecimento, então a fatia vermelha é o primeiro lugar pra cobrar renovação.`)}
+      ${relLeituraHTML(`Este gráfico conta TERMOS, não municípios — um município com termo vigente em dois departamentos entra duas vezes aqui. Pra saber quantos municípios de fato estão cobertos, use a cobertura logo abaixo, que conta cada município uma única vez.`)}
+
+      <h3 style="margin-top:18px">Cobertura dos 417 Municípios da Bahia</h3>
+      <div class="rel-linha">
+        <div style="max-width:220px">${donutCobertura}</div>
+        <div style="flex:1;min-width:260px">
+          <p><b>${covPorSituacao["Com termo vigente"]}</b> município(s) têm ao menos um termo vigente hoje. <b>${covPorSituacao["Só vencido"]}</b> só têm termo(s) vencido(s), <b>${covPorSituacao["Só em construção"]}</b> só em construção, e <b>${covPorSituacao["Sem termo"]}</b> nunca tiveram termo (Salvador, Condeúba, Taperoá, Itagibá).</p>
+        </div>
+      </div>
+      ${relLeituraHTML(`Esta é a pergunta de gestão de verdade: quantos dos 417 municípios da Bahia estão cobertos agora. ${semVigenteHoje.length} município(s) não têm nenhum termo vigente hoje — detalhados na seção 3.`)}
     </div>
 
     <div class="rel-secao">
-      <h2>2. Prazos e Pendências</h2>
-      <h3>Termos marcados VIGENTE com prazo já expirado</h3>
-      ${maisUrgentes.length ? `<table><thead><tr><th>MUNICÍPIO</th><th>DEPARTAMENTO</th><th>DIAS VENCIDO</th><th>PROCESSO SEI</th></tr></thead>
-        <tbody>${maisUrgentes.map((u) => `<tr><td>${escapeHTML(u.participe)}</td><td>${escapeHTML(u.departamento)}</td><td style="color:${COR.bad};font-weight:600">${u.dias} dias</td><td>${escapeHTML(u.processoSei || "—")}</td></tr>`).join("")}</tbody></table>`
-        : `<p>Nenhum termo VIGENTE com prazo já expirado neste momento.</p>`}
-      <p style="color:#5B6478">Provável atraso de atualização na planilha-fonte. A renovação já aconteceu na prática, mas a planilha ainda não foi atualizada.</p>
-      ${relLeituraHTML(`Esta tabela mostra por onde começar a cobrança, os municípios que a planilha ainda marca como vigentes mas cuja data de fim já passou. É a lista pra confirmar antes de qualquer reunião, junto ao departamento responsável, se a renovação já saiu ou se o município realmente ficou sem cobertura.`)}
+      <h2>2. Por COORPIN</h2>
+      <p>Município(s) sem termo vigente hoje, por COORPIN (soma inclui só vencido, só em construção e nunca teve termo) — sem esse recorte, uma COORPIN que ficou pra trás fica escondida dentro do total geral de vencidos. ${comCoorpin} termo(s) têm COORPIN reconhecida; os outros ${semCoorpin} estão fora do escopo dessa classificação (departamentos fora da DEPIN, onde COORPIN não se aplica).</p>
+      <div>${coberturaPorCoorpinRel.map((l) => relBarraHTML(`${rotularUnidadeCfcr(l.nome)} — ${l.naoVigente}/${l.total}`, l.naoVigente, maxNaoVigenteCoorpin, l.naoVigente === 0 ? COR.ok : l.naoVigente === l.total ? COR.bad : COR.warn)).join("")}</div>
+      ${relLeituraHTML(`Uma barra cheia significa que TODOS os municípios daquela COORPIN estão sem termo vigente hoje — a primeira a cobrar renovação. Uma barra em zero significa que a COORPIN inteira está coberta.`)}
     </div>
 
     <div class="rel-secao">
-      <h2>3. Objetos Acordados</h2>
-      <p>${termosTCT.length} termo(s) no total (correspondendo a ${nomesUnicos.size} municípios únicos). ${municipiosComServico} termo(s) preenchem pelo menos 1 objeto acordado. Juntos, somam ${totalOferecimentos.toLocaleString("pt-BR")} oferecimento(s) em ${servOrdenado.length} tipo(s) diferentes (${semNenhumServico} termo(s) sem nenhum objeto acordado preenchido).</p>
+      <h2>3. Sem Termo Vigente Hoje (${semVigenteHoje.length} município(s))</h2>
+      <p>Município(s) sem nenhum termo vigente no momento — inclui quem só tem termo vencido, só em construção ou nunca firmou nenhum termo.</p>
+      ${semVigenteHoje.length ? `<table><thead><tr><th>MUNICÍPIO</th><th>COORPIN</th><th>SITUAÇÃO</th><th>VIGÊNCIA</th><th>TEMPO</th></tr></thead>
+        <tbody>${[...semVigenteHoje].sort((a, b) => (a.fim ? a.fim.getTime() : Infinity) - (b.fim ? b.fim.getTime() : Infinity)).map((m) => {
+          const [vigenciaTxt, tempoTxt] = vigenciaTempoCfcr(m);
+          const cor = m.situacao === "Só vencido" ? COR.bad : m.situacao === "Só em construção" ? COR.warn : COR.neutro;
+          return `<tr><td>${escapeHTML(m.nome)}</td><td>${escapeHTML(rotularUnidadeCfcr(m.coorpin) || "—")}</td><td style="color:${cor};font-weight:600">${escapeHTML(m.situacao === "Sem termo" ? "Nunca teve termo" : m.situacao)}</td><td>${escapeHTML(vigenciaTxt)}</td><td>${escapeHTML(tempoTxt)}</td></tr>`;
+        }).join("")}</tbody></table>`
+        : `<p>Todos os 417 municípios têm ao menos um termo vigente hoje.</p>`}
+      ${relLeituraHTML(`Ordenado do vencimento mais antigo pro mais recente (quem não tem data válida vai pro fim da lista) — os primeiros são quem está sem cobertura há mais tempo.`)}
+    </div>
+
+    <div class="rel-secao">
+      <h2>4. Objetos Acordados</h2>
+      <p>${termosTCT.length} termo(s) no total, cobrindo ${municipiosComTermo} município(s). ${municipiosComServico} termo(s) preenchem pelo menos 1 objeto acordado. Juntos, somam ${totalOferecimentos.toLocaleString("pt-BR")} oferecimento(s) em ${servOrdenado.length} tipo(s) diferentes (${semNenhumServico} termo(s) sem nenhum objeto acordado preenchido).</p>
       <div>${top8.map(([nome, v]) => relBarraHTML(nome, v, maxServ, v < termosTCT.length * 0.3 ? COR.bad : COR.info)).join("")}</div>
       ${vennHTML ? `<h3 style="margin-top:16px">Sobreposição real entre os 3 objetos mais acordados</h3><div style="max-width:340px">${vennHTML}</div>` : ""}
       ${relLeituraHTML(`As barras mostram quais objetos a maioria dos municípios já tem acordado e quais ainda são raros, útil pra decidir onde vale priorizar expansão. O diagrama mostra que os 3 objetos mais comuns andam quase sempre juntos, então encontrar um deles num município normalmente é sinal de que os outros dois também estão presentes.`)}
-    </div>
-
-    <div class="rel-secao">
-      <h2>4. Distribuição Territorial</h2>
-      <div class="rel-linha">
-        <div style="max-width:220px">${donutTerritorio}</div>
-        <div style="flex:1;min-width:260px">
-          <p>${comCoorpin} termo(s) têm COORPIN (unidade regional) reconhecida. Os outros ${semCoorpin} termo(s) estão fora do escopo dessa classificação — COORPIN é uma divisão territorial que só existe dentro da estrutura da DEPIN, então não se aplica a termos de outros departamentos (não é erro de cadastro nem dado faltando).</p>
-        </div>
-      </div>
-      <h3 style="margin-top:14px">Cobertura atual por COORPIN, só termos VIGENTE</h3>
-      <p>Diferente do gráfico acima (todo termo já cadastrado com COORPIN, firmado ou não, vencido ou não), esta lista conta só município(s) diferentes com termo VIGENTE agora, por COORPIN.${coorpinsZeradasRel.length ? ` ${coorpinsZeradasRel.length} COORPIN está sem nenhum município sustentando ela neste momento: ${coorpinsZeradasRel.map((l) => rotularUnidadeCfcr(l.nome)).join(", ")}.` : " Nenhuma COORPIN está sem pelo menos 1 município vigente agora."}${coorpinsCriticasRel ? ` Mais ${coorpinsCriticasRel} COORPIN depende de um único município.` : ""}</p>
-      <div>${coberturaAtualLinhasRel.map((l) => relBarraHTML(rotularUnidadeCfcr(l.nome), l.valor, maxCoberturaRel, l.valor === 0 ? COR.bad : l.valor === 1 ? COR.warn : COR.ok)).join("")}</div>
-      ${relLeituraHTML(`A rosca acima mostra o histórico (quem já teve termo com essa COORPIN algum dia), mas a lista de barras mostra quem está sustentando ela agora. Uma barra vermelha significa que aquela COORPIN ficou sem nenhum município ativo, mesmo que o histórico pareça normal, e é a primeira COORPIN a cobrar renovação.`)}
     </div>
 
     <div class="rel-secao">
@@ -12122,7 +12129,7 @@ function vigenciaTempoCfcr(m) {
   }
   return [`em construção${D ? ` · data ${D}` : ""}`, "—"];
 }
-function classificarMunicipiosRealCfcr(termosTCT, modo) {
+function classificarMunicipiosRealCfcr(termosTCT) {
   const grupos = new Map();
   for (const t of termosTCT) {
     const chave = MAPA_MUNICIPIOS_CFCR.porParticipe[t.participe] || t.participe;
@@ -12130,14 +12137,13 @@ function classificarMunicipiosRealCfcr(termosTCT, modo) {
     grupos.get(chave).termos.push(t);
   }
   const comTermo = [...grupos.values()].map((g) => {
-    const statusDe = (t) => (modo === "data" ? statusPelaDataCfcr(t) : t.status);
-    const statuses = g.termos.map(statusDe);
+    const statuses = g.termos.map(statusPelaDataCfcr);
     const situacao = statuses.includes("VIGENTE") ? "Com termo vigente" : statuses.includes("VENCIDO") ? "Só vencido" : statuses.includes("EM CONSTRUÇÃO") ? "Só em construção" : "Só vencido";
     // Achado dela (comparado com o painel de referência): com mais de um
     // termo, mostra o VIGENTE que vai mais longe (maior fim) ou, só com
     // vencidos, o que acabou por último — não o primeiro que aparecer.
     const statusAlvo = situacao === "Com termo vigente" ? "VIGENTE" : situacao === "Só vencido" ? "VENCIDO" : "EM CONSTRUÇÃO";
-    const candidatos = g.termos.filter((t) => statusDe(t) === statusAlvo);
+    const candidatos = g.termos.filter((t) => statusPelaDataCfcr(t) === statusAlvo);
     const ref = [...candidatos].sort((a, b) => (b.fimVigenciaData ? new Date(b.fimVigenciaData).getTime() : -Infinity) - (a.fimVigenciaData ? new Date(a.fimVigenciaData).getTime() : -Infinity))[0] || g.termos[0];
     // Mais comum entre os termos do grupo, não só o do `ref` — um
     // município pode ter mudado de COORPIN entre termos antigos e novos.
@@ -12199,6 +12205,7 @@ async function carregarCfcrPortal(portalSlug) {
       <button type="button" class="dash-toggle-btn" id="cfcr-baixar-relatorio">${iconeInline("download", 12, -2)} BAIXAR RELATÓRIO (PDF)</button>
     </div>
     <p class="tela-intro">Termos de Cooperação Técnica · DEPIN · DEPOM · DPMCV. Parcerias institucionais do GDG (acordos congêneres) ficam na aba "CFCR - Acordos Congêneres", ao lado.</p>
+    <p class="dash-chart-hint">Critério de situação: pela <b>data de término da vigência</b> informada na planilha, não pelo status declarado na coluna original. Os cartões de "termos" contam cada termo (um por departamento); a "Cobertura dos 417 Municípios" conta cada município uma única vez — por isso os dois números não precisam bater.</p>
     <div class="dash-filtros" style="margin-bottom:14px">
       <div class="dash-filtro" style="flex:1;min-width:260px">
         <label>BUSCAR MUNICÍPIO (Ex.: "Anguera tem o quê?")</label>
@@ -12226,10 +12233,6 @@ async function carregarCfcrPortal(portalSlug) {
         <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">
           <h4 style="margin-bottom:0">Por COORPIN</h4>
           <div style="display:flex;gap:8px;flex-wrap:wrap">
-            <div class="dash-toggle" id="cfcr-vg-coorpin-modo-toggle">
-              <button type="button" class="dash-toggle-btn active" data-modo="declarado">STATUS DECLARADO</button>
-              <button type="button" class="dash-toggle-btn" data-modo="data">STATUS PELA DATA DE FIM</button>
-            </div>
             <div class="dash-toggle" id="cfcr-vg-coorpin-visual-toggle">
               <button type="button" class="dash-toggle-btn active" data-modo-visual="barras" title="Uma linha por COORPIN">BARRAS</button>
               <button type="button" class="dash-toggle-btn" data-modo-visual="mapa" title="Mapa real dos 417 municípios">MAPA</button>
@@ -12300,15 +12303,10 @@ async function carregarCfcrPortal(portalSlug) {
     </div>
 
     <div id="cfcr-sub-semvigente" hidden>
-      <p class="dash-chart-hint">Um município conta como coberto se tem ao menos um termo vigente, em qualquer departamento. Historicamente poucos nunca tiveram termo; aqui está a situação de hoje.</p>
-      <div class="dash-toggle" id="cfcr-zz-modo-toggle" style="margin-bottom:14px">
-        <button type="button" class="dash-toggle-btn active" data-modo="declarado">STATUS DECLARADO</button>
-        <button type="button" class="dash-toggle-btn" data-modo="data">STATUS PELA DATA DE FIM</button>
-      </div>
+      <p class="dash-chart-hint">Um município conta como coberto se tem ao menos um termo vigente, em qualquer departamento — situação calculada pela data de término da vigência informada na planilha. Historicamente poucos nunca tiveram termo; aqui está a situação de hoje.</p>
       <div class="kpi-row" id="cfcr-zz-kpis" style="margin-bottom:16px"></div>
       <div id="cfcr-zz-bar"></div>
       <div class="cfx-leg" id="cfcr-zz-leg"></div>
-      <p class="dash-chart-hint" id="cfcr-zz-diverge" style="font-weight:600;margin-top:10px"></p>
       <h4 style="margin-top:14px">Por COORPIN <small style="font-weight:400">(clique para filtrar a lista)</small></h4>
       <div style="display:flex;justify-content:flex-end;margin-bottom:8px">
         <div class="dash-toggle" id="cfcr-zz-coorpin-visual-toggle">
@@ -12352,8 +12350,13 @@ async function carregarCfcrPortal(portalSlug) {
 
   // ================= VISÃO GERAL =================
   const total = termosTCT.length;
+  // Situação pela data de término da vigência, não pelo status declarado
+  // na planilha — pedido direto dela: "vamos usar só data fim... isso é um
+  // erro de quem me mandou a planilha e eu não devo escalar o erro. vou
+  // informar somente o critério." Um único critério em todo o CFCR TCT
+  // agora, sem alternância — ver statusPelaDataCfcr.
   const porStatusTermo = { VIGENTE: 0, VENCIDO: 0, "EM CONSTRUÇÃO": 0 };
-  termosTCT.forEach((t) => { porStatusTermo[t.status] = (porStatusTermo[t.status] || 0) + 1; });
+  termosTCT.forEach((t) => { const s = statusPelaDataCfcr(t); porStatusTermo[s] = (porStatusTermo[s] || 0) + 1; });
   // Pedido direto dela: "eu clico em uma parte de uma barra e não faz
   // nada... ou do cartão" — os 3 cartões de status e os 3 segmentos
   // correspondentes da barra de cobertura abaixo agora acendem/esmaecem
@@ -12363,9 +12366,9 @@ async function carregarCfcrPortal(portalSlug) {
   function renderKpisVisaoGeral() {
     document.getElementById("cfcr-vg-kpis").innerHTML =
       kpiSimplesCfcrHTML(total, "termos firmados") +
-      `<div class="kpi-card kpi-clicavel" data-status-vg="VIGENTE" title="Clique pra destacar em Por COORPIN" style="--kpi-cor:var(--cfcr-ok);cursor:pointer;${destaqueStatusVG === "VIGENTE" ? "outline:2px solid var(--cfcr-ok);outline-offset:-2px" : ""}"><div class="kpi-value">${porStatusTermo.VIGENTE.toLocaleString("pt-BR")}</div><div class="kpi-label">vigentes (${Math.round(porStatusTermo.VIGENTE / total * 100)}%)</div></div>` +
-      `<div class="kpi-card kpi-clicavel" data-status-vg="VENCIDO" title="Clique pra destacar em Por COORPIN" style="--kpi-cor:var(--cfcr-bad);cursor:pointer;${destaqueStatusVG === "VENCIDO" ? "outline:2px solid var(--cfcr-bad);outline-offset:-2px" : ""}"><div class="kpi-value">${porStatusTermo.VENCIDO.toLocaleString("pt-BR")}</div><div class="kpi-label">vencidos (${Math.round(porStatusTermo.VENCIDO / total * 100)}%)</div></div>` +
-      `<div class="kpi-card kpi-clicavel" data-status-vg="EM CONSTRUÇÃO" title="Clique pra destacar em Por COORPIN" style="--kpi-cor:var(--cfcr-warn);cursor:pointer;${destaqueStatusVG === "EM CONSTRUÇÃO" ? "outline:2px solid var(--cfcr-warn);outline-offset:-2px" : ""}"><div class="kpi-value">${porStatusTermo["EM CONSTRUÇÃO"].toLocaleString("pt-BR")}</div><div class="kpi-label">em construção</div></div>`;
+      `<div class="kpi-card kpi-clicavel" data-status-vg="VIGENTE" title="Clique pra destacar em Por COORPIN" style="--kpi-cor:var(--cfcr-ok);cursor:pointer;${destaqueStatusVG === "VIGENTE" ? "outline:2px solid var(--cfcr-ok);outline-offset:-2px" : ""}"><div class="kpi-value">${porStatusTermo.VIGENTE.toLocaleString("pt-BR")}</div><div class="kpi-label">termos vigentes (${Math.round(porStatusTermo.VIGENTE / total * 100)}%)</div></div>` +
+      `<div class="kpi-card kpi-clicavel" data-status-vg="VENCIDO" title="Clique pra destacar em Por COORPIN" style="--kpi-cor:var(--cfcr-bad);cursor:pointer;${destaqueStatusVG === "VENCIDO" ? "outline:2px solid var(--cfcr-bad);outline-offset:-2px" : ""}"><div class="kpi-value">${porStatusTermo.VENCIDO.toLocaleString("pt-BR")}</div><div class="kpi-label">termos vencidos (${Math.round(porStatusTermo.VENCIDO / total * 100)}%)</div></div>` +
+      `<div class="kpi-card kpi-clicavel" data-status-vg="EM CONSTRUÇÃO" title="Clique pra destacar em Por COORPIN" style="--kpi-cor:var(--cfcr-warn);cursor:pointer;${destaqueStatusVG === "EM CONSTRUÇÃO" ? "outline:2px solid var(--cfcr-warn);outline-offset:-2px" : ""}"><div class="kpi-value">${porStatusTermo["EM CONSTRUÇÃO"].toLocaleString("pt-BR")}</div><div class="kpi-label">termos em construção</div></div>`;
     document.querySelectorAll("#cfcr-vg-kpis [data-status-vg]").forEach((el) => {
       el.addEventListener("click", () => {
         destaqueStatusVG = destaqueStatusVG === el.dataset.statusVg ? null : el.dataset.statusVg;
@@ -12376,7 +12379,7 @@ async function carregarCfcrPortal(portalSlug) {
     });
   }
 
-  const municipiosReal = classificarMunicipiosRealCfcr(termosTCT, "declarado");
+  const municipiosReal = classificarMunicipiosRealCfcr(termosTCT);
   const covPorSituacao = { "Com termo vigente": 0, "Só vencido": 0, "Só em construção": 0, "Sem termo": 0 };
   municipiosReal.forEach((m) => { covPorSituacao[m.situacao]++; });
   let modoVisualCoberturaVG = "barra";
@@ -12437,31 +12440,28 @@ async function carregarCfcrPortal(portalSlug) {
   renderKpisVisaoGeral();
   renderCobertura();
 
-  let modoCoorpinCfcr = "declarado", modoVisualCoorpinCfcr = "barras";
-  function coorpinComposicaoLinhas(modo) {
-    const reais = classificarMunicipiosRealCfcr(termosTCT, modo);
-    const comCoorpin = reais.filter((m) => m.coorpin);
+  let modoVisualCoorpinCfcr = "barras";
+  function coorpinComposicaoLinhas() {
+    const comCoorpin = municipiosReal.filter((m) => m.coorpin);
     const porCoorpin = new Map();
     for (const m of comCoorpin) {
       if (!porCoorpin.has(m.coorpin)) porCoorpin.set(m.coorpin, []);
       porCoorpin.get(m.coorpin).push(m);
     }
-    const KEYS = modo === "data" ? ["VIGENTE", "VENCIDO", "EM CONSTRUÇÃO", "DATA INVÁLIDA"] : ["VIGENTE", "VENCIDO", "EM CONSTRUÇÃO"];
-    const corDe = modo === "data" ? corStatusPelaDataCfcr : corStatusCfcr;
+    const KEYS = ["VIGENTE", "VENCIDO", "EM CONSTRUÇÃO", "DATA INVÁLIDA"];
     return [...porCoorpin.entries()].map(([nome, ms]) => {
       const statusPorMunicipio = ms.map((m) => {
-        const vig = m.termos.find((t) => (modo === "data" ? statusPelaDataCfcr(t) : t.status) === "VIGENTE");
+        const vig = m.termos.find((t) => statusPelaDataCfcr(t) === "VIGENTE");
         const ref = vig || m.termos[0];
-        return modo === "data" ? statusPelaDataCfcr(ref) : ref.status;
+        return statusPelaDataCfcr(ref);
       });
-      const partes = KEYS.map((k) => [k, statusPorMunicipio.filter((s) => s === k).length, corDe(k)]);
+      const partes = KEYS.map((k) => [k, statusPorMunicipio.filter((s) => s === k).length, corStatusPelaDataCfcr(k)]);
       return { nome, partes, total: ms.length };
     }).sort((a, b) => b.total - a.total);
   }
   function renderCoorpinVisaoGeral() {
-    document.querySelectorAll("#cfcr-vg-coorpin-modo-toggle .dash-toggle-btn").forEach((b) => b.classList.toggle("active", b.dataset.modo === modoCoorpinCfcr));
     document.querySelectorAll("#cfcr-vg-coorpin-visual-toggle .dash-toggle-btn").forEach((b) => b.classList.toggle("active", b.dataset.modoVisual === modoVisualCoorpinCfcr));
-    let linhas = coorpinComposicaoLinhas(modoCoorpinCfcr);
+    let linhas = coorpinComposicaoLinhas();
     // Quando um status está em destaque (clicado num KPI/segmento acima),
     // reordena pra quem tem MAIS daquele status aparecer primeiro — muda
     // a pergunta de "qual COORPIN tem mais termos" pra "qual COORPIN tem
@@ -12487,14 +12487,8 @@ async function carregarCfcrPortal(portalSlug) {
         el.addEventListener("click", () => mostrarTermosDoMunicipioCfcr(nomeMunicipioLimpo(el.dataset.cat).nome));
       });
     }
-    renderTabelaMunicipiosVG(classificarMunicipiosRealCfcr(termosTCT, modoCoorpinCfcr));
+    renderTabelaMunicipiosVG(municipiosReal);
   }
-  document.getElementById("cfcr-vg-coorpin-modo-toggle").addEventListener("click", (ev) => {
-    const btn = ev.target.closest("[data-modo]");
-    if (!btn || btn.dataset.modo === modoCoorpinCfcr) return;
-    modoCoorpinCfcr = btn.dataset.modo;
-    renderCoorpinVisaoGeral();
-  });
   document.getElementById("cfcr-vg-coorpin-visual-toggle").addEventListener("click", (ev) => {
     const btn = ev.target.closest("[data-modo-visual]");
     if (!btn || btn.dataset.modoVisual === modoVisualCoorpinCfcr) return;
@@ -12529,8 +12523,8 @@ async function carregarCfcrPortal(portalSlug) {
       tr.addEventListener("click", () => mostrarTermosDoMunicipioCfcr(tr.dataset.municipio));
     });
   }
-  ["cfcr-vg-mun-situacao", "cfcr-vg-mun-ordem"].forEach((id) => document.getElementById(id).addEventListener("change", () => renderTabelaMunicipiosVG(classificarMunicipiosRealCfcr(termosTCT, modoCoorpinCfcr))));
-  document.getElementById("cfcr-vg-mun-busca").addEventListener("input", () => renderTabelaMunicipiosVG(classificarMunicipiosRealCfcr(termosTCT, modoCoorpinCfcr)));
+  ["cfcr-vg-mun-situacao", "cfcr-vg-mun-ordem"].forEach((id) => document.getElementById(id).addEventListener("change", () => renderTabelaMunicipiosVG(municipiosReal)));
+  document.getElementById("cfcr-vg-mun-busca").addEventListener("input", () => renderTabelaMunicipiosVG(municipiosReal));
 
   renderCoorpinVisaoGeral();
 
@@ -12565,7 +12559,7 @@ async function carregarCfcrPortal(portalSlug) {
   function renderObjetos() {
     const statusF = document.getElementById("cfcr-om-status").value;
     const depF = document.getElementById("cfcr-om-dep").value;
-    const recorte = termosTCT.filter((t) => (!statusF || t.status === statusF) && (!depF || t.departamento === depF));
+    const recorte = termosTCT.filter((t) => (!statusF || statusPelaDataCfcr(t) === statusF) && (!depF || t.departamento === depF));
     const contagem = new Map();
     const porObjeto = new Map();
     for (const t of recorte) {
@@ -12611,16 +12605,16 @@ async function carregarCfcrPortal(portalSlug) {
     resultado.innerHTML = termosDoMunicipio.length
       ? termosDoMunicipio.map((t) => {
           const objetos = (t.servicos || []).filter(servicoOferecidoCfcr);
-          return `<div class="dash-chart-box" style="margin-bottom:10px"><b>${escapeHTML(t.participe)}</b> <span class="tag" style="display:inline-block;padding:1px 8px;border-radius:10px;font-size:12px;font-weight:600;color:#fff;background:${corStatusCfcr(t.status)}">${escapeHTML(t.status)}</span><br><small style="color:#8B93A3">${escapeHTML(t.departamento)} · ${escapeHTML(rotularUnidadeCfcr(t.nomeUnidade) || "—")}${t.fimVigenciaData ? " · fim: " + new Date(t.fimVigenciaData).toLocaleDateString("pt-BR") : ""}</small>${objetos.length ? `<ul style="margin:8px 0 0;padding-left:18px">${objetos.map((s) => `<li><b>${escapeHTML(s.servicoNome)}:</b> ${escapeHTML(rotularPeriodicidadeCfcr(s))}</li>`).join("")}</ul>` : `<p class="dash-chart-hint" style="margin:8px 0 0">Nenhum objeto registrado para este termo.</p>`}</div>`;
+          const statusData = statusPelaDataCfcr(t);
+          return `<div class="dash-chart-box" style="margin-bottom:10px"><b>${escapeHTML(t.participe)}</b> <span class="tag" style="display:inline-block;padding:1px 8px;border-radius:10px;font-size:12px;font-weight:600;color:#fff;background:${corStatusPelaDataCfcr(statusData)}">${escapeHTML(statusData)}</span><br><small style="color:#8B93A3">${escapeHTML(t.departamento)} · ${escapeHTML(rotularUnidadeCfcr(t.nomeUnidade) || "—")}${t.fimVigenciaData ? " · fim: " + new Date(t.fimVigenciaData).toLocaleDateString("pt-BR") : ""}</small>${objetos.length ? `<ul style="margin:8px 0 0;padding-left:18px">${objetos.map((s) => `<li><b>${escapeHTML(s.servicoNome)}:</b> ${escapeHTML(rotularPeriodicidadeCfcr(s))}</li>`).join("")}</ul>` : `<p class="dash-chart-hint" style="margin:8px 0 0">Nenhum objeto registrado para este termo.</p>`}</div>`;
         }).join("")
       : (todosMunicipiosNomes.some((m) => normalizarBusca(m) === q) ? `<div class="dash-chart-box"><p class="dash-chart-hint">Sem termo nesta planilha.</p></div>` : `<p class="dash-chart-hint">Nenhum município com esse nome.</p>`);
   });
 
   // ================= SEM TERMO VIGENTE =================
-  let modoSemVigCfcr = "declarado", coorpinFiltroSemVig = null, modoVisualCoorpinSemVig = "barras";
+  let coorpinFiltroSemVig = null, modoVisualCoorpinSemVig = "barras";
   function renderSemVigente() {
-    document.querySelectorAll("#cfcr-zz-modo-toggle .dash-toggle-btn").forEach((b) => b.classList.toggle("active", b.dataset.modo === modoSemVigCfcr));
-    const reais = classificarMunicipiosRealCfcr(termosTCT, modoSemVigCfcr);
+    const reais = municipiosReal;
     const n = reais.length;
     const c = { "Com termo vigente": 0, "Só vencido": 0, "Só em construção": 0, "Sem termo": 0 };
     reais.forEach((m) => c[m.situacao]++);
@@ -12639,13 +12633,6 @@ async function carregarCfcrPortal(portalSlug) {
     ]);
     document.getElementById("cfcr-zz-bar").innerHTML = barraHTML;
     document.getElementById("cfcr-zz-leg").innerHTML = legendaHTML;
-
-    const A = classificarMunicipiosRealCfcr(termosTCT, "declarado");
-    const B = classificarMunicipiosRealCfcr(termosTCT, "data");
-    const mapaB = new Map(B.map((m) => [m.nome, m.situacao]));
-    const divergentes = A.filter((m) => mapaB.get(m.nome) && mapaB.get(m.nome) !== m.situacao)
-      .map((m) => `${m.nome} (${m.situacao.toLowerCase()} → ${mapaB.get(m.nome).toLowerCase()})`);
-    document.getElementById("cfcr-zz-diverge").innerHTML = `<b>${divergentes.length}</b> município(s) mudam de situação quando o status é lido pela data de fim em vez do declarado na planilha: ${divergentes.join("; ") || "nenhum"}. Datas inválidas mantêm o status declarado.`;
 
     const porCoorpin = new Map();
     reais.filter((m) => m.coorpin).forEach((m) => { if (!porCoorpin.has(m.coorpin)) porCoorpin.set(m.coorpin, []); porCoorpin.get(m.coorpin).push(m); });
@@ -12707,20 +12694,14 @@ async function carregarCfcrPortal(portalSlug) {
       tr.addEventListener("click", () => mostrarTermosDoMunicipioCfcr(tr.dataset.municipio));
     });
   }
-  document.getElementById("cfcr-zz-modo-toggle").addEventListener("click", (ev) => {
-    const btn = ev.target.closest("[data-modo]");
-    if (!btn || btn.dataset.modo === modoSemVigCfcr) return;
-    modoSemVigCfcr = btn.dataset.modo;
-    renderSemVigente();
-  });
   document.getElementById("cfcr-zz-coorpin-visual-toggle").addEventListener("click", (ev) => {
     const btn = ev.target.closest("[data-modo-visual]");
     if (!btn || btn.dataset.modoVisual === modoVisualCoorpinSemVig) return;
     modoVisualCoorpinSemVig = btn.dataset.modoVisual;
     renderSemVigente();
   });
-  ["cfcr-zz-situacao", "cfcr-zz-ordem"].forEach((id) => document.getElementById(id).addEventListener("change", () => renderTabelaSemVigente(classificarMunicipiosRealCfcr(termosTCT, modoSemVigCfcr))));
-  document.getElementById("cfcr-zz-busca").addEventListener("input", () => renderTabelaSemVigente(classificarMunicipiosRealCfcr(termosTCT, modoSemVigCfcr)));
+  ["cfcr-zz-situacao", "cfcr-zz-ordem"].forEach((id) => document.getElementById(id).addEventListener("change", () => renderTabelaSemVigente(municipiosReal)));
+  document.getElementById("cfcr-zz-busca").addEventListener("input", () => renderTabelaSemVigente(municipiosReal));
   renderSemVigente();
 
   // ================= Busca livre (topo) + PDF — mantidos: "deram sentido" =================
@@ -12743,11 +12724,12 @@ async function carregarCfcrPortal(portalSlug) {
           <thead><tr><th>MUNICÍPIO</th><th>COORPIN</th><th>DEPARTAMENTO</th><th>STATUS</th><th>OBJETOS ACORDADOS</th><th>PROCESSO SEI</th></tr></thead>
           <tbody>${encontrados.map((t) => {
             const objetos = (t.servicos || []).filter(servicoOferecidoCfcr).map((s) => s.servicoNome);
+            const statusData = statusPelaDataCfcr(t);
             return `<tr>
               <td>${escapeHTML(nomeMunicipioLimpo(t.participe).nome)}</td>
               <td>${escapeHTML(rotularUnidadeCfcr(t.nomeUnidade) || "—")}</td>
               <td>${escapeHTML(t.departamento)}</td>
-              <td style="color:${corStatusCfcr(t.status)};font-weight:700">${escapeHTML(t.status)}</td>
+              <td style="color:${corStatusPelaDataCfcr(statusData)};font-weight:700">${escapeHTML(statusData)}</td>
               <td style="max-width:260px">${objetos.length ? escapeHTML(objetos.join(", ")) : "—"}</td>
               <td>${escapeHTML(t.processoSei || "—")}</td>
             </tr>`;
