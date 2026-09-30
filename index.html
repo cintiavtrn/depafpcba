@@ -8474,9 +8474,17 @@ function mapaMunicipiosCfcrSVG(municipiosPorParticipe, opcoes = {}) {
     const destacado = selecionado === participe;
     formas += `<path data-cat="${escapeAttr(participe)}" d="${d}" fill="${cor}" fill-opacity="${destacado ? 1 : 0.78}" stroke="${destacado ? "var(--carvao)" : "var(--paper)"}" stroke-width="${destacado ? 1.3 : 0.3}" fill-rule="evenodd" style="cursor:pointer"><title>${escapeHTML(nomeExibicao)}: ${escapeHTML(statusTexto)}</title></path>`;
   }
+  // Achado dela: "as legendas do mapa ainda não existe... só as
+  // descrições mas sem a marcação de cor" — a classe .sw só ganha
+  // largura/altura quando o PAI tem a classe .donut-leg (ver CSS,
+  // ".donut-leg .sw{width:11px...}"); aqui o pai era um <span> qualquer,
+  // então o quadradinho ficava com 0×0 — cor certa, tamanho zero,
+  // invisível. Corrigido com estilo inline auto-suficiente, sem depender
+  // de nenhuma classe externa.
+  const quadradoCor = (cor) => `<span style="display:inline-block;width:11px;height:11px;flex:none;border:1px solid var(--carvao);background:${cor}"></span>`;
   const legenda = `<div class="donut-legenda" style="flex-direction:row;flex-wrap:wrap;gap:14px;border-top:none;padding-top:4px">
-    ${legendaItens.map((li) => `<span style="display:flex;align-items:center;gap:5px;font-family:'IBM Plex Mono',monospace;font-size:var(--fs-ui-sm);color:var(--carvao)"><span class="sw" style="background:${li.cor}"></span>${escapeHTML(li.rotulo)}</span>`).join("")}
-    <span style="display:flex;align-items:center;gap:5px;font-family:'IBM Plex Mono',monospace;font-size:var(--fs-ui-sm);color:var(--carvao)"><span class="sw" style="background:var(--cfcr-neutro)"></span>Nunca teve termo</span>
+    ${legendaItens.map((li) => `<span style="display:flex;align-items:center;gap:5px;font-family:'IBM Plex Mono',monospace;font-size:var(--fs-ui-sm);color:var(--carvao)">${quadradoCor(li.cor)}${escapeHTML(li.rotulo)}</span>`).join("")}
+    <span style="display:flex;align-items:center;gap:5px;font-family:'IBM Plex Mono',monospace;font-size:var(--fs-ui-sm);color:var(--carvao)">${quadradoCor("var(--cfcr-neutro)")}Nunca teve termo</span>
   </div>`;
   return `<svg viewBox="${MAPA_MUNICIPIOS_CFCR.viewBox}" xmlns="http://www.w3.org/2000/svg">${formas}</svg>${legenda}`;
 }
