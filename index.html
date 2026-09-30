@@ -12285,7 +12285,24 @@ async function carregarCfcrPortal(portalSlug) {
     return;
   }
 
-  const termosTCT = termosTodos.filter((t) => t.tipo === TIPO_TCT_CFCR);
+  // Achado dela, confirmado direto na planilha-fonte (mesmo processo SEI,
+  // mesma data de fim, mesmo departamento, mesmo município): PORTO SEGURO,
+  // "1º DT PORTO SEGURO" e "2ª DE ARRAIAL D'AJUDA PORTO SEGURO"
+  // (idTermoOrigem 257/388/389) são O MESMO termo assinado, documentado em
+  // 3 linhas da planilha (uma por posto policial coberto pelo processo
+  // 020.18589.2025.0001184-09) — não 3 termos independentes. Mantém só a
+  // linha "PORTO SEGURO" (as outras duas repetem os mesmos 10 objetos, só
+  // reescritos) — 418 - 2 = 416 termos, batendo com a conta dela.
+  // NÃO generaliza pra "mesmo processo SEI = mesmo termo": os outros 2
+  // pares de processo repetido nesta base (Riachão do Jacuípe/Oliveira dos
+  // Brejinhos; Caém/Caculé) são municípios DIFERENTES, cada um com termo
+  // próprio — juntar esses apagaria um município da cobertura, por isso
+  // ficam de fora deste filtro (confirmado direto por ela).
+  // Interpretação dela, reversível: se quem mantém a planilha confirmar
+  // que são 3 termos de verdade com processo repetido por engano, é só
+  // remover o filtro abaixo — volta a 418.
+  const IDS_DUPLICADOS_PORTO_SEGURO_CFCR = new Set([388, 389]);
+  const termosTCT = termosTodos.filter((t) => t.tipo === TIPO_TCT_CFCR && !IDS_DUPLICADOS_PORTO_SEGURO_CFCR.has(t.idTermoOrigem));
   const SUBABAS_CFCR = [
     { chave: "visaogeral", rotulo: "VISÃO GERAL" },
     { chave: "objetosmunicipios", rotulo: "OBJETOS E MUNICÍPIOS" },
@@ -12400,6 +12417,8 @@ async function carregarCfcrPortal(portalSlug) {
     <div id="cfcr-sub-semvigente" hidden>
       <p class="dash-chart-hint">Um município conta como coberto se tem ao menos um termo vigente, em qualquer departamento — situação calculada pela data de término da vigência informada na planilha. Historicamente poucos nunca tiveram termo; aqui está a situação de hoje.</p>
       <div class="kpi-row" id="cfcr-zz-kpis" style="margin-bottom:16px"></div>
+      <div class="dash-toggle" style="margin-bottom:10px">${botaoEntenderDadosHTML("comolerzz", "vigente × vencido não bater não é erro")}</div>
+      <div id="cfcr-entender-comolerzz" style="margin-bottom:16px" hidden></div>
       <div id="cfcr-zz-bar"></div>
       <div class="cfx-leg" id="cfcr-zz-leg"></div>
       <h4 style="margin-top:14px">Por COORPIN <small style="font-weight:400">(clique para filtrar a lista)</small></h4>
@@ -12478,7 +12497,10 @@ async function carregarCfcrPortal(portalSlug) {
   const covPorSituacao = { "Com termo vigente": 0, "Só vencido": 0, "Só em construção": 0, "Sem termo": 0 };
   municipiosReal.forEach((m) => { covPorSituacao[m.situacao]++; });
   document.getElementById("cfcr-termo-municipio-diff").textContent = explicarDiferencaTermoMunicipioCfcr(municipiosReal);
-  ativarBotoesEntenderDados("cfcr", { comoler: () => montarPainelComoLerCfcr(municipiosReal) });
+  ativarBotoesEntenderDados("cfcr", {
+    comoler: () => montarPainelComoLerCfcr(municipiosReal),
+    comolerzz: () => montarPainelComoLerCfcr(municipiosReal),
+  });
   let modoVisualCoberturaVG = "barra";
   function renderCobertura() {
     document.querySelectorAll("#cfcr-vg-cobertura-visual-toggle .dash-toggle-btn").forEach((b) => b.classList.toggle("active", b.dataset.modoVisual === modoVisualCoberturaVG));
