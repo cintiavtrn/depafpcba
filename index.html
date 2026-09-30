@@ -8455,10 +8455,10 @@ function mapaMunicipiosCfcrSVG(municipiosPorParticipe, opcoes = {}) {
   const {
     selecionado = "",
     corFn = (m) => (!m ? "var(--cfcr-neutro)" : m.temVigente ? "var(--cfcr-ok)" : "var(--cfcr-bad)"),
-    tituloFn = (m) => (!m ? "fora deste recorte" : m.temVigente ? "com termo VIGENTE agora" : `sem termo vigente agora (${m.status.toLowerCase()})`),
+    tituloFn = (m) => (!m ? "fora deste recorte" : m.temVigente ? "com cooperação ativa agora" : `sem cooperação ativa agora (${m.status.toLowerCase()})`),
     legendaItens = [
-      { cor: "var(--cfcr-ok)", rotulo: "Com termo vigente" },
-      { cor: "var(--cfcr-bad)", rotulo: "Sem termo vigente" },
+      { cor: "var(--cfcr-ok)", rotulo: "Com cooperação ativa" },
+      { cor: "var(--cfcr-bad)", rotulo: "Sem cooperação ativa" },
     ],
   } = opcoes;
   const porParticipe = new Map(municipiosPorParticipe.map((m) => [m.participe, m]));
@@ -12002,7 +12002,7 @@ function montarRelatorioCfcr(termosTodos, termosTCT, notaRecorte = null) {
     "", { rotuloCentro: "TERMOS" }
   );
   const donutCobertura = donutCfcrSVG(
-    [{ label: "Com termo vigente", valor: covPorSituacao["Com termo vigente"], cor: COR.ok },
+    [{ label: "Com cooperação ativa", valor: covPorSituacao["Com termo vigente"], cor: COR.ok },
      { label: "Só vencido", valor: covPorSituacao["Só vencido"], cor: COR.bad },
      { label: "Só em construção", valor: covPorSituacao["Só em construção"], cor: COR.warn },
      { label: "Nunca teve termo", valor: covPorSituacao["Sem termo"], cor: COR.neutro }],
@@ -12040,34 +12040,34 @@ function montarRelatorioCfcr(termosTodos, termosTCT, notaRecorte = null) {
       </div>
       ${relLeituraHTML(`Este gráfico conta TERMOS, não municípios — um município com termo vigente em dois departamentos entra duas vezes aqui. Pra saber quantos municípios de fato estão cobertos, use a cobertura logo abaixo, que conta cada município uma única vez. ${explicarDiferencaTermoMunicipioCfcr(municipiosReal)}`)}
 
-      <h3 style="margin-top:18px">Cobertura dos 417 Municípios da Bahia</h3>
+      <h3 style="margin-top:18px">Municípios da Bahia (417)</h3>
       <div class="rel-linha">
         <div style="max-width:220px">${donutCobertura}</div>
         <div style="flex:1;min-width:260px">
-          <p><b>${covPorSituacao["Com termo vigente"]}</b> município(s) têm ao menos um termo vigente hoje. <b>${covPorSituacao["Só vencido"]}</b> só têm termo(s) vencido(s), <b>${covPorSituacao["Só em construção"]}</b> só em construção, e <b>${covPorSituacao["Sem termo"]}</b> nunca tiveram termo (Salvador, Condeúba, Taperoá, Itagibá).</p>
+          <p><b>${covPorSituacao["Com termo vigente"]}</b> município(s) têm cooperação ativa hoje. <b>${covPorSituacao["Só vencido"]}</b> só têm termo(s) vencido(s), <b>${covPorSituacao["Só em construção"]}</b> só em construção, e <b>${covPorSituacao["Sem termo"]}</b> nunca tiveram termo (Salvador, Condeúba, Taperoá, Itagibá).</p>
         </div>
       </div>
-      ${relLeituraHTML(`Esta é a pergunta de gestão de verdade: quantos dos 417 municípios da Bahia estão cobertos agora. ${semVigenteHoje.length} município(s) não têm nenhum termo vigente hoje — detalhados na seção 3.`)}
+      ${relLeituraHTML(`Esta é a pergunta de gestão de verdade: quantos dos 417 municípios da Bahia têm cooperação ativa agora. ${semVigenteHoje.length} município(s) não têm cooperação ativa hoje — detalhados na seção 3.`)}
       <div class="rel-caixa">${montarPainelComoLerCfcr(municipiosReal)}</div>
     </div>
 
     <div class="rel-secao">
       <h2>2. Por COORPIN</h2>
-      <p>Município(s) sem termo vigente hoje, por COORPIN (soma inclui só vencido, só em construção e nunca teve termo) — sem esse recorte, uma COORPIN que ficou pra trás fica escondida dentro do total geral de vencidos. ${comCoorpin} termo(s) têm COORPIN reconhecida; os outros ${semCoorpin} estão fora do escopo dessa classificação (departamentos fora da DEPIN, onde COORPIN não se aplica).</p>
+      <p>Município(s) sem cooperação ativa hoje, por COORPIN (soma inclui só vencido, só em construção e nunca teve termo) — sem esse recorte, uma COORPIN que ficou pra trás fica escondida dentro do total geral de vencidos. ${comCoorpin} termo(s) têm COORPIN reconhecida; os outros ${semCoorpin} estão fora do escopo dessa classificação (departamentos fora da DEPIN, onde COORPIN não se aplica).</p>
       <div>${coberturaPorCoorpinRel.map((l) => relBarraHTML(`${rotularUnidadeCfcr(l.nome)} — ${l.naoVigente}/${l.total}`, l.naoVigente, maxNaoVigenteCoorpin, l.naoVigente === 0 ? COR.ok : l.naoVigente === l.total ? COR.bad : COR.warn)).join("")}</div>
-      ${relLeituraHTML(`Uma barra cheia significa que TODOS os municípios daquela COORPIN estão sem termo vigente hoje — a primeira a cobrar renovação. Uma barra em zero significa que a COORPIN inteira está coberta.`)}
+      ${relLeituraHTML(`Uma barra cheia significa que TODOS os municípios daquela COORPIN estão sem cooperação ativa hoje — a primeira a cobrar renovação. Uma barra em zero significa que a COORPIN inteira tem cooperação ativa.`)}
     </div>
 
     <div class="rel-secao">
-      <h2>3. Sem Termo Vigente Hoje (${semVigenteHoje.length} município(s))</h2>
-      <p>Município(s) sem nenhum termo vigente no momento — inclui quem só tem termo vencido, só em construção ou nunca firmou nenhum termo.</p>
+      <h2>3. Sem Cooperação Ativa Hoje (${semVigenteHoje.length} município(s))</h2>
+      <p>Município(s) sem cooperação ativa no momento — inclui quem só tem termo vencido, só em construção ou nunca firmou nenhum termo.</p>
       ${semVigenteHoje.length ? `<table><thead><tr><th>MUNICÍPIO</th><th>COORPIN</th><th>SITUAÇÃO</th><th>VIGÊNCIA</th><th>TEMPO</th></tr></thead>
         <tbody>${[...semVigenteHoje].sort((a, b) => (a.fim ? a.fim.getTime() : Infinity) - (b.fim ? b.fim.getTime() : Infinity)).map((m) => {
           const [vigenciaTxt, tempoTxt] = vigenciaTempoCfcr(m);
           const cor = m.situacao === "Só vencido" ? COR.bad : m.situacao === "Só em construção" ? COR.warn : COR.neutro;
           return `<tr><td>${escapeHTML(m.nome)}</td><td>${escapeHTML(rotularUnidadeCfcr(m.coorpin) || "—")}</td><td style="color:${cor};font-weight:600">${escapeHTML(m.situacao === "Sem termo" ? "Nunca teve termo" : m.situacao)}</td><td>${escapeHTML(vigenciaTxt)}</td><td>${escapeHTML(tempoTxt)}</td></tr>`;
         }).join("")}</tbody></table>`
-        : `<p>Todos os 417 municípios têm ao menos um termo vigente hoje.</p>`}
+        : `<p>Todos os 417 municípios têm cooperação ativa hoje.</p>`}
       ${relLeituraHTML(`Ordenado do vencimento mais antigo pro mais recente (quem não tem data válida vai pro fim da lista) — os primeiros são quem está sem cobertura há mais tempo.`)}
     </div>
 
@@ -12208,7 +12208,7 @@ function municipiosParaMapaCfcr(municipiosReal) {
 // que o preenchimento do polígono já mostra.
 function tituloMapaMunicipioCfcr(m) {
   if (!m) return "fora deste recorte";
-  const rotuloSituacao = m.situacao === "Com termo vigente" ? "com termo vigente" : m.situacao === "Só em construção" ? "só em construção" : "só vencido";
+  const rotuloSituacao = m.situacao === "Com termo vigente" ? "com cooperação ativa" : m.situacao === "Só em construção" ? "só em construção" : "só vencido";
   return `${m.totalTermos} termo(s) — ${rotuloSituacao}`;
 }
 // Pedido direto dela, depois de continuar sem entender só com a frase
@@ -12246,7 +12246,7 @@ function explicarDiferencaTermoMunicipioCfcr(municipiosReal) {
 // qualquer atualização da base.
 function montarPainelComoLerCfcr(municipiosReal) {
   const comVigente = municipiosReal.filter((m) => m.situacao === "Com termo vigente");
-  const A = { label: "Com termo vigente hoje", cor: "var(--cfcr-ok)", membros: new Set(comVigente.map((m) => m.nome)) };
+  const A = { label: "Com cooperação ativa hoje", cor: "var(--cfcr-ok)", membros: new Set(comVigente.map((m) => m.nome)) };
   const temVencido = municipiosReal.filter((m) => m.termos.some((t) => statusPelaDataCfcr(t) === "VENCIDO"));
   const B = { label: "Tem algum termo vencido", cor: "var(--cfcr-bad)", membros: new Set(temVencido.map((m) => m.nome)) };
   const sobrepostos = comVigente.filter((m) => B.membros.has(m.nome));
@@ -12259,7 +12259,7 @@ function montarPainelComoLerCfcr(municipiosReal) {
     <div style="display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start">
       <div style="max-width:290px">${vennDoisConjuntosSVG(A, B)}</div>
       <div style="flex:1;min-width:280px">
-        <p class="dash-chart-hint">Verde: município com pelo menos 1 termo vigente hoje (${A.membros.size}). Vermelho: município com algum termo vencido (${B.membros.size}), mesmo que também tenha um vigente. Quem está nos dois (${sobrepostos.length}) tem um termo de cada, em departamentos diferentes — o vigente garante a cobertura, mas o vencido continua pesando no total de termos vencidos lá em cima.</p>
+        <p class="dash-chart-hint">Verde: município com cooperação ativa hoje (${A.membros.size}). Vermelho: município com algum termo vencido (${B.membros.size}), mesmo que também tenha cooperação ativa. Quem está nos dois (${sobrepostos.length}) tem um termo de cada, em departamentos diferentes — o termo vigente garante a cooperação ativa, mas o vencido continua pesando no total de termos vencidos lá em cima.</p>
         ${sobrepostos.length ? `<div class="tabela-rolavel"><table class="dash-tabela" style="margin-top:8px">
           <thead><tr><th>MUNICÍPIO</th><th>TERMO VENCIDO</th><th>TERMO VIGENTE</th></tr></thead>
           <tbody>${sobrepostos.map((m) => {
@@ -12268,7 +12268,7 @@ function montarPainelComoLerCfcr(municipiosReal) {
             return `<tr><td>${escapeHTML(m.nome)}</td><td>${escapeHTML(venc.departamento)}, fim ${dataTxt(venc)}</td><td>${escapeHTML(vig.departamento)}, fim ${dataTxt(vig)}</td></tr>`;
           }).join("")}</tbody>
         </table></div>` : ""}
-        <p class="dash-chart-hint" style="margin-top:8px"><b>${semVigenteHoje}</b> município(s) sem termo vigente hoje = ${municipiosReal.length} municípios − ${A.membros.size} cobertos (${soVencido} só com vencido + ${emConstrucao} só em construção + ${semTermo} nunca firmaram).</p>
+        <p class="dash-chart-hint" style="margin-top:8px"><b>${semVigenteHoje}</b> município(s) sem cooperação ativa hoje = ${municipiosReal.length} municípios − ${A.membros.size} com cooperação ativa (${soVencido} só com vencido + ${emConstrucao} só em construção + ${semTermo} nunca firmaram).</p>
       </div>
     </div>`;
 }
@@ -12315,7 +12315,7 @@ async function carregarCfcrPortal(portalSlug) {
     </div>
     <p class="tela-intro">Termos de Cooperação Técnica · DEPIN · DEPOM · DPMCV. Parcerias institucionais do GDG (acordos congêneres) ficam na aba "CFCR - Acordos Congêneres", ao lado.</p>
     <p class="dash-chart-hint">Critério de situação: pela <b>data de término da vigência</b> informada na planilha — recalculado sozinho toda vez que a página carrega, sem precisar de ninguém marcar nada (igual em Contratos). Não é o status declarado na coluna original da planilha.</p>
-    <p class="dash-chart-hint">Os cartões de "termos" contam cada termo (um por departamento); a "Cobertura dos 417 Municípios" conta cada município uma única vez — por isso os dois números não precisam bater. <span id="cfcr-termo-municipio-diff"></span></p>
+    <p class="dash-chart-hint">Os cartões de "termos" contam cada termo (um por departamento); "Municípios da Bahia (417)" conta cada município uma única vez — por isso os dois números não precisam bater. <span id="cfcr-termo-municipio-diff"></span></p>
     <div class="dash-filtros" style="margin-bottom:14px">
       <div class="dash-filtro" style="flex:1;min-width:260px">
         <label>BUSCAR MUNICÍPIO (Ex.: "Anguera tem o quê?")</label>
@@ -12332,7 +12332,7 @@ async function carregarCfcrPortal(portalSlug) {
       <div class="dash-toggle" style="margin-bottom:10px">${botaoEntenderDadosHTML("comoler", "vigente × vencido não bater não é erro")}</div>
       <div id="cfcr-entender-comoler" style="margin-bottom:16px" hidden></div>
       <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">
-        <h4 style="margin-bottom:0">Cobertura dos 417 Municípios da Bahia</h4>
+        <h4 style="margin-bottom:0">Municípios da Bahia (417)</h4>
         <div class="dash-toggle" id="cfcr-vg-cobertura-visual-toggle">
           <button type="button" class="dash-toggle-btn active" data-modo-visual="barra">BARRA</button>
           <button type="button" class="dash-toggle-btn" data-modo-visual="mapa" title="Mapa real dos 417 municípios">MAPA</button>
@@ -12343,7 +12343,7 @@ async function carregarCfcrPortal(portalSlug) {
       <div id="cfcr-vg-cobertura-mapa" hidden style="max-width:460px;margin:10px auto 0"></div>
       <div class="dash-chart-box" style="margin-top:14px">
         <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">
-          <h4 style="margin-bottom:0">Por COORPIN</h4>
+          <h4 style="margin-bottom:0">Por COORPIN <small style="font-weight:400">(clique para filtrar a lista de municípios abaixo)</small></h4>
           <div style="display:flex;gap:8px;flex-wrap:wrap">
             <div class="dash-toggle" id="cfcr-vg-coorpin-visual-toggle">
               <button type="button" class="dash-toggle-btn active" data-modo-visual="barras" title="Uma linha por COORPIN">BARRAS</button>
@@ -12359,7 +12359,7 @@ async function carregarCfcrPortal(portalSlug) {
         <div class="dash-filtros" style="margin-bottom:0">
           <div class="dash-filtro">
             <label>SITUAÇÃO</label>
-            <select id="cfcr-vg-mun-situacao"><option value="">Todas as situações</option><option value="Com termo vigente">Com termo vigente</option><option value="SEM">Sem termo vigente (todos)</option><option value="Só vencido">Só vencido</option><option value="Só em construção">Só em construção</option><option value="Sem termo">Nunca teve termo</option></select>
+            <select id="cfcr-vg-mun-situacao"><option value="">Todas as situações</option><option value="Com termo vigente">Com cooperação ativa</option><option value="SEM">Sem cooperação ativa (todos)</option><option value="Só vencido">Só vencido</option><option value="Só em construção">Só em construção</option><option value="Sem termo">Nunca teve termo</option></select>
           </div>
           <div class="dash-filtro">
             <label>ORDEM</label>
@@ -12415,7 +12415,7 @@ async function carregarCfcrPortal(portalSlug) {
     </div>
 
     <div id="cfcr-sub-semvigente" hidden>
-      <p class="dash-chart-hint">Um município conta como coberto se tem ao menos um termo vigente, em qualquer departamento — situação calculada pela data de término da vigência informada na planilha. Historicamente poucos nunca tiveram termo; aqui está a situação de hoje.</p>
+      <p class="dash-chart-hint">Um município tem cooperação ativa se tem ao menos um termo vigente, em qualquer departamento — situação calculada pela data de término da vigência informada na planilha. Historicamente poucos nunca tiveram termo; aqui está a situação de hoje.</p>
       <div class="kpi-row" id="cfcr-zz-kpis" style="margin-bottom:16px"></div>
       <div class="dash-toggle" style="margin-bottom:10px">${botaoEntenderDadosHTML("comolerzz", "vigente × vencido não bater não é erro")}</div>
       <div id="cfcr-entender-comolerzz" style="margin-bottom:16px" hidden></div>
@@ -12433,7 +12433,7 @@ async function carregarCfcrPortal(portalSlug) {
       <div class="dash-filtros" style="margin:14px 0">
         <div class="dash-filtro">
           <label>SITUAÇÃO</label>
-          <select id="cfcr-zz-situacao"><option value="">Todas as situações</option><option value="SEM">Sem termo vigente (todos)</option><option value="Só vencido">Só vencido</option><option value="Só em construção">Só em construção</option><option value="Sem termo">Nunca teve termo</option></select>
+          <select id="cfcr-zz-situacao"><option value="">Todas as situações</option><option value="SEM">Sem cooperação ativa (todos)</option><option value="Só vencido">Só vencido</option><option value="Só em construção">Só em construção</option><option value="Sem termo">Nunca teve termo</option></select>
         </div>
         <div class="dash-filtro">
           <label>ORDEM</label>
@@ -12510,7 +12510,7 @@ async function carregarCfcrPortal(portalSlug) {
     if (modoVisualCoberturaVG === "barra") {
       const selecionadoSituacao = destaqueStatusVG ? Object.keys(SITUACAO_PARA_STATUS_VG).find((k) => SITUACAO_PARA_STATUS_VG[k] === destaqueStatusVG) : "";
       const { barraHTML: covBar, legendaHTML: covLeg } = barraComposicaoCfcrHTML([
-        ["Com termo vigente", covPorSituacao["Com termo vigente"], "var(--cfcr-ok)"],
+        ["Com cooperação ativa", covPorSituacao["Com termo vigente"], "var(--cfcr-ok)", "Com termo vigente"],
         ["Só vencido", covPorSituacao["Só vencido"], "var(--cfcr-bad)"],
         ["Só em construção", covPorSituacao["Só em construção"], "var(--cfcr-warn)"],
         ["Sem termo (Salvador, Condeúba, Taperoá, Itagibá)", covPorSituacao["Sem termo"], "var(--cfcr-neutro)", "Sem termo"],
@@ -12533,7 +12533,7 @@ async function carregarCfcrPortal(portalSlug) {
         corFn: (m) => (!m ? "var(--cfcr-neutro)" : m.situacao === "Com termo vigente" ? "var(--cfcr-ok)" : m.situacao === "Só em construção" ? "var(--cfcr-warn)" : "var(--cfcr-bad)"),
         tituloFn: tituloMapaMunicipioCfcr,
         legendaItens: [
-          { cor: "var(--cfcr-ok)", rotulo: "Com termo vigente" },
+          { cor: "var(--cfcr-ok)", rotulo: "Com cooperação ativa" },
           { cor: "var(--cfcr-bad)", rotulo: "Só vencido" },
           { cor: "var(--cfcr-warn)", rotulo: "Só em construção" },
         ],
@@ -12553,13 +12553,13 @@ async function carregarCfcrPortal(portalSlug) {
   // mesmo, na Visão Geral, e leva direto pra aba "Sem Termo Vigente".
   if (!document.getElementById("cfcr-vg-zz-go")) {
     const semVigenteHoje = municipiosReal.length - covPorSituacao["Com termo vigente"];
-    document.getElementById("cfcr-vg-cobertura-leg").insertAdjacentHTML("afterend", `<div class="dash-chart-hint" style="margin-top:10px"><b>${semVigenteHoje.toLocaleString("pt-BR")}</b> dos ${municipiosReal.length} municípios não têm nenhum termo vigente hoje. <button type="button" class="dash-toggle-btn" id="cfcr-vg-zz-go" style="margin-left:6px">VER QUAIS SÃO</button></div>`);
+    document.getElementById("cfcr-vg-cobertura-leg").insertAdjacentHTML("afterend", `<div class="dash-chart-hint" style="margin-top:10px"><b>${semVigenteHoje.toLocaleString("pt-BR")}</b> dos ${municipiosReal.length} municípios não têm cooperação ativa hoje. <button type="button" class="dash-toggle-btn" id="cfcr-vg-zz-go" style="margin-left:6px">VER QUAIS SÃO</button></div>`);
     document.getElementById("cfcr-vg-zz-go").addEventListener("click", () => irParaSubabaCfcr("semvigente"));
   }
   renderKpisVisaoGeral();
   renderCobertura();
 
-  let modoVisualCoorpinCfcr = "barras";
+  let modoVisualCoorpinCfcr = "barras", coorpinFiltroVG = null;
   function coorpinComposicaoLinhas() {
     const comCoorpin = municipiosReal.filter((m) => m.coorpin);
     const porCoorpin = new Map();
@@ -12591,7 +12591,10 @@ async function carregarCfcrPortal(portalSlug) {
     document.getElementById("cfcr-vg-coorpin-lista").hidden = modoVisualCoorpinCfcr !== "barras";
     document.getElementById("cfcr-vg-coorpin-mapa").hidden = modoVisualCoorpinCfcr !== "mapa";
     if (modoVisualCoorpinCfcr === "barras") {
-      document.getElementById("cfcr-vg-coorpin-lista").innerHTML = linhas.map((l) => linhaComposicaoCfcrHTML(rotularUnidadeCfcr(l.nome), l.nome, l.partes, { destaque: destaqueStatusVG })).join("");
+      document.getElementById("cfcr-vg-coorpin-lista").innerHTML = linhas.map((l) => linhaComposicaoCfcrHTML(rotularUnidadeCfcr(l.nome), l.nome, l.partes, { destaque: destaqueStatusVG, clicavel: true, selecionado: coorpinFiltroVG })).join("");
+      document.querySelectorAll("#cfcr-vg-coorpin-lista [data-cat]").forEach((el) => {
+        el.addEventListener("click", () => { coorpinFiltroVG = coorpinFiltroVG === el.dataset.cat ? null : el.dataset.cat; renderCoorpinVisaoGeral(); });
+      });
       const chavesPresentes = new Set();
       linhas.forEach((l) => l.partes.forEach((p) => { if (p[1] > 0) chavesPresentes.add(p[0] + "|" + p[2]); }));
       document.getElementById("cfcr-vg-coorpin-leg").innerHTML = [...chavesPresentes].map((s) => { const [k, c] = s.split("|"); return `<span><u style="background:${c}"></u>${escapeHTML(k)}</span>`; }).join("");
@@ -12625,17 +12628,19 @@ async function carregarCfcrPortal(portalSlug) {
     const buscaF = normalizarBusca(document.getElementById("cfcr-vg-mun-busca").value.trim());
     const lista = reais.filter((m) =>
       (!situacaoF || (situacaoF === "SEM" ? m.situacao !== "Com termo vigente" : m.situacao === situacaoF)) &&
+      (!coorpinFiltroVG || m.coorpin === coorpinFiltroVG) &&
       (!buscaF || normalizarBusca(m.nome).includes(buscaF))
     );
     lista.sort(ordemF === "a" ? (a, b) => a.nome.localeCompare(b.nome, "pt-BR")
       : ordemF === "c" ? (a, b) => (a.fim ? a.fim.getTime() : Infinity) - (b.fim ? b.fim.getTime() : Infinity) || a.nome.localeCompare(b.nome, "pt-BR")
       : (a, b) => (b.fim ? b.fim.getTime() : -Infinity) - (a.fim ? a.fim.getTime() : -Infinity) || a.nome.localeCompare(b.nome, "pt-BR"));
-    document.getElementById("cfcr-vg-mun-titulo").textContent = `Municípios (${lista.length})`;
+    document.getElementById("cfcr-vg-mun-titulo").textContent = `Municípios (${lista.length})${coorpinFiltroVG ? " · " + rotularUnidadeCfcr(coorpinFiltroVG) : ""}`;
     document.getElementById("cfcr-vg-mun-tabela").innerHTML = lista.length
       ? lista.map((m) => {
           const [vigenciaTxt, tempoTxt] = vigenciaTempoCfcr(m);
           const corSituacao = m.situacao === "Com termo vigente" ? "var(--cfcr-ok)" : m.situacao === "Só vencido" ? "var(--cfcr-bad)" : m.situacao === "Só em construção" ? "var(--cfcr-warn)" : "var(--cfcr-neutro)";
-          return `<tr class="linha-municipio-cfcr" data-municipio="${escapeAttr(m.nome)}" style="cursor:pointer" title="Clique pra ver os termos deste município"><td>${escapeHTML(m.nome)}</td><td>${escapeHTML(rotularUnidadeCfcr(m.coorpin) || "Sem COORPIN na base")}</td><td><span style="color:${corSituacao};font-weight:700">${escapeHTML(m.situacao === "Sem termo" ? "Nunca teve termo" : m.situacao)}</span></td><td>${escapeHTML(vigenciaTxt)}</td><td>${escapeHTML(tempoTxt)}</td></tr>`;
+          const rotuloSituacaoBadge = m.situacao === "Com termo vigente" ? "Cooperação ativa" : m.situacao === "Sem termo" ? "Nunca teve termo" : m.situacao;
+          return `<tr class="linha-municipio-cfcr" data-municipio="${escapeAttr(m.nome)}" style="cursor:pointer" title="Clique pra ver os termos deste município"><td>${escapeHTML(m.nome)}</td><td>${escapeHTML(rotularUnidadeCfcr(m.coorpin) || "Sem COORPIN na base")}</td><td><span style="color:${corSituacao};font-weight:700">${escapeHTML(rotuloSituacaoBadge)}</span></td><td>${escapeHTML(vigenciaTxt)}</td><td>${escapeHTML(tempoTxt)}</td></tr>`;
         }).join("")
       : `<tr><td colspan="5"><small>Nenhum município neste recorte.</small></td></tr>`;
     document.querySelectorAll("#cfcr-vg-mun-tabela .linha-municipio-cfcr").forEach((tr) => {
@@ -12739,13 +12744,13 @@ async function carregarCfcrPortal(portalSlug) {
     reais.forEach((m) => c[m.situacao]++);
     const nc = n - c["Com termo vigente"];
     document.getElementById("cfcr-zz-kpis").innerHTML =
-      kpiSimplesCfcrHTML(nc, `sem termo vigente hoje (${Math.round(nc / n * 100)}%)`, "var(--cfcr-bad)") +
-      kpiSimplesCfcrHTML(c["Com termo vigente"], "com termo vigente", "var(--cfcr-ok)") +
+      kpiSimplesCfcrHTML(nc, `sem cooperação ativa hoje (${Math.round(nc / n * 100)}%)`, "var(--cfcr-bad)") +
+      kpiSimplesCfcrHTML(c["Com termo vigente"], "com cooperação ativa", "var(--cfcr-ok)") +
       kpiSimplesCfcrHTML(c["Só vencido"], "só com termo vencido") +
       kpiSimplesCfcrHTML(c["Só em construção"], "só em construção", "var(--cfcr-warn)") +
       kpiSimplesCfcrHTML(c["Sem termo"], "nunca tiveram termo");
     const { barraHTML, legendaHTML } = barraComposicaoCfcrHTML([
-      ["Com termo vigente", c["Com termo vigente"], "var(--cfcr-ok)"],
+      ["Com cooperação ativa", c["Com termo vigente"], "var(--cfcr-ok)"],
       ["Só vencido", c["Só vencido"], "var(--cfcr-bad)"],
       ["Só em construção", c["Só em construção"], "var(--cfcr-warn)"],
       ["Nunca teve termo", c["Sem termo"], "var(--cfcr-neutro)"],
@@ -12763,7 +12768,7 @@ async function carregarCfcrPortal(portalSlug) {
     if (modoVisualCoorpinSemVig === "barras") {
       document.getElementById("cfcr-zz-coorpin-lista").innerHTML = listaCoorpin.map(([nome, ms]) => {
         const partes = [
-          ["Com termo vigente", ms.filter((m) => m.situacao === "Com termo vigente").length, "var(--cfcr-ok)"],
+          ["Com cooperação ativa", ms.filter((m) => m.situacao === "Com termo vigente").length, "var(--cfcr-ok)"],
           ["Só vencido", ms.filter((m) => m.situacao === "Só vencido").length, "var(--cfcr-bad)"],
           ["Só em construção", ms.filter((m) => m.situacao === "Só em construção").length, "var(--cfcr-warn)"],
         ];
@@ -12806,7 +12811,8 @@ async function carregarCfcrPortal(portalSlug) {
       ? lista.map((m) => {
           const [vigenciaTxt, tempoTxt] = vigenciaTempoCfcr(m);
           const corSituacao = m.situacao === "Com termo vigente" ? "var(--cfcr-ok)" : m.situacao === "Só vencido" ? "var(--cfcr-bad)" : m.situacao === "Só em construção" ? "var(--cfcr-warn)" : "var(--cfcr-neutro)";
-          return `<tr class="linha-municipio-cfcr" data-municipio="${escapeAttr(m.nome)}" style="cursor:pointer" title="Clique pra ver os termos deste município"><td>${escapeHTML(m.nome)}</td><td>${escapeHTML(rotularUnidadeCfcr(m.coorpin) || "Sem COORPIN na base")}</td><td><span style="color:${corSituacao};font-weight:700">${escapeHTML(m.situacao === "Sem termo" ? "Nunca teve termo" : m.situacao)}</span></td><td>${escapeHTML(vigenciaTxt)}</td><td>${escapeHTML(tempoTxt)}</td></tr>`;
+          const rotuloSituacaoBadge = m.situacao === "Com termo vigente" ? "Cooperação ativa" : m.situacao === "Sem termo" ? "Nunca teve termo" : m.situacao;
+          return `<tr class="linha-municipio-cfcr" data-municipio="${escapeAttr(m.nome)}" style="cursor:pointer" title="Clique pra ver os termos deste município"><td>${escapeHTML(m.nome)}</td><td>${escapeHTML(rotularUnidadeCfcr(m.coorpin) || "Sem COORPIN na base")}</td><td><span style="color:${corSituacao};font-weight:700">${escapeHTML(rotuloSituacaoBadge)}</span></td><td>${escapeHTML(vigenciaTxt)}</td><td>${escapeHTML(tempoTxt)}</td></tr>`;
         }).join("")
       : `<tr><td colspan="5"><small>Nenhum município neste recorte.</small></td></tr>`;
     document.querySelectorAll("#cfcr-zz-tabela .linha-municipio-cfcr").forEach((tr) => {
