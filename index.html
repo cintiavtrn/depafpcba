@@ -12306,7 +12306,7 @@ async function carregarCfcrPortal(portalSlug) {
   const SUBABAS_CFCR = [
     { chave: "visaogeral", rotulo: "VISÃO GERAL" },
     { chave: "objetosmunicipios", rotulo: "OBJETOS E MUNICÍPIOS" },
-    { chave: "semvigente", rotulo: "SEM TERMO VIGENTE" },
+    { chave: "semvigente", rotulo: "TERRITÓRIO" },
   ];
 
   painel.innerHTML = `
@@ -12415,6 +12415,7 @@ async function carregarCfcrPortal(portalSlug) {
     </div>
 
     <div id="cfcr-sub-semvigente" hidden>
+      <h4 style="margin-bottom:4px">Bahia, município a município: onde ainda não há cooperação ativa</h4>
       <p class="dash-chart-hint">Um município tem cooperação ativa se tem ao menos um termo vigente, em qualquer departamento — situação calculada pela data de término da vigência informada na planilha. Historicamente poucos nunca tiveram termo; aqui está a situação de hoje.</p>
       <div class="kpi-row" id="cfcr-zz-kpis" style="margin-bottom:16px"></div>
       <div class="dash-toggle" style="margin-bottom:10px">${botaoEntenderDadosHTML("comolerzz", "vigente × vencido não bater não é erro")}</div>
