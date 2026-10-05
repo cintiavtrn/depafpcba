@@ -5066,11 +5066,37 @@ function agruparContratosComVariacaoDeValor(lista, n = 10) {
         pct: c.valorGlobalInicial ? (delta / c.valorGlobalInicial) * 100 : null,
         valorInicial: c.valorGlobalInicial,
         valorAtual: c.valorGlobalAtual,
+        observacao: c.observacaoValor || null,
         id: c.id,
       };
     })
     .sort((a, b) => b.total - a.total)
     .slice(0, n);
+}
+
+// "Por que varia" — o valor atual é o vigente depois dos aditivos, e a área
+// responsável devolveu uma observação por contrato (campo observacaoValor).
+// Agrupa o texto livre em motivos comparáveis só pra resumir no cartão; a
+// observação original continua sendo o que aparece na tabela.
+function motivoVariacaoValor(obs) {
+  if (!obs) return "sem observação registrada";
+  if (/6\s*\+\s*6|excepcion/i.test(obs)) return "aditivo excepcional de 6+6 meses (valor proporcional)";
+  if (/unidades/i.test(obs)) return "saldo de unidades (contrato de aquisição)";
+  if (/treinamento/i.test(obs)) return "item retirado no aditivo";
+  if (/valor inicial contratado para \d+/i.test(obs)) return "prazo aditivado menor que o contratado (valor proporcional)";
+  if (/corrigid/i.test(obs)) return "correção na planilha";
+  return "outro motivo informado";
+}
+function contratosComVariacaoDeValor(lista) {
+  return lista.filter((c) => c.valorGlobalInicial != null && c.valorGlobalAtual != null && c.valorGlobalInicial !== c.valorGlobalAtual);
+}
+function resumoMotivosVariacaoValor(lista) {
+  const cont = new Map();
+  for (const c of contratosComVariacaoDeValor(lista)) {
+    const m = motivoVariacaoValor(c.observacaoValor);
+    cont.set(m, (cont.get(m) || 0) + 1);
+  }
+  return [...cont.entries()].sort((a, b) => b[1] - a[1]);
 }
 
 // Soma o valor de TODOS os contratos da mesma empresa antes de ordenar —
@@ -6293,7 +6319,9 @@ function renderGerencialContratos(lista, resumo) {
     </div>
     <div class="dash-chart-box" id="ger-variacao-valor-caixa">
       <h4>Contratos com Variação de Valor<small class="dash-chart-hint" style="display:block;margin-top:4px">Quem mudou de valor de verdade, não quem tem o maior valor — ordenado pela diferença em R$. Passe o mouse pra ver de quanto pra quanto.</small></h4>
+      <p class="dash-chart-hint">O Valor Global Atual é o valor vigente depois dos aditivos, por isso pode diferir do inicial: fica menor quando o prazo aditivado é menor que o contratado (por exemplo 36 meses contratados e 24 aditivados, ou 6+6 meses excepcionais) ou quando sobra saldo de unidades, e fica maior em reajustes e acréscimos. A observação de cada contrato foi informada pela área responsável.</p>
       <div id="ger-variacao-valor"></div>
+      <div id="ger-variacao-valor-porque"></div>
     </div>
     <div class="kpi-row" style="margin-top:2px;grid-template-columns:repeat(auto-fit,minmax(180px,1fr))" id="ger-rodape"></div>
   `;
@@ -6643,6 +6671,12 @@ function renderGerencialContratos(lista, resumo) {
     // precisar clicar — reaproveita o .kpi-delta que já existia no CSS
     // mas não era usado aqui) e, ao clicar, rola até o "Top 10 Maiores
     // Contratos", o destino mais natural pra "quero ver os valores".
+    const motivosVariacao = resumoMotivosVariacaoValor(filtrada);
+    const qtdVariacao = motivosVariacao.reduce((a, [, n]) => a + n, 0);
+    const qtdVariacaoComMotivo = qtdVariacao - (motivosVariacao.find(([m]) => m === "sem observação registrada")?.[1] || 0);
+    const notaVariacaoCartao = qtdVariacao
+      ? `<div class="kpi-valor-exato" style="margin-top:6px;white-space:normal;line-height:1.35" title="${escapeAttr(motivosVariacao.map(([m, n]) => `${n} — ${m}`).join("\n"))}">Difere do inicial em ${qtdVariacao} contrato${qtdVariacao > 1 ? "s" : ""}: ${qtdVariacaoComMotivo} com motivo informado pela área, ${qtdVariacao - qtdVariacaoComMotivo} sem observação. Clique pra ver por quê.</div>`
+      : "";
     const deltaValor = valorInicial ? ((valorAtual - valorInicial) / valorInicial) * 100 : null;
     const deltaClasse = deltaValor === null ? "flat" : deltaValor > 0.05 ? "up" : deltaValor < -0.05 ? "down" : "flat";
     const deltaSeta = deltaClasse === "up" ? "▲" : deltaClasse === "down" ? "▼" : "●";
@@ -6655,7 +6689,7 @@ function renderGerencialContratos(lista, resumo) {
         <div class="kpi-card kpi-clicavel" data-status="Vencido" title="Clique pra ver quais são" style="--kpi-cor:var(--crit-vencido);cursor:pointer;${filtroStatusKpi === "Vencido" ? "outline:2px solid var(--crit-vencido);outline-offset:-2px" : ""}"><div class="kpi-cabeca">${kpiIcone("relogio")}<div class="kpi-label">Qtd Contratos Vencidos</div></div><div class="kpi-value">${qtdVencidos.toLocaleString("pt-BR")}</div></div>
         <div class="kpi-card kpi-clicavel" data-status="A Vencer" title="Clique pra ver quais são" style="--kpi-cor:var(--crit-alto);cursor:pointer;${filtroStatusKpi === "A Vencer" ? "outline:2px solid var(--crit-alto);outline-offset:-2px" : ""}"><div class="kpi-cabeca">${kpiIcone("relogio")}<div class="kpi-label">Qtd Contratos A Vencer</div></div><div class="kpi-value">${qtdAVencer.toLocaleString("pt-BR")}</div></div>
         <div class="kpi-card"><div class="kpi-cabeca">${kpiIcone("moeda")}<div class="kpi-label">Valor Global Inicial Total</div></div><div class="kpi-value">R$ ${formatarMoedaCompacta(valorInicial)}</div><div class="kpi-valor-exato">${formatarMoedaBR(valorInicial)}</div></div>
-        <div class="kpi-card kpi-clicavel" data-acao="variacao-valor" title="Clique pra ver quais contratos variaram de valor" style="cursor:pointer"><div class="kpi-cabeca">${kpiIcone("moeda")}<div class="kpi-label">Valor Global Atual Total</div></div><div class="kpi-value">R$ ${formatarMoedaCompacta(valorAtual)}</div><div class="kpi-valor-exato">${formatarMoedaBR(valorAtual)}</div><div class="kpi-delta ${deltaClasse}">${deltaTexto}</div></div>
+        <div class="kpi-card kpi-clicavel" data-acao="variacao-valor" title="Clique pra ver quais contratos variaram de valor" style="cursor:pointer"><div class="kpi-cabeca">${kpiIcone("moeda")}<div class="kpi-label">Valor Global Atual Total</div></div><div class="kpi-value">R$ ${formatarMoedaCompacta(valorAtual)}</div><div class="kpi-valor-exato">${formatarMoedaBR(valorAtual)}</div><div class="kpi-delta ${deltaClasse}">${deltaTexto}</div>${notaVariacaoCartao}</div>
       </div>`;
 
     // Tabela combinada: aparece sempre que QUALQUER filtro de recorte estiver
@@ -6890,6 +6924,9 @@ function renderGerencialContratos(lista, resumo) {
           limite: 20,
         })
       : `<p class="dash-chart-hint">Nenhum contrato deste recorte teve o valor mudado desde a última sincronização.</p>`;
+    document.getElementById("ger-variacao-valor-porque").innerHTML = variacaoValor.length
+      ? `<div class="tabela-rolavel" style="margin-top:10px"><table class="dash-tabela"><thead><tr><th>CONTRATO</th><th>DE → PARA</th><th>POR QUE VARIA</th></tr></thead><tbody>${variacaoValor.map((l) => `<tr><td>${escapeHTML(l.label)}</td><td>${l.delta >= 0 ? "▲" : "▼"} ${formatarMoedaCompacta(l.valorInicial)} → ${formatarMoedaCompacta(l.valorAtual)}</td><td>${l.observacao ? escapeHTML(l.observacao) : '<span style="color:#8B93A3">Sem observação registrada pela área</span>'}</td></tr>`).join("")}</tbody></table></div>`
+      : "";
     ligarTooltipLinhas(document.getElementById("ger-variacao-valor"), porId);
     adicionarControlesGrafico(document.getElementById("ger-barra"));
     adicionarControlesGrafico(document.getElementById("ger-setor"));
