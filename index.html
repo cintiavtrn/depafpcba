@@ -5969,6 +5969,7 @@ function tooltipContratoHTML(c) {
       <dt>Situação</dt><dd>${formatarDiasBR(c.diasParaVencer)}</dd>
       <dt>Gestor</dt><dd>${escapeHTML(pessoasPorPapel("Gestor"))}</dd>
       <dt>Fiscal</dt><dd>${escapeHTML(pessoasPorPapel("Fiscal"))}</dd>
+      ${c.observacaoGestao ? `<dt>Obs. gestão</dt><dd>${escapeHTML(c.observacaoGestao)}</dd>` : ""}
       <dt>Valor Atual</dt><dd>${formatarMoedaBR(c.valorGlobalAtual)}</dd>
       <dt>Aditivos</dt><dd>${c.qtdAditivos}</dd>
     </dl>`;
