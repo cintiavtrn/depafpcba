@@ -11495,7 +11495,11 @@ function prazoCelulaCfcr(t) {
 // (bi_termos_completo.html) — HTML/CSS puro, sem SVG, mesmo raciocínio das
 // funções kp()/seg()/bars() de lá. Pedido direto: "reestruturar todo nosso
 // visual... navegação, visual, formato de construção e slicer. tudo."
-function kpiSimplesCfcrHTML(valor, rotulo, cor) {
+function kpiSimplesCfcrHTML(valor, rotulo, cor, alvo = null, ativo = false) {
+  if (alvo !== null) {
+    const c = cor || "var(--carvao)";
+    return `<div class="kpi-card kpi-clicavel" data-alvo="${escapeAttr(alvo)}" role="button" tabindex="0" title="Clique pra filtrar a lista de municípios; clique de novo pra limpar" style="--kpi-cor:${c};cursor:pointer;${ativo ? `outline:2px solid ${c};outline-offset:-2px` : ""}"><div class="kpi-value">${typeof valor === "number" ? valor.toLocaleString("pt-BR") : valor}</div><div class="kpi-label">${escapeHTML(rotulo)}</div></div>`;
+  }
   return `<div class="kpi-card" style="--kpi-cor:${cor || "var(--carvao)"}"><div class="kpi-value">${typeof valor === "number" ? valor.toLocaleString("pt-BR") : valor}</div><div class="kpi-label">${escapeHTML(rotulo)}</div></div>`;
 }
 // partes: [[rótulo, valor, corCSS], ...] — barra 100% empilhada numa linha só.
@@ -12443,7 +12447,7 @@ async function carregarCfcrPortal(portalSlug) {
       <div class="dash-filtros" style="margin:14px 0">
         <div class="dash-filtro">
           <label>SITUAÇÃO</label>
-          <select id="cfcr-zz-situacao"><option value="">Todas as situações</option><option value="SEM" selected>Sem cooperação ativa (todos)</option><option value="Só vencido">Só vencido</option><option value="Só em construção">Só em construção</option><option value="Sem termo">Nunca teve termo</option></select>
+          <select id="cfcr-zz-situacao"><option value="">Todas as situações</option><option value="Com termo vigente">Com cooperação ativa</option><option value="SEM" selected>Sem cooperação ativa (todos)</option><option value="Só vencido">Só vencido</option><option value="Só em construção">Só em construção</option><option value="Sem termo">Nunca teve termo</option></select>
         </div>
         <div class="dash-filtro">
           <label>ORDEM</label>
@@ -12493,9 +12497,9 @@ async function carregarCfcrPortal(portalSlug) {
   function renderKpisVisaoGeral() {
     document.getElementById("cfcr-vg-kpis").innerHTML =
       kpiSimplesCfcrHTML(firmadosVG, "termos firmados") +
-      `<div class="kpi-card kpi-clicavel" data-status-vg="VIGENTE" title="Clique pra destacar em Por COORPIN" style="--kpi-cor:var(--cfcr-ok);cursor:pointer;${destaqueStatusVG === "VIGENTE" ? "outline:2px solid var(--cfcr-ok);outline-offset:-2px" : ""}"><div class="kpi-value">${porStatusTermo.VIGENTE.toLocaleString("pt-BR")}</div><div class="kpi-label">termos vigentes (${Math.round(porStatusTermo.VIGENTE / firmadosVG * 100)}%)</div></div>` +
-      `<div class="kpi-card kpi-clicavel" data-status-vg="VENCIDO" title="Clique pra destacar em Por COORPIN" style="--kpi-cor:var(--cfcr-bad);cursor:pointer;${destaqueStatusVG === "VENCIDO" ? "outline:2px solid var(--cfcr-bad);outline-offset:-2px" : ""}"><div class="kpi-value">${porStatusTermo.VENCIDO.toLocaleString("pt-BR")}</div><div class="kpi-label">termos vencidos (${Math.round(porStatusTermo.VENCIDO / firmadosVG * 100)}%)</div></div>` +
-      `<div class="kpi-card kpi-clicavel" data-status-vg="EM CONSTRUÇÃO" title="Clique pra destacar em Por COORPIN" style="--kpi-cor:var(--cfcr-warn);cursor:pointer;${destaqueStatusVG === "EM CONSTRUÇÃO" ? "outline:2px solid var(--cfcr-warn);outline-offset:-2px" : ""}"><div class="kpi-value">${porStatusTermo["EM CONSTRUÇÃO"].toLocaleString("pt-BR")}</div><div class="kpi-label">termos em construção (ainda não firmados)</div></div>`;
+      `<div class="kpi-card kpi-clicavel" data-status-vg="VIGENTE" title="Clique pra filtrar Por COORPIN e a lista de municípios; clique de novo pra limpar" style="--kpi-cor:var(--cfcr-ok);cursor:pointer;${destaqueStatusVG === "VIGENTE" ? "outline:2px solid var(--cfcr-ok);outline-offset:-2px" : ""}"><div class="kpi-value">${porStatusTermo.VIGENTE.toLocaleString("pt-BR")}</div><div class="kpi-label">termos vigentes (${Math.round(porStatusTermo.VIGENTE / firmadosVG * 100)}%)</div></div>` +
+      `<div class="kpi-card kpi-clicavel" data-status-vg="VENCIDO" title="Clique pra filtrar Por COORPIN e a lista de municípios; clique de novo pra limpar" style="--kpi-cor:var(--cfcr-bad);cursor:pointer;${destaqueStatusVG === "VENCIDO" ? "outline:2px solid var(--cfcr-bad);outline-offset:-2px" : ""}"><div class="kpi-value">${porStatusTermo.VENCIDO.toLocaleString("pt-BR")}</div><div class="kpi-label">termos vencidos (${Math.round(porStatusTermo.VENCIDO / firmadosVG * 100)}%)</div></div>` +
+      `<div class="kpi-card kpi-clicavel" data-status-vg="EM CONSTRUÇÃO" title="Clique pra filtrar Por COORPIN e a lista de municípios; clique de novo pra limpar" style="--kpi-cor:var(--cfcr-warn);cursor:pointer;${destaqueStatusVG === "EM CONSTRUÇÃO" ? "outline:2px solid var(--cfcr-warn);outline-offset:-2px" : ""}"><div class="kpi-value">${porStatusTermo["EM CONSTRUÇÃO"].toLocaleString("pt-BR")}</div><div class="kpi-label">termos em construção (ainda não firmados)</div></div>`;
     document.querySelectorAll("#cfcr-vg-kpis [data-status-vg]").forEach((el) => {
       el.addEventListener("click", () => {
         destaqueStatusVG = destaqueStatusVG === el.dataset.statusVg ? null : el.dataset.statusVg;
@@ -12644,12 +12648,13 @@ async function carregarCfcrPortal(portalSlug) {
     const lista = reais.filter((m) =>
       (!situacaoF || (situacaoF === "SEM" ? m.situacao !== "Com termo vigente" : m.situacao === situacaoF)) &&
       (!coorpinFiltroVG || m.coorpin === coorpinFiltroVG) &&
+      (!destaqueStatusVG || m.termos.some((t) => statusPelaDataCfcr(t) === destaqueStatusVG)) &&
       (!buscaF || normalizarBusca(m.nome).includes(buscaF))
     );
     lista.sort(ordemF === "a" ? (a, b) => a.nome.localeCompare(b.nome, "pt-BR")
       : ordemF === "c" ? (a, b) => (a.fim ? a.fim.getTime() : Infinity) - (b.fim ? b.fim.getTime() : Infinity) || a.nome.localeCompare(b.nome, "pt-BR")
       : (a, b) => (b.fim ? b.fim.getTime() : -Infinity) - (a.fim ? a.fim.getTime() : -Infinity) || a.nome.localeCompare(b.nome, "pt-BR"));
-    document.getElementById("cfcr-vg-mun-titulo").textContent = `${tituloRecorteCfcr("cfcr-vg-mun-situacao")} (${lista.length})${coorpinFiltroVG ? " · " + rotularUnidadeCfcr(coorpinFiltroVG) : ""}`;
+    document.getElementById("cfcr-vg-mun-titulo").textContent = `${tituloRecorteCfcr("cfcr-vg-mun-situacao")} (${lista.length})${coorpinFiltroVG ? " · " + rotularUnidadeCfcr(coorpinFiltroVG) : ""}${destaqueStatusVG ? " · com termo " + ({ VIGENTE: "vigente", VENCIDO: "vencido", "EM CONSTRUÇÃO": "em construção" })[destaqueStatusVG] : ""}`;
     document.getElementById("cfcr-vg-mun-tabela").innerHTML = lista.length
       ? lista.map((m) => {
           const [vigenciaTxt, tempoTxt] = vigenciaTempoCfcr(m);
@@ -12758,12 +12763,13 @@ async function carregarCfcrPortal(portalSlug) {
     const c = { "Com termo vigente": 0, "Só vencido": 0, "Só em construção": 0, "Sem termo": 0 };
     reais.forEach((m) => c[m.situacao]++);
     const nc = n - c["Com termo vigente"];
+    const sitZZ = document.getElementById("cfcr-zz-situacao").value;
     document.getElementById("cfcr-zz-kpis").innerHTML =
-      kpiSimplesCfcrHTML(nc, `municípios sem cooperação ativa hoje (${Math.round(nc / n * 100)}%)`, "var(--cfcr-bad)") +
-      kpiSimplesCfcrHTML(c["Com termo vigente"], "municípios com cooperação ativa", "var(--cfcr-ok)") +
-      kpiSimplesCfcrHTML(c["Só vencido"], "municípios com todos os termos vencidos") +
-      kpiSimplesCfcrHTML(c["Só em construção"], "municípios só com termo em construção", "var(--cfcr-warn)") +
-      kpiSimplesCfcrHTML(c["Sem termo"], "municípios sem nenhum termo registrado");
+      kpiSimplesCfcrHTML(nc, `municípios sem cooperação ativa hoje (${Math.round(nc / n * 100)}%)`, "var(--cfcr-bad)", "SEM", sitZZ === "SEM") +
+      kpiSimplesCfcrHTML(c["Com termo vigente"], "municípios com cooperação ativa", "var(--cfcr-ok)", "Com termo vigente", sitZZ === "Com termo vigente") +
+      kpiSimplesCfcrHTML(c["Só vencido"], "municípios com todos os termos vencidos", "var(--cfcr-bad)", "Só vencido", sitZZ === "Só vencido") +
+      kpiSimplesCfcrHTML(c["Só em construção"], "municípios só com termo em construção", "var(--cfcr-warn)", "Só em construção", sitZZ === "Só em construção") +
+      kpiSimplesCfcrHTML(c["Sem termo"], "municípios sem nenhum termo registrado", "var(--cfcr-neutro)", "Sem termo", sitZZ === "Sem termo");
     // Termo x município: deixa explícito se os dois números coincidem hoje.
     const termosVig = porStatusTermo.VIGENTE, munVig = c["Com termo vigente"];
     document.getElementById("cfcr-zz-kpis-nota").textContent = termosVig === munVig
@@ -12845,7 +12851,16 @@ async function carregarCfcrPortal(portalSlug) {
     modoVisualCoorpinSemVig = btn.dataset.modoVisual;
     renderSemVigente();
   });
-  ["cfcr-zz-situacao", "cfcr-zz-ordem"].forEach((id) => document.getElementById(id).addEventListener("change", () => renderTabelaSemVigente(municipiosReal)));
+  document.getElementById("cfcr-zz-situacao").addEventListener("change", renderSemVigente);
+  document.getElementById("cfcr-zz-ordem").addEventListener("change", () => renderTabelaSemVigente(municipiosReal));
+  // Cartões = filtro cruzado (pedido dela): clicar filtra a lista de municípios, clicar de novo limpa.
+  document.getElementById("cfcr-zz-kpis").addEventListener("click", (ev) => {
+    const el = ev.target.closest("[data-alvo]");
+    if (!el) return;
+    const sel = document.getElementById("cfcr-zz-situacao");
+    sel.value = sel.value === el.dataset.alvo ? "" : el.dataset.alvo;
+    renderSemVigente();
+  });
   document.getElementById("cfcr-zz-busca").addEventListener("input", () => renderTabelaSemVigente(municipiosReal));
   renderSemVigente();
 
