@@ -12425,7 +12425,8 @@ async function carregarCfcrPortal(portalSlug) {
     <div id="cfcr-sub-semvigente" hidden>
       <h4 style="margin-bottom:4px">Bahia, município a município: onde ainda não há cooperação ativa</h4>
       <p class="dash-chart-hint">Um município tem cooperação ativa se tem ao menos um termo vigente, em qualquer departamento — situação calculada pela data de término da vigência informada na planilha. Historicamente poucos nunca tiveram termo; aqui está a situação de hoje.</p>
-      <div class="kpi-row" id="cfcr-zz-kpis" style="margin-bottom:16px"></div>
+      <div class="kpi-row" id="cfcr-zz-kpis" style="margin-bottom:6px"></div>
+      <p class="dash-chart-hint" id="cfcr-zz-kpis-nota" style="margin-bottom:10px"></p>
       <div class="dash-toggle" style="margin-bottom:10px">${botaoEntenderDadosHTML("comolerzz", "vigente × vencido não bater não é erro")}</div>
       <div id="cfcr-entender-comolerzz" style="margin-bottom:16px" hidden></div>
       <div id="cfcr-zz-bar"></div>
@@ -12758,11 +12759,16 @@ async function carregarCfcrPortal(portalSlug) {
     reais.forEach((m) => c[m.situacao]++);
     const nc = n - c["Com termo vigente"];
     document.getElementById("cfcr-zz-kpis").innerHTML =
-      kpiSimplesCfcrHTML(nc, `sem cooperação ativa hoje (${Math.round(nc / n * 100)}%)`, "var(--cfcr-bad)") +
-      kpiSimplesCfcrHTML(c["Com termo vigente"], "com cooperação ativa", "var(--cfcr-ok)") +
-      kpiSimplesCfcrHTML(c["Só vencido"], "só com termo vencido") +
-      kpiSimplesCfcrHTML(c["Só em construção"], "só em construção", "var(--cfcr-warn)") +
-      kpiSimplesCfcrHTML(c["Sem termo"], "nunca tiveram termo");
+      kpiSimplesCfcrHTML(nc, `municípios sem cooperação ativa hoje (${Math.round(nc / n * 100)}%)`, "var(--cfcr-bad)") +
+      kpiSimplesCfcrHTML(c["Com termo vigente"], "municípios com cooperação ativa", "var(--cfcr-ok)") +
+      kpiSimplesCfcrHTML(c["Só vencido"], "municípios com todos os termos vencidos") +
+      kpiSimplesCfcrHTML(c["Só em construção"], "municípios só com termo em construção", "var(--cfcr-warn)") +
+      kpiSimplesCfcrHTML(c["Sem termo"], "municípios sem nenhum termo registrado");
+    // Termo x município: deixa explícito se os dois números coincidem hoje.
+    const termosVig = porStatusTermo.VIGENTE, munVig = c["Com termo vigente"];
+    document.getElementById("cfcr-zz-kpis-nota").textContent = termosVig === munVig
+      ? `Hoje cada um dos ${munVig} municípios com cooperação ativa tem exatamente 1 termo vigente (${termosVig} termos vigentes = ${munVig} municípios).`
+      : `${termosVig} termos vigentes estão em ${munVig} municípios — alguns municípios têm mais de um termo vigente.`;
     const { barraHTML, legendaHTML } = barraComposicaoCfcrHTML([
       ["Com cooperação ativa", c["Com termo vigente"], "var(--cfcr-ok)"],
       ["Só vencido", c["Só vencido"], "var(--cfcr-bad)"],
