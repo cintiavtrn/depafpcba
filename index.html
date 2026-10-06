@@ -496,6 +496,47 @@ body{background:var(--paper);color:var(--carvao);font-family:'IBM Plex Sans',san
 .acesso-portal .acesso-nome{font-family:'IBM Plex Mono',monospace;font-size:var(--fs-ui-sm);color:var(--carvao);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .acesso-portal .dash-toggle{flex:none}
 .acesso-portal .dash-toggle-btn{padding:6px 8px;min-height:28px;font-size:var(--fs-ui-xs)}
+/* ---- Painel de Frota (portal frota) — visual próprio, igual ao painel de origem ---- */
+.frota-app{--bg:#f4f3ee;--card:#fff;--ink:#1c2321;--mut:#6b7370;--line:#e4e2db;--p:#1d6f6b;--a:#d9822b;--c:#7a6fb5;--k1:#2e5e9e;--k2:#c2493d;--k3:#8a8f98;display:grid;grid-template-columns:270px minmax(0,1fr);gap:16px;padding:16px;box-sizing:border-box;width:100%;max-width:1400px;margin:0 auto;border-radius:12px;background:var(--bg);color:var(--ink);font:14px/1.4 system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;text-transform:none;letter-spacing:normal}
+@media(prefers-color-scheme:dark){.frota-app{--bg:#121618;--card:#1b2123;--ink:#e8ecea;--mut:#9aa5a1;--line:#2b3335}}
+.frota-app *{box-sizing:content-box}
+.frota-app .fr-side{position:sticky;top:16px;align-self:start;max-height:calc(100vh - 32px);overflow:auto;display:flex;flex-direction:column;gap:12px;min-width:0}
+.frota-app .fr-card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;min-width:0}
+.frota-app h1{font:inherit;font-size:18px;font-weight:700;margin:0;text-transform:none;letter-spacing:normal;color:var(--ink)}
+.frota-app h2{font:inherit;font-size:13px;font-weight:700;margin:0 0 10px;letter-spacing:.02em;text-transform:none;color:var(--ink)}
+.frota-app .fr-m{color:var(--mut);font-size:12px}
+.frota-app .fr-kg{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.frota-app .fr-k{border:1px solid var(--line);border-radius:10px;padding:8px 10px;border-left:4px solid var(--kc,var(--line))}
+.frota-app .fr-k b{display:block;font-size:22px;line-height:1.1}
+.frota-app .fr-k.fr-w{grid-column:1/-1}
+.frota-app .fr-fl{margin-bottom:8px}
+.frota-app .fr-fl>div{font-size:11px;color:var(--mut);margin-bottom:3px}
+.frota-app .fr-ch{display:flex;flex-wrap:wrap;gap:4px}
+.frota-app .fr-ch button{font:inherit;font-size:12px;padding:3px 8px;border-radius:99px;border:1px solid var(--line);background:none;color:var(--ink);cursor:pointer;text-transform:none;letter-spacing:normal}
+.frota-app .fr-ch button.on{background:var(--ink);color:var(--card);border-color:var(--ink)}
+.frota-app .fr-main{display:flex;flex-direction:column;gap:14px;min-width:0}
+.frota-app .fr-g{display:grid;grid-template-columns:repeat(auto-fit,minmax(310px,1fr));gap:14px}
+.frota-app .fr-wide{grid-column:1/-1}
+.frota-app .fr-hero{border-left:5px solid var(--k2)}
+.frota-app .fr-r{display:grid;grid-template-columns:92px 1fr;gap:8px;align-items:center;margin:3px 0;font-size:12px}
+.frota-app .fr-r.fr-a span:first-child{font-weight:700}
+.frota-app .fr-w{display:flex;align-items:center;min-width:0}
+.frota-app .fr-s{display:flex;height:16px;border-radius:3px;overflow:hidden}
+.frota-app .fr-s i{display:block;font-style:normal}
+.frota-app .fr-w em{font-style:normal;margin-left:6px;font-size:11px;color:var(--mut);white-space:nowrap}
+.frota-app .fr-lg{display:flex;flex-wrap:wrap;gap:10px;font-size:11px;color:var(--mut);margin-bottom:8px}
+.frota-app .fr-lg u{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:4px;text-decoration:none}
+.frota-app .fr-cols{display:flex;align-items:flex-end;gap:3px;height:150px}
+.frota-app .fr-cols>div{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;font-size:9px;color:var(--mut)}
+.frota-app .fr-cols .fr-st{display:flex;flex-direction:column-reverse;width:100%;justify-content:flex-start;flex:none}
+.frota-app .fr-cols .fr-st i{display:block;font-style:normal}
+.frota-app .fr-dn{display:flex;align-items:center;gap:12px}
+.frota-app .fr-dn svg{flex:none;width:110px;height:110px}
+.frota-app .fr-dn ul{list-style:none;margin:0;padding:0;font-size:12px}
+.frota-app .fr-dn li{margin:2px 0}
+.frota-app .fr-note{background:color-mix(in srgb,var(--a) 12%,transparent);border:1px solid var(--a);border-radius:10px;padding:8px 10px;font-size:12px;margin-bottom:10px}
+.frota-app .fr-sc{max-height:430px;overflow:auto}
+@media(max-width:860px){.frota-app{grid-template-columns:minmax(0,1fr);padding:12px}.frota-app .fr-side{position:static;max-height:none}}
 .modulo-check{display:flex;align-items:center;gap:8px;background:var(--paper);padding:7px 10px;min-width:0;font-family:'IBM Plex Mono',monospace;font-size:var(--fs-ui-sm);color:var(--carvao);cursor:pointer}
 .modulo-check input{flex:none;width:16px;height:16px;accent-color:var(--tinta)}
 .modulo-check input:disabled{cursor:not-allowed}
@@ -1907,6 +1948,9 @@ const SUBPORTAIS = {
     { tab: "cfcr-acordos", rotulo: "CFCR - ACORDOS CONGÊNERES", modulo: "cfcr" },
   ],
   infraestrutura: [{ tab: "obras", rotulo: "PAINEL DE OBRAS", modulo: "obras" }],
+  // O portal Frota agora é só o painel novo: as abas padrão (Visão Geral /
+  // Painéis / Planilhas) e o texto de apresentação antigo não aparecem mais.
+  frota: [{ tab: "frota", rotulo: "PAINEL DE FROTA", modulo: "frota" }],
 };
 
 // Só as abas dos módulos que esta conta pode ver (cadastro de segurança:
@@ -2465,6 +2509,7 @@ function chaveMostrarAbasOcultas(portalId) {
 }
 
 function abasPadraoOcultas(portalId) {
+  if (portalId === "frota") return true; // sem alternância nem aviso: o painel novo substituiu tudo
   if (!PORTAIS_COM_ABAS_PADRAO_OCULTAS.includes(portalId)) return false;
   if (!subportaisDe(portalId).length) return false; // nada pra sobrar visível
   if (souAdmin() && localStorage.getItem(chaveMostrarAbasOcultas(portalId)) === "1") return false;
@@ -10661,6 +10706,146 @@ function criarMotorDimensoesPorValor(linhasTodas, dimensoes, campoRegiao) {
   return { filtros, bateFiltro, filtrar: () => linhasTodas.filter((r) => bateFiltro(r, null)) };
 }
 
+// =====================================================================
+// PAINEL DE FROTA — portal "frota". Reproduz o painel de origem (mesmos
+// indicadores, gráficos, filtros e cores). Os números vêm da API
+// (/api/portais/frota/frota), atrás do login e do módulo "frota": o front é
+// público, então nada da frota fica embutido aqui. Todo o estado e as funções
+// ficam dentro de montarPainelFrota para não colidir com o resto do arquivo.
+// =====================================================================
+async function carregarFrotaPortal(portalSlug) {
+  const painel = document.getElementById("tab-frota");
+  painel.innerHTML = `<p class="tela-intro">Carregando o painel de frota...</p>`;
+  let dados;
+  try {
+    dados = await apiFetch(`/api/portais/${portalSlug}/frota`);
+  } catch (erro) {
+    painel.innerHTML = `<p class="tela-intro">Não consegui carregar o painel de frota: ${escapeHTML(erro.message)}</p>`;
+    return;
+  }
+  painel.innerHTML = `<div class="frota-app">
+    <aside class="fr-side">
+      <div class="fr-card"><h1>Frota PCBA</h1><div class="fr-m">Base: ${escapeHTML(dados.base || "")}</div></div>
+      <div class="fr-card"><h2>Indicadores</h2><div class="fr-kg" data-fr="kpi"></div></div>
+      <div class="fr-card"><h2>Filtros</h2><div data-fr="flt"></div><div class="fr-m">Filtros combinam entre si (E entre grupos, OU dentro do grupo). Não alteram o quadro vermelho nem a seção de dados parciais.</div></div>
+    </aside>
+    <main class="fr-main">
+      <section class="fr-card fr-hero"><h2>Descaracterizados nas unidades administrativas</h2><div class="fr-m" style="margin:-6px 0 8px">Unidades administrativas: GDG, DILOG, ACADEPOL, DGTI, ISPE, DEPAF, DPSV e OUVIDORIA. Não confundir com o veículo caracterizado ADM (símbolo do Estado).</div><div data-fr="hero"></div></section>
+      <section class="fr-g">
+        <div class="fr-card fr-wide"><h2>Veículos por departamento</h2><div class="fr-lg" data-fr="lgP"></div><div class="fr-sc" data-fr="dep"></div><div class="fr-m">Negrito = unidade administrativa (◆ nos filtros).</div></div>
+        <div class="fr-card"><h2>Caracterização</h2><div class="fr-dn" data-fr="dC"></div></div>
+        <div class="fr-card"><h2>Propriedade</h2><div class="fr-dn" data-fr="dP"></div></div>
+        <div class="fr-card"><h2>Região</h2><div class="fr-lg" data-fr="lgC"></div><div data-fr="reg"></div></div>
+        <div class="fr-card"><h2>Cela</h2><div class="fr-dn" data-fr="dX"></div></div>
+        <div class="fr-card"><h2>Tipo de veículo</h2><div data-fr="tip"></div></div>
+        <div class="fr-card"><h2>Ano de fabricação</h2><div class="fr-m">Respeita apenas os filtros de caracterização e propriedade.</div><div class="fr-cols" data-fr="ano"></div></div>
+      </section>
+      <section class="fr-card"><h2>Fonte do recurso, valor e entrega (dados parciais)</h2>
+        <div class="fr-note" data-fr="note"></div>
+        <div class="fr-g">
+          <div><div class="fr-m" style="margin-bottom:6px">Preenchimento da fonte do recurso, por propriedade</div><div data-fr="cov"></div></div>
+          <div><div class="fr-m" style="margin-bottom:6px">Investimento por fonte (R$ milhões, só veículos com registro)</div><div data-fr="fon"></div></div>
+          <div class="fr-wide"><div class="fr-m" style="margin-bottom:6px">Entregas por trimestre (só veículos com data)</div><div class="fr-cols" data-fr="qt"></div></div>
+        </div>
+      </section>
+    </main>
+  </div>`;
+  montarPainelFrota(painel.querySelector(".frota-app"), dados);
+}
+
+function montarPainelFrota(raiz, DB) {
+  const { D, A, C, Y, S, TN } = DB;
+  const $ = (k) => raiz.querySelector(`[data-fr="${k}"]`);
+  const N = (n) => n.toLocaleString("pt-BR");
+  const CN = ["Caracterizado padrão", "Descaracterizado", "Caracterizado ADM"], PN = ["Próprio", "Alugado", "Cedido"], RN = ["Capital", "RMS", "Interior"], XN = ["Sem cela", "Com cela"];
+  const CC = ["var(--k1)", "var(--k2)", "var(--k3)"], PC = ["var(--p)", "var(--a)", "var(--c)"];
+  const F = { c: new Set(), p: new Set(), r: new Set(), x: new Set(), d: new Set() };
+  const FD = [["c", "Caracterização", CN, [["Todos os caracterizados", [0, 2]]]], ["p", "Propriedade", PN, []], ["r", "Região", RN, [["Capital + RMS", [0, 1]]]], ["x", "Cela", XN, []]];
+  const lg = (n, c) => n.map((x, i) => `<span><u style="background:${c[i]}"></u>${x}</span>`).join("");
+  const seg = (v, c) => `<div class="fr-s">${v.map((x, i) => x ? `<i style="flex:${x};background:${c[i]}" title="${x}"></i>` : "").join("")}</div>`;
+  const soma = (v) => v.reduce((a, b) => a + b, 0);
+  function rows(items, c, max) {
+    return items.map(([l, v, ex, isA]) => {
+      const t = soma(v);
+      return `<div class="fr-r ${isA ? "fr-a" : ""}"><span>${l}</span><div class="fr-w"><div style="width:${t / max * 80}%;min-width:2px">${seg(v, c)}</div><em>${N(t)}${ex ? " · " + ex : ""}</em></div></div>`;
+    }).join("");
+  }
+  function donut(el, names, vals, cols) {
+    const T = soma(vals) || 1, R = 40, Lc = 2 * Math.PI * R;
+    let o = 0;
+    const arcs = vals.map((v, i) => {
+      const d = v / T * Lc, a = `<circle r="${R}" cx="55" cy="55" fill="none" stroke="${cols[i]}" stroke-width="18" stroke-dasharray="${d} ${Lc - d}" stroke-dashoffset="${-o}" transform="rotate(-90 55 55)"/>`;
+      o += d;
+      return a;
+    }).join("");
+    $(el).innerHTML = `<svg viewBox="0 0 110 110">${arcs}<text x="55" y="60" text-anchor="middle" font-size="16" font-weight="700" fill="currentColor">${N(soma(vals))}</text></svg><ul>${names.map((n, i) => `<li><u style="display:inline-block;width:9px;height:9px;border-radius:2px;background:${cols[i]};margin-right:5px;text-decoration:none"></u>${n}: <b>${N(vals[i])}</b> <span class="fr-m">(${(vals[i] / T * 100).toFixed(0)}%)</span></li>`).join("")}</ul>`;
+  }
+  function colunas(el, items, c) {
+    const mx = Math.max(...items.map((x) => soma(x[1])));
+    $(el).innerHTML = items.map(([l, v]) => {
+      const t = soma(v);
+      return `<div title="${l}: ${t}"><span>${t}</span><div class="fr-st" style="height:${t / mx * 105}px">${v.map((x, i) => `<i style="height:${x / t * 100}%;background:${c[i]}"></i>`).join("")}</div><span>${l}</span></div>`;
+    }).join("");
+  }
+  const ok = (st, v) => !st.size || st.has(v);
+  const ag = (R, k, n) => { const a = Array(n).fill(0); R.forEach((r) => { a[r[k]] += r[6]; }); return a; };
+
+  function hero() {
+    const R = C.filter((r) => r[1] == 1), adm = R.filter((r) => A.includes(r[0])), oth = R.filter((r) => !A.includes(r[0]));
+    const sp = (x) => [0, 1, 2].map((p) => x.filter((r) => r[2] == p).reduce((a, r) => a + r[6], 0));
+    const a = sp(adm), o = sp(oth), sa = soma(a), so = soma(o);
+    const it = A.map((d) => [D[d], sp(adm.filter((r) => r[0] == d)), "", 1]).map((x) => { x[2] = x[1][1] ? x[1][1] + " alugado" + (x[1][1] > 1 ? "s" : "") : "nenhum alugado"; return x; }).sort((x, y) => soma(y[1]) - soma(x[1]));
+    $("hero").innerHTML = `<div class="fr-kg" style="grid-template-columns:repeat(auto-fit,minmax(130px,1fr));margin-bottom:10px"><div class="fr-k" style="--kc:var(--k2)"><b>${sa}</b><span class="fr-m">descaracterizados nas 8 unidades adm.</span></div><div class="fr-k" style="--kc:var(--a)"><b>${a[1]}</b><span class="fr-m">alugados (${(a[1] / sa * 100).toFixed(0)}%)</span></div><div class="fr-k" style="--kc:var(--p)"><b>${a[0]}</b><span class="fr-m">próprios</span></div><div class="fr-k" style="--kc:var(--c)"><b>${a[2]}</b><span class="fr-m">cedidos</span></div><div class="fr-k" style="--kc:var(--k3)"><b>${N(so)}</b><span class="fr-m">nas demais unidades (${o[1]} alugados, ${o[2]} cedidos)</span></div></div><div class="fr-lg">${lg(PN, PC)}</div>${rows(it, PC, Math.max(...it.map((x) => soma(x[1]))))}`;
+  }
+  function draw() {
+    const R = C.filter((r) => ok(F.c, r[1]) && ok(F.p, r[2]) && ok(F.r, r[3]) && ok(F.x, r[4]) && ok(F.d, r[0]));
+    const T = R.reduce((a, r) => a + r[6], 0) || 1, c = ag(R, 1, 3), p = ag(R, 2, 3), r = ag(R, 3, 3), x = ag(R, 4, 2);
+    const K = [["Total de veículos", T, "", 1, "var(--ink)"], ["Descaracterizados", c[1], c[1] / T, 0, CC[1]], ["Caracterizados (padrão + ADM)", c[0] + c[2], (c[0] + c[2]) / T, 0, CC[0]], ["↳ dos quais ADM (símbolo do Estado)", c[2], c[2] / T, 0, CC[2]], ["Próprios", p[0], p[0] / T, 0, PC[0]], ["Alugados", p[1], p[1] / T, 0, PC[1]], ["Cedidos", p[2], p[2] / T, 0, PC[2]], ["Com cela", x[1], x[1] / T, 0, "var(--ink)"]];
+    $("kpi").innerHTML = K.map((k) => `<div class="fr-k ${k[3] ? "fr-w" : ""}" style="--kc:${k[4]}"><b>${N(k[1])}</b><span class="fr-m">${k[0]}${k[2] !== "" ? " · " + (k[2] * 100).toFixed(0) + "%" : ""}</span></div>`).join("");
+    const dp = D.map((n, i) => [n, ag(R.filter((q) => q[0] == i), 2, 3), "", A.includes(i)]).filter((z) => soma(z[1])).sort((a, b) => soma(b[1]) - soma(a[1]));
+    $("lgP").innerHTML = lg(PN, PC);
+    $("dep").innerHTML = rows(dp, PC, dp.length ? soma(dp[0][1]) : 1);
+    donut("dC", CN, c, CC); donut("dP", PN, p, PC); donut("dX", XN, x, ["var(--k3)", "var(--ink)"]);
+    $("lgC").innerHTML = lg(CN, CC);
+    const rg = RN.map((n, i) => [n, ag(R.filter((q) => q[3] == i), 1, 3)]);
+    $("reg").innerHTML = rows(rg, CC, Math.max(...rg.map((z) => soma(z[1])), 1));
+    const tp = TN.map((n, i) => [n, ag(R.filter((q) => q[5] == i), 2, 3)]).filter((z) => soma(z[1])).sort((a, b) => soma(b[1]) - soma(a[1]));
+    $("tip").innerHTML = `<div class="fr-lg">${lg(PN, PC)}</div>` + rows(tp, PC, tp.length ? soma(tp[0][1]) : 1);
+    const yr = {};
+    Y.filter((q) => ok(F.c, q[0]) && ok(F.p, q[1])).forEach((q) => { (yr[q[2]] = yr[q[2]] || [0, 0, 0])[q[1]] += q[3]; });
+    colunas("ano", Object.keys(yr).sort().map((k) => [String(k).slice(2), yr[k]]), PC);
+  }
+  const AD = new Set(A), OT = D.map((_, i) => i).filter((i) => !AD.has(i));
+  function chips() {
+    const b = (k, i, l) => `<button class="${F[k].has(i) ? "on" : ""}" data-act="tg" data-k="${k}" data-i="${i}">${l}</button>`;
+    const pb = (k, l, v) => `<button style="border-style:dashed" data-act="ps" data-k="${k}" data-v="${v}">${l}</button>`;
+    $("flt").innerHTML = FD.map(([k, t, n, pr]) => `<div class="fr-fl"><div>${t} <span class="fr-m">(vazio = todos)</span></div><div class="fr-ch">${n.map((l, i) => b(k, i, l)).join("")}${pr.map((z) => pb(k, z[0], z[1])).join("")}${F[k].size ? pb(k, "limpar", "") : ""}</div></div>`).join("") +
+      `<div class="fr-fl"><div>Departamentos <span class="fr-m">(◆ = unidade administrativa; escolha quantos quiser)</span></div><div class="fr-ch" style="margin-bottom:4px">${pb("d", "◆ Administrativas", A)}${pb("d", "Demais", OT)}${F.d.size ? pb("d", "limpar", "") : ""}</div><div class="fr-ch">${[...D.keys()].sort((a, b2) => (AD.has(b2) - AD.has(a)) || a - b2).map((i) => b("d", i, (AD.has(i) ? "◆ " : "") + D[i])).join("")}</div></div>`;
+  }
+  // Os botões são redesenhados a cada clique; um único ouvinte no painel
+  // resolve todos (nada de onclick inline nem de funções globais).
+  raiz.addEventListener("click", (ev) => {
+    const bt = ev.target.closest("[data-act]");
+    if (!bt || !raiz.contains(bt)) return;
+    const k = bt.dataset.k;
+    if (bt.dataset.act === "tg") {
+      const v = Number(bt.dataset.i);
+      F[k].has(v) ? F[k].delete(v) : F[k].add(v);
+    } else {
+      F[k] = new Set(bt.dataset.v ? bt.dataset.v.split(",").map(Number) : []);
+    }
+    chips(); draw();
+  });
+
+  const cv = S.cov, pr = cv[0], totalVeic = soma(cv.map((z) => z[1]));
+  $("note").innerHTML = `Fonte, valor e data só existem para <b>${N(S.nf)}</b> de ${N(totalVeic)} veículos (${(S.nf / totalVeic * 100).toFixed(0)}%). Alugados não têm esses campos por natureza; entre os próprios, ${(pr[2] / pr[1] * 100).toFixed(0)}% estão preenchidos. Por isso estes gráficos mostram apenas o que foi registrado — <b>não representam a frota inteira</b>. Total registrado: R$ ${S.tot.toLocaleString("pt-BR")} mi em ${N(S.nv)} veículos.`;
+  $("cov").innerHTML = cv.map(([n, t, f], i) => `<div class="fr-r"><span>${n}</span><div class="fr-w"><div style="width:80%"><div class="fr-s" style="background:var(--line)"><i style="width:${f / t * 100}%;background:${PC[i]}"></i></div></div><em>${N(f)} de ${N(t)}</em></div></div>`).join("");
+  const fm = Math.max(...S.F.map((z) => z[2]));
+  $("fon").innerHTML = S.F.map(([n, q, v]) => `<div class="fr-r"><span>${n}</span><div class="fr-w"><div style="width:${v / fm * 70}%;min-width:2px"><div class="fr-s"><i style="flex:1;background:var(--k1)"></i></div></div><em>${v ? "R$ " + v.toLocaleString("pt-BR") + " mi · " : ""}${q} veíc.</em></div></div>`).join("");
+  colunas("qt", S.Q.map(([l, n]) => [l, [n]]), ["var(--k1)"]);
+  chips(); draw(); hero();
+}
+
 async function carregarObrasPortal(portalSlug) {
   const painel = document.getElementById("tab-obras");
   painel.innerHTML = `<p class="tela-intro">Carregando o painel de obras...</p>`;
@@ -13777,7 +13962,7 @@ async function abrirTela(id) {
       </div>
       <span class="mini-rosa" title="Este portal na rosa dos ventos do DEPAF">${miniRosaSVG(PORTAIS.findIndex(x => x.id === id), PORTAIS.length, p.cor)}</span>
     </div>
-    <p class="tela-intro">${p.intro}</p>
+    ${id === "frota" ? "" : `<p class="tela-intro">${p.intro}</p>`}
     ${avisoAbasOcultas}
     <div class="tabs">
       ${ocultarAbasPadrao ? "" : `
@@ -13807,6 +13992,7 @@ async function abrirTela(id) {
     if (nome === "paineis") carregarPaineisPortal(p.id);
     if (nome === "contratos") carregarContratosPortal(p.id);
     if (nome === "obras") carregarObrasPortal(p.id);
+    if (nome === "frota") carregarFrotaPortal(p.id);
     if (nome === "cfcr") carregarCfcrPortal(p.id);
     if (nome === "cfcr-acordos") carregarCfcrAcordosPortal(p.id);
     // recarrega os destaques ao voltar pra Visão Geral: marcar um painel na
