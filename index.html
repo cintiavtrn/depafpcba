@@ -536,6 +536,32 @@ body{background:var(--paper);color:var(--carvao);font-family:'IBM Plex Sans',san
 .frota-app .fr-dn li{margin:2px 0}
 .frota-app .fr-note{background:color-mix(in srgb,var(--a) 12%,transparent);border:1px solid var(--a);border-radius:10px;padding:8px 10px;font-size:12px;margin-bottom:10px}
 .frota-app .fr-sc{max-height:430px;overflow:auto}
+.frota-app .fr-mxhead{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap;margin:4px 0 8px}
+.frota-app .fr-mxhead .fr-mxl{font-size:10px;color:var(--mut);letter-spacing:.08em}
+.frota-app .fr-mxhead b{display:block;font-size:22px;line-height:1.1}
+.frota-app .fr-mxctl{display:flex;flex-direction:column;align-items:flex-end;gap:6px}
+.frota-app .fr-seg{display:flex;border:1px solid var(--line);border-radius:99px;overflow:hidden}
+.frota-app .fr-seg button,.frota-app .fr-ic{font:inherit;font-size:11px;padding:4px 10px;border:0;background:none;color:var(--ink);cursor:pointer;letter-spacing:.04em;text-transform:none}
+.frota-app .fr-seg button+button{border-left:1px solid var(--line)}
+.frota-app .fr-seg button.on{background:var(--ink);color:var(--card)}
+.frota-app .fr-ics{display:flex;gap:4px}
+.frota-app .fr-ic{border:1px solid var(--line);border-radius:6px;padding:4px 7px;line-height:0}
+.frota-app .fr-ic svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.8}
+.frota-app .fr-dimsel{display:flex;flex-wrap:wrap;gap:4px;align-items:center;margin-bottom:6px;font-size:11px;color:var(--mut)}
+.frota-app .fr-dimsel button{font:inherit;font-size:12px;padding:3px 8px;border-radius:99px;border:1px solid var(--line);background:none;color:var(--ink);cursor:pointer;text-transform:none;letter-spacing:normal}
+.frota-app .fr-dimsel button.on{background:var(--ink);color:var(--card);border-color:var(--ink)}
+.frota-app .fr-mxs{overflow-x:auto;padding:2px 0 6px}
+.frota-app table.fr-mxt{border-collapse:separate;border-spacing:2px;margin:0 90px 0 0}
+.frota-app .fr-mxt th,.frota-app .fr-mxt td{padding:0;font-weight:400}
+.frota-app .fr-mxt th.fr-rot{position:relative;height:128px;min-width:40px;vertical-align:bottom}
+.frota-app .fr-mxt th.fr-rot>div{position:absolute;left:50%;bottom:2px;transform-origin:0 100%;transform:rotate(-45deg);white-space:nowrap;font-size:11px;color:var(--ink);text-align:left}
+.frota-app .fr-mxt th.fr-rot.fr-tt>div{font-weight:700}
+.frota-app .fr-mxt th.fr-rl{text-align:right;padding-right:8px;font-size:12px;white-space:nowrap;max-width:190px;overflow:hidden;text-overflow:ellipsis}
+.frota-app .fr-mxt td{height:32px;min-width:40px;text-align:center;font-size:12px;border-radius:3px}
+.frota-app .fr-mxt td.fr-z{background:color-mix(in srgb,var(--ink) 4%,var(--card))}
+.frota-app .fr-mxt td.fr-t{background:color-mix(in srgb,var(--ink) 8%,var(--card));font-weight:700}
+.frota-app .fr-card.fr-fs{position:fixed;top:0;right:0;bottom:0;left:0;z-index:2000;border-radius:0;overflow:auto;max-height:none}
+.frota-app .fr-ins{font-size:12px;margin:0 0 8px}
 @media(max-width:860px){.frota-app{grid-template-columns:minmax(0,1fr);padding:12px}.frota-app .fr-side{position:static;max-height:none}}
 .modulo-check{display:flex;align-items:center;gap:8px;background:var(--paper);padding:7px 10px;min-width:0;font-family:'IBM Plex Mono',monospace;font-size:var(--fs-ui-sm);color:var(--carvao);cursor:pointer}
 .modulo-check input{flex:none;width:16px;height:16px;accent-color:var(--tinta)}
@@ -10738,7 +10764,15 @@ async function carregarFrotaPortal(portalSlug) {
         <div class="fr-card"><h2>Região</h2><div class="fr-lg" data-fr="lgC"></div><div data-fr="reg"></div></div>
         <div class="fr-card"><h2>Cela</h2><div class="fr-dn" data-fr="dX"></div></div>
         <div class="fr-card"><h2>Tipo de veículo</h2><div data-fr="tip"></div></div>
+        <div class="fr-card fr-wide" data-fr="card-mod"><h2>Modelos da frota</h2><div class="fr-m">Os 14 modelos mais frequentes nos filtros escolhidos (o restante soma em “Outros modelos”). A marca foi acrescentada a partir do modelo; a planilha só informa o modelo.</div>
+          <div class="fr-dimsel" data-fr="mod-dim"></div>
+          <div class="fr-mxhead"><div><span class="fr-mxl">TOTAL GERAL</span><b data-fr="mod-tot"></b></div><div class="fr-mxctl" data-fr="mod-ctl"></div></div>
+          <div data-fr="mod-leg"></div><div class="fr-mxs" data-fr="mod"></div></div>
         <div class="fr-card"><h2>Ano de fabricação</h2><div class="fr-m">Respeita apenas os filtros de caracterização e propriedade.</div><div class="fr-cols" data-fr="ano"></div></div>
+        <div class="fr-card fr-wide" data-fr="card-ae"><h2>Ano de fabricação × ano de entrega</h2><div class="fr-m">O ano que consta na planilha é o de fabricação, não o de entrega: um veículo fabricado em 2024 pode ter sido entregue em 2025. Aqui os dois lados a lado, respeitando todos os filtros.</div>
+          <p class="fr-ins" data-fr="ae-ins"></p>
+          <div class="fr-mxhead"><div><span class="fr-mxl">TOTAL GERAL</span><b data-fr="ae-tot"></b></div><div class="fr-mxctl" data-fr="ae-ctl"></div></div>
+          <div data-fr="ae-leg"></div><div class="fr-mxs" data-fr="ae"></div></div>
       </section>
       <section class="fr-card"><h2>Fonte do recurso, valor e entrega (dados parciais)</h2>
         <div class="fr-note" data-fr="note"></div>
@@ -10814,6 +10848,98 @@ function montarPainelFrota(raiz, DB) {
     const yr = {};
     Y.filter((q) => ok(F.c, q[0]) && ok(F.p, q[1])).forEach((q) => { (yr[q[2]] = yr[q[2]] || [0, 0, 0])[q[1]] += q[3]; });
     colunas("ano", Object.keys(yr).sort().map((k) => [String(k).slice(2), yr[k]]), PC);
+    matrizes();
+  }
+  // ---------- matrizes (modelo × linha escolhida; ano de fabricação × ano de entrega) ----------
+  // V = [depto, caracterização, propriedade, região, cela, tipo, modelo, anoFab, anoEntrega(0=sem data), qtd]
+  const V = DB.V || [], M = DB.M || [];
+  const DIMS = { tipo: ["Tipo de veículo", 5, TN], dep: ["Departamento", 0, D], prop: ["Propriedade", 2, PN], reg: ["Região", 3, RN], carac: ["Caracterização", 1, CN] };
+  const MX = { mod: { modo: "matriz", dim: "tipo" }, ae: { modo: "matriz" } };
+  const MXD = {};
+  const PAL = ["#1d6f6b", "#d9822b", "#7a6fb5", "#2e5e9e", "#c2493d", "#8a8f98", "#3f9d97", "#e8ab6b", "#a79fd1", "#6b8fc4", "#d98277", "#b3b7bd", "#2d4f4c", "#8c5a1d", "#4d4478"];
+  const filtra = (r) => ok(F.c, r[1]) && ok(F.p, r[2]) && ok(F.r, r[3]) && ok(F.x, r[4]) && ok(F.d, r[0]);
+  const ICO_FS = `<svg viewBox="0 0 16 16"><path d="M1 6V1h5M10 1h5v5M15 10v5h-5M6 15H1v-5"/></svg>`;
+  const ICO_DL = `<svg viewBox="0 0 16 16"><path d="M8 1v9M4 7l4 4 4-4M2 14h12"/></svg>`;
+  const pctTxt = (v) => (v > 0 && v < 0.5 ? "<1" : String(Math.round(v)));
+
+  function renderMx(ch, cfg) {
+    // cfg: { rows:[{l, v:[...]}], cols:[...], ordenar }
+    MXD[ch] = cfg;
+    const { rows: rw, cols: cl } = cfg, modo = MX[ch].modo;
+    const rt = rw.map((r) => soma(r.v)), ct = cl.map((_, j) => rw.reduce((a, r) => a + r.v[j], 0)), geral = soma(rt);
+    $(ch + "-tot").textContent = N(geral);
+    $(ch + "-ctl").innerHTML = `<div class="fr-seg">${[["matriz", "MATRIZ"], ["barras", "BARRAS"], ["prop", "% PROPORÇÃO"]].map(([m, l]) => `<button class="${modo === m ? "on" : ""}" data-mx="${ch}" data-modo="${m}">${l}</button>`).join("")}</div><div class="fr-ics"><button class="fr-ic" title="Tela cheia" data-mx="${ch}" data-fs="1">${ICO_FS}</button><button class="fr-ic" title="Baixar CSV" data-mx="${ch}" data-dl="1">${ICO_DL}</button></div>`;
+    const alvo = $(ch), leg = $(ch + "-leg");
+    if (!geral) { alvo.innerHTML = `<div class="fr-m" style="padding:14px 0">Nenhum veículo com os filtros escolhidos.</div>`; leg.innerHTML = ""; return; }
+    if (modo === "barras") {
+      leg.innerHTML = `<div class="fr-lg">${lg(cl, cl.map((_, i) => PAL[i % PAL.length]))}</div>`;
+      alvo.innerHTML = rows(rw.map((r) => [r.l, r.v, "", false]), cl.map((_, i) => PAL[i % PAL.length]), Math.max(...rt, 1));
+      return;
+    }
+    leg.innerHTML = "";
+    const pc = modo === "prop";
+    const val = (r, j, t) => (pc ? (t ? r.v[j] / t * 100 : 0) : r.v[j]);
+    const neu = cfg.neutra ?? -1; // coluna "sem dado": aparece, mas não entra na escala de cor
+    const mx = Math.max(...rw.map((r, i) => Math.max(...r.v.map((x, j) => (j === neu ? 0 : val({ v: r.v }, j, rt[i]))))), 1);
+    const cel = (v, txt, j) => {
+      if (!v) return `<td class="fr-z"></td>`;
+      if (j === neu) return `<td class="fr-z" style="color:var(--mut)">${txt}</td>`;
+      const k = Math.round(12 + 88 * Math.pow(v / mx, 0.6));
+      return `<td style="background:color-mix(in srgb,var(--p) ${k}%,var(--card));color:${k > 52 ? "#fff" : "var(--ink)"}">${txt}</td>`;
+    };
+    const cab = cl.map((c) => `<th class="fr-rot"><div>${c}</div></th>`).join("") + `<th class="fr-rot fr-tt"><div>TOTAL</div></th>`;
+    const corpo = rw.map((r, i) => `<tr><th class="fr-rl" title="${r.l}">${r.l}</th>${r.v.map((x, j) => { const v = val(r, j, rt[i]); return cel(v, pc ? pctTxt(v) : N(x), j); }).join("")}<td class="fr-t">${pc ? "100" : N(rt[i])}</td></tr>`).join("");
+    const rodape = `<tr><th class="fr-rl"><b>TOTAL</b></th>${ct.map((x) => `<td class="fr-t">${pc ? pctTxt(x / geral * 100) : N(x)}</td>`).join("")}<td class="fr-t">${pc ? "100" : N(geral)}</td></tr>`;
+    alvo.innerHTML = `<table class="fr-mxt"><thead><tr><th></th>${cab}</tr></thead><tbody>${corpo}${rodape}</tbody></table>`;
+  }
+
+  function matrizes() {
+    if (!V.length) return;
+    const R = V.filter(filtra);
+    // 1) modelos
+    const porModelo = new Map();
+    R.forEach((r) => porModelo.set(r[6], (porModelo.get(r[6]) || 0) + r[9]));
+    const ord = [...porModelo.entries()].sort((a, b) => b[1] - a[1]);
+    const top = ord.slice(0, 14).map((z) => z[0]), outros = ord.length > 14;
+    const cols = top.map((i) => M[i]).concat(outros ? ["Outros modelos"] : []);
+    const [, k, labels] = DIMS[MX.mod.dim];
+    const cel = labels.map(() => Array(cols.length).fill(0));
+    R.forEach((r) => { const ci = top.indexOf(r[6]); cel[r[k]][ci >= 0 ? ci : cols.length - 1] += r[9]; });
+    const linhas = labels.map((l, i) => ({ l, v: cel[i] })).filter((z) => soma(z.v)).sort((a, b) => soma(b.v) - soma(a.v));
+    $("mod-dim").innerHTML = `<span>Linhas:</span>` + Object.entries(DIMS).map(([c, d]) => `<button class="${MX.mod.dim === c ? "on" : ""}" data-mx="mod" data-dim="${c}">${d[0]}</button>`).join("");
+    renderMx("mod", { rows: linhas, cols, nome: "modelos-por-" + MX.mod.dim });
+    // 2) ano de fabricação × ano de entrega
+    const anosF = [...new Set(R.map((r) => r[7]))].sort((a, b) => a - b);
+    const anosE = [...new Set(R.filter((r) => r[8] > 0).map((r) => r[8]))].sort((a, b) => a - b);
+    const semData = R.some((r) => r[8] === 0);
+    const colsE = anosE.map(String).concat(semData ? ["Sem data de entrega"] : []);
+    const celE = anosF.map(() => Array(colsE.length).fill(0));
+    R.forEach((r) => { const j = r[8] > 0 ? anosE.indexOf(r[8]) : colsE.length - 1; celE[anosF.indexOf(r[7])][j] += r[9]; });
+    renderMx("ae", { rows: anosF.map((a, i) => ({ l: String(a), v: celE[i] })), cols: colsE, neutra: semData ? colsE.length - 1 : -1, nome: "ano-fabricacao-x-ano-entrega" });
+    const com = R.filter((r) => r[8] > 0), nCom = soma(com.map((r) => r[9])), nSem = soma(R.filter((r) => r[8] === 0).map((r) => r[9]));
+    const por = (f) => soma(com.filter(f).map((r) => r[9]));
+    const ins = $("ae-ins");
+    ins.innerHTML = nCom
+      ? `Dos <b>${N(nCom)}</b> veículos com data de entrega registrada, <b>${(por((r) => r[8] <= r[7]) / nCom * 100).toFixed(0)}%</b> foram entregues no mesmo ano de fabricação, <b>${(por((r) => r[8] - r[7] === 1) / nCom * 100).toFixed(0)}%</b> no ano seguinte e <b>${(por((r) => r[8] - r[7] >= 2) / nCom * 100).toFixed(0)}%</b> dois ou mais anos depois. Os outros <b>${N(nSem)}</b> não têm data de entrega na planilha.`
+      : `Nenhum veículo com data de entrega registrada nos filtros escolhidos.`;
+  }
+
+  function baixarMx(ch) {
+    const c = MXD[ch];
+    if (!c) return;
+    const aspas = (t) => `"${String(t).replace(/"/g, '""')}"`;
+    const linhas = [["", ...c.cols, "TOTAL"].map(aspas).join(";")].concat(c.rows.map((r) => [aspas(r.l), ...r.v, soma(r.v)].join(";")));
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob(["\ufeff" + linhas.join("\r\n")], { type: "text/csv;charset=utf-8" }));
+    a.download = `frota-${c.nome}.csv`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  }
+  function telaCheia(ch) {
+    const card = $("card-" + ch), on = !card.classList.contains("fr-fs");
+    card.classList.toggle("fr-fs", on);
+    const sai = (ev) => { if (ev.key === "Escape" || !raiz.isConnected) { card.classList.remove("fr-fs"); document.removeEventListener("keydown", sai); } };
+    if (on) document.addEventListener("keydown", sai);
   }
   const AD = new Set(A), OT = D.map((_, i) => i).filter((i) => !AD.has(i));
   function chips() {
@@ -10825,6 +10951,16 @@ function montarPainelFrota(raiz, DB) {
   // Os botões são redesenhados a cada clique; um único ouvinte no painel
   // resolve todos (nada de onclick inline nem de funções globais).
   raiz.addEventListener("click", (ev) => {
+    const mxb = ev.target.closest("[data-mx]");
+    if (mxb && raiz.contains(mxb)) {
+      const ch = mxb.dataset.mx;
+      if (mxb.dataset.modo) MX[ch].modo = mxb.dataset.modo;
+      else if (mxb.dataset.dim) MX[ch].dim = mxb.dataset.dim;
+      else if (mxb.dataset.fs) { telaCheia(ch); return; }
+      else if (mxb.dataset.dl) { baixarMx(ch); return; }
+      matrizes();
+      return;
+    }
     const bt = ev.target.closest("[data-act]");
     if (!bt || !raiz.contains(bt)) return;
     const k = bt.dataset.k;
