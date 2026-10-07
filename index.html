@@ -2101,47 +2101,6 @@ if (document.fonts && document.fonts.ready) {
   document.fonts.ready.then(agendarRebuildHub);
 }
 
-// Conta que entrou sem passar pelo formulário (Google) ainda não disse de que
-// unidade/coordenação é. A tela pede uma vez; não libera nada — quem libera é
-// a administradora. Sem escape: sem a resposta a conta continua sem ver nada.
-async function exigirCadastroCompleto() {
-  if (document.getElementById("modal-cadastro-completo")) return;
-  let eu;
-  try { eu = await apiFetch("/api/eu"); } catch { return; }
-  if (eu.cadastroCompleto) return;
-  const fundo = document.createElement("div");
-  fundo.className = "modal-fundo";
-  fundo.id = "modal-cadastro-completo";
-  fundo.innerHTML = `
-    <div class="modal-caixa" role="dialog" aria-modal="true" aria-label="Complete seu cadastro">
-      <h3>Complete seu cadastro</h3>
-      <p>Para a administradora liberar o que você precisa, diga de qual unidade gestora e coordenação você faz parte. Isso é pedido uma única vez.</p>
-      <div class="dash-filtros" style="flex-direction:column;margin:12px 0">
-        <div class="dash-filtro"><select id="completo-unidade" aria-label="Unidade gestora"></select></div>
-        <div class="dash-filtro"><select id="completo-coordenacao" disabled aria-label="Coordenação"></select></div>
-      </div>
-      <p id="completo-status" style="color:var(--terracota)"></p>
-      <div class="modal-botoes"><button class="btn-primario" id="completo-salvar">SALVAR</button></div>
-    </div>`;
-  document.body.appendChild(fundo);
-  const selU = fundo.querySelector("#completo-unidade");
-  const selC = fundo.querySelector("#completo-coordenacao");
-  ligarSelectsUnidade(selU, selC, eu.catalogo.unidades);
-  fundo.querySelector("#completo-salvar").addEventListener("click", async () => {
-    const status = fundo.querySelector("#completo-status");
-    if (!selU.value || !selC.value) { status.textContent = "Escolha a unidade e a coordenação."; return; }
-    try {
-      await apiFetch("/api/eu/cadastro", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ unidadeGestora: selU.value, coordenacao: selC.value }),
-      });
-      fundo.remove();
-      toastOk("Cadastro completo. A administradora vai liberar os módulos que você precisa.");
-    } catch (erro) { status.textContent = erro.message; }
-  });
-}
-
 async function carregarPortais() {
   try {
     const lista = await apiFetch("/api/portais");
@@ -2158,7 +2117,6 @@ async function carregarPortais() {
     for (const item of lista) PAPEL_POR_PORTAL.set(item.slug, item.meuPapel || "leitor");
     atualizarBotoesPorPapel();
     buildHub();
-    exigirCadastroCompleto();
   } catch (erro) {
     document.querySelector("#tela-inicio .intro p").textContent =
       "Não consegui carregar os portais: " + erro.message +
