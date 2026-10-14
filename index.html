@@ -920,6 +920,38 @@ table.v2-mx td.t{background:var(--paper-line);font-weight:600;color:var(--carvao
 .frota-ctl{display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center;margin-bottom:12px}
 .frota-ctl label{display:flex;gap:8px;align-items:center;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#8B93A3}
 .frota-v2 .vazio-v2{color:#8B93A3;padding:10px 0;font-size:var(--fs-corpo)}
+/* ---------- menu por tipo de informação (Contratos) ---------- */
+.menu-tipos .cab-outros-v2{border-top:2px solid var(--carvao);padding-top:14px;margin:30px 0 6px}
+.menu-tipos .cab-outros-v2 h2{font-family:'Spectral',serif;font-weight:700;font-size:1.25rem}
+.menu-tipos .cab-outros-v2 p{font-size:var(--fs-corpo);color:#9AA3B2;margin-top:4px;max-width:70ch}
+.secao-v2 .item-v2{border-top:1px solid var(--paper-line);padding:12px 0}
+.secao-v2 .item-v2:first-child{border-top:0;padding-top:0}
+.item-cab-v2{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;flex-wrap:wrap}
+.item-cab-v2 h3{font-family:'Spectral',serif;font-weight:700;font-size:1.08rem;line-height:1.3;color:var(--carvao);display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}
+.item-cab-v2 .dash-toggle-btn{padding:4px 12px}
+.etiqueta-v2{font-family:'IBM Plex Mono',monospace;font-weight:500;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#8B93A3;border:1px solid var(--paper-line);padding:1px 6px}
+.item-corpo-v2{padding-top:12px}
+.item-corpo-v2>.tab-panel{padding-top:6px}
+.item-sub-v2{font-size:var(--fs-corpo);color:#9AA3B2;margin-top:3px;max-width:70ch}
+.v2c-ativos{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px;font-size:var(--fs-corpo)}
+.v2c-pilula{display:inline-flex;gap:8px;align-items:center;border:1px solid var(--carvao);padding:2px 4px 2px 10px}
+.v2c-pilula button{width:22px;height:22px;text-align:center;font-weight:700;color:var(--carvao);background:transparent;border:0;cursor:pointer}
+.v2c-pilula button:hover{background:var(--carvao);color:var(--paper)}
+.v2c-ctl{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;margin-bottom:12px}
+.v2c-cols{display:flex;align-items:flex-end;gap:6px;height:220px;padding-top:20px;border-bottom:2px solid var(--carvao)}
+.v2c-cols button{flex:1;min-width:0;height:100%;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;background:transparent;border:0;cursor:pointer;padding:0;color:var(--carvao)}
+.v2c-cols button:hover{background:var(--paper-line)}
+.v2c-cols .pilha-col{width:100%;display:flex;flex-direction:column-reverse}
+.v2c-cols em{font:500 11px 'IBM Plex Mono',monospace;font-style:normal;margin-bottom:3px}
+.v2c-cols button.on .pilha-col{outline:2px solid var(--tinta);outline-offset:2px}
+.v2c-rot{display:flex;gap:6px;margin-top:4px}
+.v2c-rot span{flex:1;text-align:center;font:500 10px 'IBM Plex Mono',monospace;color:#8B93A3;min-width:0;overflow:hidden}
+.v2c-rot span:first-child{font-size:9px;letter-spacing:-.04em}
+.v2c-leit{min-height:1.6em;font:500 12px 'IBM Plex Mono',monospace;margin-bottom:6px;color:var(--carvao)}
+.v2c-cola{font:500 10px 'IBM Plex Mono',monospace;letter-spacing:.1em;text-transform:uppercase;color:var(--mostarda);border-top:2px solid var(--mostarda);padding-top:2px;margin-bottom:4px;white-space:nowrap}
+.v2c-lista-tit{font-family:'Spectral',serif;font-weight:700;font-size:1rem;margin:18px 0 8px}
+button.v2-lin{background:transparent;border:0;color:inherit;text-align:left;cursor:pointer;font-family:inherit}
+button.v2-lin:hover,.v2-lin.on{background:var(--paper-line)}
 </style>
 </head>
 <body>
@@ -1566,7 +1598,7 @@ function barRankingChartSVG(categorias, selectedLabel) {
     const largura = Math.abs(xValor - xZero);
     // Negativo em cor própria, como já é feito nas barras verticais: não é o
     // mesmo número com sinal, é outra coisa.
-    const cor = negativo ? "var(--terracota)" : corCategoria(i);
+    const cor = negativo ? "var(--terracota)" : COR_BARRA_NEUTRA;
     // O número do negativo fica à DIREITA da linha do zero, nunca à esquerda.
     // À esquerda ele colidia com o nome da categoria: quando o negativo é
     // pequeno perto da amplitude (2,3 milhões contra 86), a barra vira uma
@@ -2097,6 +2129,8 @@ const MESES = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov"
 
 const TONS = ["var(--tinta)", "var(--mostarda)", "var(--terracota)", "var(--oliva)", "var(--dourado)", "var(--vinho)"];
 function corCategoria(i) { return TONS[i % TONS.length]; }
+// Barras horizontais de ranking ficam neutras: a cor é reservada para estado.
+const COR_BARRA_NEUTRA = "#7E8A8C";
 
 // Subaba dentro de um portal — mais barato que um portal-filho de verdade no
 // banco (Portal não tem hierarquia) e resolve o pedido real: uma seção extra
@@ -2272,16 +2306,19 @@ const STOP_BUSCA = new Set("a o os as de do da dos das e em que quero saber vao 
 const normBusca = (t) => String(t).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 const DESTINOS_BUSCA = [
   // CPG - Contratos
-  { id: "c-prazos", tipo: "Prazos", t: "Prazos e vencimentos dos contratos", kw: "quantos vencer vencem vencimento vencimentos prazo prazos quando criticidade gantt", portal: "orcamento", sub: "contratos", aba: ["contratos", "tatico"] },
-  { id: "c-pessoas", tipo: "Pessoas", t: "Gestores e fiscais, com os contratos de cada um", kw: "quem pessoas pessoa gestor gestores fiscal fiscais responsavel responsaveis servidores", portal: "orcamento", sub: "contratos", aba: ["contratos", "porpessoas"] },
+  { id: "c-prazos", tipo: "Prazos", t: "Vencimentos por mês e os contratos que vencem primeiro", kw: "quantos vencer vencem vencimento vencimentos prazo prazos quando mes meses", portal: "orcamento", sub: "contratos", menuItem: "mes", ancoraSel: '[data-item="mes"]' },
+  { id: "c-tatico", tipo: "Prazos", t: "Controle de prazos, linha do tempo e criticidade", kw: "prazos prazo criticidade gantt linha do tempo tatico vencimento", portal: "orcamento", sub: "contratos", aba: ["contratos", "tatico"] },
+  { id: "c-pessoas", tipo: "Pessoas", t: "Gestores e fiscais, com os contratos de cada um", kw: "quem pessoas pessoa gestor gestores fiscal fiscais responsavel responsaveis servidores", portal: "orcamento", sub: "contratos", menuItem: "pessoas", ancoraSel: '[data-item="pessoas"]' },
   { id: "c-agir", tipo: "Pessoas", t: "Quem precisa agir nos contratos que vencem", kw: "quem agir acao renovar renovacao responsavel pessoas", portal: "orcamento", sub: "contratos", aba: ["contratos", "tatico"], titulo: "Quem Precisa Agir" },
   { id: "c-onde", tipo: "Onde estão", t: "Onde estão os contratos, por setor demandante", kw: "onde estao vencer setor demandante coorpin area unidade local", portal: "orcamento", sub: "contratos", aba: ["contratos", "porarea"] },
-  { id: "c-dirpin", tipo: "Onde estão", t: "Contratos da DEPIN por diretoria regional", kw: "onde estao dirpin regional depin interior diretoria", portal: "orcamento", sub: "contratos", aba: ["contratos", "gerencial"], antes: () => document.querySelector('.unidade-gestora-btn[data-unidade="DEPIN"]')?.click(), ancoraSel: "#contratos-filtro-dirpin-linha" },
-  { id: "c-valor", tipo: "Valores", t: "Valor dos contratos e os maiores contratos", kw: "valor valores dinheiro custo custam gasto total maiores top quanto", portal: "orcamento", sub: "contratos", aba: ["contratos", "gerencial"], titulo: "Top 10 Maiores Contratos" },
+  { id: "c-dirpin", tipo: "Onde estão", t: "Contratos por diretoria regional (DIRPIN)", kw: "onde estao dirpin regional depin interior diretoria", portal: "orcamento", sub: "contratos", menuItem: "regional", ancoraSel: '[data-item="regional"]' },
+  { id: "c-valor", tipo: "Valores", t: "Valor por categoria de objeto", kw: "valor valores dinheiro custo custam gasto total quanto categoria", portal: "orcamento", sub: "contratos", menuItem: "valor", ancoraSel: '[data-item="valor"]' },
+  { id: "c-maiores", tipo: "Valores", t: "Os maiores contratos", kw: "maiores top contratos valor grandes", portal: "orcamento", sub: "contratos", aba: ["contratos", "gerencial"], titulo: "Top 10 Maiores Contratos" },
   { id: "c-forn", tipo: "Valores", t: "Maiores fornecedores por valor", kw: "fornecedores fornecedor empresas empresa valor maiores top", portal: "orcamento", sub: "contratos", aba: ["contratos", "gerencial"], titulo: "Top 10 Maiores Fornecedores" },
   { id: "c-var", tipo: "Valores", t: "Contratos com variação de valor e o motivo", kw: "variacao valor aditivo inicial atual por que varia diferenca", portal: "orcamento", sub: "contratos", aba: ["contratos", "gerencial"], titulo: "Contratos com Variação de Valor" },
   { id: "c-cat", tipo: "Valores", t: "Contratos por categoria de objeto", kw: "categoria categorias tipo objeto ti transporte imoveis servicos", portal: "orcamento", sub: "contratos", aba: ["contratos", "porcategoria"] },
-  { id: "c-sit", tipo: "Situação", t: "Situação dos contratos por criticidade e setor", kw: "situacao criticidade vigentes vencidos setor mapa matriz", portal: "orcamento", sub: "contratos", aba: ["contratos", "gerencial"], titulo: "Contratos por Criticidade e Setor Demandante" },
+  { id: "c-sit", tipo: "Situação", t: "Situação dos contratos em cada categoria", kw: "situacao categoria vigentes vencidos vencer matriz", portal: "orcamento", sub: "contratos", menuItem: "matriz", ancoraSel: '[data-item="matriz"]' },
+  { id: "c-crit", tipo: "Situação", t: "Criticidade dos contratos por setor demandante", kw: "criticidade setor demandante mapa gerencial", portal: "orcamento", sub: "contratos", aba: ["contratos", "gerencial"], titulo: "Contratos por Criticidade e Setor Demandante" },
   { id: "c-renov", tipo: "Prazos", t: "Acompanhamento da renovação de cada contrato", kw: "renovacao renovar tramites acompanhamento execucao prazo", portal: "orcamento", sub: "contratos", aba: ["contratos", "operacional"] },
   { id: "c-atual", tipo: "Situação", t: "Contratos atualizados recentemente", kw: "atualizados recentes recentemente novos mudaram", portal: "orcamento", sub: "contratos", aba: ["contratos", "atualizados"] },
   // CFCR
@@ -2341,7 +2378,7 @@ const esperarAte = (fn, ms = 20000) => new Promise((ok) => {
 });
 function acharTituloNaTela(texto) {
   const alvo = normBusca(texto);
-  return [...telaConteudo.querySelectorAll("h2,h3,h4")].find((h) => h.offsetParent !== null && normBusca(h.textContent).includes(alvo)) || null;
+  return [...telaConteudo.querySelectorAll("h2,h3,h4")].find((h) => h.offsetParent !== null && !h.closest(".item-cab-v2, .grupo-cab-v2") && normBusca(h.textContent).includes(alvo)) || null;
 }
 // Leva até a informação: abre o portal, escolhe a aba e rola até o gráfico.
 // Os botões de aba são os mesmos da navegação manual, então tudo o que a
@@ -2361,6 +2398,7 @@ async function irParaInformacao(d) {
   }
   if (d.antes) { await esperarAte(() => telaConteudo.querySelector(".unidade-gestora-btn, [data-subtab-contratos]")); d.antes(); }
   if (d.grupo) { await esperarAte(() => window.__frotaAbrirGrupo); window.__frotaAbrirGrupo?.(d.grupo); }
+  if (d.menuItem) { await esperarAte(() => window.__menuContratos); window.__menuContratos?.abrir(d.menuItem, false); }
   let alvo = null;
   if (d.titulo) alvo = await esperarAte(() => acharTituloNaTela(d.titulo));
   else if (d.ancoraSel) alvo = await esperarAte(() => { const e = telaConteudo.querySelector(d.ancoraSel); return e && e.offsetParent !== null ? e : null; }, 6000);
@@ -5664,7 +5702,7 @@ function barraContagemHorizontalSVG(linhas, opcoes = {}) {
       corpo += `<g data-cat="${escapeAttr(l.label)}"${atributoValor}${atributosContrato} style="cursor:pointer" opacity="${dim ? 0.4 : 1}">`;
       corpo += `<rect class="area-hit" x="0" y="${y.toFixed(1)}" width="${w}" height="${rowH}" fill="transparent" />`;
       corpo += textoSVG(l.label, padL - 8, y + rowH / 2, { maxChars: maxRotulo, anchor: "end", fontSize: 9, alturaLinha: ALTURA_LINHA_TEXTO, peso: destacado ? 700 : 400 });
-      corpo += `<rect x="${padL}" y="${yBarra.toFixed(1)}" width="${Math.max(larg, 1.5).toFixed(1)}" height="${alturaBarra}" fill="${corUnica ? TONS[0] : corCategoria(i)}"><title>${escapeHTML(tituloTooltip(l))}</title></rect>`;
+      corpo += `<rect x="${padL}" y="${yBarra.toFixed(1)}" width="${Math.max(larg, 1.5).toFixed(1)}" height="${alturaBarra}" fill="${corUnica ? TONS[0] : COR_BARRA_NEUTRA}"><title>${escapeHTML(tituloTooltip(l))}</title></rect>`;
       corpo += `<text x="${(padL + larg + 6).toFixed(1)}" y="${(yBarra + alturaBarra / 2 + 3.5).toFixed(1)}" font-family="monospace" font-size="9" font-weight="700" fill="var(--carvao)">${escapeHTML(textoValor)}</text>`;
       corpo += `</g>`;
     }
@@ -8126,6 +8164,277 @@ document.addEventListener("click", (e) => {
   const b = e.target.closest("[data-v2-acao='situacao-contratos']"); if (!b) return;
   document.querySelector(`#contratos-resumo-rapido [data-resumo-status="${b.dataset.k}"]`)?.click();
 });
+
+// =====================================================================
+// MENU POR TIPO DE INFORMAÇÃO — Contratos
+// =====================================================================
+// O que já existia (Gerencial, Tático, Operacional, Por setor, Por categoria,
+// Por pessoas, Atualizados) continua inteiro, mas deixa de ser uma lista solta
+// de sete abas: cada visão entra na seção do tipo de pergunta que ela
+// responde (Prazos, Valores, Pessoas, Onde estão, Situação) e mantém o nome
+// antigo numa etiqueta, pra quem já conhece. À frente de cada seção há um
+// gráfico novo, mais direto, com os cortes mais pedidos.
+const V2C_COR = { vigente: "#9AA5A7", aVencer: "var(--mostarda)", vencido: "var(--terracota)", aContratar: "#56625F" };
+const V2C_STATUS = ["Vigente", "A Vencer", "Vencido", "A Contratar"];
+const V2C_STATUS_ROT = ["Vigentes", "A vencer em 90 dias", "Vencidos", "A contratar"];
+const V2C_STATUS_COR = [V2C_COR.vigente, V2C_COR.aVencer, V2C_COR.vencido, V2C_COR.aContratar];
+
+function v2Barras(itens, { max, sel, acao } = {}) {
+  const mx = max || Math.max(...itens.map((i) => i.v), 1);
+  return itens.map((i) => {
+    const tag = i.clic === false || !acao ? "div" : "button";
+    const cor = sel === i.k ? "var(--tinta)" : i.cor || "#7E8A8C";
+    return `<${tag} class="v2-lin ${sel === i.k ? "on" : ""}" ${tag === "button" ? `type="button" data-v2c="${acao}" data-k="${escapeAttr(i.k)}"` : ""} title="${escapeAttr(i.l)}"><span class="v2-lin-r">${escapeHTML(i.l)}</span><div class="v2-lin-t"><div class="v2-lin-b" style="width:${i.v / mx * 100}%;background:${cor}"></div></div><span class="v2-lin-v">${i.txt}</span></${tag}>`;
+  }).join("");
+}
+function v2Empilhadas(rows, cols, cores) {
+  const rt = rows.map((r) => r.v.reduce((a, b) => a + b, 0)), mx = Math.max(...rt, 1);
+  return rows.map((r, i) => `<div class="v2-lin"><span class="v2-lin-r" title="${escapeAttr(r.l)}">${escapeHTML(r.l)}</span><div class="v2-lin-t"><div class="v2-lin-b" style="width:${rt[i] / mx * 100}%">${r.v.map((x, j) => x ? `<b style="flex:${x};background:${cores[j]};color:${j === 0 || j === 3 ? "#111819" : "#111819"}" title="${escapeAttr(cols[j])}: ${x}">${i === 0 && x / rt[i] > .22 ? escapeHTML(cols[j]) : ""}</b>` : "").join("")}</div></div><span class="v2-lin-v">${rt[i]}</span></div>`).join("");
+}
+function v2Matriz(rows, cols, modo, { neutra = -1, cores = null } = {}) {
+  const N = (n) => Math.round(n).toLocaleString("pt-BR"), soma = (a) => a.reduce((x, y) => x + y, 0);
+  const rt = rows.map((r) => soma(r.v)), ct = cols.map((_, j) => soma(rows.map((r) => r.v[j]))), g = soma(rt);
+  if (!g) return `<p class="item-sub-v2">Nenhum contrato com esses filtros.</p>`;
+  if (modo === "barras" && cores) return v2Empilhadas(rows, cols, cores);
+  const pc = modo === "prop", val = (i, j) => pc ? (rt[i] ? rows[i].v[j] / rt[i] * 100 : 0) : rows[i].v[j];
+  const mx = Math.max(...rows.map((_, i) => Math.max(...cols.map((__, j) => j === neutra ? 0 : val(i, j)))), 1);
+  const p1 = (v) => v > 0 && v < .5 ? "<1" : String(Math.round(v));
+  const cel = (v, txt, j) => {
+    if (!v) return `<td class="z"></td>`;
+    if (j === neutra) return `<td class="z" style="color:#9AA3B2">${txt}</td>`;
+    const k = Math.round(14 + 86 * Math.pow(v / mx, 0.6));
+    return `<td style="background:color-mix(in srgb,var(--tinta) ${k}%,var(--surface));color:${k > 55 ? "#111819" : "var(--carvao)"}">${txt}</td>`;
+  };
+  return `<div class="v2-mx-rol"><table class="v2-mx"><thead><tr><th></th>${cols.map((c) => `<th class="rot"><div>${escapeHTML(c)}</div></th>`).join("")}<th class="rot"><div><b>Total</b></div></th></tr></thead><tbody>` +
+    rows.map((r, i) => `<tr><th class="rl" title="${escapeAttr(r.l)}">${escapeHTML(r.l)}</th>${r.v.map((x, j) => { const v = val(i, j); return cel(v, pc ? p1(v) : N(x), j); }).join("")}<td class="t">${pc ? "100" : N(rt[i])}</td></tr>`).join("") +
+    `<tr><th class="rl"><b>Total</b></th>${ct.map((x) => `<td class="t">${pc ? p1(x / g * 100) : N(x)}</td>`).join("")}<td class="t">${pc ? "100" : N(g)}</td></tr></tbody></table></div>`;
+}
+
+// Monta o menu por tipo dentro do painel de Contratos. `secoes` descreve a
+// ordem; cada item é uma visão antiga (legado: clica na aba original) ou uma
+// visão nova (render). Um item aberto por vez.
+function menuPorTipo(painel, { titulo, subtitulo, secoes }) {
+  const raiz = document.createElement("div");
+  raiz.className = "menu-tipos";
+  raiz.innerHTML = `<div class="cab-outros-v2"><h2>${escapeHTML(titulo)}</h2><p>${escapeHTML(subtitulo)}</p></div>`;
+  const itens = [];
+  secoes.forEach((sec) => {
+    const el = document.createElement("section");
+    el.className = "nota-v2 secao-v2";
+    el.innerHTML = `<div class="k">${escapeHTML(sec.tipo)}</div><div class="v"></div>`;
+    sec.itens.forEach((def) => {
+      const art = document.createElement("article");
+      art.className = "item-v2"; art.dataset.item = def.id;
+      art.innerHTML = `<div class="item-cab-v2"><h3><span class="t"></span>${def.etiqueta ? `<span class="etiqueta-v2">${escapeHTML(def.etiqueta)}</span>` : ""}</h3><button type="button" class="dash-toggle-btn" aria-expanded="false">Abrir</button></div>${def.sub ? `<p class="item-sub-v2">${escapeHTML(def.sub)}</p>` : ""}<div class="item-corpo-v2"></div>`;
+      art.querySelector(".t").textContent = def.titulo;
+      const corpo = art.querySelector(".item-corpo-v2");
+      const it = { def, art, corpo, bt: art.querySelector(".dash-toggle-btn"), h: art.querySelector(".t") };
+      if (def.legado) {
+        it.btn = painel.querySelector(`[data-subtab-contratos="${def.legado}"]`);
+        it.pn = painel.querySelector(`#contratos-sub-${def.legado}`);
+        if (!it.btn || !it.pn) return;
+        corpo.appendChild(it.pn);
+      }
+      el.querySelector(".v").appendChild(art);
+      itens.push(it);
+    });
+    raiz.appendChild(el);
+  });
+  const barra = painel.querySelector("[data-subtab-contratos]").closest(".tabs");
+  barra.classList.add("tabs-em-grupos");
+  barra.after(raiz);
+
+  let aberto = null;
+  const abertoLegado = () => itens.find((it) => it.pn && !it.pn.hidden) || null;
+  const sincronizar = () => itens.forEach((it) => {
+    const ab = aberto === it;
+    it.art.classList.toggle("aberto", ab);
+    it.bt.textContent = ab ? "Fechar" : "Abrir";
+    it.bt.setAttribute("aria-expanded", String(ab));
+    it.corpo.hidden = !ab;
+    if (it.def.tituloDinamico) it.h.textContent = it.def.tituloDinamico();
+  });
+  const fecharLegado = () => itens.forEach((it) => { if (it.pn && !it.pn.hidden) { it.pn.hidden = true; it.btn.classList.remove("active"); } });
+  const renderNovo = (it) => { if (it.def.render) { it.corpo.innerHTML = it.def.render(); it.def.depois?.(it.corpo); } };
+  function abrir(id, rolar = true) {
+    const it = itens.find((x) => x.def.id === id); if (!it) return;
+    if (it.pn) { aberto = it; it.btn.click(); }
+    else { fecharLegado(); aberto = it; renderNovo(it); }
+    sincronizar();
+    if (rolar) it.art.scrollIntoView?.({ behavior: "smooth", block: "start" });
+  }
+  function fechar() { fecharLegado(); aberto = null; sincronizar(); }
+  itens.forEach((it) => it.bt.addEventListener("click", () => { if (aberto === it) { if (it.pn) { it.pn.hidden = true; it.btn.classList.remove("active"); } aberto = null; sincronizar(); } else abrir(it.def.id, false); }));
+  // Outra parte do sistema clicou numa aba antiga (cartão do resumo, busca):
+  // abre o item correspondente e rola até ele.
+  const mo = new MutationObserver(() => {
+    const leg = abertoLegado();
+    if (leg && aberto !== leg) { aberto = leg; sincronizar(); leg.art.scrollIntoView?.({ behavior: "smooth", block: "start" }); }
+    else if (!leg && aberto && aberto.pn) { aberto = null; sincronizar(); }
+  });
+  itens.forEach((it) => { if (it.pn) { it.pn.hidden = true; it.btn.classList.remove("active"); mo.observe(it.pn, { attributes: true, attributeFilter: ["hidden"] }); } });
+  itens.forEach((it) => { if (!it.pn) it.corpo.hidden = true; });
+  sincronizar();
+  return {
+    raiz, abrir, fechar,
+    atualizarAberto() { if (aberto && !aberto.pn) renderNovo(aberto); sincronizar(); },
+    renderAberto() { if (aberto && !aberto.pn) renderNovo(aberto); },
+    aberto: () => aberto?.def.id || null,
+  };
+}
+
+// Itens novos do menu de Contratos. O estado de filtro é compartilhado entre
+// eles e zera quando a base muda (outra unidade gestora ou DIRPIN).
+function montarMenuContratos(painel, getContext) {
+  const N = (n) => Math.round(n).toLocaleString("pt-BR");
+  const soma = (a) => a.reduce((x, y) => x + y, 0);
+  const moedaC = (v) => "R$ " + formatarMoedaCompacta(v);
+  const gest = (c, papel) => [...new Set((c.pessoas || []).filter((p) => p.papel === papel).map((p) => p.nomePessoa))];
+  const categoria = (c) => c.tipoObjeto || "(sem categoria)";
+  const mes = (c) => (c.dataFim ? String(c.dataFim).slice(0, 7) : "");
+  const MESES_ROT = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
+  const mesRot = (ym) => (ym === "vencidos" ? "Vencidos" : `${MESES_ROT[+ym.slice(5, 7) - 1]}/${ym.slice(2, 4)}`);
+  const ST = { mes: null, cat: null, pes: null, onde: "todos", valorModo: "valor", pesPapel: "Gestor", mx: "matriz" };
+  const base = () => getContext().lista;
+  const passa = (c, ign = {}) => {
+    if (!ign.mes && ST.mes && (ST.mes === "vencidos" ? c.statusVigencia !== "Vencido" : mes(c) !== ST.mes || c.statusVigencia === "Vencido")) return false;
+    if (!ign.cat && ST.cat !== null && categoria(c) !== ST.cat) return false;
+    if (!ign.pes && ST.pes && !gest(c, ST.pes.papel).includes(ST.pes.nome)) return false;
+    return true;
+  };
+  const filtrada = (ign) => base().filter((c) => passa(c, ign));
+  const pilulas = () => {
+    const p = [];
+    if (ST.mes) p.push(["mes", ST.mes === "vencidos" ? "Vencidos" : `Vence em ${mesRot(ST.mes)}`]);
+    if (ST.cat !== null) p.push(["cat", ST.cat]);
+    if (ST.pes) p.push(["pes", `${ST.pes.papel} ${ST.pes.nome}`]);
+    return p.length ? `<div class="v2c-ativos"><span class="rot-v2">Filtros ativos</span>${p.map(([k, t]) => `<span class="v2c-pilula">${escapeHTML(t)}<button type="button" data-v2c="limpa" data-k="${k}" aria-label="Remover filtro ${escapeAttr(t)}">×</button></span>`).join("")}<button type="button" class="dash-toggle-btn" data-v2c="limpa" data-k="tudo">Limpar filtros</button></div>` : "";
+  };
+  const grp = (id, ops, atual) => `<div class="dash-toggle" role="group">${ops.map(([k, l]) => `<button type="button" class="dash-toggle-btn${k === atual ? " active" : ""}" data-v2c="troca" data-id="${id}" data-k="${k}" aria-pressed="${k === atual}">${l}</button>`).join("")}</div>`;
+  const tabela = (lista, titulo, limite = 10) => {
+    if (!lista.length) return `<p class="item-sub-v2">Nenhum contrato com esses filtros.</p>`;
+    return `<h4 class="v2c-lista-tit">${escapeHTML(titulo)}${lista.length > limite ? ` <span class="etiqueta-v2">${limite} de ${N(lista.length)}</span>` : ""}</h4><div class="tabela-rolavel" style="max-height:340px" data-v2c-tab>${tabelaContratosHTML(lista.slice(0, limite))}</div>`;
+  };
+  const ligarTabela = (corpo, lista) => {
+    const alvo = corpo.querySelector("[data-v2c-tab]"); if (alvo) ligarTooltipLinhas(alvo, new Map(lista.map((c) => [c.id, c])));
+  };
+
+  // ---- Prazos: vencimentos por mês
+  function mesesProximos() {
+    const a = [], hoje = new Date(); let y = hoje.getFullYear(), m = hoje.getMonth();
+    for (let i = 0; i < 12; i++) { a.push(`${y}-${String(m + 1).padStart(2, "0")}`); m++; if (m > 11) { m = 0; y++; } }
+    return a;
+  }
+  function itemMes() {
+    const lista = filtrada({ mes: true }), meses = mesesProximos();
+    const venc = lista.filter((c) => c.statusVigencia === "Vencido");
+    const cols = [{ k: "vencidos", rot: "Vencidos", seg: [[venc.length, V2C_COR.vencido]], n: venc.length, v: soma(venc.map((c) => c.valorGlobalAtual || 0)) }];
+    meses.forEach((ym, idx) => {
+      const x = lista.filter((c) => c.statusVigencia !== "Vencido" && c.statusVigencia !== "A Contratar" && mes(c) === ym);
+      const av = x.filter((c) => c.statusVigencia === "A Vencer").length;
+      cols.push({ k: ym, rot: (idx === 0 || ym.slice(5, 7) === "01") ? mesRot(ym) : MESES_ROT[+ym.slice(5, 7) - 1], seg: [[av, V2C_COR.aVencer], [x.length - av, V2C_COR.vigente]], n: x.length, v: soma(x.map((c) => c.valorGlobalAtual || 0)) });
+    });
+    const mx = Math.max(...cols.map((c) => c.n), 1);
+    const ate = cols.map((c, i) => (i > 0 && c.seg[0][0] > 0 ? i : -1)).filter((i) => i > 0);
+    const cola = ate.length ? `<div class="v2c-cola" style="margin-left:calc(${(ate[0]) / cols.length * 100}% + 3px);width:${(ate[ate.length - 1] - ate[0] + 1) / cols.length * 100}%">A vencer em 90 dias</div>` : "";
+    let sel = lista;
+    if (ST.mes) sel = lista.filter((c) => (ST.mes === "vencidos" ? c.statusVigencia === "Vencido" : mes(c) === ST.mes && c.statusVigencia !== "Vencido"));
+    else sel = lista.filter((c) => c.diasParaVencer != null && c.statusVigencia !== "A Contratar");
+    sel = [...sel].sort((a, b) => (a.diasParaVencer ?? 1e9) - (b.diasParaVencer ?? 1e9));
+    const tituloLista = ST.mes ? (ST.mes === "vencidos" ? "Contratos vencidos, do mais atrasado ao menos atrasado" : `Contratos que vencem em ${mesRot(ST.mes)}`) : "Os mais urgentes, dos já vencidos aos que vencem primeiro";
+    return `${pilulas()}<div class="v2c-leit" data-v2c-leit></div>${cola}
+      <div class="v2c-cols">${cols.map((c) => `<button type="button" data-v2c="mes" data-k="${c.k}" class="${ST.mes === c.k ? "on" : ""}" data-leit="${escapeAttr(`${c.rot}, ${c.n} ${c.n === 1 ? "contrato" : "contratos"}, ${moedaC(c.v)}`)}" aria-label="${escapeAttr(c.rot)}: ${c.n} contratos"><em>${c.n || ""}</em><div class="pilha-col" style="height:${c.n / mx * 100}%">${c.seg.map(([n, cor]) => (n ? `<i style="display:block;height:${n / c.n * 100}%;background:${cor}"></i>` : "")).join("")}</div></button>`).join("")}</div>
+      <div class="v2c-rot">${cols.map((c) => `<span>${c.rot}</span>`).join("")}</div>
+      <div data-v2c-lista>${tabela(sel, tituloLista)}</div>`;
+  }
+  // ---- Valores: por categoria
+  function itemValor() {
+    const lista = filtrada({ cat: true }), g = {};
+    lista.forEach((c) => { const k = categoria(c); (g[k] ||= { n: 0, v: 0 }); g[k].n++; g[k].v += c.valorGlobalAtual || 0; });
+    const v = ST.valorModo === "valor", todos = Object.entries(g).map(([k, x]) => ({ k, ...x })).sort((a, b) => (v ? b.v - a.v : b.n - a.n));
+    const itens = todos.slice(0, 7).map((d) => ({ k: d.k, l: d.k, v: v ? d.v : d.n, txt: v ? moedaC(d.v) : N(d.n) }));
+    const resto = todos.slice(7);
+    if (resto.length) { const vr = soma(resto.map((d) => (v ? d.v : d.n))); itens.push({ k: "outras", l: `Outras ${resto.length} categorias`, v: vr, txt: v ? moedaC(vr) : N(vr), cor: "#56625F", clic: false }); }
+    const sel = ST.cat === null ? null : ST.cat;
+    return `${pilulas()}<div class="v2c-ctl">${grp("valorModo", [["valor", "Por valor"], ["qtd", "Por quantidade"]], ST.valorModo)}</div>${itens.length ? v2Barras(itens, { sel, acao: "cat" }) : `<p class="item-sub-v2">Nenhum contrato com esses filtros.</p>`}
+      <div data-v2c-lista>${ST.cat !== null ? tabela([...filtrada()].sort((a, b) => (b.valorGlobalAtual || 0) - (a.valorGlobalAtual || 0)), `Contratos de ${ST.cat}, do maior valor para o menor`) : ""}</div>`;
+  }
+  // ---- Pessoas: gestores e fiscais
+  function itemPessoas() {
+    const papel = ST.pesPapel, lista = filtrada({ pes: true }), m = new Map();
+    lista.forEach((c) => gest(c, papel).forEach((nome) => { const x = m.get(nome) || { nome, n: 0, av: 0, ve: 0, v: 0 }; x.n++; x.v += c.valorGlobalAtual || 0; if (c.statusVigencia === "A Vencer") x.av++; if (c.statusVigencia === "Vencido") x.ve++; m.set(nome, x); }));
+    const L = [...m.values()].sort((a, b) => b.n - a.n || b.av - a.av).slice(0, 14);
+    return `${pilulas()}<div class="v2c-ctl">${grp("pesPapel", [["Gestor", "Gestores"], ["Fiscal", "Fiscais"]], papel)}</div>` + (L.length
+      ? `<div class="tabela-rolavel" style="max-height:380px"><table class="dash-tabela"><thead><tr><th>${papel.toUpperCase()}</th><th class="num">CONTRATOS</th><th class="num">A VENCER</th><th class="num">VENCIDOS</th><th class="num">VALOR</th></tr></thead><tbody>${L.map((x) => `<tr data-v2c="pessoa" data-k="${escapeAttr(x.nome)}" style="cursor:pointer${ST.pes && ST.pes.nome === x.nome && ST.pes.papel === papel ? ";background:var(--paper-line)" : ""}"><td><b>${escapeHTML(x.nome)}</b></td><td class="num">${x.n}</td><td class="num" style="${x.av ? "color:var(--mostarda)" : ""}">${x.av || ""}</td><td class="num" style="${x.ve ? "color:var(--terracota)" : ""}">${x.ve || ""}</td><td class="num">${moedaC(x.v)}</td></tr>`).join("")}</tbody></table></div><p class="item-sub-v2">As 14 pessoas com mais contratos. Clique numa linha para ver os contratos dela.</p>`
+      : `<p class="item-sub-v2">Nenhuma pessoa com esses filtros.</p>`)
+      + `<div data-v2c-lista>${ST.pes ? tabela([...filtrada()].sort((a, b) => (a.diasParaVencer ?? 1e9) - (b.diasParaVencer ?? 1e9)), `Contratos sob ${ST.pes.papel === "Gestor" ? "gestão" : "fiscalização"} de ${ST.pes.nome}`) : ""}</div>`;
+  }
+  // ---- Onde estão: regional
+  function itemRegional() {
+    const so = ST.onde === "avencer", lista = filtrada().filter((c) => !so || c.statusVigencia === "A Vencer");
+    const nomes = [...new Set(base().flatMap(dirpinsDoContrato))].sort();
+    const itens = nomes.map((d) => ({ k: d, l: "DIRPIN " + d, v: lista.filter((c) => dirpinsDoContrato(c).includes(d)).length })).filter((x) => x.v).sort((a, b) => b.v - a.v).map((x) => ({ ...x, txt: N(x.v), clic: false }));
+    const sem = lista.filter((c) => !dirpinsDoContrato(c).length).length;
+    if (sem) itens.push({ k: "sem", l: "Sem regional definida", v: sem, txt: N(sem), cor: "#56625F", clic: false });
+    return `<div class="v2c-ctl">${grp("onde", [["todos", "Todos os contratos"], ["avencer", "Só os a vencer em 90 dias"]], ST.onde)}</div>` + (itens.length ? v2Barras(itens) + `<p class="item-sub-v2">Um contrato da DEPIN pode atender mais de uma diretoria regional e entra em cada uma. Contratos que não são da DEPIN não têm regional.</p>` : `<p class="item-sub-v2">Nenhum contrato com esses filtros.</p>`);
+  }
+  // ---- Situação: categoria x situação
+  function itemMatriz() {
+    const g = {}; filtrada().forEach((c) => { const k = categoria(c), j = Math.max(V2C_STATUS.indexOf(c.statusVigencia), 0); (g[k] ||= [0, 0, 0, 0])[j]++; });
+    const rows = Object.entries(g).map(([l, v]) => ({ l, v })).sort((a, b) => soma(b.v) - soma(a.v)).slice(0, 12);
+    return `${pilulas()}<div class="v2c-ctl">${grp("mx", [["matriz", "Matriz"], ["barras", "Barras"], ["prop", "% da linha"]], ST.mx)}</div>` + v2Matriz(rows, V2C_STATUS_ROT, ST.mx, { cores: V2C_STATUS_COR });
+  }
+
+  const raizMenu = menuPorTipo(painel, {
+    titulo: "Informações deste painel, por tipo",
+    subtitulo: "Cada tipo reúne as visões que respondem àquela pergunta. As visões completas mantêm o nome de sempre na etiqueta.",
+    secoes: [
+      { tipo: "Prazos", itens: [
+        { id: "mes", titulo: "Vencimentos por mês, próximos 12 meses", sub: "Quantos contratos vencem em cada mês e quais são.", render: itemMes, depois: (c) => ligarTabela(c, ultimaLista.mes) },
+        { id: "tatico", titulo: "Controle de prazos e quem precisa agir", etiqueta: "Tático", legado: "tatico" },
+        { id: "operacional", titulo: "Acompanhamento da renovação, contrato a contrato", etiqueta: "Operacional", legado: "operacional" },
+      ] },
+      { tipo: "Valores", itens: [
+        { id: "valor", titulo: "Valor por categoria de objeto", sub: "Onde está o dinheiro.", render: itemValor, depois: (c) => ligarTabela(c, ultimaLista.valor) },
+        { id: "gerencial", titulo: "Valor, maiores contratos e variação de valor", etiqueta: "Gerencial", legado: "gerencial" },
+        { id: "porcategoria", titulo: "Contratos por categoria, perfil completo", etiqueta: "Por categoria", legado: "porcategoria" },
+      ] },
+      { tipo: "Pessoas", itens: [
+        { id: "pessoas", titulo: "Gestores e fiscais, com os contratos de cada um", render: itemPessoas, depois: (c) => ligarTabela(c, ultimaLista.pessoas) },
+        { id: "porpessoas", titulo: "Perfil de cada gestor e fiscal", etiqueta: "Por pessoas", legado: "porpessoas" },
+      ] },
+      { tipo: "Onde estão", itens: [
+        { id: "regional", titulo: "Contratos por diretoria regional", render: itemRegional },
+        { id: "porarea", titulo: "Contratos por setor demandante", etiqueta: "Por área", legado: "porarea", tituloDinamico: () => (document.getElementById("contratos-tab-porarea-label")?.textContent === "UNIDADES ATENDIDAS" ? "Contratos por unidade atendida" : "Contratos por setor demandante") },
+      ] },
+      { tipo: "Situação", itens: [
+        { id: "matriz", titulo: "Situação dos contratos em cada categoria", render: itemMatriz },
+        { id: "atualizados", titulo: "Contratos atualizados recentemente", etiqueta: "Histórico", legado: "atualizados" },
+      ] },
+    ],
+  });
+  // listas usadas pelas tabelas de cada item (para ligar o balão de detalhe)
+  const ultimaLista = { get mes() { return base(); }, get valor() { return base(); }, get pessoas() { return base(); } };
+
+  raizMenu.raiz.addEventListener("click", (ev) => {
+    const b = ev.target.closest("[data-v2c]"); if (!b) return;
+    const a = b.dataset.v2c, k = b.dataset.k;
+    if (a === "mes") ST.mes = ST.mes === k ? null : k;
+    else if (a === "cat") ST.cat = ST.cat === k ? null : k;
+    else if (a === "pessoa") ST.pes = ST.pes && ST.pes.nome === k && ST.pes.papel === ST.pesPapel ? null : { nome: k, papel: ST.pesPapel };
+    else if (a === "troca") { ST[b.dataset.id] = k; }
+    else if (a === "limpa") { if (k === "tudo") { ST.mes = null; ST.cat = null; ST.pes = null; } else ST[k] = null; }
+    raizMenu.renderAberto();
+  });
+  const leit = (ev) => { const b = ev.target.closest("[data-leit]"); const l = raizMenu.raiz.querySelector("[data-v2c-leit]"); if (b && l) l.textContent = b.dataset.leit; };
+  raizMenu.raiz.addEventListener("mouseover", leit);
+  raizMenu.raiz.addEventListener("focusin", leit);
+  return {
+    ...raizMenu,
+    // Base nova (outra unidade gestora ou DIRPIN): zera os filtros locais.
+    novaBase() { ST.mes = null; ST.cat = null; ST.pes = null; raizMenu.fechar(); },
+  };
+}
 
 function renderResumoRapido(lista, resumo) {
   const alvo = document.getElementById("contratos-resumo-rapido");
@@ -11091,6 +11400,7 @@ function criarMotorDimensoesPorValor(linhasTodas, dimensoes, campoRegiao) {
 async function carregarFrotaPortal(portalSlug) {
   const painel = document.getElementById("tab-frota");
   painel.innerHTML = `<p class="tela-intro">Carregando o painel de frota...</p>`;
+  window.__frotaAbrirGrupo = null;
   let dados;
   try {
     dados = await apiFetch(`/api/portais/${portalSlug}/frota`);
@@ -13947,6 +14257,7 @@ function montarRelatorioContratos(resumo, lista, unidadeGestoraTopo) {
 async function carregarContratosPortal(portalSlug) {
   const painel = document.getElementById("tab-contratos");
   painel.innerHTML = `<p class="tela-intro">Carregando contratos...</p>`;
+  window.__menuContratos = null; // a busca só pode usar o menu da carga atual
 
   let resumo, lista;
   try {
@@ -14126,6 +14437,7 @@ async function carregarContratosPortal(portalSlug) {
   // recriar o HTML inteiro, os campos continuam sendo os MESMOS elementos.
   let RESETAR_SUBABA_CONTRATOS = {};
   let subabaContratosAtiva = "gerencial";
+  let menuContratos = null;
 
   // Reconstrói o CONTEÚDO das 6 abas (não os botões — esses ficam parados,
   // o clique neles é ligado uma vez só, mais abaixo) em cima da lista que
@@ -14170,6 +14482,8 @@ async function carregarContratosPortal(portalSlug) {
     // Tema V2: trocar a base fecha todos os grupos (antes abria o Gerencial).
     painel.querySelectorAll("[data-subtab-contratos]").forEach((b) => b.classList.remove("active"));
     SUBABAS_CONTRATOS.forEach((nome) => { painel.querySelector(`#contratos-sub-${nome}`).hidden = true; });
+    baseAtualContratos = listaExibida;
+    menuContratos?.novaBase();
 
     // Depois de Gerencial/Por Área já existirem no DOM — os cliques do
     // Resumo Rápido disparam eventos em cima dos elementos DELES (cartão
@@ -14189,19 +14503,9 @@ async function carregarContratosPortal(portalSlug) {
     });
   });
 
-  abasComoGrupos(painel, {
-    dataKey: "subtabContratos",
-    painelSel: (k) => `#contratos-sub-${k}`,
-    grupos: [
-      { k: "gerencial", tipo: "Valores", titulo: "Valor, maiores contratos e variação de valor" },
-      { k: "tatico", tipo: "Prazos", titulo: "Controle de prazos e quem precisa agir" },
-      { k: "operacional", tipo: "Pessoas", titulo: "Gestor, fiscal e acompanhamento da renovação" },
-      { k: "porarea", tipo: "Onde estão", titulo: "Contratos por setor demandante", tituloDinamico: () => (document.getElementById("contratos-tab-porarea-label")?.textContent === "UNIDADES ATENDIDAS" ? "Contratos por unidade atendida" : "Contratos por setor demandante") },
-      { k: "porcategoria", tipo: "Valores", titulo: "Contratos por categoria de objeto" },
-      { k: "porpessoas", tipo: "Pessoas", titulo: "Contratos por gestor e por fiscal" },
-      { k: "atualizados", tipo: "Situação", titulo: "Contratos atualizados recentemente" },
-    ],
-  });
+  let baseAtualContratos = lista;
+  menuContratos = montarMenuContratos(painel, () => ({ lista: baseAtualContratos }));
+  window.__menuContratos = menuContratos;
   montarAbas(lista, resumo);
 
   document.getElementById("contratos-baixar-relatorio").addEventListener("click", () => {
