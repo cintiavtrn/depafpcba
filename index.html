@@ -764,13 +764,13 @@ select:focus-visible,input:focus-visible{
    ===================================================================== */
 :root{
   --paper:#111819;--surface:#172021;--paper-line:#2B3839;--carvao:#E4EBE9;
-  --tinta:#7FB2D1;--tinta-glow:rgba(127,178,209,.16);
+  --tinta:#4CC3DC;--tinta-glow:rgba(76,195,220,.16);
   --terracota:#E0745C;--terracota-glow:rgba(224,116,92,.16);
   --mostarda:#D9A441;--mostarda-glow:rgba(217,164,65,.18);
-  --radius-sm:0;--radius-md:0;
+  --radius-sm:6px;--radius-md:8px;--radius-card:12px;--radius-chip:999px;--border-subtle:rgba(160,185,200,.18);--transition-ui:180ms ease;
   --shadow-xs:none;--shadow-sm:none;--shadow-md:none;--shadow-inset:none;
 }
-*,*::before,*::after{border-radius:0!important;box-shadow:none!important;text-shadow:none!important}
+*,*::before,*::after{box-shadow:none!important;text-shadow:none!important}
 .hub-node .dot,.hub-node .dot *{border-radius:50%!important}
 .hub-node .dot{box-shadow:0 0 18px -4px var(--node-glow,transparent)!important}
 .hub-node:hover .dot{box-shadow:0 0 34px -2px var(--node-glow,transparent)!important}
@@ -1028,6 +1028,263 @@ body.em-login footer{display:none}
   .topbar .topo-busca-wrap{grid-column:1/-1;grid-row:2;max-width:none;order:0}
   .topbar .topbar-acoes{grid-column:2;grid-row:1}
 }
+
+/* ---------- TEMA V3: componentes suaves, hierarquia por função ----------
+   Menu orienta, cards resumem, tabela organiza. Cantos 8px (controles) e
+   12px (cards), borda de 1px com baixo contraste, ciano só no que importa.
+   Só CSS: nenhuma lógica foi alterada. */
+.voltar,.btn-exportar-xlsx,.btn-exportar-pbi,.btn-secundario,.btn-perigo,.dash-toggle-btn,.tab-btn{
+  border:1px solid var(--border-subtle);border-radius:var(--radius-md);
+  transition:background-color var(--transition-ui),border-color var(--transition-ui),color var(--transition-ui)}
+.voltar:hover,.btn-exportar-xlsx:hover,.btn-exportar-pbi:hover,.btn-secundario:hover,.dash-toggle-btn:hover,.tab-btn:hover{
+  background:var(--tinta-glow,rgba(127,178,209,.16));border-color:var(--tinta);color:var(--carvao)}
+.btn-perigo{border-color:color-mix(in srgb,var(--terracota) 55%,transparent);color:var(--terracota)}
+.btn-perigo:hover{background:var(--terracota-glow,rgba(224,116,92,.16));border-color:var(--terracota)}
+.btn-primario{background:var(--tinta);color:var(--paper);border:1px solid var(--tinta);border-radius:var(--radius-md);font-weight:600;
+  transition:background-color var(--transition-ui),border-color var(--transition-ui)}
+.btn-primario:hover{background:color-mix(in srgb,var(--tinta) 82%,#fff);border-color:color-mix(in srgb,var(--tinta) 82%,#fff);color:var(--paper)}
+/* selecionado = fundo suave + cor de destaque, não inversão de cores */
+.dash-toggle-btn.active,.voltar.active{background:var(--tinta-glow,rgba(127,178,209,.16));color:var(--tinta);border-color:color-mix(in srgb,var(--tinta) 55%,transparent)}
+.dash-toggle{gap:4px}
+.dash-toggle .dash-toggle-btn{margin-left:0}
+/* abas: filete embaixo + indicador no ativo */
+.tabs{gap:4px;border-bottom:1px solid var(--paper-line)}
+.tab-btn{margin:0 0 -1px;border-radius:var(--radius-md) var(--radius-md) 0 0;border-bottom-color:transparent}
+.tabs .tab-btn:first-child{margin-left:0}
+.tab-btn.active{background:var(--tinta-glow,rgba(127,178,209,.16));color:var(--tinta);border-color:var(--border-subtle);border-bottom:2px solid var(--tinta)}
+/* botões de unidade gestora (chips) */
+#contratos-filtro-unidade-gestora{gap:6px!important}
+.unidade-gestora-btn{border:1px solid var(--border-subtle);border-radius:var(--radius-md);margin-left:0;
+  transition:background-color var(--transition-ui),border-color var(--transition-ui)}
+.unidade-gestora-btn:hover{background:var(--tinta-glow,rgba(127,178,209,.16));border-color:var(--tinta)}
+.unidade-gestora-btn.active{background:var(--tinta-glow,rgba(127,178,209,.16));color:var(--tinta);border-color:color-mix(in srgb,var(--tinta) 55%,transparent)}
+.unidade-gestora-btn.active .unidade-gestora-qtd{color:var(--tinta)}
+/* campos */
+.dash-filtro select,.dash-filtro input:not([type=checkbox]):not([type=radio]),
+input:not([type=checkbox]):not([type=radio]):not([type=file]),select,textarea,.busca input{
+  border:1px solid var(--border-subtle);border-radius:var(--radius-md);background:var(--surface);color:var(--carvao);
+  transition:border-color var(--transition-ui),box-shadow var(--transition-ui)}
+input[type="file"]{border:1px solid var(--border-subtle);border-radius:var(--radius-md)}
+.dash-filtro select:hover,.dash-filtro select:focus,.dash-filtro input:hover,.dash-filtro input:focus,
+input:not([type=checkbox]):not([type=radio]):focus,select:focus,textarea:focus{border-color:var(--tinta)}
+button:focus-visible,.btn-primario:focus-visible,select:focus-visible,input:focus-visible,textarea:focus-visible,.tab-btn:focus-visible{
+  outline:2px solid var(--tinta);outline-offset:2px}
+/* cards: caixa leve, canto 12px, mais respiro */
+.dash-chart-box,.projeto-card,.dado{background:var(--surface);border:1px solid var(--border-subtle);border-radius:var(--radius-card);padding:18px 20px}
+.dash-chart-box:hover,.projeto-card:hover{border-color:color-mix(in srgb,var(--tinta) 45%,transparent)}
+.dash-filtros{background:var(--surface);border:1px solid var(--border-subtle);border-radius:var(--radius-card);padding:16px 20px}
+.dash-chart-hint{background:var(--paper-line);border:0;border-radius:var(--radius-md);padding:10px 14px}
+.alerta-vencimento{border:1px solid var(--border-subtle)!important;border-radius:var(--radius-card)!important;background:var(--surface)!important;padding:0 16px}
+details.painel-detalhes{border:1px solid var(--border-subtle)!important;border-radius:var(--radius-card)}
+/* indicadores: cards com número em destaque */
+.kpi-row{gap:12px}
+.kpi-card{background:var(--surface);border:1px solid var(--border-subtle);border-radius:var(--radius-card);padding:14px 18px;margin-right:0;
+  transition:border-color var(--transition-ui),background-color var(--transition-ui)}
+.kpi-card:hover{background:var(--surface);border-color:color-mix(in srgb,var(--tinta) 55%,transparent)}
+.kpi-card:last-child{border:1px solid var(--border-subtle)}
+.hoje-v2{gap:12px}
+.hoje-v2 button{background:var(--surface);border:1px solid var(--border-subtle);border-radius:var(--radius-card);padding:14px 18px;margin-right:0;
+  transition:border-color var(--transition-ui)}
+.hoje-v2 button:last-child{border:1px solid var(--border-subtle)}
+.hoje-v2 button:hover{background:var(--surface);border-color:var(--tinta)}
+/* tabelas: só divisória horizontal, cabeçalho discreto, hover suave */
+.dash-tabela{background:var(--surface);border:1px solid var(--border-subtle);border-radius:var(--radius-card);border-collapse:separate;border-spacing:0;overflow:hidden}
+.tabela-rolavel{border:1px solid var(--border-subtle);border-radius:var(--radius-card)}
+.tabela-rolavel .dash-tabela{border:0;border-radius:0}
+.dash-tabela th,.dash-tabela td{border:0;border-bottom:1px solid var(--paper-line);padding:10px 12px}
+.dash-tabela th{background:var(--paper);color:#9AA3B2}
+.dash-tabela tr:last-child td{border-bottom:0}
+.dash-tabela tr[data-cat]:hover,.dash-tabela tbody tr:hover{background:color-mix(in srgb,var(--tinta) 7%,transparent)}
+.dash-tabela tr.selecionada{background:var(--tinta-glow,rgba(127,178,209,.16))}
+.dash-tabela tr.selecionada td{border-color:var(--paper-line)}
+/* situação em chips; tags e etiquetas */
+.pill-criticidade,.tag,.etiqueta-v2,.v2c-pilula{border-radius:var(--radius-chip)}
+.tag,.etiqueta-v2{padding:2px 10px}
+.v2c-pilula{border:1px solid var(--border-subtle)}
+.v2c-pilula button{border-radius:50%}
+.legenda-criticidade button{border-radius:var(--radius-chip)}
+/* barras de gráfico em div: cantos leves */
+.v2-pilha-barra{border:1px solid var(--border-subtle);border-radius:var(--radius-md);overflow:hidden}
+.v2-lin,.v2-lin-b{border-radius:4px}
+.cfx-row{border-radius:var(--radius-md)}
+.v2c-cols button{border-radius:var(--radius-md)}
+/* busca, modais, avisos e popovers */
+.busca-lista{border:1px solid var(--border-subtle);border-radius:0 0 var(--radius-card) var(--radius-card);box-shadow:0 12px 28px -10px rgba(0,0,0,.6)!important}
+html body .modal-caixa,html body .pop{border-radius:var(--radius-card);box-shadow:0 18px 40px -14px rgba(0,0,0,.7)!important;border:1px solid var(--border-subtle)}
+html body .toast{border-radius:var(--radius-md);box-shadow:0 10px 24px -10px rgba(0,0,0,.6)!important;border:1px solid var(--border-subtle)!important;border-left:3px solid var(--tinta)!important}
+.toast.erro{border-left-color:var(--terracota)!important}.toast.aviso{border-left-color:var(--mostarda)!important}.toast.sucesso{border-left-color:var(--oliva)!important}
+/* topo, cabeçalhos e rodapé: filetes finos em vez de 2-3px */
+.topbar{border-bottom:1px solid var(--border-subtle)}
+.tela-head{border-bottom:1px solid var(--paper-line)}
+footer{border-top:1px solid var(--paper-line)}
+.grupos-v2 .cab-outros-v2,.menu-tipos .cab-outros-v2{border-top:1px solid var(--paper-line)}
+/* login: abas segmentadas */
+.login-id{border-right:1px solid var(--border-subtle)}
+.login-abas{gap:6px}
+.login-abas button{border:1px solid var(--border-subtle);border-radius:var(--radius-md);transition:background-color var(--transition-ui),border-color var(--transition-ui)}
+.login-abas button+button{margin-left:0}
+.login-abas button:hover{background:var(--tinta-glow,rgba(127,178,209,.16));border-color:var(--tinta)}
+.login-abas button.active{background:var(--tinta-glow,rgba(127,178,209,.16));color:var(--tinta);border-color:color-mix(in srgb,var(--tinta) 55%,transparent)}
+@media (max-width:860px){.login-id{border-bottom:1px solid var(--border-subtle)}}
+
+/* ---------- tela inicial sem rosa dos ventos ---------- */
+.login-bussola{display:none!important}
+.login-id{justify-content:flex-start;gap:48px}
+/* rosa dos ventos da tela inicial: menor que a original */
+.inicio-dir .hub{width:min(380px,88vw)}
+.hub.hub-cards{width:100%;aspect-ratio:auto;display:grid;grid-template-columns:repeat(auto-fill,minmax(168px,1fr));gap:12px;isolation:auto}
+.portal-card{display:flex;flex-direction:column;align-items:flex-start;gap:14px;text-align:left;cursor:pointer;
+  padding:18px;background:var(--surface);color:var(--carvao);border:1px solid var(--border-subtle);border-radius:var(--radius-card);
+  font:inherit;transition:border-color var(--transition-ui),background-color var(--transition-ui)}
+.portal-card:hover{border-color:var(--node-color,var(--tinta));background:color-mix(in srgb,var(--node-color,var(--tinta)) 8%,var(--surface))}
+.portal-card-icone{display:grid;place-items:center;width:38px;height:38px;border-radius:var(--radius-md);
+  color:var(--node-color,var(--tinta));background:var(--node-glow,var(--tinta-glow))}
+.portal-card-icone svg{width:20px;height:20px}
+.portal-card-rotulo{font-family:'IBM Plex Mono',monospace;font-size:var(--fs-ui-sm);letter-spacing:.08em;line-height:1.3;text-transform:uppercase}
+
+#btn-previa[hidden]{display:none!important}
+#btn-previa:not([hidden]){display:block}
+
+/* ---------- LOGIN V3: sem cartão, painel de marca + formulário limpo ---------- */
+.login-grade{grid-template-columns:minmax(0,1.1fr) minmax(0,1fr)}
+.login-id{position:relative;overflow:hidden;border:0!important;justify-content:space-between;gap:32px;padding:44px 56px;
+  background:radial-gradient(820px 480px at 12% 6%,rgba(34,211,238,.14),transparent 62%),
+             radial-gradient(640px 460px at 100% 100%,rgba(127,178,209,.11),transparent 60%),var(--paper)}
+.login-id::before{content:"";position:absolute;inset:0;pointer-events:none;opacity:.32;
+  background-image:linear-gradient(var(--paper-line) 1px,transparent 1px),linear-gradient(90deg,var(--paper-line) 1px,transparent 1px);
+  background-size:48px 48px;-webkit-mask-image:linear-gradient(180deg,#000,transparent 80%);mask-image:linear-gradient(180deg,#000,transparent 80%)}
+.login-id>*{position:relative}
+.login-brasao{width:56px}
+.login-frase h1{font-size:clamp(1.9rem,3vw,2.7rem);line-height:1.1;max-width:19ch;letter-spacing:-.01em}
+.login-frase p{font-size:var(--fs-lead);max-width:44ch;color:#9AA3B2}
+.login-areas{list-style:none;display:flex;flex-wrap:wrap;gap:8px;margin-top:26px}
+.login-areas li{font-family:'IBM Plex Mono',monospace;font-size:var(--fs-ui-sm);letter-spacing:.06em;color:#B7BFCC;
+  padding:6px 12px;border:1px solid var(--border-subtle);border-radius:var(--radius-chip);background:rgba(255,255,255,.02)}
+.login-acesso{background:var(--paper);padding:48px 40px}
+.login-caixa{max-width:380px}
+.login-caixa h2{font-size:1.9rem;margin-bottom:22px;letter-spacing:-.01em}
+.login-abas{gap:4px;padding:4px;margin-bottom:24px;background:var(--surface);border:1px solid var(--border-subtle);border-radius:12px}
+.login-abas button{border:0;border-radius:var(--radius-md);padding:10px 12px;color:#9AA3B2;background:transparent}
+.login-abas button:hover{background:var(--paper-line);border:0;color:var(--carvao)}
+.login-abas button.active{background:var(--paper-line);color:var(--carvao);border:0;box-shadow:inset 0 0 0 1px var(--border-subtle)!important}
+.login-forms input:not([type=checkbox]):not([type=radio]),.login-forms select{padding:13px 14px;font-size:var(--fs-corpo);border-radius:10px}
+.login-forms .btn-primario{padding:13px 16px;font-size:var(--fs-corpo);border-radius:10px;letter-spacing:.04em}
+#btn-previa{padding:12px 16px;border-style:dashed;border-radius:10px;color:#9AA3B2;font-size:var(--fs-ui-sm);letter-spacing:.06em}
+#btn-previa:hover{color:var(--carvao)}
+.login-protegido{border-top:0;padding-top:0;margin-top:20px}
+@media (max-width:860px){
+  .login-id{padding:28px 22px;gap:18px}
+  .login-areas,.login-frase p{display:none}
+  .login-frase h1{display:block;font-size:1.6rem;max-width:none}
+  .login-acesso{padding:28px 22px 40px}
+}
+
+/* ---------- MENU LATERAL DOS PORTAIS ---------- */
+.portal-layout{display:grid;grid-template-columns:264px minmax(0,1fr);gap:32px;align-items:start}
+.portal-main{min-width:0}
+.portal-main>.tabs{display:none}
+.portal-main>.tela-head{margin-top:0}
+.portal-menu{position:sticky;top:84px;max-height:calc(100vh - 104px);overflow:auto;padding:12px;
+  background:var(--surface);border:1px solid var(--border-subtle);border-radius:var(--radius-card)}
+.pm-titulo{font-family:'IBM Plex Mono',monospace;font-size:var(--fs-ui-xs);letter-spacing:.14em;text-transform:uppercase;color:#8B93A3;padding:14px 10px 6px}
+.pm-item{position:relative;display:flex;align-items:center;gap:10px;width:100%;text-align:left;padding:9px 10px;border:0;background:transparent;
+  color:var(--carvao);border-radius:var(--radius-md);font:inherit;font-size:var(--fs-corpo);line-height:1.3;cursor:pointer;
+  transition:background-color var(--transition-ui),color var(--transition-ui)}
+.pm-item:hover{background:var(--paper-line)}
+.pm-inicio{color:#9AA3B2;font-size:var(--fs-ui)}
+.pm-icone{display:grid;place-items:center;flex:none;width:26px;height:26px;border-radius:7px;color:var(--pm-cor,var(--tinta));
+  background:color-mix(in srgb,var(--pm-cor,var(--tinta)) 14%,transparent)}
+.pm-icone svg{width:15px;height:15px}
+.pm-portal-atual{font-weight:600}
+.pm-portal-atual.pm-no-portal.atual,.pm-sub-item.atual{background:var(--tinta-glow);color:var(--tinta)}
+.pm-sub-item.atual::before,.pm-portal-atual.atual::before{content:"";position:absolute;left:-1px;top:8px;bottom:8px;width:3px;border-radius:3px;background:var(--tinta)}
+.pm-sub{margin:2px 0 8px 22px;padding-left:8px;border-left:1px solid var(--paper-line)}
+.pm-sub .pm-item{font-size:var(--fs-ui);padding:7px 10px;color:#B7BFCC}
+.pm-sub .pm-item.atual{color:var(--tinta)}
+.pm-sub-admin{margin-left:10px}
+.pm-sep{height:1px;background:var(--paper-line);margin:14px 4px 0}
+.pm-nota{font-family:'IBM Plex Mono',monospace;font-size:var(--fs-ui-xs);line-height:1.5;color:#8B93A3;padding:6px 10px 2px}
+.pm-toggle{display:none;align-items:center;gap:8px;width:100%;padding:11px 14px;border:1px solid var(--border-subtle);border-radius:var(--radius-md);
+  background:var(--surface);color:var(--carvao);font:inherit;font-size:var(--fs-corpo);cursor:pointer}
+@media (max-width:900px){
+  .portal-layout{grid-template-columns:1fr;gap:14px}
+  .pm-toggle{display:flex}
+  .portal-menu{display:none;position:static;max-height:none}
+  .portal-menu.aberto{display:block}
+}
+
+/* ---------- topo e atalhos de busca: mesma linguagem suave ---------- */
+.topbar .voltar{border:1px solid var(--border-subtle);border-radius:var(--radius-md);padding:8px 14px;font-weight:500}
+.topbar .voltar:hover{border-color:var(--tinta);background:var(--tinta-glow)}
+.topbar .voltar.active{color:var(--tinta)}
+.exemplos-busca button{border:1px solid var(--border-subtle);border-radius:var(--radius-chip);color:#B7BFCC;padding:6px 14px;font-size:var(--fs-ui);
+  transition:background-color var(--transition-ui),border-color var(--transition-ui),color var(--transition-ui)}
+.exemplos-busca button:hover{background:var(--tinta-glow);border-color:var(--tinta);color:var(--carvao)}
+
+@media (max-width:600px){#usuario-badge{display:none!important}.topbar .brand-text{font-size:9px}}
+
+/* ---------- TEMA V3 refinado: cartões com ícone, topo, menu recolhível ---------- */
+.kpi-icone{display:flex;flex:none;width:32px;height:32px;border-radius:10px;align-items:center;justify-content:center;
+  background:color-mix(in srgb,var(--kpi-cor,var(--tinta)) 16%,transparent);color:var(--kpi-cor,var(--tinta))}
+.kpi-icone svg{width:17px;height:17px}
+.kpi-cabeca{gap:10px;margin-bottom:10px}
+.kpi-label{font-size:var(--fs-ui)}
+.kpi-value{font-size:2rem;letter-spacing:-.01em}
+.kpi-card{padding:16px 18px}
+/* topo */
+.topbar{padding:10px 24px}
+.topo-esq{display:flex;align-items:center;gap:14px;min-width:0}
+.topo-portal{position:relative}
+.topo-portal-btn{display:inline-flex;align-items:center;gap:8px;padding:8px 12px;background:transparent;color:var(--carvao);border:1px solid var(--border-subtle);border-radius:var(--radius-md);font:inherit;font-size:var(--fs-corpo);cursor:pointer;max-width:240px}
+.topo-portal-btn .rot{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.topo-portal-btn:hover{border-color:var(--tinta);background:var(--tinta-glow)}
+.topo-portal-btn[hidden]{display:none}
+.topo-portal-lista{position:absolute;left:0;top:calc(100% + 6px);z-index:90;min-width:260px;padding:6px;background:var(--surface);border:1px solid var(--border-subtle);border-radius:var(--radius-card);box-shadow:0 14px 30px -12px rgba(0,0,0,.7)!important}
+.topo-portal-lista[hidden]{display:none}
+.topo-portal-lista button{display:flex;align-items:center;gap:10px;width:100%;padding:8px 10px;border:0;background:transparent;color:var(--carvao);font:inherit;font-size:var(--fs-corpo);text-align:left;border-radius:var(--radius-md);cursor:pointer}
+.topo-portal-lista button:hover{background:var(--paper-line)}
+.topo-portal-lista button.atual{background:var(--tinta-glow);color:var(--tinta)}
+.topo-portal-lista .pm-icone{display:grid;place-items:center;flex:none;width:26px;height:26px;border-radius:7px;color:var(--pm-cor,var(--tinta));background:color-mix(in srgb,var(--pm-cor,var(--tinta)) 14%,transparent)}
+.topo-portal-lista .pm-icone svg{width:15px;height:15px}
+.topbar .topo-busca-wrap{position:relative}
+.topbar .topo-busca-wrap input{border-radius:999px;padding-left:16px;padding-right:74px;background:var(--surface)}
+.topbar .topo-busca-wrap::after{content:"Ctrl K";position:absolute;right:12px;top:50%;transform:translateY(-50%);padding:2px 8px;border:1px solid var(--border-subtle);border-radius:6px;font-family:'IBM Plex Mono',monospace;font-size:var(--fs-ui-xs);color:#8B93A3;pointer-events:none}
+.topbar .topo-busca-wrap:focus-within::after{display:none}
+#usuario-badge{align-items:center;gap:10px;color:var(--carvao)!important;padding-right:6px}
+#usuario-badge .avatar{display:grid;place-items:center;width:34px;height:34px;border-radius:50%;background:var(--tinta-glow);color:var(--tinta);border:1px solid color-mix(in srgb,var(--tinta) 45%,transparent);font-family:'Archivo',sans-serif;font-weight:700;font-size:var(--fs-ui)}
+#usuario-badge .perfil-nome{display:flex;flex-direction:column;line-height:1.2;font-family:'Archivo',sans-serif;font-size:var(--fs-ui);max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#usuario-badge .perfil-nome small{font-family:'IBM Plex Mono',monospace;font-size:var(--fs-ui-xs);color:#8B93A3;text-transform:uppercase;letter-spacing:.08em}
+.topbar .topbar-acoes .voltar{border-color:transparent;background:transparent}
+.topbar .topbar-acoes .voltar:hover{border-color:var(--border-subtle);background:var(--paper-line)}
+@media (max-width:1100px){
+  .topbar{grid-template-columns:minmax(0,1fr) auto}
+  .topbar .topo-busca-wrap{grid-column:1/-1;grid-row:2;max-width:none}
+  .topbar .topbar-acoes{grid-column:2;grid-row:1}
+  .topo-esq{grid-column:1}.topbar .topo-portal-btn{max-width:200px}
+}
+@media (max-width:700px){#usuario-badge .perfil-nome{display:none}}
+/* início */
+.inicio-esq .intro h1{max-width:12ch}
+/* menu lateral */
+.portal-layout{transition:grid-template-columns var(--transition-ui)}
+.portal-menu{padding:10px;background:linear-gradient(180deg,var(--surface),var(--paper));}
+.pm-titulo{padding:16px 10px 6px}
+.pm-sub{margin-left:20px}
+.pm-sub .pm-item{position:relative;padding-left:22px}
+.pm-sub .pm-item::after{content:"";position:absolute;left:8px;top:50%;width:5px;height:5px;margin-top:-2.5px;border-radius:50%;background:#56625F}
+.pm-sub .pm-item.atual::after{background:var(--tinta)}
+.pm-sub-admin .pm-item::after{display:none}
+.pm-sub-admin .pm-item{padding-left:10px}
+.pm-rodape{margin-top:14px;padding-top:10px;border-top:1px solid var(--paper-line)}
+.pm-recolher{color:#8B93A3;font-size:var(--fs-ui)}
+.pm-recolher .pm-seta{display:grid;place-items:center;width:26px;height:26px;font-size:1.1rem;transition:transform var(--transition-ui)}
+.portal-layout.recolhido{grid-template-columns:68px minmax(0,1fr)}
+.portal-layout.recolhido .pm-item>span:not(.pm-icone):not(.pm-seta),.portal-layout.recolhido .pm-sub,.portal-layout.recolhido .pm-titulo,.portal-layout.recolhido .pm-nota,.portal-layout.recolhido .pm-sep,.portal-layout.recolhido .pm-inicio{display:none}
+.portal-layout.recolhido .portal-menu{padding:10px 8px}
+.portal-layout.recolhido .pm-item{justify-content:center;padding:8px 0}
+.portal-layout.recolhido .pm-seta{transform:rotate(180deg)}
+.portal-layout.recolhido .pm-portal-atual.pm-no-portal.atual::before,.portal-layout.recolhido .pm-portal-atual::before{display:none}
+@media (max-width:900px){.pm-rodape{display:none}.portal-layout.recolhido{grid-template-columns:1fr}.portal-layout.recolhido .pm-item>span:not(.pm-icone):not(.pm-seta){display:inline}}
 </style>
 </head>
 <body>
@@ -1040,9 +1297,15 @@ body.em-login footer{display:none}
 </div>
 
 <div class="topbar">
+  <div class="topo-esq">
   <div class="brand" id="brand-home-btn">
     <span id="brand-icon"></span>
     <span class="brand-text">POLÍCIA CIVIL DA BAHIA<b>DEPAF</b></span>
+  </div>
+  <div class="topo-portal">
+    <button type="button" id="topo-portal-btn" class="topo-portal-btn" aria-haspopup="true" aria-expanded="false" hidden><span class="rot">Escolher área</span><span aria-hidden="true">⌄</span></button>
+    <div id="topo-portal-lista" class="topo-portal-lista" hidden></div>
+  </div>
   </div>
   <div class="busca topo-busca-wrap" data-busca="topo" id="busca-topo-wrap" style="display:none">
     <label class="sr" for="busca-topo">Buscar informação</label>
@@ -1071,6 +1334,7 @@ body.em-login footer{display:none}
       <div class="login-frase">
         <h1>Contratos, termos, obras e frota em um só lugar.</h1>
         <p>O acesso é liberado pela administração conforme a sua unidade e a sua coordenação.</p>
+        <ul class="login-areas" aria-label="Áreas do portal"><li>Contratos</li><li>Termos de cooperação</li><li>Obras</li><li>Frota</li></ul>
       </div>
     </aside>
     <div class="login-acesso">
@@ -1133,6 +1397,7 @@ body.em-login footer{display:none}
     </form>
     <p id="redefinir-senha-status" class="font-mono" style="text-align:center;margin-top:10px;font-size:var(--fs-ui-sm);color:#9AA3B2"></p>
         </div>
+        <button type="button" id="btn-previa" class="btn-secundario" hidden style="width:100%;margin-top:18px">VER A INTERFACE SEM ENTRAR (PRÉVIA)</button>
         <p class="login-protegido">Os dados são acessados apenas após o login e conforme a permissão de cada conta.</p>
       </div>
     </div>
@@ -1144,17 +1409,9 @@ body.em-login footer{display:none}
   <div class="inicio-esq">
   <div class="intro">
     <div class="eyebrow">PORTAL INSTITUCIONAL DEPAF</div>
-    <h1>Escreva o que você precisa saber hoje</h1>
+    <h1>Escolha uma área para começar</h1>
   </div>
 
-  <div class="hero-busca">
-    <div class="busca grande" data-busca="home">
-      <label class="sr" for="busca-home">Buscar informação</label>
-      <input id="busca-home" data-busca-in placeholder="Ex.: quantos vão vencer e onde estão" autocomplete="off" role="combobox" aria-expanded="false" aria-controls="lista-home" aria-autocomplete="list">
-      <div class="busca-lista" id="lista-home" role="listbox" hidden></div>
-    </div>
-    <div class="exemplos-busca" id="exemplos-busca" aria-label="Consultas de exemplo"></div>
-  </div>
   </div>
 
   <div class="inicio-dir">
@@ -2068,7 +2325,44 @@ const API_CONFIG = {
 };
 
 const CHAVE_SESSAO = "depaf_sessao";
+// ---- MODO PRÉVIA: só para ver a interface (menus, abas, cards) sem login.
+// Tudo em memória; não grava sessão e não acessa dados reais. O botão só
+// aparece abrindo o arquivo direto do computador, em localhost, ou com ?previa
+// no endereço. O servidor continua exigindo login de verdade para qualquer dado.
+window.__PREVIA = false;
+const PREVIA_DISPONIVEL = location.protocol === "file:" || ["localhost", "127.0.0.1"].includes(location.hostname) || /[?&]previa\b/.test(location.search);
+const PORTAIS_PREVIA = [
+  { slug: "orcamento", label: "ORÇAMENTO E FINANÇAS", icon: "competencia_orcamento", corHex: "22D3EE" },
+  { slug: "infraestrutura", label: "INFRAESTRUTURA", icon: "obras", corHex: "EAB308" },
+  { slug: "frota", label: "FROTA", icon: "competencia_frota", corHex: "34D399" },
+  { slug: "pessoal", label: "PESSOAL", icon: "pessoa", corHex: "A78BFA" },
+  { slug: "normas", label: "NORMAS", icon: "competencia_normas", corHex: "FB7185" },
+  { slug: "patrimonio", label: "PATRIMÔNIO", icon: "competencia_tombamento", corHex: "EC4899" },
+  { slug: "projetos", label: "PROJETOS", icon: "projeto_rede", corHex: "7FB2D1" },
+].map((x) => ({ ...x, artigos: [], modulos: null, meuPapel: "editor" }));
+// Troque para false antes de publicar, se não quiser o botão na tela de login.
+const PREVIA_SEMPRE_VISIVEL = false;
+function ligarBotaoPrevia() {
+  const b = document.getElementById("btn-previa");
+  if (!b || b.dataset.ligado) return;
+  b.dataset.ligado = "1";
+  if (PREVIA_SEMPRE_VISIVEL || PREVIA_DISPONIVEL) b.hidden = false;
+  b.addEventListener("click", async () => {
+    window.__PREVIA = true;
+    mostrarAppLogado({ nome: "Prévia", papel: "admin" });
+    await carregarPortais();
+  });
+}
+if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", ligarBotaoPrevia);
+else ligarBotaoPrevia();
+function apiPrevia(caminho) {
+  if (caminho === "/api/portais") return Promise.resolve(PORTAIS_PREVIA);
+  const m = caminho.match(/^\/api\/portais\/([^/?]+)$/);
+  if (m) return Promise.resolve({ intro: "Prévia da interface — sem dados reais.", indicadores: [], projetos: [] });
+  return Promise.reject(new Error("modo prévia: sem dados do servidor"));
+}
 function obterSessao() {
+  if (window.__PREVIA) return { token: "previa", usuario: { nome: "Prévia", papel: "admin" } };
   try {
     return JSON.parse(localStorage.getItem(CHAVE_SESSAO) || "null");
   } catch {
@@ -2166,6 +2460,7 @@ function confirmarAcao({ titulo, texto, alvo = "", rotuloConfirmar = "CONFIRMAR"
 }
 
 async function apiFetch(caminho, opcoes = {}) {
+  if (window.__PREVIA) return apiPrevia(caminho);
   const sessao = obterSessao();
   const resposta = await fetch(`${API_CONFIG.BASE_URL}${caminho}`, {
     ...opcoes,
@@ -2252,7 +2547,27 @@ function subportaisDe(portalId) {
 document.getElementById("brand-icon").innerHTML = ICONS.brasao_pcba;
 document.getElementById("footer-selo").innerHTML = seloSVG("DEPAF", "DOSSIÊ");
 const hub = document.getElementById("hub");
+// Tela inicial sem a rosa dos ventos: as áreas viram cards. Para voltar à
+// bússola, troque para true — o desenho antigo continua em buildHubBussola().
+const USAR_BUSSOLA_NO_INICIO = true;
 function buildHub() {
+  if (USAR_BUSSOLA_NO_INICIO) { hub.classList.remove("hub-cards"); return buildHubBussola(); }
+  hub.innerHTML = "";
+  hub.classList.add("hub-cards");
+  PORTAIS.forEach((p) => {
+    const card = document.createElement("button");
+    card.type = "button";
+    card.className = "portal-card";
+    card.style.setProperty("--node-color", p.cor);
+    card.style.setProperty("--node-glow", corGlow(p.cor));
+    card.setAttribute("aria-label", `Abrir ${p.label}`);
+    card.innerHTML = `<span class="portal-card-icone">${ICONS[p.icon] || ""}</span><span class="portal-card-rotulo">${escapeHTML(p.label)}</span>`;
+    card.addEventListener("click", () => abrirTela(p.id));
+    hub.appendChild(card);
+  });
+}
+
+function buildHubBussola() {
   hub.innerHTML = "";
   const size = hub.clientWidth;
   const center = size / 2;
@@ -2467,7 +2782,26 @@ const DICA_BUSCA_PORTAL = {
   orcamento: "contrato, empresa, município ou gestor", projetos: "projeto ou responsável",
   pessoal: "indicador ou painel", normas: "indicador ou painel", patrimonio: "indicador ou painel"
 };
+// Seletor de área no topo: sempre mostra onde a pessoa está e leva a outra área sem passar pelo início.
+function atualizarSeletorPortal() {
+  const b = document.getElementById("topo-portal-btn"), l = document.getElementById("topo-portal-lista");
+  if (!b || !l) return;
+  const atual = PORTAIS.find((x) => x.id === PORTAL_ATUAL);
+  b.hidden = !PORTAIS.length;
+  b.querySelector(".rot").textContent = atual ? atual.label : "Escolher área";
+  l.innerHTML = `<button type="button" data-topo-portal="" class="${atual ? "" : "atual"}"><span class="pm-icone" aria-hidden="true">⌂</span>Início</button>`
+    + PORTAIS.map((x) => `<button type="button" data-topo-portal="${escapeAttr(x.id)}" class="${x.id === PORTAL_ATUAL ? "atual" : ""}"><span class="pm-icone" style="--pm-cor:${x.cor}">${ICONS[x.icon] || ""}</span>${escapeHTML(x.label)}</button>`).join("");
+}
+document.addEventListener("click", (e) => {
+  const l = document.getElementById("topo-portal-lista"), b = document.getElementById("topo-portal-btn");
+  if (!l) return;
+  if (e.target.closest("#topo-portal-btn")) { l.hidden = !l.hidden; b.setAttribute("aria-expanded", String(!l.hidden)); return; }
+  const it = e.target.closest("[data-topo-portal]");
+  if (it) { l.hidden = true; b.setAttribute("aria-expanded", "false"); if (it.dataset.topoPortal) abrirTela(it.dataset.topoPortal); else fecharTela(); return; }
+  l.hidden = true; b.setAttribute("aria-expanded", "false");
+});
 function atualizarPlaceholderBusca() {
+  atualizarSeletorPortal();
   const topo = document.getElementById("busca-topo"), home = document.getElementById("busca-home");
   const p = PORTAL_ATUAL && PORTAIS.find((x) => x.id === PORTAL_ATUAL);
   // No início, a dica lista só o que a conta enxerga.
@@ -2780,8 +3114,9 @@ function mostrarAppLogado(usuario) {
   document.getElementById("tela-login").hidden = true;
   document.getElementById("tela-inicio").hidden = false;
   const badge = document.getElementById("usuario-badge");
-  badge.textContent = `${usuario.nome} · ${usuario.papel}`;
-  badge.style.display = "inline";
+  const iniciais = String(usuario.nome || "?").trim().split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join("").toUpperCase() || "?";
+  badge.innerHTML = `<span class="avatar" aria-hidden="true">${escapeHTML(iniciais)}</span><span class="perfil-nome">${escapeHTML(usuario.nome)}<small>${escapeHTML(usuario.papel)}</small></span>`;
+  badge.style.display = "inline-flex";
     // Os papéis por portal só chegam depois de carregarPortais(), que roda
   // logo em seguida e chama esta função de novo — é lá que dá pra decidir de
   // verdade se esta pessoa sobe planilha.
@@ -2823,6 +3158,7 @@ document.getElementById("btn-sair").addEventListener("click", () => {
   // tela JÁ, e avisa o servidor pra revogar a sessão em segundo plano (sem
   // `await`); se essa parte falhar, não tem problema, é só o token
   // continuar "válido" no banco por mais alguns minutos até expirar sozinho.
+  if (window.__PREVIA) { window.__PREVIA = false; PORTAIS = []; mostrarTelaLogin(""); location.reload(); return; }
   const sessao = obterSessao();
   limparSessao();
   mostrarTelaLogin("");
@@ -14998,6 +15334,93 @@ function renderAtualizadosRecentemente(lista, decisoesRenovacao) {
   ligarTooltipLinhas(document.getElementById("atualizados-tabela"), porId);
 }
 
+// ---------- menu lateral dos portais ----------
+// O menu responde "onde quero ir?"; o conteúdo responde "o que consulto aqui?".
+// As abas antigas continuam existindo (escondidas): o menu só clica nelas, então
+// a busca global, os atalhos e o carregamento de cada área seguem funcionando.
+const ROTULO_ABA = {
+  geral: "Visão geral", paineis: "Painéis", planilhas: "Planilhas enviadas",
+  contratos: "CPG — Contratos", cfcr: "TCT municipais", "cfcr-acordos": "Acordos congêneres",
+  obras: "Painel de obras", frota: "Painel de frota",
+};
+function montarMenuLateral(p, SUB, ocultarAbasPadrao) {
+  const navTabs = [...(ocultarAbasPadrao ? [] : ["geral"]), ...SUB.map(sp => sp.tab)];
+  const adminTabs = ocultarAbasPadrao ? [] : ["paineis", "planilhas"];
+  const tabsEl = telaConteudo.querySelector(".tabs");
+  if (!tabsEl) return;
+
+  const layout = document.createElement("div");
+  layout.className = "portal-layout";
+  const main = document.createElement("div");
+  main.className = "portal-main";
+  [...telaConteudo.childNodes].forEach(k => main.appendChild(k));
+
+  const toggle = document.createElement("button");
+  toggle.type = "button";
+  toggle.className = "pm-toggle";
+  toggle.setAttribute("aria-expanded", "false");
+  toggle.innerHTML = `<span aria-hidden="true">☰</span> Menu do portal`;
+
+  const menu = document.createElement("aside");
+  menu.className = "portal-menu";
+  menu.setAttribute("aria-label", "Navegação do portal");
+
+  const item = (tab) => `<button type="button" class="pm-item pm-sub-item" data-pm-tab="${tab}">${ROTULO_ABA[tab] || tab}</button>`;
+  const portaisHtml = PORTAIS.map(x => {
+    const icone = `<span class="pm-icone" style="--pm-cor:${x.cor}">${ICONS[x.icon] || ""}</span>`;
+    if (x.id !== p.id) return `<button type="button" class="pm-item" data-pm-portal="${escapeAttr(x.id)}" title="${escapeAttr(x.label)}">${icone}<span>${escapeHTML(x.label)}</span></button>`;
+    const subs = navTabs.length > 1 ? `<div class="pm-sub">${navTabs.map(item).join("")}</div>` : "";
+    return `<button type="button" class="pm-item pm-portal-atual" data-pm-aqui="1">${icone}<span>${escapeHTML(x.label)}</span></button>${subs}`;
+  }).join("");
+  const adminHtml = adminTabs.length ? `
+    <div class="pm-sep"></div>
+    <div class="pm-titulo">Administração</div>
+    <div class="pm-sub pm-sub-admin">${adminTabs.map(item).join("")}</div>
+    <p class="pm-nota">Itens administrativos aparecem só para quem tem permissão.</p>` : "";
+  menu.innerHTML = `
+    <button type="button" class="pm-item pm-inicio" data-pm-inicio="1"><span aria-hidden="true">←</span><span>Início</span></button>
+    <div class="pm-titulo">Portais</div>
+    ${portaisHtml}${adminHtml}
+    <div class="pm-rodape"><button type="button" class="pm-item pm-recolher" data-pm-recolher="1" title="Recolher ou expandir o menu"><span class="pm-seta" aria-hidden="true">‹</span><span class="pm-rotulo-rec">Recolher menu</span></button></div>`;
+
+  layout.append(toggle, menu, main);
+  telaConteudo.appendChild(layout);
+  try { layout.classList.toggle("recolhido", localStorage.getItem("depaf_menu_recolhido") === "1"); } catch { /* sem armazenamento: segue expandido */ }
+
+  const fechar = () => { menu.classList.remove("aberto"); toggle.setAttribute("aria-expanded", "false"); };
+  toggle.addEventListener("click", () => {
+    const abrir = !menu.classList.contains("aberto");
+    menu.classList.toggle("aberto", abrir);
+    toggle.setAttribute("aria-expanded", String(abrir));
+  });
+  const sincronizar = () => {
+    const ativa = tabsEl.querySelector(".tab-btn.active")?.dataset.tab;
+    menu.querySelectorAll("[data-pm-tab]").forEach(b => b.classList.toggle("atual", b.dataset.pmTab === ativa));
+    const aqui = menu.querySelector("[data-pm-aqui]");
+    if (aqui) aqui.classList.toggle("atual", navTabs.length === 1 ? navTabs[0] === ativa : false);
+    if (aqui) aqui.classList.toggle("pm-no-portal", !adminTabs.includes(ativa));
+  };
+  menu.addEventListener("click", (ev) => {
+    const alvo = ev.target.closest("button");
+    if (!alvo) return;
+    if (alvo.dataset.pmRecolher) {
+      const r = layout.classList.toggle("recolhido");
+      try { localStorage.setItem("depaf_menu_recolhido", r ? "1" : "0"); } catch { /* ignora */ }
+      return;
+    }
+    if (alvo.dataset.pmInicio) { fecharTela(); return; }
+    if (alvo.dataset.pmPortal) { abrirTela(alvo.dataset.pmPortal); return; }
+    if (alvo.dataset.pmAqui) { const t = navTabs[0]; if (t) tabsEl.querySelector(`.tab-btn[data-tab="${t}"]`)?.click(); fechar(); return; }
+    if (alvo.dataset.pmTab) {
+      tabsEl.querySelector(`.tab-btn[data-tab="${alvo.dataset.pmTab}"]`)?.click();
+      fechar();
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  });
+  new MutationObserver(sincronizar).observe(tabsEl, { attributes: true, subtree: true, attributeFilter: ["class"] });
+  sincronizar();
+}
+
 async function abrirTela(id) {
   const pBase = PORTAIS.find(x => x.id === id);
   if (!pBase) return;
@@ -15114,6 +15537,7 @@ async function abrirTela(id) {
   const btnAlternarAbas = document.getElementById("btn-alternar-abas-ocultas");
   if (btnAlternarAbas) btnAlternarAbas.addEventListener("click", () => alternarAbasOcultas(id));
 
+  montarMenuLateral(p, SUB, ocultarAbasPadrao);
   ligarEdicaoIndicadores(p.id);
   ligarEdicaoProjetos(p.id);
   carregarConteudoAba(abaInicial);
