@@ -178,12 +178,37 @@ body{background:var(--paper);color:var(--carvao);font-family:'IBM Plex Sans',san
 .hub-node:hover .dot{background:var(--node-color,var(--carvao));color:var(--paper);transform:scale(1.1)}
 .hub-node .label{font-family:'IBM Plex Mono',monospace;font-size:var(--fs-ui-sm);letter-spacing:0.08em;line-height:1.2;color:var(--carvao);opacity:.75}
 
-.direcao-card{
-  max-width:420px;margin:36px auto 0;	background:var(--surface);border:2px solid var(--carvao);padding:18px 20px;text-align:left;
-}
-.direcao-card .card-label{font-family:'IBM Plex Mono',monospace;font-size:var(--fs-ui-sm);letter-spacing:0.1em;color:var(--terracota);margin-bottom:6px}
-.direcao-card h3{font-family:'Space Grotesk',sans-serif;font-size:var(--fs-titulo)}
-.direcao-card p{font-size:var(--fs-corpo);color:#9AA3B2;margin-top:4px}
+
+/* ---------- busca por tipo de informação (início e topo) ---------- */
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+.busca{position:relative;width:100%}
+.busca input{width:100%;border:2px solid var(--carvao);background:var(--surface);color:var(--carvao);padding:9px 12px;font-family:'IBM Plex Mono',monospace;font-size:var(--fs-ui);border-radius:0}
+.busca input::placeholder{color:#8B93A3}
+.busca.grande input{padding:16px 18px;font-size:var(--fs-lead)}
+.busca-lista{position:absolute;left:0;right:0;top:100%;z-index:60;background:var(--surface);border:2px solid var(--carvao);border-top:0;box-shadow:8px 8px 0 #000;max-height:min(70vh,520px);overflow:auto;text-align:left}
+.busca-lista[hidden]{display:none}
+.busca-tipos{padding:10px 12px;border-bottom:1px solid var(--paper-line)}
+.busca-tipos .rotulo-busca{font-family:'IBM Plex Mono',monospace;font-size:var(--fs-ui-xs);letter-spacing:.14em;text-transform:uppercase;color:#8B93A3;margin-bottom:7px}
+.busca-tipos .busca-grupo{display:inline-flex;flex-wrap:wrap}
+.busca-tipos button{border:2px solid var(--carvao);margin-left:-2px;padding:5px 10px;font-family:'IBM Plex Mono',monospace;font-size:var(--fs-ui-sm);color:var(--carvao);background:transparent;cursor:pointer}
+.busca-tipos button:first-child{margin-left:0}
+.busca-tipos button:hover{background:var(--paper-line)}
+.busca-tipos button.on{background:var(--carvao);color:var(--paper)}
+.busca-res{display:grid;grid-template-columns:96px minmax(0,1fr);gap:0 14px;width:100%;padding:10px 12px;border:0;border-bottom:1px solid var(--paper-line);background:transparent;color:var(--carvao);text-align:left;cursor:pointer;font-family:inherit}
+.busca-res .k{font-family:'IBM Plex Mono',monospace;font-size:var(--fs-ui-xs);letter-spacing:.12em;text-transform:uppercase;text-align:right;color:#8B93A3;padding-top:2px}
+.busca-res b{display:block;font-size:var(--fs-corpo);font-weight:600}
+.busca-res small{display:block;font-family:'IBM Plex Mono',monospace;font-size:var(--fs-ui-xs);color:#8B93A3;margin-top:2px}
+.busca-res:hover,.busca-res[aria-selected="true"]{background:var(--carvao);color:var(--paper)}
+.busca-res:hover .k,.busca-res[aria-selected="true"] .k,.busca-res:hover small,.busca-res[aria-selected="true"] small{color:var(--paper-line)}
+.busca-vazia{padding:12px;color:#8B93A3;font-size:var(--fs-corpo)}
+.exemplos-busca{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:14px}
+.exemplos-busca button{border:1px solid var(--carvao);background:transparent;color:var(--carvao);padding:6px 12px;font-size:var(--fs-corpo);cursor:pointer;font-family:inherit}
+.exemplos-busca button:hover{background:var(--carvao);color:var(--paper)}
+.hero-busca{max-width:680px;margin:26px auto 0}
+.rotulo-rosa{text-align:center;font-family:'IBM Plex Mono',monospace;font-size:var(--fs-ui-sm);letter-spacing:.14em;text-transform:uppercase;color:#8B93A3;margin-top:40px}
+.topo-busca-wrap{width:min(300px,34vw)}
+.achado-busca{outline:3px solid var(--tinta);outline-offset:4px}
+@media (max-width:760px){.topo-busca-wrap{width:100%;order:9}.busca-res{grid-template-columns:1fr}.busca-res .k{text-align:left}}
 
 /* ---------- telas dedicadas ---------- */
 .tela{padding:48px 32px 64px;max-width:1600px;margin:0 auto}
@@ -642,7 +667,7 @@ body{background:var(--paper);color:var(--carvao);font-family:'IBM Plex Sans',san
 .btn-exportar-xlsx:hover{background:var(--mostarda);color:var(--carvao)}
 
 /* ---------- upgrade visual: superfícies quentes, legenda de donut, botões ---------- */
-.dado,.kpi-card,.projeto-card,.dash-chart-box,.dash-tabela,.direcao-card,.dash-filtros{background:var(--surface)}
+.dado,.kpi-card,.projeto-card,.dash-chart-box,.dash-tabela,.dash-filtros{background:var(--surface)}
 .dash-chart-box svg{overflow:visible}
 .donut-fatia{transition:transform .18s ease,opacity .2s ease;transform-origin:100px 100px}
 .donut-fatia:hover{transform:scale(1.04)}
@@ -748,7 +773,7 @@ select:focus-visible,input:focus-visible{
 }
 .dash-filtro select:hover,.dash-filtro select:focus{border-color:var(--tinta)}
 
-.dado,.kpi-card,.projeto-card,.dash-chart-box,.dash-tabela,.direcao-card,.dash-filtros{
+.dado,.kpi-card,.projeto-card,.dash-chart-box,.dash-tabela,.dash-filtros{
   box-shadow:var(--shadow-sm);position:relative;
 }
 .kpi-card{transition:transform .18s var(--ease-spring),box-shadow .18s ease}
@@ -810,6 +835,11 @@ select:focus-visible,input:focus-visible{
     <span class="brand-text">POLÍCIA CIVIL DA BAHIA<b>DEPAF</b></span>
   </div>
   <div class="topbar-acoes">
+    <div class="busca topo-busca-wrap" data-busca="topo" id="busca-topo-wrap" style="display:none">
+      <label class="sr" for="busca-topo">Buscar informação</label>
+      <input id="busca-topo" data-busca-in placeholder="Buscar informação (Ctrl K)" autocomplete="off" role="combobox" aria-expanded="false" aria-controls="lista-topo" aria-autocomplete="list">
+      <div class="busca-lista" id="lista-topo" role="listbox" hidden></div>
+    </div>
     <span id="usuario-badge" class="font-mono" style="font-size:var(--fs-ui-sm);color:#9AA3B2;display:none"></span>
     <button class="voltar show" id="btn-abrir-usuarios" style="margin-right:8px;display:none"><span style="display:inline-flex;width:14px;height:14px;vertical-align:-3px;flex:none"><svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="square" stroke-linejoin="miter" xmlns="http://www.w3.org/2000/svg"><circle cx="32" cy="18" r="10" /><path d="M 12 56 A 20 20 0 0 1 52 56" /></svg></span> ACESSOS</button>
     <button class="voltar show" id="btn-abrir-upload" style="margin-right:8px;background:var(--tinta,#22D3EE);display:none"><span style="display:inline-flex;width:14px;height:14px;vertical-align:-3px;flex:none"><svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="square" stroke-linejoin="miter" xmlns="http://www.w3.org/2000/svg"><polyline points="18,24 32,8 46,24" /><line x1="32" y1="8" x2="32" y2="42" /><line x1="12" y1="54" x2="52" y2="54" /></svg></span> SUBIR PLANILHA</button>
@@ -892,16 +922,23 @@ select:focus-visible,input:focus-visible{
 
 <div id="tela-inicio" hidden>
   <div class="intro">
-    <div class="eyebrow">DOSSIÊ INSTITUCIONAL · PORTAL INTERATIVO</div>
-    <h1>DEPAF</h1>
-    <p>Departamento de Planejamento, Administração e Finanças da Polícia Civil da Bahia. Escolha um caminho a partir do brasão para explorar cada frente do departamento.</p>
+    <div class="eyebrow">PORTAL INSTITUCIONAL DEPAF</div>
+    <h1>Escreva o que você precisa saber hoje</h1>
   </div>
 
-  <div class="hub-container">
+  <div class="hero-busca">
+    <div class="busca grande" data-busca="home">
+      <label class="sr" for="busca-home">Buscar informação</label>
+      <input id="busca-home" data-busca-in placeholder="Ex.: quantos vão vencer e onde estão" autocomplete="off" role="combobox" aria-expanded="false" aria-controls="lista-home" aria-autocomplete="list">
+      <div class="busca-lista" id="lista-home" role="listbox" hidden></div>
+    </div>
+    <div class="exemplos-busca" id="exemplos-busca" aria-label="Consultas de exemplo"></div>
+  </div>
+
+  <p class="rotulo-rosa">Ou escolha uma área a partir do brasão</p>
+  <div class="hub-container" style="margin-top:14px">
     <div class="hub grid-bg" id="hub" style="background:none"></div>
   </div>
-
-  <div class="direcao-card" id="direcao-card"></div>
 </div>
 
 <section class="tela" id="tela-conteudo" hidden></section>
@@ -1942,12 +1979,6 @@ let PORTAIS = [];
 // na tela (era assim no HTML original), e os exportadores de Excel/Power BI
 // também precisam dessa versão sem filtro.
 
-const DIRECAO = {
-  nome: "Del. Cristiano Marcos Pitangueira Mangueira",
-  cargo: "Diretor do DEPAF",
-  nota: "Patrocinador dos projetos institucionais do DEPAF no Portfólio 2026–2027."
-};
-
 const MESES = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
 
 // =====================================================================
@@ -1993,12 +2024,6 @@ function subportaisDe(portalId) {
 // =====================================================================
 document.getElementById("brand-icon").innerHTML = ICONS.brasao_pcba;
 document.getElementById("footer-selo").innerHTML = seloSVG("DEPAF", "DOSSIÊ");
-document.getElementById("direcao-card").innerHTML = `
-  <div class="card-label">DIREÇÃO ATUAL</div>
-  <h3>${DIRECAO.nome}</h3>
-  <p>${DIRECAO.nota}</p>
-`;
-
 const hub = document.getElementById("hub");
 function buildHub() {
   hub.innerHTML = "";
@@ -2117,16 +2142,163 @@ async function carregarPortais() {
     for (const item of lista) PAPEL_POR_PORTAL.set(item.slug, item.meuPapel || "leitor");
     atualizarBotoesPorPapel();
     buildHub();
+    montarExemplosBusca();
   } catch (erro) {
-    document.querySelector("#tela-inicio .intro p").textContent =
-      "Não consegui carregar os portais: " + erro.message +
-      " — confira se o backend está rodando (npm start) e se você ainda está logado.";
+    // O parágrafo de apresentação do início saiu; o aviso vai pelo toast.
+    console.error(erro);
+    mostrarToast("Não consegui carregar os portais: " + erro.message + ". Confira se o servidor está no ar e se você ainda está logado.", "erro", 12000);
   }
 }
 
 // =====================================================================
 // 4c. LOGIN COM GOOGLE — gate de acesso antes de mostrar qualquer dado
 // =====================================================================
+// =====================================================================
+// BUSCA POR TIPO DE INFORMAÇÃO — menu suspenso sob o campo (início e topo)
+// =====================================================================
+// Pedido direto: "um menu suspenso rápido ou pesquisa rápida... o gestor
+// pergunta 'quantos vão vencer e onde estão', 'quem são as pessoas', 'os
+// prazos'... a pessoa sabe o que é possível ver e abre só aquele grupo".
+// Cada entrada leva ao portal, à aba e (quando existe) ao gráfico certo.
+// A lista só considera o que a conta pode ver: PORTAIS já vem filtrado pelo
+// servidor e subportaisDe() filtra os módulos liberados — nada aparece na
+// busca que a pessoa não alcançaria navegando.
+const TIPOS_BUSCA = ["Prazos", "Quantidades", "Pessoas", "Onde estão", "Valores", "Situação"];
+const STOP_BUSCA = new Set("a o os as de do da dos das e em que quero saber vao vai ser tem ter sao um uma para por no na nos nas ate me mostre mostrar ver qual quais como sera".split(" "));
+const normBusca = (t) => String(t).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+const DESTINOS_BUSCA = [
+  // CPG - Contratos
+  { id: "c-prazos", tipo: "Prazos", t: "Prazos e vencimentos dos contratos", kw: "quantos vencer vencem vencimento vencimentos prazo prazos quando criticidade gantt", portal: "orcamento", sub: "contratos", aba: ["contratos", "tatico"] },
+  { id: "c-pessoas", tipo: "Pessoas", t: "Gestores e fiscais, com os contratos de cada um", kw: "quem pessoas pessoa gestor gestores fiscal fiscais responsavel responsaveis servidores", portal: "orcamento", sub: "contratos", aba: ["contratos", "porpessoas"] },
+  { id: "c-agir", tipo: "Pessoas", t: "Quem precisa agir nos contratos que vencem", kw: "quem agir acao renovar renovacao responsavel pessoas", portal: "orcamento", sub: "contratos", aba: ["contratos", "tatico"], titulo: "Quem Precisa Agir" },
+  { id: "c-onde", tipo: "Onde estão", t: "Onde estão os contratos, por setor demandante", kw: "onde estao vencer setor demandante coorpin area unidade local", portal: "orcamento", sub: "contratos", aba: ["contratos", "porarea"] },
+  { id: "c-dirpin", tipo: "Onde estão", t: "Contratos da DEPIN por diretoria regional", kw: "onde estao dirpin regional depin interior diretoria", portal: "orcamento", sub: "contratos", aba: ["contratos", "gerencial"], antes: () => document.querySelector('.unidade-gestora-btn[data-unidade="DEPIN"]')?.click(), ancoraSel: "#contratos-filtro-dirpin-linha" },
+  { id: "c-valor", tipo: "Valores", t: "Valor dos contratos e os maiores contratos", kw: "valor valores dinheiro custo custam gasto total maiores top quanto", portal: "orcamento", sub: "contratos", aba: ["contratos", "gerencial"], titulo: "Top 10 Maiores Contratos" },
+  { id: "c-forn", tipo: "Valores", t: "Maiores fornecedores por valor", kw: "fornecedores fornecedor empresas empresa valor maiores top", portal: "orcamento", sub: "contratos", aba: ["contratos", "gerencial"], titulo: "Top 10 Maiores Fornecedores" },
+  { id: "c-var", tipo: "Valores", t: "Contratos com variação de valor e o motivo", kw: "variacao valor aditivo inicial atual por que varia diferenca", portal: "orcamento", sub: "contratos", aba: ["contratos", "gerencial"], titulo: "Contratos com Variação de Valor" },
+  { id: "c-cat", tipo: "Valores", t: "Contratos por categoria de objeto", kw: "categoria categorias tipo objeto ti transporte imoveis servicos", portal: "orcamento", sub: "contratos", aba: ["contratos", "porcategoria"] },
+  { id: "c-sit", tipo: "Situação", t: "Situação dos contratos por criticidade e setor", kw: "situacao criticidade vigentes vencidos setor mapa matriz", portal: "orcamento", sub: "contratos", aba: ["contratos", "gerencial"], titulo: "Contratos por Criticidade e Setor Demandante" },
+  { id: "c-renov", tipo: "Prazos", t: "Acompanhamento da renovação de cada contrato", kw: "renovacao renovar tramites acompanhamento execucao prazo", portal: "orcamento", sub: "contratos", aba: ["contratos", "operacional"] },
+  { id: "c-atual", tipo: "Situação", t: "Contratos atualizados recentemente", kw: "atualizados recentes recentemente novos mudaram", portal: "orcamento", sub: "contratos", aba: ["contratos", "atualizados"] },
+  // CFCR
+  { id: "x-cob", tipo: "Situação", t: "Municípios com e sem cooperação ativa", kw: "municipios municipio cooperacao ativa sem termo termos vigentes vencidos situacao cobertura", portal: "orcamento", sub: "cfcr", aba: ["cfcr", "visaogeral"], titulo: "Municípios da Bahia" },
+  { id: "x-obj", tipo: "Quantidades", t: "O que foi acordado com os municípios", kw: "acordado acordados obrigacoes objetos servicos imovel limpeza alimentacao prefeitura quantos", portal: "orcamento", sub: "cfcr", aba: ["cfcr", "objetosmunicipios"] },
+  { id: "x-terr", tipo: "Onde estão", t: "Municípios sem cooperação ativa, por território", kw: "onde estao sem vigente territorio coorpin municipios lacuna", portal: "orcamento", sub: "cfcr", aba: ["cfcr", "semvigente"] },
+  { id: "x-busca", tipo: "Onde estão", t: "Buscar um município e ver o que ele tem", kw: "municipio buscar busca anguera onde estao termo prefeitura", portal: "orcamento", sub: "cfcr", aba: ["cfcr", "visaogeral"], foco: "#cfcr-busca-input" },
+  { id: "x-cong", tipo: "Situação", t: "Acordos congêneres, parcerias institucionais", kw: "acordos congeneres gdg parcerias institucionais termos", portal: "orcamento", sub: "cfcr-acordos" },
+  // Obras
+  { id: "o-geral", tipo: "Situação", t: "Obras e imóveis por unidade policial", kw: "obras obra imoveis unidades policiais situacao", portal: "infraestrutura", sub: "obras", aba: ["obras", "geral"] },
+  { id: "o-man", tipo: "Quantidades", t: "Ordens de manutenção das unidades", kw: "manutencao ordens ordem reparo unidades quantas", portal: "infraestrutura", sub: "obras", aba: ["obras", "manutencao"] },
+  { id: "o-ceirf", tipo: "Quantidades", t: "Intervenções do CEIRF", kw: "ceirf intervencoes intervencao obras", portal: "infraestrutura", sub: "obras", aba: ["obras", "ceirf"] },
+  // Frota
+  { id: "f-dep", tipo: "Quantidades", t: "Quantas viaturas cada departamento tem", kw: "quantos quantas viaturas veiculos carros departamento departamentos frota", portal: "frota", sub: "frota", titulo: "Veículos por departamento" },
+  { id: "f-prop", tipo: "Quantidades", t: "Veículos próprios, alugados e cedidos", kw: "proprios alugados cedidos locados propriedade viaturas", portal: "frota", sub: "frota", titulo: "Propriedade" },
+  { id: "f-reg", tipo: "Onde estão", t: "Onde estão as viaturas, por região", kw: "onde estao viaturas veiculos regiao capital interior rms localizacao", portal: "frota", sub: "frota", titulo: "Região" },
+  { id: "f-mod", tipo: "Quantidades", t: "Modelos de veículos da frota", kw: "modelos modelo marca ranger spin onix tipo veiculos matriz", portal: "frota", sub: "frota", titulo: "Modelos da frota" },
+  { id: "f-ano", tipo: "Prazos", t: "Ano de fabricação e de entrega dos veículos", kw: "prazos ano fabricacao entrega idade antigos veiculos quando", portal: "frota", sub: "frota", titulo: "Ano de fabricação × ano de entrega" },
+  { id: "f-adm", tipo: "Situação", t: "Descaracterizados nas unidades administrativas", kw: "descaracterizados caracterizados administrativas alugados viaturas", portal: "frota", sub: "frota", titulo: "Descaracterizados nas unidades administrativas" }
+];
+const destinoDisponivel = (d) => PORTAIS.some((p) => p.id === d.portal) && (!d.sub || subportaisDe(d.portal).some((sp) => sp.tab === d.sub));
+const ROTULO_SUB_BUSCA = { contratos: "Contratos", cfcr: "Termos de cooperação", "cfcr-acordos": "Acordos congêneres", obras: "Obras e manutenção", frota: "Frota de viaturas" };
+const rotuloCaminho = (d) => { const p = PORTAIS.find((x) => x.id === d.portal); return `${p ? p.label : ""}${d.sub ? " › " + (ROTULO_SUB_BUSCA[d.sub] || d.sub) : ""}`; };
+const todosDestinosBusca = () => [
+  ...DESTINOS_BUSCA.filter(destinoDisponivel),
+  ...PORTAIS.map((p) => ({ id: "p-" + p.id, tipo: "Área", t: `Abrir ${p.label}`, kw: `${p.label} area portal`, portal: p.id }))
+];
+let buscaEst = { tipo: null, res: [], sel: 0 };
+function resultadosBusca(q) {
+  const toks = normBusca(q).split(/\s+/).filter((w) => w && !STOP_BUSCA.has(w));
+  return todosDestinosBusca().map((d, ord) => {
+    if (buscaEst.tipo && d.tipo !== buscaEst.tipo) return null;
+    if (!toks.length && d.tipo === "Área") return null;
+    const h = normBusca(`${d.t} ${d.kw} ${d.tipo}`), s = toks.filter((w) => h.includes(w)).length;
+    if (toks.length && !s) return null;
+    return { ...d, s, ord, caminho: rotuloCaminho(d) };
+  }).filter(Boolean).sort((a, b) => b.s - a.s || a.ord - b.ord).slice(0, 8);
+}
+function desenharListaBusca(caixa) {
+  const inp = caixa.querySelector("[data-busca-in]"), lista = caixa.querySelector(".busca-lista");
+  buscaEst.res = resultadosBusca(inp.value);
+  buscaEst.sel = Math.min(buscaEst.sel, Math.max(buscaEst.res.length - 1, 0));
+  const tipos = `<div class="busca-tipos"><div class="rotulo-busca">Tipo de informação</div><div class="busca-grupo">${TIPOS_BUSCA.map((t) => `<button type="button" data-busca-tipo="${t}" class="${buscaEst.tipo === t ? "on" : ""}" aria-pressed="${buscaEst.tipo === t}">${t}</button>`).join("")}</div></div>`;
+  lista.innerHTML = tipos + (buscaEst.res.length
+    ? buscaEst.res.map((r, i) => `<button type="button" class="busca-res" role="option" data-busca-res="${i}" aria-selected="${i === buscaEst.sel}"><span class="k">${r.tipo}</span><span><b>${escapeHTML(r.t)}</b><small>${escapeHTML(r.caminho)}</small></span></button>`).join("")
+    : `<p class="busca-vazia">Nenhum resultado nas áreas que o seu acesso permite.</p>`);
+  lista.hidden = false;
+  inp.setAttribute("aria-expanded", "true");
+}
+function fecharListasBusca() {
+  document.querySelectorAll(".busca-lista").forEach((l) => { l.hidden = true; });
+  document.querySelectorAll("[data-busca-in]").forEach((i) => i.setAttribute("aria-expanded", "false"));
+}
+const esperarAte = (fn, ms = 20000) => new Promise((ok) => {
+  const t0 = Date.now();
+  (function ver() { const r = fn(); if (r) return ok(r); if (Date.now() - t0 > ms) return ok(null); setTimeout(ver, 120); })();
+});
+function acharTituloNaTela(texto) {
+  const alvo = normBusca(texto);
+  return [...telaConteudo.querySelectorAll("h2,h3,h4")].find((h) => h.offsetParent !== null && normBusca(h.textContent).includes(alvo)) || null;
+}
+// Leva até a informação: abre o portal, escolhe a aba e rola até o gráfico.
+// Os botões de aba são os mesmos da navegação manual, então tudo o que a
+// pessoa faria com cliques acontece aqui por ela, e o resto da tela segue
+// funcionando igual.
+async function irParaInformacao(d) {
+  fecharListasBusca();
+  document.querySelectorAll("[data-busca-in]").forEach((i) => { i.value = ""; i.blur(); });
+  await abrirTela(d.portal);
+  if (d.sub) {
+    const b = await esperarAte(() => telaConteudo.querySelector(`.tab-btn[data-tab="${d.sub}"]`), 8000);
+    if (b && !b.classList.contains("active")) b.click();
+  }
+  if (d.aba) {
+    const b = await esperarAte(() => telaConteudo.querySelector(`[data-subtab-${d.aba[0]}="${d.aba[1]}"]`));
+    if (b) { if (!b.classList.contains("active")) b.click(); }
+  }
+  if (d.antes) { await esperarAte(() => telaConteudo.querySelector(".unidade-gestora-btn, [data-subtab-contratos]")); d.antes(); }
+  let alvo = null;
+  if (d.titulo) alvo = await esperarAte(() => acharTituloNaTela(d.titulo));
+  else if (d.ancoraSel) alvo = await esperarAte(() => { const e = telaConteudo.querySelector(d.ancoraSel); return e && e.offsetParent !== null ? e : null; }, 6000);
+  else if (d.foco) alvo = await esperarAte(() => telaConteudo.querySelector(d.foco));
+  if (alvo) {
+    const caixa = alvo.closest(".dash-chart-box, .fr-card, .nota, .dash-filtro, .dash-filtros") || alvo;
+    caixa.scrollIntoView({ behavior: "smooth", block: "start" });
+    if (d.foco) alvo.focus({ preventScroll: true });
+    else { caixa.classList.add("achado-busca"); setTimeout(() => caixa.classList.remove("achado-busca"), 3200); }
+  }
+  // Aviso depois da ação, com o verbo do botão no particípio.
+  mostrarToast(`Aberto: ${d.t}`, "sucesso", 3000);
+}
+function abrirResultadoBusca(i) { const r = buscaEst.res[i]; if (r) irParaInformacao(r); }
+function montarExemplosBusca() {
+  const alvo = document.getElementById("exemplos-busca"); if (!alvo) return;
+  const ex = [["Quantos contratos vencem e onde estão", "c-onde"], ["Quem são os gestores e fiscais dos contratos", "c-pessoas"], ["Quantas viaturas cada departamento tem", "f-dep"], ["Municípios com e sem cooperação ativa", "x-cob"], ["Ordens de manutenção das unidades", "o-man"]]
+    .filter(([, id]) => destinoDisponivel(DESTINOS_BUSCA.find((d) => d.id === id))).slice(0, 3);
+  alvo.innerHTML = ex.map(([t, id]) => `<button type="button" data-busca-exemplo="${id}">${t}</button>`).join("");
+}
+document.addEventListener("click", (e) => {
+  const t = e.target;
+  if (!t.closest("[data-busca]")) fecharListasBusca();
+  let b;
+  if ((b = t.closest("[data-busca-tipo]"))) { buscaEst.tipo = buscaEst.tipo === b.dataset.buscaTipo ? null : b.dataset.buscaTipo; const c = b.closest("[data-busca]"); desenharListaBusca(c); c.querySelector("[data-busca-in]").focus(); return; }
+  if ((b = t.closest("[data-busca-res]"))) { abrirResultadoBusca(+b.dataset.buscaRes); return; }
+  if ((b = t.closest("[data-busca-exemplo]"))) { irParaInformacao(DESTINOS_BUSCA.find((d) => d.id === b.dataset.buscaExemplo)); }
+});
+document.addEventListener("input", (e) => { const i = e.target.closest("[data-busca-in]"); if (i) { buscaEst.sel = 0; desenharListaBusca(i.closest("[data-busca]")); } });
+document.addEventListener("focusin", (e) => { const i = e.target.closest("[data-busca-in]"); if (i) { fecharListasBusca(); desenharListaBusca(i.closest("[data-busca]")); } });
+document.addEventListener("keydown", (e) => {
+  const ativo = document.activeElement, noCampo = ativo && ativo.matches && ativo.matches("[data-busca-in]"), digitando = /^(INPUT|TEXTAREA|SELECT)$/.test(ativo?.tagName || "");
+  const campoVisivel = () => { const h = document.getElementById("busca-home"); return (h && h.offsetParent !== null) ? h : document.getElementById("busca-topo"); };
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") { e.preventDefault(); campoVisivel()?.focus(); return; }
+  if (e.key === "/" && !digitando && !document.querySelector(".modal-fundo")) { e.preventDefault(); campoVisivel()?.focus(); return; }
+  if (!noCampo) return;
+  const caixa = ativo.closest("[data-busca]");
+  if (e.key === "ArrowDown") { e.preventDefault(); buscaEst.sel = Math.min(buscaEst.sel + 1, buscaEst.res.length - 1); desenharListaBusca(caixa); }
+  else if (e.key === "ArrowUp") { e.preventDefault(); buscaEst.sel = Math.max(buscaEst.sel - 1, 0); desenharListaBusca(caixa); }
+  else if (e.key === "Enter") { e.preventDefault(); abrirResultadoBusca(buscaEst.sel); }
+  else if (e.key === "Escape") { fecharListasBusca(); ativo.blur(); }
+});
+
 function mostrarTelaLogin(mensagem) {
   document.getElementById("tela-login").hidden = false;
   document.getElementById("tela-inicio").hidden = true;
@@ -2138,6 +2310,7 @@ function mostrarTelaLogin(mensagem) {
   document.getElementById("btn-abrir-upload").style.display = "none";
   document.getElementById("btn-abrir-usuarios").style.display = "none";
   document.getElementById("btn-sair").style.display = "none";
+  document.getElementById("busca-topo-wrap").style.display = "none";
   document.getElementById("voltar-btn").classList.remove("show");
   if (mensagem) document.getElementById("login-status").textContent = mensagem;
 }
@@ -2153,6 +2326,7 @@ function mostrarAppLogado(usuario) {
   // verdade se esta pessoa sobe planilha.
   atualizarBotoesPorPapel();
   document.getElementById("btn-sair").style.display = "inline-block";
+  document.getElementById("busca-topo-wrap").style.display = "";
 }
 
 async function aoReceberCredencialGoogle(response) {
@@ -2223,7 +2397,13 @@ function iniciarApp() {
     mostrarTelaLogin("");
   }
 }
-iniciarApp();
+// Só depois da página inteira lida: iniciarApp usa constantes declaradas mais
+// abaixo (ex.: PAPEL_POR_PORTAL). Chamar durante a leitura funcionava só
+// quando o script do Google ainda não tinha carregado (cai no setTimeout);
+// com ele em cache, a restauração da sessão quebrava com "Cannot access
+// before initialization".
+if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", iniciarApp);
+else iniciarApp();
 
 // Pedido direto: "adicionar a possibilidade de login com pcivil.ba.gov.br...
 // a pessoa escolhe a própria senha... eu aprovo cadastro ou não e ela
