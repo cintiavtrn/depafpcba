@@ -6694,7 +6694,7 @@ function renderGerencialContratos(lista, resumo) {
         (barra/mapa/mapa de calor, logo abaixo) separado de propósito — ele
         responde uma pergunta de FORMATO (como a criticidade se distribui
         dentro de cada setor) que uma tabela não substitui. -->
-        <p class="dash-chart-hint">Contratos, valor total, ticket médio e quantos estão vencidos ou a vencer, por setor demandante (quem PEDIU o contrato — pra DEPIN, sempre "DEPIN", centralizada) — clique numa linha pra isolar aquele setor.</p>
+        <details class="painel-detalhes"><summary>Como ler</summary><p class="dash-chart-hint">Contratos, valor total, ticket médio e quantos estão vencidos ou a vencer, por setor demandante (quem PEDIU o contrato; para a DEPIN, sempre "DEPIN", centralizada). Clique numa linha para isolar aquele setor.</p></details>
         <div id="ger-setor"></div>
       </div>
     </div>
@@ -6702,7 +6702,6 @@ function renderGerencialContratos(lista, resumo) {
     <div class="dash-charts" style="grid-template-columns:1fr">
       <div class="dash-chart-box">
         <h4>Contratos por Criticidade e Setor Demandante</h4>
-        <p class="dash-chart-hint">Clique numa barra pra isolar aquele setor.</p>
         <div class="linha-troca-grafico"><div class="dash-toggle" id="ger-barra-toggle">
           <button class="dash-toggle-btn" data-modo="proporcao" title="Compara a composição de criticidade de cada setor">% POR SETOR</button>
           <button class="dash-toggle-btn" data-modo="absoluto" title="Compara o tamanho dos setores entre si">QTD POR SETOR</button>
@@ -6710,6 +6709,8 @@ function renderGerencialContratos(lista, resumo) {
           <button class="dash-toggle-btn" data-modo="calor" title="Cor = criticidade; intensidade = volume de contratos na célula">MAPA DE CALOR</button>
         </div></div>
         <div id="ger-barra"></div>
+        <div id="ger-barra-mais" style="margin-top:8px" hidden><button type="button" class="dash-toggle-btn" id="ger-barra-mais-btn"></button></div>
+        <details class="painel-detalhes"><summary>Como ler</summary><p class="dash-chart-hint">Clique numa barra para isolar aquele setor.</p></details>
       </div>
     </div>
     <div class="dash-charts" style="grid-template-columns:1fr">
@@ -6723,51 +6724,46 @@ function renderGerencialContratos(lista, resumo) {
         eram 2 tabelas lado a lado com as MESMAS 22 categorias, uma por
         quantidade, outra por valor. O ticket médio (valor ÷ contratos) nem
         aparecia em nenhuma das duas, e é o dado mais informativo dos três. -->
-        <p class="dash-chart-hint">Contratos, valor total e ticket médio por tipo de objeto — clique numa linha pra isolar aquele tipo.</p>
+        <details class="painel-detalhes"><summary>Como ler</summary><p class="dash-chart-hint">Contratos, valor total e ticket médio por tipo de objeto. Clique numa linha para isolar aquele tipo.</p></details>
         <div id="ger-tipo"></div>
         <div id="ger-tipo-agrupar" class="dash-chart-hint" hidden></div>
       </div>
     </div>
-    <div class="dash-charts" style="grid-template-columns:1fr 1fr">
-      <div class="dash-chart-box">
-        <h4>Distribuição de Contratos por Analista</h4>
-        <p class="dash-chart-hint">Clique num nome pra ver os contratos sob responsabilidade dele.</p>
-        <div id="ger-analista"></div>
-      </div>
-      <div class="dash-chart-box">
-        <h4>Distribuição de Contratos por Nº de Aditivos</h4>
-        <p class="dash-chart-hint">Quantos contratos têm 0, 1, 2... aditivos. Não é uma linha do tempo — pra isso precisaria da data de CADA aditivo, que a planilha ainda não traz. Clique numa barra pra ver quais contratos são e o número do SEI de cada aditivo.</p>
-        <div id="ger-aditivos"></div>
-        <p class="dash-chart-hint" id="ger-aditivos-insight" style="margin-top:8px"></p>
-      </div>
-    </div>
-    <div class="dash-charts" style="grid-template-columns:1fr 1fr">
-      <div class="dash-chart-box">
-        <h4>Distribuição de Contratos por Gestor</h4>
-        <p class="dash-chart-hint">Clique num nome pra ver os contratos sob responsabilidade dele.</p>
-        <div id="ger-gestor"></div>
-      </div>
-      <div class="dash-chart-box">
-        <h4>Distribuição de Contratos por Fiscal</h4>
-        <p class="dash-chart-hint">Clique num nome pra ver os contratos sob responsabilidade dele.</p>
-        <div id="ger-fiscal"></div>
+    <div class="dash-charts" style="grid-template-columns:1fr">
+      <div class="dash-chart-box" id="ger-resp-caixa">
+        <h4>Quem responde pelos contratos</h4>
+        <div class="linha-troca-grafico"><div class="dash-toggle" id="ger-resp-toggle">
+          <button class="dash-toggle-btn active" data-resp="analista">ANALISTA</button>
+          <button class="dash-toggle-btn" data-resp="gestor">GESTOR</button>
+          <button class="dash-toggle-btn" data-resp="fiscal">FISCAL</button>
+          <button class="dash-toggle-btn" data-resp="aditivos">Nº DE ADITIVOS</button>
+        </div></div>
+        <div data-resp-pane="analista"><div id="ger-analista"></div></div>
+        <div data-resp-pane="gestor" hidden><div id="ger-gestor"></div></div>
+        <div data-resp-pane="fiscal" hidden><div id="ger-fiscal"></div></div>
+        <div data-resp-pane="aditivos" hidden>
+          <div id="ger-aditivos"></div>
+          <p class="dash-chart-hint" id="ger-aditivos-insight" style="margin-top:8px"></p>
+        </div>
+        <details class="painel-detalhes"><summary>Como ler</summary><p class="dash-chart-hint">Clique num nome para ver os contratos sob responsabilidade dele. Em Nº de aditivos, clique numa barra para ver quais contratos são e o número do SEI de cada aditivo. A contagem de aditivos não é uma linha do tempo, porque a planilha ainda não traz a data de cada um.</p></details>
       </div>
     </div>
     <div class="dash-charts" style="grid-template-columns:1fr 1fr">
       <div class="dash-chart-box">
         <h4>Top 10 Maiores Contratos (Valor Atual)</h4>
-        <p class="dash-chart-hint">Passe o mouse numa barra pra ver o detalhe rápido — clique pra abrir o panorama completo do contrato.</p>
+        <details class="painel-detalhes"><summary>Como ler</summary><p class="dash-chart-hint">Passe o mouse numa barra para ver o detalhe rápido. Clique para abrir o panorama completo do contrato.</p></details>
         <div id="ger-top-contratos"></div>
       </div>
       <div class="dash-chart-box">
         <h4>Top 10 Maiores Fornecedores (Valor Atual)</h4>
-        <p class="dash-chart-hint">Soma o valor de todos os contratos da mesma empresa, quando ela tem mais de um.</p>
+        <details class="painel-detalhes"><summary>Como ler</summary><p class="dash-chart-hint">Soma o valor de todos os contratos da mesma empresa, quando ela tem mais de um.</p></details>
         <div id="ger-top-fornecedores"></div>
       </div>
     </div>
     <div class="dash-chart-box" id="ger-variacao-valor-caixa">
-      <h4>Contratos com Variação de Valor<small class="dash-chart-hint" style="display:block;margin-top:4px">Quem mudou de valor de verdade, não quem tem o maior valor — ordenado pela diferença em R$. Passe o mouse pra ver de quanto pra quanto.</small></h4>
-      <p class="dash-chart-hint">O Valor Global Atual é o valor vigente depois dos aditivos, por isso pode diferir do inicial: fica menor quando o prazo aditivado é menor que o contratado (por exemplo 36 meses contratados e 24 aditivados, ou 6+6 meses excepcionais) ou quando sobra saldo de unidades, e fica maior em reajustes e acréscimos. A observação de cada contrato foi informada pela área responsável.</p>
+      <h4>Contratos com Variação de Valor</h4>
+      <details class="painel-detalhes"><summary>Como ler</summary><p class="dash-chart-hint">Quem mudou de valor de verdade, não quem tem o maior valor, ordenado pela diferença em R$. Passe o mouse para ver de quanto para quanto.</p>
+      <p class="dash-chart-hint">O Valor Global Atual é o valor vigente depois dos aditivos, por isso pode diferir do inicial: fica menor quando o prazo aditivado é menor que o contratado (por exemplo 36 meses contratados e 24 aditivados, ou 6+6 meses excepcionais) ou quando sobra saldo de unidades, e fica maior em reajustes e acréscimos. A observação de cada contrato foi informada pela área responsável.</p></details>
       <div id="ger-variacao-valor"></div>
       <div id="ger-variacao-valor-porque"></div>
     </div>
@@ -6776,6 +6772,19 @@ function renderGerencialContratos(lista, resumo) {
 
   ligarBuscaContratos(lista, porId, "ger-busca", "ger-busca-resultado");
 
+  // "Quem responde" junta Analista/Gestor/Fiscal/Aditivos numa caixa só; os
+  // quatro gráficos continuam com os mesmos ids e a mesma lógica de filtro,
+  // só um fica visível por vez.
+  function mostrarResp(chave) {
+    document.querySelectorAll("#ger-resp-toggle [data-resp]").forEach((b) => b.classList.toggle("active", b.dataset.resp === chave));
+    document.querySelectorAll("#ger-resp-caixa [data-resp-pane]").forEach((el) => { el.hidden = el.dataset.respPane !== chave; });
+  }
+  document.getElementById("ger-resp-toggle").addEventListener("click", (ev) => {
+    const btn = ev.target.closest("[data-resp]");
+    if (btn) mostrarResp(btn.dataset.resp);
+  });
+  let verTodosSetoresBarra = false;
+  document.getElementById("ger-barra-mais-btn").addEventListener("click", () => { verTodosSetoresBarra = !verTodosSetoresBarra; atualizar(); });
   document.getElementById("ger-barra-toggle").addEventListener("click", (ev) => {
     const btn = ev.target.closest("[data-modo]");
     if (!btn || btn.dataset.modo === modoBarra) return;
@@ -6903,7 +6912,7 @@ function renderGerencialContratos(lista, resumo) {
     const cardCriticidade = ev.target.closest("[data-criticidade]");
     if (cardCriticidade) return selecionarCriticidadeBaixo();
     const acaoRodape = ev.target.closest("[data-acao]");
-    if (acaoRodape?.dataset.acao === "aditivos") rolarEDestacar("ger-aditivos");
+    if (acaoRodape?.dataset.acao === "aditivos") { mostrarResp("aditivos"); rolarEDestacar("ger-aditivos"); }
     // Pedido direto: "o cartão de clique de unidades beneficiadas não
     // funciona" — não tinha clique nenhum (só informativo). Depois da
     // correção de rumo (Setor Demandante ≠ Unidades Beneficiadas pra
@@ -7169,11 +7178,18 @@ function renderGerencialContratos(lista, resumo) {
     } else {
       document.getElementById("ger-kpi-tabela").innerHTML = "";
     }
+    const LIMITE_SETORES_BARRA = 8;
+    const barraEmLinhas = modoBarra !== "treemap" && modoBarra !== "calor";
+    const porAreaOrdenada = porArea.slice().sort((a, b) => b.total - a.total);
+    const cortaBarra = barraEmLinhas && !verTodosSetoresBarra && porAreaOrdenada.length > LIMITE_SETORES_BARRA;
     document.getElementById("ger-barra").innerHTML = modoBarra === "treemap"
       ? treemapAreaCriticidadeSVG(porArea)
       : modoBarra === "calor"
       ? heatmapAreaCriticidadeSVG(porArea)
-      : barraCriticidadeHorizontalSVG(porArea, modoBarra);
+      : barraCriticidadeHorizontalSVG(cortaBarra ? porAreaOrdenada.slice(0, LIMITE_SETORES_BARRA) : porAreaOrdenada, modoBarra);
+    const maisBarra = document.getElementById("ger-barra-mais");
+    maisBarra.hidden = !(barraEmLinhas && porAreaOrdenada.length > LIMITE_SETORES_BARRA);
+    document.getElementById("ger-barra-mais-btn").textContent = verTodosSetoresBarra ? `MOSTRAR SÓ OS ${LIMITE_SETORES_BARRA} MAIORES` : `MOSTRAR OS ${porAreaOrdenada.length} SETORES`;
     document.querySelectorAll("#ger-barra-toggle [data-modo]").forEach((btn) => {
       btn.classList.toggle("active", btn.dataset.modo === modoBarra);
     });
@@ -7247,8 +7263,7 @@ function renderGerencialContratos(lista, resumo) {
         : "Contratos, valor total, ticket médio e quantos estão vencidos ou a vencer, por unidade regional atendida (COORPIN) — clique numa linha pra isolar aquela unidade.";
       caixaUnidades.innerHTML = `
         <h4>Unidades Beneficiadas</h4>
-        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
-          <p class="dash-chart-hint" style="margin:0">${hintUnidades}</p>
+        <div style="display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:8px">
           <div class="dash-toggle" id="ger-unidades-visual-toggle">
             <button class="dash-toggle-btn${modoVisualGerUnidades === "lista" ? " active" : ""}" data-modo-visual="lista" title="Tabela ordenável, com % do total">LISTA</button>
             <button class="dash-toggle-btn${modoVisualGerUnidades === "mapa" ? " active" : ""}" data-modo-visual="mapa" title="Bolha grande = mais valor; anel tracejado = 1 contrato concentra 40%+ do valor daquela unidade">MAPA</button>
@@ -7256,6 +7271,7 @@ function renderGerencialContratos(lista, resumo) {
         </div>
         <div id="ger-unidades">${corpoUnidades}</div>
         <div id="ger-unidades-legenda">${legendaUnidades}</div>
+        <details class="painel-detalhes"><summary>Como ler</summary><p class="dash-chart-hint">${hintUnidades}</p></details>
       `;
       if (modoVisualGerUnidades === "lista") ligarOrdenacaoTabelaPropria(document.getElementById("ger-unidades"));
       adicionarControlesGrafico(document.getElementById("ger-unidades"));
@@ -7464,12 +7480,12 @@ function renderTaticoContratos(lista) {
     </div>
     <div class="dash-chart-box" style="margin-bottom:16px">
       <h4>Contratos por Vencimento e Criticidade</h4>
-      <p class="dash-chart-hint" id="tat-grafico-hint">Clique numa barra pra isolar só aquele mês de vencimento na tabela abaixo — clique de novo pra voltar a ver todos os meses.</p>
       <div class="linha-troca-grafico"><div class="dash-toggle" id="tat-mes-toggle">
         <button class="dash-toggle-btn" data-modo="colunas" title="Compara o total de cada mês">COLUNAS</button>
         <button class="dash-toggle-btn" data-modo="gantt" title="Mostra a vigência de cada contrato numa linha do tempo">GANTT</button>
       </div></div>
       <div id="tat-grafico-mes"></div>
+      <details class="painel-detalhes"><summary>Como ler</summary><p class="dash-chart-hint" id="tat-grafico-hint"></p></details>
     </div>
     <!-- Pedido direto (crítica externa que ela trouxe, decisão via pergunta
     direta: "duplicar nos dois" em vez de mover): "num Gerencial/Tático/
@@ -7480,17 +7496,18 @@ function renderTaticoContratos(lista) {
     comparação com carga de trabalho) continua em Por Pessoas. -->
     <div class="dash-chart-box" style="margin-bottom:16px">
       <h4>Quem Precisa Agir</h4>
-      <p class="dash-chart-hint" id="tat-risco-hint">Gestores e fiscais com mais contrato vencido ou vencendo em até 90 dias sob responsabilidade agora — clique num nome pra abrir o perfil completo (Top 10, Duplas e comparação com carga de trabalho total ficam na aba "Por Pessoas").</p>
+      <p class="dash-chart-hint" id="tat-risco-hint"></p>
       <div class="dash-charts" style="grid-template-columns:1fr 1fr">
         <div><h4 style="font-size:var(--fs-ui-sm);margin-bottom:6px">Gestores</h4><div id="tat-risco-gestores"></div></div>
         <div><h4 style="font-size:var(--fs-ui-sm);margin-bottom:6px">Fiscais</h4><div id="tat-risco-fiscais"></div></div>
       </div>
+      <details class="painel-detalhes"><summary>Como ler</summary><p class="dash-chart-hint">Clique num nome para abrir o perfil completo. O Top 10, as duplas e a comparação com a carga de trabalho total ficam na aba "Por pessoas".</p></details>
     </div>
     <h4 style="font-family:'Spectral',sans-serif;font-size:var(--fs-subtitulo);margin-bottom:8px">Detalhamento dos Contratos</h4>
-    <p class="font-mono" style="font-size:var(--fs-ui-sm);color:#8B93A3;margin-bottom:8px">Passe o mouse numa linha pra ver o detalhe rápido — clique pra abrir o panorama completo do contrato.</p>
+    <details class="painel-detalhes" style="margin-bottom:8px"><summary>Como ler</summary><p class="dash-chart-hint">Passe o mouse numa linha para ver o detalhe rápido. Clique para abrir o panorama completo do contrato.</p></details>
     <div id="tat-chip-filtro"></div>
     <div style="text-align:right;margin-bottom:6px"><button type="button" class="dash-toggle-btn" id="tat-tabela-baixar" title="Baixar esta tabela como imagem">${iconeInline("download", 12, -2)} TABELA (PNG)</button></div>
-    <div id="tat-tabela" class="tabela-rolavel"></div>
+    <div id="tat-tabela" class="tabela-rolavel" style="max-height:520px"></div>
   `;
 
   ligarBuscaContratos(lista, porId, "tat-busca", "tat-busca-resultado");
@@ -7523,7 +7540,7 @@ function renderTaticoContratos(lista) {
       clausulaFiltro = "vencido ou vencendo em até 90 dias";
     }
     const temFiltroAtivo = filtroMes || temFiltroCriticidadeOuTipo;
-    document.getElementById("tat-risco-hint").textContent = `Gestores e fiscais com${temFiltroAtivo ? "" : " mais"} contrato ${clausulaFiltro} sob responsabilidade${temFiltroAtivo ? "" : " agora"} — clique num nome pra abrir o perfil completo (Top 10, Duplas e comparação com carga de trabalho total ficam na aba "Por Pessoas").`;
+    document.getElementById("tat-risco-hint").textContent = `Gestores e fiscais com${temFiltroAtivo ? "" : " mais"} contrato ${clausulaFiltro} sob responsabilidade${temFiltroAtivo ? "" : " agora"}.`;
     const gestoresRiscoTat = agruparContratosPorPessoa(contratosEmRiscoTat, "Gestor").slice(0, 5);
     const fiscaisRiscoTat = agruparContratosPorPessoa(contratosEmRiscoTat, "Fiscal").slice(0, 5);
     document.getElementById("tat-risco-gestores").innerHTML = gestoresRiscoTat.length
