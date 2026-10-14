@@ -11606,16 +11606,21 @@ async function carregarObrasPortal(portalSlug) {
     <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start">
       <div id="obras-kpis" style="flex:0 0 220px;min-width:200px;display:flex;flex-direction:column;gap:12px"></div>
       <div style="flex:1;min-width:280px;display:flex;flex-direction:column;gap:16px">
-        ${DIMENSOES_OBRAS.map((d) => `
-        <div class="dash-chart-box">
-          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">
-            <h4 style="margin-bottom:0">${escapeHTML(d.rotulo)}</h4>
-            <button type="button" class="dash-toggle-btn" id="${d.containerId}-agrupar-toggle" title="Selecionar categorias pra juntar num grupo personalizado, tipo o Power BI">AGRUPAR</button>
-          </div>
-          ${d.hintId ? `<p class="dash-chart-hint" id="${d.hintId}"></p>` : ""}
-          <div id="${d.containerId}"></div>
-          <div id="${d.containerId}-agrupar" class="dash-chart-hint" hidden></div>
-        </div>`).join("")}
+        <div class="dash-chart-box" id="obras-dim-caixa">
+          <h4>Unidades policiais por característica</h4>
+          <div class="linha-troca-grafico"><div class="dash-toggle" id="obras-dim-toggle">
+            ${DIMENSOES_OBRAS.map((d, i) => `<button type="button" class="dash-toggle-btn${i === 0 ? " active" : ""}" data-dim="${d.chave}">${escapeHTML(d.rotulo.toUpperCase())}</button>`).join("")}
+          </div></div>
+          ${DIMENSOES_OBRAS.map((d, i) => `
+          <div data-dim-pane="${d.chave}"${i === 0 ? "" : " hidden"}>
+            <div style="display:flex;justify-content:flex-end;margin-bottom:6px">
+              <button type="button" class="dash-toggle-btn" id="${d.containerId}-agrupar-toggle" title="Selecionar categorias pra juntar num grupo personalizado, tipo o Power BI">AGRUPAR</button>
+            </div>
+            <div id="${d.containerId}"></div>
+            <div id="${d.containerId}-agrupar" class="dash-chart-hint" hidden></div>
+            ${d.hintId ? `<details class="painel-detalhes"><summary>Cobertura do dado</summary><p class="dash-chart-hint" id="${d.hintId}"></p></details>` : ""}
+          </div>`).join("")}
+        </div>
         <div class="dash-chart-box">
           <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:4px">
             <h4 style="margin-bottom:0">Financeiro por Diretoria Regional</h4>
@@ -11624,8 +11629,10 @@ async function carregarObrasPortal(portalSlug) {
               <button class="dash-toggle-btn${modoVisualFinanceiro === "treemap" ? " active" : ""}" data-modo-visual="treemap" title="Bloco = tamanho do valor">MAPA DE ÁRVORE</button>
             </div>
           </div>
-          <p class="dash-chart-hint">Construção e manutenção são dois TIPOS de obra (não duas coisas separadas) — os registros vêm de bases diferentes na planilha-fonte, e nem toda unidade com manutenção tem valor de construção, e vice-versa — por isso cada tipo tem seu próprio cartão abaixo.</p>
-          <p class="dash-chart-hint">Esta quebra por Diretoria Regional usa o valor registrado em cada unidade individualmente — menos completo que o Controle CEIRF/Manutenção PC, que não têm campo de Diretoria Regional pra cruzar — por isso a soma aqui fica abaixo dos cartões "Valor Total de Obra (Construção/Manutenção)" lá em cima, que vêm das bases completas.</p>
+          <details class="painel-detalhes"><summary>Como ler</summary>
+            <p class="dash-chart-hint">Construção e manutenção são dois tipos de obra, não duas coisas separadas. Os registros vêm de bases diferentes na planilha-fonte, e nem toda unidade com manutenção tem valor de construção, e vice-versa. Por isso cada tipo tem seu próprio cartão abaixo.</p>
+            <p class="dash-chart-hint">Esta quebra por Diretoria Regional usa o valor registrado em cada unidade individualmente. É menos completa que o Controle CEIRF e a Manutenção PC, que não têm campo de Diretoria Regional para cruzar. Por isso a soma aqui fica abaixo dos cartões "Valor Total de Obra (Construção/Manutenção)" do topo, que vêm das bases completas.</p>
+          </details>
           <div class="dash-toggle">${botaoEntenderDadosHTML("financeiro", "por que os dois valores de obra não batem")}</div>
           <div id="obras-entender-financeiro" style="margin-top:10px" hidden></div>
         </div>
@@ -11638,7 +11645,7 @@ async function carregarObrasPortal(portalSlug) {
           <div class="dash-chart-box">
             <h4>Obra — Manutenção</h4>
             <p class="dash-chart-hint" id="obras-valor-manutencao-hint"></p>
-            <p class="dash-chart-hint">Valor PARCIAL: a fonte bruta de manutenção tem mais ordens de serviço do que as que deu pra vincular com segurança a uma unidade específica — o restante foi gasto, mas não sei em qual unidade exata.</p>
+            <details class="painel-detalhes"><summary>Valor parcial</summary><p class="dash-chart-hint">A fonte bruta de manutenção tem mais ordens de serviço do que as que foi possível vincular com segurança a uma unidade específica. O restante foi gasto, mas não se sabe em qual unidade exata.</p></details>
             <div id="obras-valor-manutencao"></div>
           </div>
         </div>
@@ -11660,7 +11667,7 @@ async function carregarObrasPortal(portalSlug) {
       <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:8px">
         <div>
           <h3 style="margin:0 0 4px;text-transform:uppercase;letter-spacing:.05em;font-size:1.05rem">Manutenção PC</h3>
-          <p class="dash-chart-hint" style="margin:0">Base própria (115 ordens de serviço de manutenção predial, transcrição completa — Salvador/RMS + Interior) — universo completo, a mesma base do cartão "Valor Total de Obra (Manutenção)" na Visão Geral. Diferente do cartão "Unidades com Manutenção Registrada" (esse sim é a fatia vinculada a uma unidade específica).</p>
+          <details class="painel-detalhes"><summary>Sobre esta base</summary><p class="dash-chart-hint" style="margin:0">Base própria, com 115 ordens de serviço de manutenção predial (transcrição completa, Salvador/RMS e Interior). É o universo completo, a mesma base do cartão "Valor Total de Obra (Manutenção)" da Visão Geral. Difere do cartão "Unidades com Manutenção Registrada", que é a fatia vinculada a uma unidade específica.</p></details>
         </div>
         <div class="dash-toggle" id="manut-regiao-seg">
           <button class="dash-toggle-btn active" data-val="">TODAS</button>
@@ -11675,7 +11682,7 @@ async function carregarObrasPortal(portalSlug) {
           ${DIMENSOES_MANUTENCAO.map((d) => `
           <div class="dash-chart-box"${d.largo ? ` style="grid-column:1/-1"` : ""}>
             <h4>${escapeHTML(d.rotulo)}</h4>
-            ${d.hint ? `<p class="dash-chart-hint">${escapeHTML(d.hint)}</p>` : ""}
+            ${d.hint ? `<details class="painel-detalhes"><summary>Como ler</summary><p class="dash-chart-hint">${escapeHTML(d.hint)}</p></details>` : ""}
             <div id="${d.containerId}"></div>
           </div>`).join("")}
         </div>
@@ -11687,8 +11694,7 @@ async function carregarObrasPortal(portalSlug) {
       mesmo motorManutencao.filtros — "clicar redireciona" agora também
       quer dizer "revela a lista por trás do número". -->
       <div class="dash-chart-box" style="margin-top:16px">
-        <h4>Ordens de Serviço deste Recorte</h4>
-        <p class="dash-chart-hint">Atualiza sozinha conforme você filtra pelos gráficos acima.</p>
+        <h4>Ordens de serviço do recorte atual</h4>
         <div class="tabela-rolavel" style="max-height:360px" id="manut-tabela"></div>
       </div>
     </div>
@@ -11697,7 +11703,7 @@ async function carregarObrasPortal(portalSlug) {
       <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:8px">
         <div>
           <h3 style="margin:0 0 4px;text-transform:uppercase;letter-spacing:.05em;font-size:1.05rem">Intervenções CEIRF — Escopo Ampliado</h3>
-          <p class="dash-chart-hint" style="margin:0">Base própria (334 intervenções do Controle CEIRF, todas as forças). Escopo Ampliado: PC + EBAL, JOMAFA e DISEP Senhor do Bomfim (unidades integradas/ambíguas).</p>
+          <details class="painel-detalhes"><summary>Sobre esta base</summary><p class="dash-chart-hint" style="margin:0">Base própria, com 334 intervenções do Controle CEIRF, de todas as forças. Escopo Ampliado: PC mais EBAL, JOMAFA e DISEP Senhor do Bomfim (unidades integradas ou ambíguas).</p></details>
         </div>
         <div class="dash-toggle" id="ceirf-regiao-seg">
           <button class="dash-toggle-btn active" data-val="">TODAS</button>
@@ -11712,7 +11718,7 @@ async function carregarObrasPortal(portalSlug) {
           ${DIMENSOES_CEIRF.map((d) => `
           <div class="dash-chart-box"${d.largo ? ` style="grid-column:1/-1"` : ""}>
             <h4>${escapeHTML(d.rotulo)}</h4>
-            ${d.hint ? `<p class="dash-chart-hint">${escapeHTML(d.hint)}</p>` : ""}
+            ${d.hint ? `<details class="painel-detalhes"><summary>Como ler</summary><p class="dash-chart-hint">${escapeHTML(d.hint)}</p></details>` : ""}
             <div id="${d.containerId}"></div>
           </div>`).join("")}
         </div>
@@ -11721,8 +11727,7 @@ async function carregarObrasPortal(portalSlug) {
       cliques redirecionando" — mesma tabela reativa da Manutenção, aqui
       escopada ao motorCeirf.filtros. -->
       <div class="dash-chart-box" style="margin-top:16px">
-        <h4>Intervenções deste Recorte</h4>
-        <p class="dash-chart-hint">Atualiza sozinha conforme você filtra pelos gráficos acima.</p>
+        <h4>Intervenções do recorte atual</h4>
         <div class="tabela-rolavel" style="max-height:360px" id="ceirf-tabela"></div>
       </div>
     </div>
@@ -11733,6 +11738,12 @@ async function carregarObrasPortal(portalSlug) {
     if (!btn) return;
     document.querySelectorAll("#obras-subtabs .tab-btn").forEach((b) => b.classList.toggle("active", b === btn));
     SUBABAS_OBRAS.forEach((s) => { document.getElementById(`obras-sub-${s.chave}`).hidden = s.chave !== btn.dataset.subtabObras; });
+  });
+  document.getElementById("obras-dim-toggle").addEventListener("click", (ev) => {
+    const btn = ev.target.closest("[data-dim]");
+    if (!btn) return;
+    document.querySelectorAll("#obras-dim-toggle [data-dim]").forEach((b) => b.classList.toggle("active", b === btn));
+    document.querySelectorAll("#obras-dim-caixa [data-dim-pane]").forEach((el) => { el.hidden = el.dataset.dimPane !== btn.dataset.dim; });
   });
   document.getElementById("obras-manchete").textContent = `${unidades.length.toLocaleString("pt-BR")} unidades policiais, ${manutencaoTodas.length.toLocaleString("pt-BR")} ordens de manutenção e ${ceirfAmpliado.length.toLocaleString("pt-BR")} intervenções do CEIRF.`;
   abasComoGrupos(painel, {
@@ -13380,6 +13391,7 @@ async function carregarCfcrPortal(portalSlug) {
     <p class="dash-chart-hint">Critério de situação: pela <b>data de término da vigência</b> informada na planilha — recalculado sozinho toda vez que a página carrega, sem precisar de ninguém marcar nada (igual em Contratos). Não é o status declarado na coluna original da planilha.</p>
     <p class="dash-chart-hint">Os cartões de "termos" contam cada termo (um por departamento); "Municípios da Bahia (417)" conta cada município uma única vez — por isso os dois números não precisam bater. <span id="cfcr-termo-municipio-diff"></span></p>
     </div></details>
+    <section class="nota-v2" id="cfcr-lead" style="margin-bottom:18px"><div class="k">Situação</div><div class="v" id="cfcr-lead-corpo"></div></section>
     <div class="tabs" id="cfcr-subtabs" style="margin-bottom:14px">
       ${SUBABAS_CFCR.map((s, i) => `<button type="button" class="tab-btn${i === 0 ? " active" : ""}" data-subtab-cfcr="${s.chave}">${s.rotulo}</button>`).join("")}
     </div>
@@ -13472,8 +13484,8 @@ async function carregarCfcrPortal(portalSlug) {
     </div>
 
     <div id="cfcr-sub-semvigente" hidden>
-      <h4 style="margin-bottom:4px">Bahia, município a município: onde ainda não há cooperação ativa</h4>
-      <p class="dash-chart-hint">Um município tem cooperação ativa se tem ao menos um termo vigente, em qualquer departamento — situação calculada pela data de término da vigência informada na planilha. Historicamente poucos nunca tiveram termo; aqui está a situação de hoje.</p>
+      <h4 style="margin-bottom:4px">Onde ainda não há cooperação ativa, município a município</h4>
+      <details class="painel-detalhes"><summary>Como ler</summary><p class="dash-chart-hint">Um município tem cooperação ativa se tem ao menos um termo vigente, em qualquer departamento. A situação é calculada pela data de término da vigência informada na planilha. Poucos municípios nunca tiveram termo; aqui está a situação de hoje.</p></details>
       <div class="kpi-row" id="cfcr-zz-kpis" style="margin-bottom:6px"></div>
       <p class="dash-chart-hint" id="cfcr-zz-kpis-nota" style="margin-bottom:10px"></p>
       <div class="dash-toggle" style="margin-bottom:10px">${botaoEntenderDadosHTML("comolerzz", "vigente × vencido não bater não é erro")}</div>
@@ -13528,10 +13540,26 @@ async function carregarCfcrPortal(portalSlug) {
     const ativos = munReal.filter((m) => m.situacao === "Com termo vigente").length, totalMun = munReal.length;
     document.getElementById("cfcr-manchete").textContent = `${ativos.toLocaleString("pt-BR")} de ${totalMun.toLocaleString("pt-BR")} municípios têm cooperação ativa. Os outros ${(totalMun - ativos).toLocaleString("pt-BR")} não têm.`;
   } catch (erro) { console.error(erro); }
+  // Move (não copia) os cartões e a barra de situação para o topo: os ids
+  // e a lógica de filtro continuam os mesmos.
+  {
+    const corpoLead = document.getElementById("cfcr-lead-corpo");
+    const vg = document.getElementById("cfcr-sub-visaogeral");
+    const mover = [document.getElementById("cfcr-vg-kpis"), document.getElementById("cfcr-vg-cobertura-bar")?.previousElementSibling, document.getElementById("cfcr-vg-cobertura-bar"), document.getElementById("cfcr-vg-cobertura-leg"), document.getElementById("cfcr-vg-cobertura-mapa")];
+    const dica = document.getElementById("cfcr-vg-cobertura-leg")?.nextElementSibling;
+    if (dica && dica.classList.contains("dash-chart-hint")) mover.push(dica);
+    mover.filter(Boolean).forEach((el) => corpoLead.appendChild(el));
+    const comoLer = document.getElementById("cfcr-entender-comoler");
+    if (comoLer) { const alvoToggle = comoLer.previousElementSibling; if (alvoToggle) corpoLead.appendChild(alvoToggle); corpoLead.appendChild(comoLer); }
+    corpoLead.addEventListener("click", (ev) => {
+      if (!ev.target.closest("[data-cat]")) return;
+      if (vg.hidden) irParaSubabaCfcr("visaogeral");
+    });
+  }
   abasComoGrupos(painel, {
     dataKey: "subtabCfcr",
     painelSel: (k) => `#cfcr-sub-${k}`,
-    abertoInicial: "visaogeral",
+    abertoInicial: null,
     grupos: [
       { k: "visaogeral", tipo: "Situação", titulo: "Municípios e termos por situação, unidade e mapa" },
       { k: "objetosmunicipios", tipo: "Quantidades", titulo: "Objetos acordados com os municípios" },
