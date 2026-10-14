@@ -200,6 +200,10 @@ body{background:var(--paper);color:var(--carvao);font-family:'Archivo',sans-seri
 .busca-res:hover,.busca-res[aria-selected="true"]{background:var(--carvao);color:var(--paper)}
 .busca-res:hover .k,.busca-res[aria-selected="true"] .k,.busca-res:hover small,.busca-res[aria-selected="true"] small{color:var(--paper-line)}
 .busca-vazia{padding:12px;color:#8B93A3;font-size:var(--fs-corpo)}
+.busca-sec{padding:8px 12px 4px;font-family:'IBM Plex Mono',monospace;font-size:var(--fs-ui-xs);letter-spacing:.14em;text-transform:uppercase;color:#8B93A3;border-bottom:1px solid var(--paper-line)}
+.busca-res em{display:block;font-style:normal;font-size:var(--fs-ui-sm);color:#9AA3B2;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.busca-res:hover em,.busca-res[aria-selected="true"] em{color:var(--paper-line)}
+.busca-dica{padding:8px 12px;font-family:'IBM Plex Mono',monospace;font-size:var(--fs-ui-xs);color:#8B93A3;text-align:right}
 .exemplos-busca{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:14px}
 .exemplos-busca button{border:1px solid var(--carvao);background:transparent;color:var(--carvao);padding:6px 12px;font-size:var(--fs-corpo);cursor:pointer;font-family:inherit}
 .exemplos-busca button:hover{background:var(--carvao);color:var(--paper)}
@@ -970,7 +974,7 @@ button.v2-lin:hover,.v2-lin.on{background:var(--paper-line)}
   <div class="topbar-acoes">
     <div class="busca topo-busca-wrap" data-busca="topo" id="busca-topo-wrap" style="display:none">
       <label class="sr" for="busca-topo">Buscar informação</label>
-      <input id="busca-topo" data-busca-in placeholder="Buscar informação (Ctrl K)" autocomplete="off" role="combobox" aria-expanded="false" aria-controls="lista-topo" aria-autocomplete="list">
+      <input id="busca-topo" data-busca-in placeholder="Buscar contrato, município, viatura ou unidade" autocomplete="off" role="combobox" aria-expanded="false" aria-controls="lista-topo" aria-autocomplete="list">
       <div class="busca-lista" id="lista-topo" role="listbox" hidden></div>
     </div>
     <span id="usuario-badge" class="font-mono" style="font-size:var(--fs-ui-sm);color:#9AA3B2;display:none"></span>
@@ -2279,6 +2283,7 @@ async function carregarPortais() {
     for (const item of lista) PAPEL_POR_PORTAL.set(item.slug, item.meuPapel || "leitor");
     atualizarBotoesPorPapel();
     buildHub();
+    reiniciarIndiceBusca();
     montarExemplosBusca();
   } catch (erro) {
     // O parágrafo de apresentação do início saiu; o aviso vai pelo toast.
@@ -2301,7 +2306,7 @@ async function carregarPortais() {
 // servidor e subportaisDe() filtra os módulos liberados — nada aparece na
 // busca que a pessoa não alcançaria navegando.
 const TIPOS_BUSCA = ["Prazos", "Quantidades", "Pessoas", "Onde estão", "Valores", "Situação"];
-const STOP_BUSCA = new Set("a o os as de do da dos das e em que quero saber vao vai ser tem ter sao um uma para por no na nos nas ate me mostre mostrar ver qual quais como sera".split(" "));
+const STOP_BUSCA = new Set("a o os as de do da dos das e em que quero saber vao vai ser tem ter sao um uma para por no na nos nas ate me mostre mostrar ver qual quais como sera indicador indicadores dados informacao informacoes numeros".split(" "));
 const normBusca = (t) => String(t).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 const DESTINOS_BUSCA = [
   // CPG - Contratos
@@ -2336,34 +2341,175 @@ const DESTINOS_BUSCA = [
   { id: "f-reg", tipo: "Onde estão", t: "Onde estão as viaturas, por região", kw: "onde estao viaturas veiculos regiao capital interior rms localizacao", portal: "frota", sub: "frota", grupo: "reg", ancoraSel: "#frota-g-reg" },
   { id: "f-mod", tipo: "Quantidades", t: "Modelos de veículos da frota", kw: "modelos modelo marca ranger spin onix tipo veiculos matriz", portal: "frota", sub: "frota", grupo: "mod", ancoraSel: "#frota-g-mod" },
   { id: "f-ano", tipo: "Prazos", t: "Ano de fabricação e de entrega dos veículos", kw: "prazos ano fabricacao entrega idade antigos veiculos quando", portal: "frota", sub: "frota", grupo: "ano", ancoraSel: "#frota-g-ano" },
-  { id: "f-adm", tipo: "Situação", t: "Descaracterizados nas unidades administrativas", kw: "descaracterizados caracterizados administrativas alugados viaturas", portal: "frota", sub: "frota", grupo: "adm", ancoraSel: "#frota-g-adm" }
+  { id: "f-adm", tipo: "Situação", t: "Descaracterizados nas unidades administrativas", kw: "descaracterizados caracterizados administrativas alugados viaturas", portal: "frota", sub: "frota", grupo: "adm", ancoraSel: "#frota-g-adm" },
+  { id: "f-hoje", tipo: "Situação", t: "Descaracterizados e alugados hoje", kw: "hoje descaracterizados alugados quantos viaturas situacao percentual", portal: "frota", sub: "frota", ancoraSel: ".hoje-v2" },
+  // Obras (cada característica abre a dimensão certa do seletor)
+  { id: "o-dir", tipo: "Onde estão", t: "Unidades policiais por diretoria regional", kw: "onde estao diretoria regional dirpin coorpin interior capital unidades", portal: "infraestrutura", sub: "obras", aba: ["obras", "geral"], esperar: "#obras-dim-toggle", antes: () => document.querySelector('#obras-dim-toggle [data-dim="diretoriaRegional"]')?.click(), ancoraSel: "#obras-dim-caixa" },
+  { id: "o-dep", tipo: "Quantidades", t: "Unidades policiais por departamento", kw: "quantas unidades departamento departamentos delegacias", portal: "infraestrutura", sub: "obras", aba: ["obras", "geral"], esperar: "#obras-dim-toggle", antes: () => document.querySelector('#obras-dim-toggle [data-dim="departamento"]')?.click(), ancoraSel: "#obras-dim-caixa" },
+  { id: "o-tipo", tipo: "Quantidades", t: "Unidades policiais por tipo de unidade", kw: "tipo unidade delegacia posto quantas", portal: "infraestrutura", sub: "obras", aba: ["obras", "geral"], esperar: "#obras-dim-toggle", antes: () => document.querySelector('#obras-dim-toggle [data-dim="tipoDeUnidade"]')?.click(), ancoraSel: "#obras-dim-caixa" },
+  { id: "o-util", tipo: "Situação", t: "Unidades inauguradas e não ocupadas", kw: "inauguradas inauguradas ocupadas ocupacao utilizacao status unidades", portal: "infraestrutura", sub: "obras", aba: ["obras", "geral"], esperar: "#obras-dim-toggle", antes: () => document.querySelector('#obras-dim-toggle [data-dim="statusDeUtilizacao"]')?.click(), ancoraSel: "#obras-dim-caixa" },
+  { id: "o-prop", tipo: "Situação", t: "Propriedade e situação legal dos imóveis", kw: "propriedade proprio alugado locado situacao legal imoveis cedido", portal: "infraestrutura", sub: "obras", aba: ["obras", "geral"], esperar: "#obras-dim-toggle", antes: () => document.querySelector('#obras-dim-toggle [data-dim="propriedade"]')?.click(), ancoraSel: "#obras-dim-caixa" },
+  { id: "o-req", tipo: "Situação", t: "Programa de requalificação das unidades", kw: "requalificacao programa reforma unidades", portal: "infraestrutura", sub: "obras", aba: ["obras", "geral"], esperar: "#obras-dim-toggle", antes: () => document.querySelector('#obras-dim-toggle [data-dim="programaDeRequalificacao"]')?.click(), ancoraSel: "#obras-dim-caixa" },
+  { id: "o-valor", tipo: "Valores", t: "Valor de obra e de manutenção por diretoria regional", kw: "valor valores dinheiro gasto obra manutencao financeiro custo diretoria", portal: "infraestrutura", sub: "obras", aba: ["obras", "geral"], titulo: "Financeiro por Diretoria Regional" },
+  { id: "o-unid", tipo: "Onde estão", t: "Buscar uma unidade policial e ver a obra dela", kw: "buscar unidade policial delegacia municipio endereco obra", portal: "infraestrutura", sub: "obras", aba: ["obras", "geral"], foco: "#obras-busca" },
+  // Termos de cooperação
+  { id: "x-recurso", tipo: "Situação", t: "Termos de cooperação por situação e por unidade regional", kw: "termos situacao vigentes vencidos coorpin depom dpmcv unidade", portal: "orcamento", sub: "cfcr", aba: ["cfcr", "visaogeral"], titulo: "Por unidade" },
+  // Áreas sem painel próprio
+  { id: "p-proj", tipo: "Situação", t: "Projetos e o andamento de cada um", kw: "projetos projeto andamento progresso status gestor gerente patrocinador execucao planejamento", portal: "projetos" },
+  { id: "pe-res", tipo: "Quantidades", t: "Pessoal: servidores lotados, vacância e admissões", kw: "pessoal servidores lotados cargos vacancia admissoes concurso efetivo quantos", portal: "pessoal" },
+  { id: "n-res", tipo: "Quantidades", t: "Normas emitidas e projetos de modernização", kw: "normas atos emitidas modernizacao portarias", portal: "normas" },
+  { id: "pa-res", tipo: "Quantidades", t: "Patrimônio: itens tombados, requisições e bens sob guarda", kw: "patrimonio bens tombados requisicoes material apreendidos guarda itens", portal: "patrimonio" }
 ];
 const destinoDisponivel = (d) => PORTAIS.some((p) => p.id === d.portal) && (!d.sub || subportaisDe(d.portal).some((sp) => sp.tab === d.sub));
-const ROTULO_SUB_BUSCA = { contratos: "Contratos", cfcr: "Termos de cooperação", "cfcr-acordos": "Acordos congêneres", obras: "Obras e manutenção", frota: "Frota de viaturas" };
+const ROTULO_SUB_BUSCA = { contratos: "Contratos", cfcr: "Termos de cooperação", "cfcr-acordos": "Acordos congêneres", obras: "Obras e manutenção", frota: "Frota de viaturas", paineis: "Painéis" };
 const rotuloCaminho = (d) => { const p = PORTAIS.find((x) => x.id === d.portal); return `${p ? p.label : ""}${d.sub ? " › " + (ROTULO_SUB_BUSCA[d.sub] || d.sub) : ""}`; };
 const todosDestinosBusca = () => [
   ...DESTINOS_BUSCA.filter(destinoDisponivel),
   ...PORTAIS.map((p) => ({ id: "p-" + p.id, tipo: "Área", t: `Abrir ${p.label}`, kw: `${p.label} area portal`, portal: p.id }))
 ];
 let buscaEst = { tipo: null, res: [], sel: 0 };
+// Portal aberto agora (null no início). A busca dá prioridade ao que está nele.
+let PORTAL_ATUAL = null;
+const DICA_BUSCA_PORTAL = {
+  frota: "modelo, departamento ou região", infraestrutura: "unidade, município ou diretoria",
+  orcamento: "contrato, empresa, município ou gestor", projetos: "projeto ou responsável",
+  pessoal: "indicador ou painel", normas: "indicador ou painel", patrimonio: "indicador ou painel"
+};
+function atualizarPlaceholderBusca() {
+  const topo = document.getElementById("busca-topo"), home = document.getElementById("busca-home");
+  const p = PORTAL_ATUAL && PORTAIS.find((x) => x.id === PORTAL_ATUAL);
+  if (topo) topo.placeholder = p ? `Buscar em ${p.label}: ${DICA_BUSCA_PORTAL[p.id] || "indicador ou painel"}` : "Buscar contrato, município, viatura ou unidade";
+  if (home) home.placeholder = "Ex.: quantos vão vencer e onde estão";
+}
+
+// ---- Índice dos dados: nomes e números que a pessoa digita de cabeça
+// (contrato, empresa, gestor, município, unidade, modelo, departamento,
+// projeto, indicador). Carrega uma vez, só do que a conta enxerga: cada fonte
+// usa a mesma rota do painel, então a permissão é a mesma.
+const INDICE_BUSCA = { itens: [], carregando: null, pronto: false };
+const FONTES_BUSCA = [
+  { k: "contratos", portal: "orcamento", sub: "contratos", url: "/api/portais/orcamento/contratos", itens(dados) {
+    const base = [], pessoas = new Map();
+    for (const c of dados) {
+      const nomes = (c.pessoas || []).map((x) => x.nomePessoa).filter(Boolean);
+      base.push({ tipo: "Contrato", t: `${c.numeroContrato} · ${c.empresa || "sem empresa"}`, d: (c.objeto || "").slice(0, 90), hay: normBusca([c.numeroContrato, c.empresa, c.objeto, c.processo, c.cnpjCpf, c.analista, c.tipoObjeto, ...nomes].join(" ")), portal: "orcamento", sub: "contratos", esperar: "#op-select-contrato", abrir: () => abrirContratoNoOperacional(c.id) });
+      for (const x of c.pessoas || []) {
+        if (!x.nomePessoa) continue;
+        const e = pessoas.get(x.nomePessoa) || { papeis: new Set(), n: 0 };
+        e.papeis.add(x.papel); e.n++; pessoas.set(x.nomePessoa, e);
+      }
+    }
+    for (const [nome, e] of pessoas) base.push({ tipo: "Pessoa", t: nome, d: `${[...e.papeis].join(" e ")} em ${e.n} contrato${e.n > 1 ? "s" : ""}`, hay: normBusca(nome), portal: "orcamento", sub: "contratos", menuItem: "pessoas", ancoraSel: '[data-item="pessoas"]' });
+    return base;
+  } },
+  { k: "cfcr", portal: "orcamento", sub: "cfcr", url: "/api/portais/orcamento/cfcr", itens(dados) {
+    const out = [], mun = new Map(), unid = new Map();
+    for (const t of dados) {
+      if (t.tipo !== "Termo de Cooperação Técnica") {
+        out.push({ tipo: "Parceria", t: t.participe || "Parceria institucional", d: (t.objeto || "").slice(0, 90), hay: normBusca([t.participe, t.objeto, t.departamento].join(" ")), portal: "orcamento", sub: "cfcr-acordos" });
+        continue;
+      }
+      const m = mun.get(t.participe) || { n: 0, st: new Set(), dep: new Set() };
+      m.n++; m.st.add(t.status); if (t.departamento) m.dep.add(t.departamento); mun.set(t.participe, m);
+      if (t.nomeUnidade) unid.set(t.nomeUnidade, (unid.get(t.nomeUnidade) || 0) + 1);
+    }
+    for (const [nome, m] of mun) out.push({ tipo: "Município", t: nome, d: `${m.n} termo${m.n > 1 ? "s" : ""} · ${[...m.st].map((x) => String(x).toLowerCase()).join(", ")} · ${[...m.dep].join(", ")}`, hay: normBusca(nome), portal: "orcamento", sub: "cfcr", aba: ["cfcr", "visaogeral"], preencher: { sel: "#cfcr-busca-input", valor: nome } });
+    for (const [nome, n] of unid) out.push({ tipo: "Unidade regional", t: nome, d: `${n} termo${n > 1 ? "s" : ""} de cooperação`, hay: normBusca(nome), portal: "orcamento", sub: "cfcr", aba: ["cfcr", "visaogeral"], preencher: { sel: "#cfcr-busca-input", valor: nome } });
+    return out;
+  } },
+  { k: "obras", portal: "infraestrutura", sub: "obras", url: "/api/portais/infraestrutura/obras", itens(dados) {
+    const out = [], mun = new Map();
+    for (const u of dados) {
+      const m = u.municipio?.municipio || "";
+      if (m) mun.set(m, (mun.get(m) || 0) + 1);
+      out.push({ tipo: "Unidade policial", t: u.nomeDaUnidade, d: [m, u.departamento, u.diretoriaRegional].filter(Boolean).join(" · "), hay: normBusca([u.nomeDaUnidade, m, u.departamento, u.diretoriaRegional, u.endereco].join(" ")), portal: "infraestrutura", sub: "obras", aba: ["obras", "geral"], preencher: { sel: "#obras-busca", valor: u.nomeDaUnidade } });
+    }
+    for (const [nome, n] of mun) out.push({ tipo: "Município", t: nome, d: `${n} unidade${n > 1 ? "s" : ""} policia${n > 1 ? "is" : "l"}`, hay: normBusca(nome), portal: "infraestrutura", sub: "obras", aba: ["obras", "geral"], preencher: { sel: "#obras-busca", valor: nome } });
+    return out;
+  } },
+  { k: "frota", portal: "frota", sub: "frota", url: "/api/portais/frota/frota", itens(DB) {
+    const { D, M, TN, V } = DB, N = (n) => Math.round(n).toLocaleString("pt-BR"), out = [];
+    const conta = (i, v) => V.reduce((a, r) => a + (r[i] === v ? r[9] : 0), 0);
+    D.forEach((nome, i) => { const n = conta(0, i); if (n) out.push({ tipo: "Departamento", t: nome, d: `${N(n)} viaturas`, hay: normBusca(nome), portal: "frota", sub: "frota", grupo: "dep", texto: nome }); });
+    M.forEach((nome, i) => { const n = conta(6, i); if (n) out.push({ tipo: "Modelo", t: nome, d: `${N(n)} veículo${n > 1 ? "s" : ""}`, hay: normBusca(nome), portal: "frota", sub: "frota", grupo: "mod", texto: nome }); });
+    TN.forEach((nome, i) => { const n = conta(5, i); if (n) out.push({ tipo: "Tipo de veículo", t: nome, d: `${N(n)} veículo${n > 1 ? "s" : ""}`, hay: normBusca(nome), portal: "frota", sub: "frota", grupo: "mod", texto: nome }); });
+    return out;
+  } }
+];
+// Portais sem painel próprio: indicadores, projetos e (para admin) painéis.
+const PORTAIS_GENERICOS_BUSCA = ["normas", "patrimonio", "pessoal", "projetos"];
+async function itensPortalGenerico(id) {
+  const out = [];
+  const det = await apiFetch(`/api/portais/${id}`);
+  for (const i of det.indicadores || []) {
+    const v = i.valorAoVivo != null && i.valorAoVivo !== "" ? Number(i.valorAoVivo).toLocaleString("pt-BR") : (i.valor || "");
+    out.push({ tipo: "Indicador", t: i.rotulo, d: v, hay: normBusca(`${i.rotulo} ${v}`), portal: id, texto: i.rotulo });
+  }
+  for (const pr of det.projetos || []) {
+    out.push({ tipo: "Projeto", t: pr.titulo, d: [pr.status, pr.progresso != null ? pr.progresso + "%" : "", pr.gestor].filter(Boolean).join(" · "), hay: normBusca([pr.titulo, pr.texto, pr.status, pr.gestor, pr.gerente, pr.patrocinador].join(" ")), portal: id, texto: pr.titulo });
+  }
+  if (souAdmin()) {
+    try {
+      for (const pa of await apiFetch(`/api/portais/${id}/paineis`)) out.push({ tipo: "Painel", t: pa.nome, d: "", hay: normBusca(pa.nome), portal: id, sub: "paineis", texto: pa.nome });
+    } catch { /* sem acesso aos painéis: segue sem eles */ }
+  }
+  return out;
+}
+function carregarIndiceBusca() {
+  if (INDICE_BUSCA.carregando) return INDICE_BUSCA.carregando;
+  const fontes = FONTES_BUSCA.filter((f) => PORTAIS.some((p) => p.id === f.portal) && subportaisDe(f.portal).some((sp) => sp.tab === f.sub));
+  const tarefas = fontes.map(async (f) => {
+    try { INDICE_BUSCA.itens.push(...f.itens(await apiFetch(f.url))); } catch (e) { console.warn("Busca: sem dados de", f.k, e.message); }
+  }).concat(PORTAIS.filter((p) => PORTAIS_GENERICOS_BUSCA.includes(p.id)).map(async (p) => {
+    try { INDICE_BUSCA.itens.push(...(await itensPortalGenerico(p.id))); } catch (e) { console.warn("Busca: sem dados de", p.id, e.message); }
+  }));
+  INDICE_BUSCA.carregando = Promise.all(tarefas).then(() => {
+    INDICE_BUSCA.pronto = true;
+    const aberta = document.querySelector(".busca-lista:not([hidden])");
+    if (aberta) desenharListaBusca(aberta.closest("[data-busca]"));
+  });
+  return INDICE_BUSCA.carregando;
+}
+function reiniciarIndiceBusca() { INDICE_BUSCA.itens = []; INDICE_BUSCA.carregando = null; INDICE_BUSCA.pronto = false; }
+
 function resultadosBusca(q) {
   const toks = normBusca(q).split(/\s+/).filter((w) => w && !STOP_BUSCA.has(w));
-  return todosDestinosBusca().map((d, ord) => {
+  const atual = !telaConteudo.hidden ? PORTAL_ATUAL : null;
+  const dest = todosDestinosBusca().map((d, ord) => {
     if (buscaEst.tipo && d.tipo !== buscaEst.tipo) return null;
     if (!toks.length && d.tipo === "Área") return null;
     const h = normBusca(`${d.t} ${d.kw} ${d.tipo}`), s = toks.filter((w) => h.includes(w)).length;
     if (toks.length && !s) return null;
-    return { ...d, s, ord, caminho: rotuloCaminho(d) };
-  }).filter(Boolean).sort((a, b) => b.s - a.s || a.ord - b.ord).slice(0, 8);
+    return { ...d, s: s + (d.portal === atual ? 0.5 : 0), ord, aqui: d.portal === atual, caminho: rotuloCaminho(d) };
+  }).filter(Boolean);
+  // Nomes e números só entram quando há o que procurar e nenhum tipo está escolhido.
+  let ents = [];
+  if (toks.length && !buscaEst.tipo) {
+    const porTipo = {};
+    ents = INDICE_BUSCA.itens.map((e, ord) => {
+      if (!toks.every((w) => e.hay.includes(w))) return null;
+      const tit = normBusca(e.t), noTitulo = toks.every((w) => tit.includes(w)) ? 1.5 : 0, exato = tit === toks.join(" ") ? 1 : 0;
+      return { ...e, id: "e-" + ord, s: toks.length * 2 + noTitulo + exato + (e.portal === atual ? 0.5 : 0), ord: 1000 + ord, aqui: e.portal === atual, caminho: rotuloCaminho(e) };
+    }).filter(Boolean).sort((a, b) => b.s - a.s || a.ord - b.ord)
+      .filter((e) => (porTipo[e.tipo + e.portal] = (porTipo[e.tipo + e.portal] || 0) + 1) <= 3).slice(0, 6);
+  }
+  return [...ents, ...dest].sort((a, b) => b.s - a.s || a.ord - b.ord).slice(0, 9);
 }
 function desenharListaBusca(caixa) {
   const inp = caixa.querySelector("[data-busca-in]"), lista = caixa.querySelector(".busca-lista");
+  carregarIndiceBusca();
   buscaEst.res = resultadosBusca(inp.value);
   buscaEst.sel = Math.min(buscaEst.sel, Math.max(buscaEst.res.length - 1, 0));
   const tipos = `<div class="busca-tipos"><div class="rotulo-busca">Tipo de informação</div><div class="busca-grupo">${TIPOS_BUSCA.map((t) => `<button type="button" data-busca-tipo="${t}" class="${buscaEst.tipo === t ? "on" : ""}" aria-pressed="${buscaEst.tipo === t}">${t}</button>`).join("")}</div></div>`;
-  lista.innerHTML = tipos + (buscaEst.res.length
-    ? buscaEst.res.map((r, i) => `<button type="button" class="busca-res" role="option" data-busca-res="${i}" aria-selected="${i === buscaEst.sel}"><span class="k">${r.tipo}</span><span><b>${escapeHTML(r.t)}</b><small>${escapeHTML(r.caminho)}</small></span></button>`).join("")
-    : `<p class="busca-vazia">Nenhum resultado nas áreas que o seu acesso permite.</p>`);
+  const temAqui = buscaEst.res.some((r) => r.aqui), temFora = buscaEst.res.some((r) => !r.aqui);
+  const nomePortal = PORTAIS.find((x) => x.id === PORTAL_ATUAL)?.label || "";
+  let corpo = "";
+  buscaEst.res.forEach((r, i) => {
+    if (temAqui && temFora && (i === 0 || r.aqui !== buscaEst.res[i - 1].aqui)) corpo += `<div class="busca-sec">${r.aqui ? `Em ${escapeHTML(nomePortal)}` : "Em outras áreas"}</div>`;
+    corpo += `<button type="button" class="busca-res" role="option" data-busca-res="${i}" aria-selected="${i === buscaEst.sel}"><span class="k">${escapeHTML(r.tipo)}</span><span><b>${escapeHTML(r.t)}</b>${r.d ? `<em>${escapeHTML(r.d)}</em>` : ""}<small>${escapeHTML(r.caminho)}</small></span></button>`;
+  });
+  const carregando = !INDICE_BUSCA.pronto && inp.value.trim() ? `<p class="busca-vazia">Carregando nomes e números…</p>` : "";
+  lista.innerHTML = tipos + (corpo || (INDICE_BUSCA.pronto || !inp.value.trim() ? `<p class="busca-vazia">Nenhum resultado nas áreas que o seu acesso permite.</p>` : "")) + carregando + `<p class="busca-dica">Atalho: Ctrl K ou /</p>`;
   lista.hidden = false;
   inp.setAttribute("aria-expanded", "true");
 }
@@ -2375,6 +2521,17 @@ const esperarAte = (fn, ms = 20000) => new Promise((ok) => {
   const t0 = Date.now();
   (function ver() { const r = fn(); if (r) return ok(r); if (Date.now() - t0 > ms) return ok(null); setTimeout(ver, 120); })();
 });
+function acharTextoNaTela(texto) {
+  const alvo = normBusca(texto).trim();
+  if (!alvo) return null;
+  const w = document.createTreeWalker(telaConteudo, NodeFilter.SHOW_TEXT);
+  let n;
+  while ((n = w.nextNode())) {
+    const el = n.parentElement;
+    if (el && el.offsetParent !== null && !el.closest("script,style,.busca-lista") && normBusca(n.nodeValue).includes(alvo)) return el;
+  }
+  return null;
+}
 function acharTituloNaTela(texto) {
   const alvo = normBusca(texto);
   return [...telaConteudo.querySelectorAll("h2,h3,h4")].find((h) => h.offsetParent !== null && !h.closest(".item-cab-v2, .grupo-cab-v2") && normBusca(h.textContent).includes(alvo)) || null;
@@ -2395,18 +2552,25 @@ async function irParaInformacao(d) {
     const b = await esperarAte(() => telaConteudo.querySelector(`[data-subtab-${d.aba[0]}="${d.aba[1]}"]`));
     if (b) { if (!b.classList.contains("active")) b.click(); }
   }
-  if (d.antes) { await esperarAte(() => telaConteudo.querySelector(".unidade-gestora-btn, [data-subtab-contratos]")); d.antes(); }
+  if (d.esperar) await esperarAte(() => telaConteudo.querySelector(d.esperar));
+  if (d.antes) d.antes();
+  if (d.abrir) { await esperarAte(() => { const sel = telaConteudo.querySelector(d.esperar || "#op-select-contrato"); return sel && sel.options.length > 1; }); d.abrir(); }
   if (d.grupo) { await esperarAte(() => window.__frotaAbrirGrupo); window.__frotaAbrirGrupo?.(d.grupo); }
   if (d.menuItem) { await esperarAte(() => window.__menuContratos); window.__menuContratos?.abrir(d.menuItem, false); }
   let alvo = null;
-  if (d.titulo) alvo = await esperarAte(() => acharTituloNaTela(d.titulo));
+  if (d.preencher) {
+    alvo = await esperarAte(() => telaConteudo.querySelector(d.preencher.sel));
+    if (alvo) { alvo.value = d.preencher.valor; alvo.dispatchEvent(new Event("input", { bubbles: true })); }
+  } else if (d.texto) alvo = await esperarAte(() => acharTextoNaTela(d.texto), 6000);
+  else if (d.abrir) alvo = null;
+  else if (d.titulo) alvo = await esperarAte(() => acharTituloNaTela(d.titulo));
   else if (d.ancoraSel) alvo = await esperarAte(() => { const e = telaConteudo.querySelector(d.ancoraSel); return e && e.offsetParent !== null ? e : null; }, 6000);
   else if (d.foco) alvo = await esperarAte(() => telaConteudo.querySelector(d.foco));
   if (alvo) {
-    const caixa = alvo.closest(".dash-chart-box, .fr-card, .nota, .dash-filtro, .dash-filtros") || alvo;
+    const caixa = alvo.closest(".dash-chart-box, .fr-card, .nota, .nota-v2, .projeto-card, .kpi-card, .dash-filtro, .dash-filtros") || alvo;
     caixa.scrollIntoView({ behavior: "smooth", block: "start" });
     if (d.foco) alvo.focus({ preventScroll: true });
-    else { caixa.classList.add("achado-busca"); setTimeout(() => caixa.classList.remove("achado-busca"), 3200); }
+    else if (!d.preencher) { caixa.classList.add("achado-busca"); setTimeout(() => caixa.classList.remove("achado-busca"), 3200); }
   }
   // Aviso depois da ação, com o verbo do botão no particípio.
   mostrarToast(`Aberto: ${d.t}`, "sucesso", 3000);
@@ -14656,6 +14820,8 @@ function renderAtualizadosRecentemente(lista, decisoesRenovacao) {
 async function abrirTela(id) {
   const pBase = PORTAIS.find(x => x.id === id);
   if (!pBase) return;
+  PORTAL_ATUAL = id;
+  atualizarPlaceholderBusca();
 
   telaConteudo.innerHTML = `<p class="tela-intro">Carregando...</p>`;
   telaConteudo.hidden = false;
@@ -15101,6 +15267,8 @@ function fecharTela() {
   const telaUpload = document.getElementById("tela-upload");
   if (telaUpload) telaUpload.hidden = true;
   telaInicio.style.display = "";
+  PORTAL_ATUAL = null;
+  atualizarPlaceholderBusca();
   voltarBtn.classList.remove("show");
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
