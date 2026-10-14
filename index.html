@@ -43,19 +43,18 @@
   --dourado:#A78BFA;      --dourado-glow:rgba(167,139,250,.18);
   --vinho:#EC4899;        --vinho-glow:rgba(236,72,153,.16);
 
-  /* Criticidade de vencimento de contrato (CPG - Contratos): as MESMAS 5
-     cores da medida "Cor Criticidade" do painel de Power BI original — não a
-     rampa de 3 matizes usada no resto do sistema. Pedido explícito da
-     coordenação: esse código de cor (vermelho/laranja/amarelo/verde/cinza) já
-     é o que a equipe reconhece de outros sistemas de gestão, então foge da
-     regra geral "sem paleta de ferramenta de BI" de propósito. */
-  --crit-vencido:#C00000;  --crit-vencido-glow:rgba(192,0,0,.18);
-  --crit-critico:#E74C3C;  --crit-critico-glow:rgba(231,76,60,.18);
-  --crit-alto:#ED7D31;     --crit-alto-glow:rgba(237,125,49,.18);
-  --crit-medio:#FFC000;    --crit-medio-glow:rgba(255,192,0,.2);
-  --crit-baixo:#70AD47;    --crit-baixo-glow:rgba(112,173,71,.18);
-  --crit-neutro:#A6A6A6;   --crit-neutro-glow:rgba(166,166,166,.16);
-  --crit-semdata:#BFBFBF;  --crit-semdata-glow:rgba(191,191,191,.16);
+  /* Criticidade de vencimento de contrato (CPG - Contratos). Cor só para
+     estado, na família do tema V2: terracota para vencido e crítico, mostarda
+     para alto e médio, neutros para o que não pede ação (baixo, a contratar,
+     sem data). Substitui o código vermelho/laranja/amarelo/verde do Power BI
+     original, a pedido dela (manual anticliché). */
+  --crit-vencido:#C9503A;  --crit-vencido-glow:rgba(201,80,58,.18);
+  --crit-critico:#E0745C;  --crit-critico-glow:rgba(224,116,92,.18);
+  --crit-alto:#D9A441;     --crit-alto-glow:rgba(217,164,65,.18);
+  --crit-medio:#E6CC8A;    --crit-medio-glow:rgba(230,204,138,.2);
+  --crit-baixo:#8E9B9D;    --crit-baixo-glow:rgba(142,155,157,.18);
+  --crit-neutro:#56625F;   --crit-neutro-glow:rgba(86,98,95,.2);
+  --crit-semdata:#6B7678;  --crit-semdata-glow:rgba(107,118,120,.16);
 
   /* CFCR - Termos de Cooperação: paleta própria, por pedido direto ("as
      cores estão aí inclusive... usar as cores do mockup como estão") — não
@@ -220,7 +219,7 @@ body{background:var(--paper);color:var(--carvao);font-family:'Archivo',sans-seri
 .tela-head .artigos{font-family:'IBM Plex Mono',monospace;font-size:var(--fs-ui-sm);color:#9AA3B2;margin-top:2px}
 .tela-intro{max-width:64ch;color:#C7CDD9;margin-bottom:30px;font-size:var(--fs-lead)}
 
-.dados-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:2px;background:var(--carvao);border:2px solid var(--carvao)}
+.dados-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:0 28px;background:transparent;border:0}
 @media (max-width:640px){.dados-grid{grid-template-columns:1fr}}
 .dado{	background:var(--surface);padding:18px}
 .dado .valor{font-family:'Spectral',sans-serif;font-size:var(--fs-display);line-height:1}
@@ -855,7 +854,7 @@ footer{border-top:2px solid var(--carvao)}
 .toast.erro{border-color:var(--terracota)!important}
 .toast.sucesso{border-color:var(--carvao)!important}
 .toast.aviso{border-color:var(--mostarda)!important}
-details.painel-detalhes,[style*="border-left:3px"],[style*="border-left: 3px"]{border-left:0!important}
+details.painel-detalhes,[style*="border-left:3px"],[style*="border-left: 3px"],[style*="border-left:4px"],[style*="border-left: 4px"]{border-left:0!important}
 details.painel-detalhes{border:1px solid var(--paper-line)!important}
 .cfx-row.active{background:var(--paper-line)}
 /* ---------- peças V2: manchete, nota de margem, barra de situação, grupos ---------- */
@@ -10023,7 +10022,7 @@ function renderPorDimensaoContratos(lista, cfg, unidadeGestoraAtiva) {
       <p class="dash-chart-hint" style="margin-top:4px">${exclusivos} contrato(s) atende(m) uma DIRPIN só — os outros ${compartilhados} atendem mais de uma (por isso a soma dos filtros de DIRPIN acima passa de ${contratosComUnidade.length}). Útil saber antes de montar relatório ou apresentação com esse corte.</p>
       <div class="dash-toggle" style="margin-top:6px">${botaoEntenderDadosHTML("compartilhados", "por que a soma das DIRPIN passa do total de contratos")}</div>
       <div id="contratos-entender-compartilhados" style="margin-top:10px" hidden></div>` : ""}
-      ${p !== "area" ? "" : `<div class="dash-chart-box" id="${p}-grafico-unidade-caixa" style="margin-top:16px;border-left:4px solid var(--dourado);background:color-mix(in srgb, var(--dourado) 7%, transparent)">
+      ${p !== "area" ? "" : `<div class="dash-chart-box" id="${p}-grafico-unidade-caixa" style="margin-top:16px">
         <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">
           <h4 style="margin-bottom:0">Distribuição Geográfica</h4>
           <div class="dash-toggle">${botaoEntenderDadosHTML("geografia", "por que nem todo contrato vira um ponto no mapa")}</div>
@@ -10039,7 +10038,7 @@ function renderPorDimensaoContratos(lista, cfg, unidadeGestoraAtiva) {
         (contratosComUnidade.length > 0, ramo de baixo), o mapa continua —
         aí Salvador é uma aproximação legítima ao lado de dado real, não a
         íntegra do gráfico. -->
-        <p class="dash-chart-hint">100% dos ${contratosSemUnidade.length} contrato(s) desta seleção não têm unidade regional (COORPIN) cadastrada — hoje só a DEPIN cadastra essa informação. Sem nenhum ponto real pra ancorar, um mapa aqui só mostraria "tudo em Salvador", o que parece uma leitura geográfica sem ser — por isso não desenha nenhum.</p>` : `
+        <p class="dash-chart-hint">Nenhum dos ${contratosSemUnidade.length} contrato(s) desta seleção tem unidade regional (COORPIN) cadastrada. Hoje só a DEPIN cadastra essa informação, então não há ponto real para desenhar no mapa.</p>` : `
         <p class="dash-chart-hint">${contratosSemUnidade.length
           ? `${contratosComUnidade.length} contrato(s) têm unidade regional (COORPIN) cadastrada e entram um a um no mapa; ${contratosSemUnidade.length} são de outras áreas gestoras (sem essa informação, hoje só a DEPIN cadastra) e entram juntos em "Salvador (outras áreas)" — a maioria dessas áreas é coordenação central do estado, então Salvador é a melhor aproximação sem inventar dado que a planilha não tem.`
           : `Todos os ${contratosComUnidade.length} contrato(s) desta seleção têm unidade regional (COORPIN) cadastrada.`
@@ -14169,7 +14168,7 @@ async function carregarCfcrAcordosPortal(portalSlug) {
 // `lista` (contratos já enriquecidos). `unidadeGestoraTopo` é a função já
 // definida em carregarContratosPortal — reaproveitada aqui, não duplicada.
 function montarRelatorioContratos(resumo, lista, unidadeGestoraTopo) {
-  const COR = { vencido: "#C00000", critico: "#E74C3C", alto: "#ED7D31", medio: "#FFC000", baixo: "#70AD47", neutro: "#A6A6A6", info: "#2B5CA8", roxo: "#7C5CBF", laranja: "#ED7D31" };
+  const COR = { vencido: "#C9503A", critico: "#E0745C", alto: "#D9A441", medio: "#E6CC8A", baixo: "#8E9B9D", neutro: "#56625F", info: "#7FB2D1", roxo: "#7FB2D1", laranja: "#D9A441" };
   const agora = new Date().toLocaleDateString("pt-BR");
   const moeda = (v) => v == null ? "—" : "R$ " + v.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const moedaCompacta = (v) => v == null ? "—" : v >= 1e6 ? `R$ ${(v / 1e6).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} milhões` : v >= 1e3 ? `R$ ${Math.round(v / 1e3)} mil` : moeda(v);
