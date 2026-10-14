@@ -6,7 +6,7 @@
 <title>DEPAF — Portal Institucional</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Spectral:wght@500;700&family=Archivo:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <style>
 :root{
@@ -90,8 +90,8 @@
 }
 *{box-sizing:border-box;margin:0;padding:0}
 html{scroll-behavior:smooth}
-body{background:var(--paper);color:var(--carvao);font-family:'IBM Plex Sans',sans-serif;line-height:1.5;overflow-x:hidden}
-.font-display{font-family:'Space Grotesk',sans-serif;text-transform:uppercase}
+body{background:var(--paper);color:var(--carvao);font-family:'Archivo',sans-serif;line-height:1.5;overflow-x:hidden}
+.font-display{font-family:'Spectral',sans-serif;text-transform:uppercase}
 .font-mono{font-family:'IBM Plex Mono',monospace}
 
 .grid-bg{
@@ -119,7 +119,7 @@ body{background:var(--paper);color:var(--carvao);font-family:'IBM Plex Sans',san
 .topbar .brand{display:flex;align-items:center;gap:12px;cursor:pointer}
 .topbar .brand svg{width:28px;height:28px;color:var(--carvao)}
 .topbar .brand-text{font-family:'IBM Plex Mono',monospace;font-size:var(--fs-ui);letter-spacing:0.1em}
-.topbar .brand-text b{font-family:'Space Grotesk',sans-serif;	font-size:var(--fs-subtitulo);display:block}
+.topbar .brand-text b{font-family:'Spectral',sans-serif;	font-size:var(--fs-subtitulo);display:block}
 .topbar .voltar{
   font-family:'IBM Plex Mono',monospace;font-size:var(--fs-ui);letter-spacing:0.06em;
   background:var(--carvao);color:var(--paper);border:none;padding:8px 14px;cursor:pointer;display:none;
@@ -152,7 +152,7 @@ body{background:var(--paper);color:var(--carvao);font-family:'IBM Plex Sans',san
 #tela-inicio{padding:0 24px 40px;max-width:1100px;margin:0 auto}
 .intro{max-width:680px;margin:0 auto 8px;text-align:center}
 .intro .eyebrow{font-family:'IBM Plex Mono',monospace;font-size:var(--fs-ui);letter-spacing:0.16em;color:var(--terracota);margin-bottom:12px}
-.intro h1{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:clamp(34px,6vw,56px);line-height:0.95}
+.intro h1{font-family:'Spectral',sans-serif;font-weight:700;font-size:clamp(34px,6vw,56px);line-height:0.95}
 .intro p{margin-top:16px;color:#C7CDD9;font-size:var(--fs-lead)}
 
 /* ---------- hub / rosa dos ventos ---------- */
@@ -216,14 +216,14 @@ body{background:var(--paper);color:var(--carvao);font-family:'IBM Plex Sans',san
 .tela-head{display:flex;align-items:center;gap:16px;border-bottom:3px solid var(--carvao);padding-bottom:16px;margin-bottom:28px}
 .tela-head .icon-grande{width:46px;height:46px;color:var(--tela-color,var(--carvao))}
 .tela-head .icon-grande svg{width:100%;height:100%}
-.tela-head h2{font-family:'Space Grotesk',sans-serif;font-size:clamp(28px,5vw,42px)}
+.tela-head h2{font-family:'Spectral',sans-serif;font-size:clamp(28px,5vw,42px)}
 .tela-head .artigos{font-family:'IBM Plex Mono',monospace;font-size:var(--fs-ui-sm);color:#9AA3B2;margin-top:2px}
 .tela-intro{max-width:64ch;color:#C7CDD9;margin-bottom:30px;font-size:var(--fs-lead)}
 
 .dados-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:2px;background:var(--carvao);border:2px solid var(--carvao)}
 @media (max-width:640px){.dados-grid{grid-template-columns:1fr}}
 .dado{	background:var(--surface);padding:18px}
-.dado .valor{font-family:'Space Grotesk',sans-serif;font-size:var(--fs-display);line-height:1}
+.dado .valor{font-family:'Spectral',sans-serif;font-size:var(--fs-display);line-height:1}
 .dado .rotulo{font-family:'IBM Plex Mono',monospace;font-size:var(--fs-ui-sm);color:#9AA3B2;margin-top:8px}
 .tag{
   display:inline-block;font-family:'IBM Plex Mono',monospace;font-size:var(--fs-ui-xs);letter-spacing:0.08em;
@@ -243,7 +243,7 @@ body{background:var(--paper);color:var(--carvao);font-family:'IBM Plex Sans',san
 .kpi-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;margin-bottom:16px}
 .kpi-card{	background:var(--surface);padding:16px 18px;border:1.5px solid var(--paper-line)}
 .kpi-label{font-family:'IBM Plex Mono',monospace;font-size:var(--fs-ui-sm);letter-spacing:.08em;color:#9AA3B2;text-transform:uppercase;display:inline-flex;align-items:center;gap:5px}
-.kpi-value{font-family:'Space Grotesk',sans-serif;font-size:var(--fs-display);line-height:1;margin-top:6px;font-variant-numeric:tabular-nums}
+.kpi-value{font-family:'Spectral',sans-serif;font-size:var(--fs-display);line-height:1;margin-top:6px;font-variant-numeric:tabular-nums}
 /* Ícone redondo (à la SEI) + cabeçalho do cartão — só entra quando o
    cartão explicitamente monta um .kpi-cabeca; cartão sem ele continua
    igual, sem buraco nenhum no layout. */
@@ -309,7 +309,7 @@ body{background:var(--paper);color:var(--carvao);font-family:'IBM Plex Sans',san
 .projeto-card .top{display:flex;gap:14px;align-items:flex-start}
 .projeto-card .icon{width:36px;height:36px;color:var(--carvao);flex:none}
 .projeto-card .icon svg{width:100%;height:100%}
-.projeto-card h3{font-family:'Space Grotesk',sans-serif;font-size:var(--fs-titulo)}
+.projeto-card h3{font-family:'Spectral',sans-serif;font-size:var(--fs-titulo)}
 .projeto-card p.texto{font-size:var(--fs-corpo);color:#C7CDD9;margin-top:4px}
 .progress-row{display:flex;align-items:center;gap:10px;margin-top:14px}
 .progress-track{flex:1;height:8px;background:var(--paper-line);position:relative}
@@ -380,7 +380,7 @@ body{background:var(--paper);color:var(--carvao);font-family:'IBM Plex Sans',san
 /* Pisca de leve quando um cartão "leva até aqui" em vez de filtrar algo —
    avisa que a rolagem parou no lugar certo, sem precisar de mais texto. */
 .destaque-temporario{border-color:var(--tinta);box-shadow:0 0 0 3px var(--tinta-glow)}
-.dash-chart-box h4{font-family:'Space Grotesk',sans-serif;font-size:var(--fs-subtitulo);margin-bottom:12px}
+.dash-chart-box h4{font-family:'Spectral',sans-serif;font-size:var(--fs-subtitulo);margin-bottom:12px}
 .dash-chart-box svg{width:100%;height:auto;display:block}
 
 /* Alerta de vencimento — pedido direto: "chegou ali no 90 dias o sistema
@@ -460,13 +460,13 @@ body{background:var(--paper);color:var(--carvao);font-family:'IBM Plex Sans',san
 .gauge-prazo{display:flex;align-items:center;gap:20px;background:var(--surface);border:2px solid var(--carvao);padding:16px 20px;margin-bottom:18px}
 .gauge-prazo svg{width:112px;height:112px;flex:none}
 .gauge-prazo .legenda-gauge{min-width:0}
-.gauge-prazo .legenda-gauge h4{font-family:'Space Grotesk',sans-serif;font-size:var(--fs-subtitulo);margin-bottom:4px}
+.gauge-prazo .legenda-gauge h4{font-family:'Spectral',sans-serif;font-size:var(--fs-subtitulo);margin-bottom:4px}
 .gauge-prazo .legenda-gauge p{font-size:var(--fs-corpo);color:#C7CDD9}
 .gauge-prazo .legenda-gauge .fonte{font-family:'IBM Plex Mono',monospace;font-size:var(--fs-ui-sm);color:#9AA3B2;margin-top:6px}
 
 .linha-contrato:hover{background:var(--paper-line);cursor:pointer}
 .tooltip-contrato{position:fixed;z-index:200;width:320px;max-width:calc(100vw - 24px);background:var(--surface);border:2px solid var(--carvao);box-shadow:var(--shadow-lg);padding:16px 18px;pointer-events:none}
-.tooltip-contrato h4{font-family:'Space Grotesk',sans-serif;font-size:var(--fs-subtitulo);margin-bottom:2px;padding-right:74px;line-height:1.25}
+.tooltip-contrato h4{font-family:'Spectral',sans-serif;font-size:var(--fs-subtitulo);margin-bottom:2px;padding-right:74px;line-height:1.25}
 .tooltip-contrato .obj{font-size:var(--fs-ui-sm);color:#C7CDD9;margin-bottom:10px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .tooltip-contrato dl{display:grid;grid-template-columns:auto 1fr;gap:5px 10px;font-size:var(--fs-ui-sm)}
 .tooltip-contrato dt{font-family:'IBM Plex Mono',monospace;color:#9AA3B2;text-transform:uppercase;letter-spacing:.05em}
@@ -521,73 +521,6 @@ body{background:var(--paper);color:var(--carvao);font-family:'IBM Plex Sans',san
 .acesso-portal .acesso-nome{font-family:'IBM Plex Mono',monospace;font-size:var(--fs-ui-sm);color:var(--carvao);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .acesso-portal .dash-toggle{flex:none}
 .acesso-portal .dash-toggle-btn{padding:6px 8px;min-height:28px;font-size:var(--fs-ui-xs)}
-/* ---- Painel de Frota (portal frota) — visual próprio, igual ao painel de origem ---- */
-.frota-app{--bg:#f4f3ee;--card:#fff;--ink:#1c2321;--mut:#6b7370;--line:#e4e2db;--p:#1d6f6b;--a:#d9822b;--c:#7a6fb5;--k1:#2e5e9e;--k2:#c2493d;--k3:#8a8f98;display:grid;grid-template-columns:270px minmax(0,1fr);gap:16px;padding:16px;box-sizing:border-box;width:100%;max-width:1400px;margin:0 auto;border-radius:12px;background:var(--bg);color:var(--ink);font:14px/1.4 system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;text-transform:none;letter-spacing:normal}
-@media(prefers-color-scheme:dark){.frota-app{--bg:#121618;--card:#1b2123;--ink:#e8ecea;--mut:#9aa5a1;--line:#2b3335}}
-.frota-app *{box-sizing:content-box}
-.frota-app .fr-side{position:sticky;top:16px;align-self:start;max-height:calc(100vh - 32px);overflow:auto;display:flex;flex-direction:column;gap:12px;min-width:0}
-.frota-app .fr-card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;min-width:0}
-.frota-app h1{font:inherit;font-size:18px;font-weight:700;margin:0;text-transform:none;letter-spacing:normal;color:var(--ink)}
-.frota-app h2{font:inherit;font-size:13px;font-weight:700;margin:0 0 10px;letter-spacing:.02em;text-transform:none;color:var(--ink)}
-.frota-app .fr-m{color:var(--mut);font-size:12px}
-.frota-app .fr-kg{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-.frota-app .fr-k{border:1px solid var(--line);border-radius:10px;padding:8px 10px;border-left:4px solid var(--kc,var(--line))}
-.frota-app .fr-k b{display:block;font-size:22px;line-height:1.1}
-.frota-app .fr-k.fr-w{grid-column:1/-1}
-.frota-app .fr-fl{margin-bottom:8px}
-.frota-app .fr-fl>div{font-size:11px;color:var(--mut);margin-bottom:3px}
-.frota-app .fr-ch{display:flex;flex-wrap:wrap;gap:4px}
-.frota-app .fr-ch button{font:inherit;font-size:12px;padding:3px 8px;border-radius:99px;border:1px solid var(--line);background:none;color:var(--ink);cursor:pointer;text-transform:none;letter-spacing:normal}
-.frota-app .fr-ch button.on{background:var(--ink);color:var(--card);border-color:var(--ink)}
-.frota-app .fr-main{display:flex;flex-direction:column;gap:14px;min-width:0}
-.frota-app .fr-g{display:grid;grid-template-columns:repeat(auto-fit,minmax(310px,1fr));gap:14px}
-.frota-app .fr-wide{grid-column:1/-1}
-.frota-app .fr-hero{border-left:5px solid var(--k2)}
-.frota-app .fr-r{display:grid;grid-template-columns:92px 1fr;gap:8px;align-items:center;margin:3px 0;font-size:12px}
-.frota-app .fr-r.fr-a span:first-child{font-weight:700}
-.frota-app .fr-w{display:flex;align-items:center;min-width:0}
-.frota-app .fr-s{display:flex;height:16px;border-radius:3px;overflow:hidden}
-.frota-app .fr-s i{display:block;font-style:normal}
-.frota-app .fr-w em{font-style:normal;margin-left:6px;font-size:11px;color:var(--mut);white-space:nowrap}
-.frota-app .fr-lg{display:flex;flex-wrap:wrap;gap:10px;font-size:11px;color:var(--mut);margin-bottom:8px}
-.frota-app .fr-lg u{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:4px;text-decoration:none}
-.frota-app .fr-cols{display:flex;align-items:flex-end;gap:3px;height:150px}
-.frota-app .fr-cols>div{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;font-size:9px;color:var(--mut)}
-.frota-app .fr-cols .fr-st{display:flex;flex-direction:column-reverse;width:100%;justify-content:flex-start;flex:none}
-.frota-app .fr-cols .fr-st i{display:block;font-style:normal}
-.frota-app .fr-dn{display:flex;align-items:center;gap:12px}
-.frota-app .fr-dn svg{flex:none;width:110px;height:110px}
-.frota-app .fr-dn ul{list-style:none;margin:0;padding:0;font-size:12px}
-.frota-app .fr-dn li{margin:2px 0}
-.frota-app .fr-note{background:color-mix(in srgb,var(--a) 12%,transparent);border:1px solid var(--a);border-radius:10px;padding:8px 10px;font-size:12px;margin-bottom:10px}
-.frota-app .fr-sc{max-height:430px;overflow:auto}
-.frota-app .fr-mxhead{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap;margin:4px 0 8px}
-.frota-app .fr-mxhead .fr-mxl{font-size:10px;color:var(--mut);letter-spacing:.08em}
-.frota-app .fr-mxhead b{display:block;font-size:22px;line-height:1.1}
-.frota-app .fr-mxctl{display:flex;flex-direction:column;align-items:flex-end;gap:6px}
-.frota-app .fr-seg{display:flex;border:1px solid var(--line);border-radius:99px;overflow:hidden}
-.frota-app .fr-seg button,.frota-app .fr-ic{font:inherit;font-size:11px;padding:4px 10px;border:0;background:none;color:var(--ink);cursor:pointer;letter-spacing:.04em;text-transform:none}
-.frota-app .fr-seg button+button{border-left:1px solid var(--line)}
-.frota-app .fr-seg button.on{background:var(--ink);color:var(--card)}
-.frota-app .fr-ics{display:flex;gap:4px}
-.frota-app .fr-ic{border:1px solid var(--line);border-radius:6px;padding:4px 7px;line-height:0}
-.frota-app .fr-ic svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.8}
-.frota-app .fr-dimsel{display:flex;flex-wrap:wrap;gap:4px;align-items:center;margin-bottom:6px;font-size:11px;color:var(--mut)}
-.frota-app .fr-dimsel button{font:inherit;font-size:12px;padding:3px 8px;border-radius:99px;border:1px solid var(--line);background:none;color:var(--ink);cursor:pointer;text-transform:none;letter-spacing:normal}
-.frota-app .fr-dimsel button.on{background:var(--ink);color:var(--card);border-color:var(--ink)}
-.frota-app .fr-mxs{overflow-x:auto;padding:2px 0 6px}
-.frota-app table.fr-mxt{border-collapse:separate;border-spacing:2px;margin:0 90px 0 0}
-.frota-app .fr-mxt th,.frota-app .fr-mxt td{padding:0;font-weight:400}
-.frota-app .fr-mxt th.fr-rot{position:relative;height:128px;min-width:40px;vertical-align:bottom}
-.frota-app .fr-mxt th.fr-rot>div{position:absolute;left:50%;bottom:2px;transform-origin:0 100%;transform:rotate(-45deg);white-space:nowrap;font-size:11px;color:var(--ink);text-align:left}
-.frota-app .fr-mxt th.fr-rot.fr-tt>div{font-weight:700}
-.frota-app .fr-mxt th.fr-rl{text-align:right;padding-right:8px;font-size:12px;white-space:nowrap;max-width:190px;overflow:hidden;text-overflow:ellipsis}
-.frota-app .fr-mxt td{height:32px;min-width:40px;text-align:center;font-size:12px;border-radius:3px}
-.frota-app .fr-mxt td.fr-z{background:color-mix(in srgb,var(--ink) 4%,var(--card))}
-.frota-app .fr-mxt td.fr-t{background:color-mix(in srgb,var(--ink) 8%,var(--card));font-weight:700}
-.frota-app .fr-card.fr-fs{position:fixed;top:0;right:0;bottom:0;left:0;z-index:2000;border-radius:0;overflow:auto;max-height:none}
-.frota-app .fr-ins{font-size:12px;margin:0 0 8px}
-@media(max-width:860px){.frota-app{grid-template-columns:minmax(0,1fr);padding:12px}.frota-app .fr-side{position:static;max-height:none}}
 .modulo-check{display:flex;align-items:center;gap:8px;background:var(--paper);padding:7px 10px;min-width:0;font-family:'IBM Plex Mono',monospace;font-size:var(--fs-ui-sm);color:var(--carvao);cursor:pointer}
 .modulo-check input{flex:none;width:16px;height:16px;accent-color:var(--tinta)}
 .modulo-check input:disabled{cursor:not-allowed}
@@ -631,7 +564,7 @@ body{background:var(--paper);color:var(--carvao);font-family:'IBM Plex Sans',san
 @media(prefers-reduced-motion:reduce){.toast{animation:none}}
 .modal-fundo{position:fixed;inset:0;z-index:9100;background:rgba(4,6,10,.72);display:flex;align-items:center;justify-content:center;padding:20px}
 .modal-caixa{background:var(--surface);border-top:4px solid var(--terracota);max-width:460px;width:100%;padding:22px 24px;box-shadow:var(--shadow-md)}
-.modal-caixa h3{font-family:'Space Grotesk',sans-serif;	font-size:var(--fs-subtitulo);margin:10px 0 8px}
+.modal-caixa h3{font-family:'Spectral',sans-serif;	font-size:var(--fs-subtitulo);margin:10px 0 8px}
 .modal-caixa p{font-family:'IBM Plex Mono',monospace;font-size:var(--fs-ui-sm);line-height:1.55;color:#9AA3B2;margin-bottom:6px}
 .modal-caixa .modal-alvo{color:var(--carvao);font-weight:700;word-break:break-word}
 .modal-caixa .modal-selo{width:34px;height:34px;opacity:.85}
@@ -818,6 +751,175 @@ select:focus-visible,input:focus-visible{
   .hub::before,.hub .anel-vivo{animation:none}
   .voltar,.btn-exportar-xlsx,.btn-exportar-pbi,.kpi-card,.hub-node .dot{transition:none}
 }
+/* =====================================================================
+   TEMA V2 — manual anticliché (outubro de 2026)
+   Camada final: reescreve o que existia sem tocar nos componentes.
+   Regras: canto vivo, sem sombra com borrão, sem gradiente, sem barra de
+   cor lateral, borda sólida de 1 a 2px, cor só para estado, hover só troca
+   o fundo, foco com contorno visível. A bússola da tela inicial fica como
+   estava (decisão da Cíntia: é a peça mais trabalhada).
+   ===================================================================== */
+:root{
+  --paper:#111819;--surface:#172021;--paper-line:#2B3839;--carvao:#E4EBE9;
+  --tinta:#7FB2D1;--tinta-glow:rgba(127,178,209,.16);
+  --terracota:#E0745C;--terracota-glow:rgba(224,116,92,.16);
+  --mostarda:#D9A441;--mostarda-glow:rgba(217,164,65,.18);
+  --radius-sm:0;--radius-md:0;
+  --shadow-xs:none;--shadow-sm:none;--shadow-md:none;--shadow-inset:none;
+}
+*,*::before,*::after{border-radius:0!important;box-shadow:none!important;text-shadow:none!important}
+.hub-node .dot,.hub-node .dot *{border-radius:50%!important}
+.hub-node .dot{box-shadow:0 0 18px -4px var(--node-glow,transparent)!important}
+.hub-node:hover .dot{box-shadow:0 0 34px -2px var(--node-glow,transparent)!important}
+body::before{display:none}
+.mira-cantos,.topbar::after{display:none}
+.hero-fundo::before,.hero-fundo::after{display:none}
+.hero-emblem{filter:none}
+html body .busca-lista,html body .modal-caixa,html body .toast,html body .pop{box-shadow:8px 8px 0 #000!important}
+
+/* topo */
+.topbar{position:sticky!important;top:0;z-index:80!important;border-bottom:2px solid var(--carvao);padding:12px 28px;box-shadow:none}
+.topbar .brand-text{letter-spacing:.14em;font-size:var(--fs-ui-xs);color:#8B93A3;text-transform:uppercase}
+.topbar .brand-text b{font-family:'Spectral',serif;font-size:1.35rem;letter-spacing:0;color:var(--carvao);text-transform:none}
+.topbar .brand svg{filter:none!important;transform:none!important}
+.topbar .voltar{font-family:'Archivo',sans-serif;font-weight:600;font-size:var(--fs-ui);letter-spacing:0;text-transform:none;background:transparent;color:var(--carvao);border:2px solid var(--carvao);padding:7px 14px}
+.topbar .voltar:hover{background:var(--paper-line)}
+#voltar-btn,#voltar-btn.show{display:none!important}
+.migalhas{max-width:1600px;margin:0 auto;padding:14px 32px 0;display:flex;flex-wrap:wrap;gap:6px;font-family:'IBM Plex Mono',monospace;font-size:var(--fs-ui-sm);letter-spacing:.08em;text-transform:uppercase;color:#8B93A3;position:relative;z-index:2}
+.migalhas[hidden]{display:none}
+.migalhas a{color:inherit;text-decoration:none;cursor:pointer}
+.migalhas a:hover{background:var(--paper-line)}
+.migalhas [aria-current]{color:var(--carvao)}
+.topo-busca-wrap .busca-lista{left:auto;right:0;width:min(560px,92vw)}
+
+/* botões: retângulo de canto vivo, borda de 2px, fundo transparente; ativo inverte */
+.voltar,.btn-exportar-xlsx,.btn-exportar-pbi,.btn-secundario,.btn-perigo,.dash-toggle-btn,.tab-btn{
+  clip-path:none!important;transform:none!important;filter:none!important;
+  background:transparent;color:var(--carvao);border:2px solid var(--carvao);
+  transition:background .12s ease,color .12s ease;
+}
+.voltar:hover,.btn-exportar-xlsx:hover,.btn-exportar-pbi:hover,.btn-secundario:hover,.btn-perigo:hover,.dash-toggle-btn:hover,.tab-btn:hover{background:var(--paper-line);color:var(--carvao);transform:none!important}
+.btn-primario{clip-path:none!important;background:var(--carvao);color:var(--paper);border:2px solid var(--carvao);transition:background .12s ease}
+.btn-primario:hover{background:var(--tinta);border-color:var(--tinta);color:var(--paper)}
+.btn-perigo{border-color:var(--terracota);color:var(--terracota)}
+.dash-toggle-btn.active,.tab-btn.active,.voltar.active{background:var(--carvao);color:var(--paper)}
+.dash-toggle{display:inline-flex;flex-wrap:wrap;border:0;overflow:visible}
+.dash-toggle .dash-toggle-btn{margin-left:-2px}
+.dash-toggle .dash-toggle-btn:first-child{margin-left:0}
+.tabs{display:flex;flex-wrap:wrap;gap:0;border-bottom:2px solid var(--carvao);padding-bottom:0}
+.tab-btn{top:0!important;padding:9px 16px;margin-left:-2px;margin-bottom:-2px}
+.tabs .tab-btn:first-child{margin-left:0}
+.tab-btn.active{padding-bottom:9px}
+.tab-btn svg{display:none}
+
+/* campos */
+.dash-filtro select,.dash-filtro input[type="text"],.dash-filtro input[type="date"],.dash-filtro input[type="email"],.dash-filtro input[type="password"],input[type="file"],input[type="text"],input[type="number"],select{
+  border:2px solid var(--carvao);background:var(--surface);color:var(--carvao)
+}
+.dash-filtro select:hover,.dash-filtro select:focus,.dash-filtro input:hover,.dash-filtro input:focus{border-color:var(--tinta)}
+
+/* cartões e quadros: sem caixa; separação por filete */
+.dash-chart-box,.projeto-card,.dado{background:transparent;border:0;border-top:1px solid var(--paper-line);padding:16px 0}
+.dash-chart-box:hover,.projeto-card:hover{border-color:var(--paper-line)}
+.dash-chart-box h4{padding-left:0;font-family:'Spectral',serif;font-weight:700}
+.dash-chart-box h4::before{display:none}
+.dash-filtros{background:transparent;border:0;border-top:1px solid var(--paper-line);padding:14px 0}
+.dash-tabela{background:transparent;border:2px solid var(--carvao)}
+.dash-tabela th{background:var(--surface);color:var(--carvao);border-color:var(--paper-line)}
+.dash-chart-hint{background:transparent;border:0;border-top:1px solid var(--paper-line);padding:10px 0 0;color:#9AA3B2}
+.kpi-row{gap:0}
+.kpi-card{background:transparent;border:0;border-right:1px solid var(--paper-line);padding:4px 20px 10px 0;margin-right:20px}
+.kpi-card:last-child{border-right:0}
+.kpi-card:hover{background:var(--paper-line);transform:none}
+.kpi-icone,.kpi-cabeca>svg{display:none}
+.kpi-value{font-family:'Spectral',serif;font-weight:700;font-variant-numeric:lining-nums tabular-nums}
+.kpi-card[data-resumo-status="Vencido"] .kpi-value{color:var(--crit-vencido-texto,#F0735A);font-size:3rem}
+.kpi-card[data-resumo-status="A Vencer"] .kpi-value{color:var(--mostarda);font-size:3rem}
+.kpi-delta{background:transparent!important;padding:0}
+.unidade-gestora-btn{flex-direction:row;gap:8px;padding:6px 14px;min-width:0;background:transparent;border:2px solid var(--carvao);margin-left:-2px;transform:none!important}
+.unidade-gestora-btn:hover{background:var(--paper-line);border-color:var(--carvao)}
+.unidade-gestora-btn.active{background:var(--carvao);color:var(--paper);border-color:var(--carvao)}
+.unidade-gestora-btn.active .unidade-gestora-qtd{color:var(--paper)}
+.unidade-gestora-icone{display:none}
+#contratos-filtro-unidade-gestora{gap:0!important}
+.tag{background:transparent;border:1px solid currentColor;color:#9AA3B2}
+.tag-exemplo{background:transparent;color:var(--mostarda)}
+
+/* cabeçalho das telas */
+.tela-head{border-bottom:2px solid var(--carvao)}
+.tela-head .icon-grande,.tela-head .mini-rosa{display:none}
+.tela-head h2{font-family:'Spectral',serif;font-weight:700}
+.intro .eyebrow{color:#8B93A3}
+footer{border-top:2px solid var(--carvao)}
+.toast{border:2px solid var(--tinta)!important}
+.toast.erro{border-color:var(--terracota)!important}
+.toast.sucesso{border-color:var(--carvao)!important}
+.toast.aviso{border-color:var(--mostarda)!important}
+details.painel-detalhes,[style*="border-left:3px"],[style*="border-left: 3px"]{border-left:0!important}
+details.painel-detalhes{border:1px solid var(--paper-line)!important}
+.cfx-row.active{background:var(--paper-line)}
+/* ---------- peças V2: manchete, nota de margem, barra de situação, grupos ---------- */
+.cab-v2{margin:6px 0 18px}
+.rot-v2{font-family:'IBM Plex Mono',monospace;font-size:var(--fs-ui-sm);letter-spacing:.14em;text-transform:uppercase;color:#8B93A3}
+.tit-v2{font-family:'Spectral',serif;font-weight:700;font-size:clamp(1.55rem,3.1vw,2.3rem);line-height:1.15;max-width:36ch;margin-top:8px;color:var(--carvao)}
+.nota-v2{display:grid;grid-template-columns:132px minmax(0,1fr);gap:0 22px;padding:15px 0;border-top:1px solid var(--paper-line)}
+.nota-v2>.k{font-family:'IBM Plex Mono',monospace;font-size:11px;line-height:1.5;letter-spacing:1.5px;text-transform:uppercase;text-align:right;color:#8B93A3;padding-top:5px}
+.nota-v2>.v{min-width:0}
+.nota-v2 h3{font-family:'Spectral',serif;font-weight:700;font-size:1.1rem;line-height:1.3;color:var(--carvao)}
+.v2-pilha{position:relative;padding:26px 0}
+.v2-pilha-barra{display:flex;height:46px;border:2px solid var(--carvao)}
+.v2-pilha-barra button{display:flex;align-items:center;padding:0 10px;min-width:3px;overflow:hidden;white-space:nowrap;font-family:'IBM Plex Mono',monospace;font-size:var(--fs-ui);border:0;cursor:pointer}
+.v2-pilha-barra button[disabled]{cursor:default}
+.v2-pilha-barra button b{font-family:'Archivo',sans-serif;font-size:.95rem;margin-left:8px}
+.v2-pilha-barra button:not([disabled]):hover{outline:2px solid var(--tinta);outline-offset:-4px}
+.v2-fora{position:absolute;white-space:nowrap;font-family:'IBM Plex Mono',monospace;font-size:var(--fs-ui-sm);color:var(--carvao)}
+.v2-fora.cima{top:0}.v2-fora.baixo{bottom:0}
+.v2-fora::after{content:"";position:absolute;left:var(--ax,0);width:1px;background:var(--carvao);height:11px}
+.v2-fora.cima::after{top:15px}.v2-fora.baixo::after{bottom:15px}
+.tabs-em-grupos{display:none!important}
+.grupos-v2 .cab-outros-v2{border-top:2px solid var(--carvao);padding-top:14px;margin:30px 0 6px}
+.grupos-v2 .cab-outros-v2 h2{font-family:'Spectral',serif;font-weight:700;font-size:1.25rem}
+.grupo-cab-v2{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;flex-wrap:wrap}
+.grupo-cab-v2 .dash-toggle-btn{padding:4px 12px}
+.grupo-corpo-v2{padding-top:10px}
+.grupo-corpo-v2>.tab-panel{padding-top:6px}
+.grupo-v2.aberto{background:transparent}
+.alerta-vencimento{border:0!important;border-top:1px solid var(--paper-line)!important;background:transparent!important;margin-bottom:12px}
+.alerta-vencimento summary{padding:12px 0;font-family:'Spectral',serif;font-size:1.1rem;display:block}
+.alerta-vencimento summary::before{display:inline-block;margin-right:8px}
+.alerta-vencimento summary svg{display:none}
+.alerta-vencimento .corpo{padding:0 0 12px}
+#contratos-resumo-rapido .kpi-row:first-of-type{display:flex;flex-wrap:wrap}
+#contratos-resumo-rapido .kpi-row:first-of-type .kpi-card{flex:1 1 150px}
+#contratos-resumo-rapido .kpi-card[data-resumo-status="Vencido"]{order:-3;flex:2 1 230px}
+#contratos-resumo-rapido .kpi-card[data-resumo-status="A Vencer"]{order:-2;flex:2 1 230px}
+@media (max-width:760px){.nota-v2{grid-template-columns:1fr;gap:4px 0}.nota-v2>.k{text-align:left;padding-top:0}}
+/* ---------- Painel de Frota (tema V2) ---------- */
+.hoje-v2{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:0}
+.hoje-v2 button{text-align:left;padding:2px 22px 8px 0;margin-right:22px;border:0;border-right:1px solid var(--paper-line);background:transparent;color:var(--carvao);cursor:pointer;font-family:inherit}
+.hoje-v2 button:last-child{border-right:0}
+.hoje-v2 button:hover{background:var(--paper-line)}
+.hoje-v2 .n{font-family:'Spectral',serif;font-weight:700;font-size:3rem;line-height:1;font-variant-numeric:lining-nums tabular-nums}
+.hoje-v2 .l{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.12em;text-transform:uppercase;margin-top:4px}
+.hoje-v2 .s{font-family:'IBM Plex Mono',monospace;font-size:12px;color:#8B93A3;margin-top:2px}
+.v2-lin{display:grid;grid-template-columns:minmax(80px,30%) minmax(0,1fr) auto;gap:10px;align-items:center;padding:3px 4px;font-size:var(--fs-corpo);width:100%}
+.v2-lin-r{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.v2-lin-t{height:16px;display:flex}
+.v2-lin-b{display:flex;height:16px;min-width:2px}
+.v2-lin-b b{display:block;min-width:2px;overflow:hidden;font:500 10px/16px 'IBM Plex Mono',monospace;padding-left:5px;white-space:nowrap}
+.v2-lin-v{font-family:'IBM Plex Mono',monospace;font-size:11px;color:#9AA3B2;white-space:nowrap}
+.v2-mx-rol{overflow-x:auto;padding-bottom:6px}
+table.v2-mx{border-collapse:separate;border-spacing:2px;margin-right:90px}
+table.v2-mx th,table.v2-mx td{padding:0;font-weight:400}
+table.v2-mx th.rot{position:relative;height:122px;min-width:38px;vertical-align:bottom}
+table.v2-mx th.rot>div{position:absolute;left:50%;bottom:2px;transform-origin:0 100%;transform:rotate(-45deg);white-space:nowrap;font:500 11px 'Archivo',sans-serif;color:var(--carvao)}
+table.v2-mx th.rl{text-align:right;padding-right:8px;font-size:12px;white-space:nowrap;max-width:190px;overflow:hidden;text-overflow:ellipsis;color:var(--carvao)}
+table.v2-mx td{height:30px;min-width:38px;text-align:center;font:500 12px 'IBM Plex Mono',monospace}
+table.v2-mx td.z{background:var(--paper-line)}
+table.v2-mx td.t{background:var(--paper-line);font-weight:600;color:var(--carvao)}
+.frota-ctl{display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center;margin-bottom:12px}
+.frota-ctl label{display:flex;gap:8px;align-items:center;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#8B93A3}
+.frota-v2 .vazio-v2{color:#8B93A3;padding:10px 0;font-size:var(--fs-corpo)}
 </style>
 </head>
 <body>
@@ -841,12 +943,14 @@ select:focus-visible,input:focus-visible{
       <div class="busca-lista" id="lista-topo" role="listbox" hidden></div>
     </div>
     <span id="usuario-badge" class="font-mono" style="font-size:var(--fs-ui-sm);color:#9AA3B2;display:none"></span>
-    <button class="voltar show" id="btn-abrir-usuarios" style="margin-right:8px;display:none"><span style="display:inline-flex;width:14px;height:14px;vertical-align:-3px;flex:none"><svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="square" stroke-linejoin="miter" xmlns="http://www.w3.org/2000/svg"><circle cx="32" cy="18" r="10" /><path d="M 12 56 A 20 20 0 0 1 52 56" /></svg></span> ACESSOS</button>
-    <button class="voltar show" id="btn-abrir-upload" style="margin-right:8px;background:var(--tinta,#22D3EE);display:none"><span style="display:inline-flex;width:14px;height:14px;vertical-align:-3px;flex:none"><svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="square" stroke-linejoin="miter" xmlns="http://www.w3.org/2000/svg"><polyline points="18,24 32,8 46,24" /><line x1="32" y1="8" x2="32" y2="42" /><line x1="12" y1="54" x2="52" y2="54" /></svg></span> SUBIR PLANILHA</button>
-    <button class="voltar" id="btn-sair" style="display:none">SAIR</button>
+    <button class="voltar show" id="btn-abrir-usuarios" style="display:none">Acessos</button>
+    <button class="voltar show" id="btn-abrir-upload" style="display:none">Subir planilha</button>
+    <button class="voltar" id="btn-sair" style="display:none">Sair</button>
     <button class="voltar" id="voltar-btn">← VOLTAR AO PORTAL</button>
   </div>
 </div>
+
+<nav class="migalhas" id="migalhas" aria-label="Onde você está" hidden></nav>
 
 <section id="tela-login">
   <div class="hero-fundo">
@@ -1401,7 +1505,7 @@ function pieChartSVG(categorias, selectedLabel, opcoes = {}) {
   const totalPorExtenso = total.toLocaleString("pt-BR");
   const totalTexto = formatarCentro ? formatarCentro(total) : (totalPorExtenso.length <= 9 ? totalPorExtenso : formatarEixo(total));
   const totalFontSize = totalTexto.length <= 5 ? 22 : totalTexto.length <= 7 ? 17 : 13;
-  const totalMeio = `<text x="${cx}" y="${(cy - 3).toFixed(1)}" text-anchor="middle" font-family="'Space Grotesk',sans-serif" font-size="${totalFontSize}" font-weight="700" fill="var(--carvao)"><title>${escapeHTML(formatarValor(total))}</title>${escapeHTML(totalTexto)}</text><text x="${cx}" y="${(cy + 13).toFixed(1)}" text-anchor="middle" font-family="monospace" font-size="7.5" letter-spacing="1.5" fill="var(--carvao)" fill-opacity="0.6">TOTAL</text>`;
+  const totalMeio = `<text x="${cx}" y="${(cy - 3).toFixed(1)}" text-anchor="middle" font-family="'Spectral',sans-serif" font-size="${totalFontSize}" font-weight="700" fill="var(--carvao)"><title>${escapeHTML(formatarValor(total))}</title>${escapeHTML(totalTexto)}</text><text x="${cx}" y="${(cy + 13).toFixed(1)}" text-anchor="middle" font-family="monospace" font-size="7.5" letter-spacing="1.5" fill="var(--carvao)" fill-opacity="0.6">TOTAL</text>`;
   return `<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">${fatias}${rotulosFatia}${totalMeio}</svg><div class="donut-legenda">${legenda}</div>`;
 }
 
@@ -2191,12 +2295,12 @@ const DESTINOS_BUSCA = [
   { id: "o-man", tipo: "Quantidades", t: "Ordens de manutenção das unidades", kw: "manutencao ordens ordem reparo unidades quantas", portal: "infraestrutura", sub: "obras", aba: ["obras", "manutencao"] },
   { id: "o-ceirf", tipo: "Quantidades", t: "Intervenções do CEIRF", kw: "ceirf intervencoes intervencao obras", portal: "infraestrutura", sub: "obras", aba: ["obras", "ceirf"] },
   // Frota
-  { id: "f-dep", tipo: "Quantidades", t: "Quantas viaturas cada departamento tem", kw: "quantos quantas viaturas veiculos carros departamento departamentos frota", portal: "frota", sub: "frota", titulo: "Veículos por departamento" },
-  { id: "f-prop", tipo: "Quantidades", t: "Veículos próprios, alugados e cedidos", kw: "proprios alugados cedidos locados propriedade viaturas", portal: "frota", sub: "frota", titulo: "Propriedade" },
-  { id: "f-reg", tipo: "Onde estão", t: "Onde estão as viaturas, por região", kw: "onde estao viaturas veiculos regiao capital interior rms localizacao", portal: "frota", sub: "frota", titulo: "Região" },
-  { id: "f-mod", tipo: "Quantidades", t: "Modelos de veículos da frota", kw: "modelos modelo marca ranger spin onix tipo veiculos matriz", portal: "frota", sub: "frota", titulo: "Modelos da frota" },
-  { id: "f-ano", tipo: "Prazos", t: "Ano de fabricação e de entrega dos veículos", kw: "prazos ano fabricacao entrega idade antigos veiculos quando", portal: "frota", sub: "frota", titulo: "Ano de fabricação × ano de entrega" },
-  { id: "f-adm", tipo: "Situação", t: "Descaracterizados nas unidades administrativas", kw: "descaracterizados caracterizados administrativas alugados viaturas", portal: "frota", sub: "frota", titulo: "Descaracterizados nas unidades administrativas" }
+  { id: "f-dep", tipo: "Quantidades", t: "Quantas viaturas cada departamento tem", kw: "quantos quantas viaturas veiculos carros departamento departamentos frota", portal: "frota", sub: "frota", grupo: "dep", ancoraSel: "#frota-g-dep" },
+  { id: "f-prop", tipo: "Quantidades", t: "Veículos próprios, alugados e cedidos", kw: "proprios alugados cedidos locados propriedade viaturas", portal: "frota", sub: "frota", ancoraSel: "#frota-situacao" },
+  { id: "f-reg", tipo: "Onde estão", t: "Onde estão as viaturas, por região", kw: "onde estao viaturas veiculos regiao capital interior rms localizacao", portal: "frota", sub: "frota", grupo: "reg", ancoraSel: "#frota-g-reg" },
+  { id: "f-mod", tipo: "Quantidades", t: "Modelos de veículos da frota", kw: "modelos modelo marca ranger spin onix tipo veiculos matriz", portal: "frota", sub: "frota", grupo: "mod", ancoraSel: "#frota-g-mod" },
+  { id: "f-ano", tipo: "Prazos", t: "Ano de fabricação e de entrega dos veículos", kw: "prazos ano fabricacao entrega idade antigos veiculos quando", portal: "frota", sub: "frota", grupo: "ano", ancoraSel: "#frota-g-ano" },
+  { id: "f-adm", tipo: "Situação", t: "Descaracterizados nas unidades administrativas", kw: "descaracterizados caracterizados administrativas alugados viaturas", portal: "frota", sub: "frota", grupo: "adm", ancoraSel: "#frota-g-adm" }
 ];
 const destinoDisponivel = (d) => PORTAIS.some((p) => p.id === d.portal) && (!d.sub || subportaisDe(d.portal).some((sp) => sp.tab === d.sub));
 const ROTULO_SUB_BUSCA = { contratos: "Contratos", cfcr: "Termos de cooperação", "cfcr-acordos": "Acordos congêneres", obras: "Obras e manutenção", frota: "Frota de viaturas" };
@@ -2256,6 +2360,7 @@ async function irParaInformacao(d) {
     if (b) { if (!b.classList.contains("active")) b.click(); }
   }
   if (d.antes) { await esperarAte(() => telaConteudo.querySelector(".unidade-gestora-btn, [data-subtab-contratos]")); d.antes(); }
+  if (d.grupo) { await esperarAte(() => window.__frotaAbrirGrupo); window.__frotaAbrirGrupo?.(d.grupo); }
   let alvo = null;
   if (d.titulo) alvo = await esperarAte(() => acharTituloNaTela(d.titulo));
   else if (d.ancoraSel) alvo = await esperarAte(() => { const e = telaConteudo.querySelector(d.ancoraSel); return e && e.offsetParent !== null ? e : null; }, 6000);
@@ -2786,7 +2891,7 @@ function templateProjetoEdicao(proj) {
   proj = proj || {};
   return `
     <div class="projeto-card projeto-edicao" data-id="${proj.id || ""}">
-      <input type="text" class="input-titulo" placeholder="Título do projeto" value="${escapeAttr(proj.titulo)}" style="${CAMPO_STYLE};margin-bottom:6px;font-family:'Space Grotesk',sans-serif;font-size:var(--fs-lead)">
+      <input type="text" class="input-titulo" placeholder="Título do projeto" value="${escapeAttr(proj.titulo)}" style="${CAMPO_STYLE};margin-bottom:6px;font-family:'Spectral',sans-serif;font-size:var(--fs-lead)">
       <textarea class="input-texto" placeholder="Descrição" rows="2" style="${CAMPO_STYLE};margin-bottom:6px">${escapeHTML(proj.texto)}</textarea>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px">
         <input type="text" class="input-status" placeholder="Status (ex: Em execução)" value="${escapeAttr(proj.status)}" style="${CAMPO_STYLE}">
@@ -2800,7 +2905,7 @@ function templateProjetoEdicao(proj) {
   `;
 }
 
-const CAMPO_STYLE = "width:100%;background:var(--paper);color:var(--carvao);border:1px solid var(--paper-line);padding:6px;font-family:'IBM Plex Sans',sans-serif;font-size:var(--fs-ui);box-sizing:border-box";
+const CAMPO_STYLE = "width:100%;background:var(--paper);color:var(--carvao);border:1px solid var(--paper-line);padding:6px;font-family:'Archivo',sans-serif;font-size:var(--fs-ui);box-sizing:border-box";
 
 function renderProjetosEdicao(projetos) {
   const cards = (projetos || []).map(templateProjetoEdicao).join("");
@@ -5057,7 +5162,7 @@ function gaugeSVG(pct, corVar, tamanho = 112) {
       <circle cx="${cx}" cy="${cy}" r="${raio.toFixed(1)}" fill="none" stroke="${corVar}" stroke-width="10"
         stroke-linecap="round" stroke-dasharray="${preenchido.toFixed(1)} ${(perimetro - preenchido).toFixed(1)}"
         transform="rotate(135 ${cx} ${cy})" style="transition:stroke-dasharray .25s ease" />
-      <text x="${cx}" y="${(cy + tamanho * 0.02).toFixed(1)}" text-anchor="middle" font-family="'Space Grotesk',sans-serif" font-size="${tamanho * 0.19}" font-weight="700" fill="var(--carvao)">${p === null ? "—" : Math.round(p * 100) + "%"}</text>
+      <text x="${cx}" y="${(cy + tamanho * 0.02).toFixed(1)}" text-anchor="middle" font-family="'Spectral',sans-serif" font-size="${tamanho * 0.19}" font-weight="700" fill="var(--carvao)">${p === null ? "—" : Math.round(p * 100) + "%"}</text>
       <text x="${cx}" y="${(cy + tamanho * 0.17).toFixed(1)}" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="${tamanho * 0.07}" letter-spacing="1.5" fill="#9AA3B2">PRAZO</text>
     </svg>`;
 }
@@ -7314,7 +7419,7 @@ function renderTaticoContratos(lista) {
     </div>
     <div id="tat-busca-resultado"></div>
     <div class="kpi-row" style="margin-bottom:16px" id="tat-resumo"></div>
-    <h4 style="font-family:'Space Grotesk',sans-serif;font-size:var(--fs-subtitulo);margin-bottom:8px">Controle de Prazos</h4>
+    <h4 style="font-family:'Spectral',sans-serif;font-size:var(--fs-subtitulo);margin-bottom:8px">Controle de Prazos</h4>
     <div class="dash-toggle" id="tat-toggle-criticidade" style="margin-bottom:18px;flex-wrap:wrap">
       <button class="dash-toggle-btn active" data-crit="">SELECIONAR TUDO</button>
       ${ORDEM_CRITICIDADE.filter((l) => lista.some((c) => c.criticidade === l)).map((l) => `<button class="dash-toggle-btn" data-crit="${escapeAttr(l)}">${escapeHTML(l.toUpperCase())}</button>`).join("")}
@@ -7343,7 +7448,7 @@ function renderTaticoContratos(lista) {
         <div><h4 style="font-size:var(--fs-ui-sm);margin-bottom:6px">Fiscais</h4><div id="tat-risco-fiscais"></div></div>
       </div>
     </div>
-    <h4 style="font-family:'Space Grotesk',sans-serif;font-size:var(--fs-subtitulo);margin-bottom:8px">Detalhamento dos Contratos</h4>
+    <h4 style="font-family:'Spectral',sans-serif;font-size:var(--fs-subtitulo);margin-bottom:8px">Detalhamento dos Contratos</h4>
     <p class="font-mono" style="font-size:var(--fs-ui-sm);color:#8B93A3;margin-bottom:8px">Passe o mouse numa linha pra ver o detalhe rápido — clique pra abrir o panorama completo do contrato.</p>
     <div id="tat-chip-filtro"></div>
     <div style="text-align:right;margin-bottom:6px"><button type="button" class="dash-toggle-btn" id="tat-tabela-baixar" title="Baixar esta tabela como imagem">${iconeInline("download", 12, -2)} TABELA (PNG)</button></div>
@@ -7916,6 +8021,112 @@ function dicaLeituraContratosHTML() {
 // mais pesam?' e ela precisa responder na hora", sem abrir aba nem clicar
 // em gráfico. Isso é só leitura de propósito — não é outro filtro pra
 // aprender, é o retrato de 1 segundo antes de qualquer coisa.
+// =====================================================================
+// PEÇAS DO TEMA V2 — reaproveitadas pelos painéis
+// =====================================================================
+// Barra empilhada única: mostra a composição de um todo (ex.: situação dos
+// contratos). O nome fica colado no próprio segmento; segmento estreito leva
+// o nome para fora, ligado por um filete, como anotação de prancha.
+function v2Pilha(segs, { sel = null, acao = "" } = {}) {
+  const tot = segs.reduce((a, x) => a + x.n, 0) || 1;
+  let acum = 0, alt = 0, fora = "";
+  const pct = (n) => (n > 0 && n / tot < 0.005 ? "<1%" : Math.round(n / tot * 100) + "%");
+  const barra = segs.map((x) => {
+    const p = x.n / tot * 100, centro = acum + p / 2; acum += p;
+    const dentro = p >= 15;
+    if (!dentro && x.n > 0) {
+      const cima = (alt++ % 2) === 0, ancora = centro > 82 ? "right" : centro < 12 ? "left" : "center";
+      fora += `<span class="v2-fora ${cima ? "cima" : "baixo"}" style="left:${centro}%;transform:translateX(${ancora === "right" ? "-100%" : ancora === "left" ? "0" : "-50%"});--ax:${ancora === "right" ? "100%" : ancora === "left" ? "0" : "50%"}">${escapeHTML(x.l)} ${x.n.toLocaleString("pt-BR")} (${pct(x.n)})</span>`;
+    }
+    const clicavel = acao && x.k != null && !x.semAcao;
+    return `<button type="button" ${clicavel ? `data-v2-acao="${acao}" data-k="${escapeAttr(x.k)}"` : "disabled"} style="flex:${Math.max(x.n, 0.0001)};background:${x.bg};color:${x.fg}" aria-label="${escapeAttr(x.l)}: ${x.n}" title="${escapeAttr(x.l)}: ${x.n.toLocaleString("pt-BR")} (${pct(x.n)})">${dentro ? `${escapeHTML(x.l)}<b>${x.n.toLocaleString("pt-BR")}</b>` : ""}</button>`;
+  }).join("");
+  return `<div class="v2-pilha">${fora}<div class="v2-pilha-barra">${barra}</div></div>`;
+}
+
+// Abas viram grupos: a barra de abas some e cada aba passa a ser uma linha
+// ("Abrir"/"Fechar") com o tipo de informação na margem. Os botões originais
+// continuam sendo a fonte da verdade: abrir um grupo é clicar na aba de
+// sempre, então carregamento, filtros e "volta ao estado inicial ao sair"
+// funcionam como antes (um grupo aberto por vez). Quando outra parte do
+// sistema clica numa aba por conta própria (cartão que leva ao Gerencial,
+// busca), o grupo correspondente abre e a tela rola até ele.
+function abasComoGrupos(painel, { dataKey, painelSel, grupos, abertoInicial = null, titulo = "Outras informações deste painel" }) {
+  const btns = [...painel.querySelectorAll(`[data-${dataKey.replace(/[A-Z]/g, (c) => "-" + c.toLowerCase())}]`)];
+  if (!btns.length) return;
+  const barra = btns[0].closest(".tabs");
+  barra.classList.add("tabs-em-grupos");
+  const raiz = document.createElement("div");
+  raiz.className = "grupos-v2";
+  raiz.innerHTML = `<div class="cab-outros-v2"><h2>${escapeHTML(titulo)}</h2></div>`;
+  const itens = grupos.map((g) => {
+    const btn = btns.find((b) => b.dataset[dataKey] === g.k), pn = painel.querySelector(painelSel(g.k));
+    if (!btn || !pn) return null;
+    const sec = document.createElement("section");
+    sec.className = "nota-v2 grupo-v2";
+    sec.dataset.grupo = g.k;
+    sec.innerHTML = `<div class="k">${escapeHTML(g.tipo)}</div><div class="v"><div class="grupo-cab-v2"><h3></h3><button type="button" class="dash-toggle-btn" aria-expanded="false">Abrir</button></div><div class="grupo-corpo-v2"></div></div>`;
+    sec.querySelector("h3").textContent = g.titulo;
+    sec.querySelector(".grupo-corpo-v2").appendChild(pn);
+    raiz.appendChild(sec);
+    return { g, btn, pn, sec, h3: sec.querySelector("h3"), bt: sec.querySelector(".grupo-cab-v2 button") };
+  }).filter(Boolean);
+  barra.after(raiz);
+  let anterior = null;
+  const sincronizar = () => itens.forEach((it) => {
+    const aberto = !it.pn.hidden;
+    it.sec.classList.toggle("aberto", aberto);
+    it.bt.textContent = aberto ? "Fechar" : "Abrir";
+    it.bt.setAttribute("aria-expanded", String(aberto));
+    if (it.g.tituloDinamico) it.h3.textContent = it.g.tituloDinamico();
+  });
+  itens.forEach((it) => { it.pn.hidden = it.g.k !== abertoInicial; it.btn.classList.toggle("active", it.g.k === abertoInicial); });
+  anterior = itens.find((it) => !it.pn.hidden) || null;
+  sincronizar();
+  const mo = new MutationObserver(() => {
+    sincronizar();
+    const agora = itens.find((it) => !it.pn.hidden) || null;
+    if (agora && agora !== anterior) agora.sec.scrollIntoView?.({ behavior: "smooth", block: "start" });
+    anterior = agora;
+  });
+  itens.forEach((it) => mo.observe(it.pn, { attributes: true, attributeFilter: ["hidden"] }));
+  itens.forEach((it) => it.bt.addEventListener("click", () => {
+    if (!it.pn.hidden) { it.pn.hidden = true; it.btn.classList.remove("active"); } else it.btn.click();
+  }));
+  return { sincronizar };
+}
+
+// Manchete do painel de contratos: uma frase com o essencial, que muda com
+// o filtro de unidade.
+function renderCabecalhoContratos(lista, resumo, unidade) {
+  const alvo = document.getElementById("contratos-manchete"); if (!alvo) return;
+  const n = resumo.qtdContratos, valor = "R$ " + formatarMoedaCompacta(resumo.valorGlobalAtualTotal);
+  const quem = unidade ? ` da ${unidade}` : "";
+  const partes = [`${n.toLocaleString("pt-BR")} ${n === 1 ? "contrato" : "contratos"}${quem} ${n === 1 ? "soma" : "somam"} ${valor}.`];
+  const frases = [];
+  if (resumo.qtdAVencer) frases.push(`${resumo.qtdAVencer.toLocaleString("pt-BR")} ${resumo.qtdAVencer === 1 ? "vence" : "vencem"} em até 90 dias`);
+  if (resumo.qtdVencidos) frases.push(`${resumo.qtdVencidos.toLocaleString("pt-BR")} já ${resumo.qtdVencidos === 1 ? "venceu" : "venceram"}`);
+  if (frases.length) partes.push(frases.join(" e ") + ".");
+  alvo.textContent = partes.join(" ");
+}
+// Composição da carteira por situação. Só vencidos e a vencer recebem cor;
+// o restante fica neutro. Clicar num segmento com cor aciona o mesmo cartão
+// do resumo, que filtra o Gerencial.
+function renderSituacaoContratos(lista, resumo) {
+  const alvo = document.getElementById("contratos-v2-situacao"); if (!alvo) return;
+  const segs = [
+    { k: "NaoVencidoVigente", l: "Vigentes", n: resumo.qtdVigentes, bg: "#9AA5A7", fg: "#111819", semAcao: true },
+    { k: "A Vencer", l: "A vencer em 90 dias", n: resumo.qtdAVencer, bg: "var(--mostarda)", fg: "#111819" },
+    { k: "Vencido", l: "Vencidos", n: resumo.qtdVencidos, bg: "var(--terracota)", fg: "#111819" },
+    { k: "AContratar", l: "A contratar", n: resumo.qtdAContratar, bg: "#56625F", fg: "#E4EBE9", semAcao: true },
+  ].filter((x) => x.n > 0);
+  alvo.innerHTML = `<section class="nota-v2"><div class="k">Situação</div><div class="v"><h3>Situação dos ${resumo.qtdContratos.toLocaleString("pt-BR")} contratos</h3>${v2Pilha(segs, { acao: "situacao-contratos" })}</div></section>`;
+}
+document.addEventListener("click", (e) => {
+  const b = e.target.closest("[data-v2-acao='situacao-contratos']"); if (!b) return;
+  document.querySelector(`#contratos-resumo-rapido [data-resumo-status="${b.dataset.k}"]`)?.click();
+});
+
 function renderResumoRapido(lista, resumo) {
   const alvo = document.getElementById("contratos-resumo-rapido");
   if (!alvo) return;
@@ -7998,7 +8209,7 @@ function renderResumoRapido(lista, resumo) {
   }
 
   function desenhar() {
-    alvo.innerHTML = `<div class="dash-chart-box" style="margin-bottom:16px"><h4>Resumo Rápido</h4>${corpoHTML()}</div>`;
+    alvo.innerHTML = `<div class="dash-chart-box" style="margin-bottom:16px"><h4>Em resumo</h4>${corpoHTML()}</div>`;
     alvo.querySelector("#resumo-ranking-toggle").addEventListener("click", (ev) => {
       const btn = ev.target.closest("[data-modo]");
       if (!btn || btn.dataset.modo === modoRanking) return;
@@ -8116,7 +8327,7 @@ function renderAlertaVencimentoContratos(lista, porId, decisoesRenovacao = new M
   const partes = [
     vencidos.length ? `${vencidos.length} vencido${vencidos.length === 1 ? "" : "s"}` : "",
     aVencer.length ? `${aVencer.length} vencendo em até 90 dias` : "",
-  ].filter(Boolean).join(" · ");
+  ].filter(Boolean).join(" e ");
 
   const ordenados = [...vencidos, ...aVencer].sort((a, b) => (a.diasParaVencer ?? 1e9) - (b.diasParaVencer ?? 1e9));
 
@@ -8129,9 +8340,8 @@ function renderAlertaVencimentoContratos(lista, porId, decisoesRenovacao = new M
   const valorEmRisco = ordenados.reduce((a, c) => a + (c.valorGlobalAtual || 0), 0);
   const blocoUrgente = total
     ? `<details class="alerta-vencimento" style="--alerta-cor:${cor};--alerta-cor-glow:${corGlowVar}" open>
-        <summary>${iconeInline("alerta", 13, -2)} ${total} contrato${total === 1 ? "" : "s"} merece${total === 1 ? "" : "m"} atenção — <span title="${escapeAttr(formatarMoedaBR(valorEmRisco))}">R$ ${escapeHTML(formatarMoedaCompacta(valorEmRisco))} em risco</span> <span class="conta">— ${escapeHTML(partes)}</span></summary>
+        <summary>${total} contrato${total === 1 ? "" : "s"} ${total === 1 ? "pede" : "pedem"} atenção, com <span title="${escapeAttr(formatarMoedaBR(valorEmRisco))}">R$ ${escapeHTML(formatarMoedaCompacta(valorEmRisco))} em risco</span> <span class="conta">(${escapeHTML(partes)})</span></summary>
         <div class="corpo">
-          <p class="dash-chart-hint" style="margin:0 0 8px">Passe o mouse numa linha pra ver o detalhe rápido — clique pra abrir o panorama completo do contrato.</p>
           <div class="tabela-rolavel" style="max-height:280px" id="contratos-alerta-tabela"></div>
         </div>
       </details>`
@@ -8141,7 +8351,7 @@ function renderAlertaVencimentoContratos(lista, porId, decisoesRenovacao = new M
   // cabe mais aqui: já foi resolvido, só falta a planilha alcançar.
   const blocoJaRenovado = jaRenovados.length
     ? `<details class="alerta-vencimento" style="--alerta-cor:var(--crit-baixo);--alerta-cor-glow:var(--crit-baixo-glow)">
-        <summary>✓ ${jaRenovados.length} contrato${jaRenovados.length === 1 ? "" : "s"} já renovado${jaRenovados.length === 1 ? "" : "s"} <span class="conta">— aguardando a planilha atualizar</span></summary>
+        <summary>${jaRenovados.length} contrato${jaRenovados.length === 1 ? "" : "s"} já renovado${jaRenovados.length === 1 ? "" : "s"} <span class="conta">(aguardando a planilha atualizar)</span></summary>
         <div class="corpo">
           <p class="dash-chart-hint" style="margin:0 0 8px">A planilha-fonte ainda mostra estes como vencido/a vencer, mas já foram renovados de fato (marcado no Acompanhamento de Renovação, aba Operacional).</p>
           <div class="tabela-rolavel" style="max-height:280px" id="contratos-alerta-renovado-tabela"></div>
@@ -10871,11 +11081,12 @@ function criarMotorDimensoesPorValor(linhasTodas, dimensoes, campoRegiao) {
 }
 
 // =====================================================================
-// PAINEL DE FROTA — portal "frota". Reproduz o painel de origem (mesmos
-// indicadores, gráficos, filtros e cores). Os números vêm da API
+// PAINEL DE FROTA — portal "frota" (tema V2). Os números vêm da API
 // (/api/portais/frota/frota), atrás do login e do módulo "frota": o front é
-// público, então nada da frota fica embutido aqui. Todo o estado e as funções
-// ficam dentro de montarPainelFrota para não colidir com o resto do arquivo.
+// público, então nada da frota fica embutido aqui. Estado e funções ficam
+// dentro de montarPainelFrota para não colidir com o resto do arquivo.
+// Estrutura: manchete, filtros, Hoje (descaracterizados e alugados), barra de
+// propriedade e grupos de informação que abrem sob demanda.
 // =====================================================================
 async function carregarFrotaPortal(portalSlug) {
   const painel = document.getElementById("tab-frota");
@@ -10887,237 +11098,110 @@ async function carregarFrotaPortal(portalSlug) {
     painel.innerHTML = `<p class="tela-intro">Não consegui carregar o painel de frota: ${escapeHTML(erro.message)}</p>`;
     return;
   }
-  painel.innerHTML = `<div class="frota-app">
-    <aside class="fr-side">
-      <div class="fr-card"><h1>Frota PCBA</h1><div class="fr-m">Base: ${escapeHTML(dados.base || "")}</div></div>
-      <div class="fr-card"><h2>Indicadores</h2><div class="fr-kg" data-fr="kpi"></div></div>
-      <div class="fr-card"><h2>Filtros</h2><div data-fr="flt"></div><div class="fr-m">Filtros combinam entre si (E entre grupos, OU dentro do grupo). Não alteram o quadro vermelho nem a seção de dados parciais.</div></div>
-    </aside>
-    <main class="fr-main">
-      <section class="fr-card fr-hero"><h2>Descaracterizados nas unidades administrativas</h2><div class="fr-m" style="margin:-6px 0 8px">Unidades administrativas: GDG, DILOG, ACADEPOL, DGTI, ISPE, DEPAF, DPSV e OUVIDORIA. Não confundir com o veículo caracterizado ADM (símbolo do Estado).</div><div data-fr="hero"></div></section>
-      <section class="fr-g">
-        <div class="fr-card fr-wide"><h2>Veículos por departamento</h2><div class="fr-lg" data-fr="lgP"></div><div class="fr-sc" data-fr="dep"></div><div class="fr-m">Negrito = unidade administrativa (◆ nos filtros).</div></div>
-        <div class="fr-card"><h2>Caracterização</h2><div class="fr-dn" data-fr="dC"></div></div>
-        <div class="fr-card"><h2>Propriedade</h2><div class="fr-dn" data-fr="dP"></div></div>
-        <div class="fr-card"><h2>Região</h2><div class="fr-lg" data-fr="lgC"></div><div data-fr="reg"></div></div>
-        <div class="fr-card"><h2>Cela</h2><div class="fr-dn" data-fr="dX"></div></div>
-        <div class="fr-card"><h2>Tipo de veículo</h2><div data-fr="tip"></div></div>
-        <div class="fr-card fr-wide" data-fr="card-mod"><h2>Modelos da frota</h2><div class="fr-m">Os 14 modelos mais frequentes nos filtros escolhidos (o restante soma em “Outros modelos”). A marca foi acrescentada a partir do modelo; a planilha só informa o modelo.</div>
-          <div class="fr-dimsel" data-fr="mod-dim"></div>
-          <div class="fr-mxhead"><div><span class="fr-mxl">TOTAL GERAL</span><b data-fr="mod-tot"></b></div><div class="fr-mxctl" data-fr="mod-ctl"></div></div>
-          <div data-fr="mod-leg"></div><div class="fr-mxs" data-fr="mod"></div></div>
-        <div class="fr-card"><h2>Ano de fabricação</h2><div class="fr-m">Respeita apenas os filtros de caracterização e propriedade.</div><div class="fr-cols" data-fr="ano"></div></div>
-        <div class="fr-card fr-wide" data-fr="card-ae"><h2>Ano de fabricação × ano de entrega</h2><div class="fr-m">O ano que consta na planilha é o de fabricação, não o de entrega: um veículo fabricado em 2024 pode ter sido entregue em 2025. Aqui os dois lados a lado, respeitando todos os filtros.</div>
-          <p class="fr-ins" data-fr="ae-ins"></p>
-          <div class="fr-mxhead"><div><span class="fr-mxl">TOTAL GERAL</span><b data-fr="ae-tot"></b></div><div class="fr-mxctl" data-fr="ae-ctl"></div></div>
-          <div data-fr="ae-leg"></div><div class="fr-mxs" data-fr="ae"></div></div>
-      </section>
-      <section class="fr-card"><h2>Fonte do recurso, valor e entrega (dados parciais)</h2>
-        <div class="fr-note" data-fr="note"></div>
-        <div class="fr-g">
-          <div><div class="fr-m" style="margin-bottom:6px">Preenchimento da fonte do recurso, por propriedade</div><div data-fr="cov"></div></div>
-          <div><div class="fr-m" style="margin-bottom:6px">Investimento por fonte (R$ milhões, só veículos com registro)</div><div data-fr="fon"></div></div>
-          <div class="fr-wide"><div class="fr-m" style="margin-bottom:6px">Entregas por trimestre (só veículos com data)</div><div class="fr-cols" data-fr="qt"></div></div>
-        </div>
-      </section>
-    </main>
-  </div>`;
-  montarPainelFrota(painel.querySelector(".frota-app"), dados);
+  painel.innerHTML = `<div class="frota-v2"></div>`;
+  montarPainelFrota(painel.firstElementChild, dados);
 }
 
 function montarPainelFrota(raiz, DB) {
-  const { D, A, C, Y, S, TN } = DB;
-  const $ = (k) => raiz.querySelector(`[data-fr="${k}"]`);
-  const N = (n) => n.toLocaleString("pt-BR");
-  const CN = ["Caracterizado padrão", "Descaracterizado", "Caracterizado ADM"], PN = ["Próprio", "Alugado", "Cedido"], RN = ["Capital", "RMS", "Interior"], XN = ["Sem cela", "Com cela"];
-  const CC = ["var(--k1)", "var(--k2)", "var(--k3)"], PC = ["var(--p)", "var(--a)", "var(--c)"];
-  const F = { c: new Set(), p: new Set(), r: new Set(), x: new Set(), d: new Set() };
-  const FD = [["c", "Caracterização", CN, [["Todos os caracterizados", [0, 2]]]], ["p", "Propriedade", PN, []], ["r", "Região", RN, [["Capital + RMS", [0, 1]]]], ["x", "Cela", XN, []]];
-  const lg = (n, c) => n.map((x, i) => `<span><u style="background:${c[i]}"></u>${x}</span>`).join("");
-  const seg = (v, c) => `<div class="fr-s">${v.map((x, i) => x ? `<i style="flex:${x};background:${c[i]}" title="${x}"></i>` : "").join("")}</div>`;
-  const soma = (v) => v.reduce((a, b) => a + b, 0);
-  function rows(items, c, max) {
-    return items.map(([l, v, ex, isA]) => {
-      const t = soma(v);
-      return `<div class="fr-r ${isA ? "fr-a" : ""}"><span>${l}</span><div class="fr-w"><div style="width:${t / max * 80}%;min-width:2px">${seg(v, c)}</div><em>${N(t)}${ex ? " · " + ex : ""}</em></div></div>`;
-    }).join("");
-  }
-  function donut(el, names, vals, cols) {
-    const T = soma(vals) || 1, R = 40, Lc = 2 * Math.PI * R;
-    let o = 0;
-    const arcs = vals.map((v, i) => {
-      const d = v / T * Lc, a = `<circle r="${R}" cx="55" cy="55" fill="none" stroke="${cols[i]}" stroke-width="18" stroke-dasharray="${d} ${Lc - d}" stroke-dashoffset="${-o}" transform="rotate(-90 55 55)"/>`;
-      o += d;
-      return a;
-    }).join("");
-    $(el).innerHTML = `<svg viewBox="0 0 110 110">${arcs}<text x="55" y="60" text-anchor="middle" font-size="16" font-weight="700" fill="currentColor">${N(soma(vals))}</text></svg><ul>${names.map((n, i) => `<li><u style="display:inline-block;width:9px;height:9px;border-radius:2px;background:${cols[i]};margin-right:5px;text-decoration:none"></u>${n}: <b>${N(vals[i])}</b> <span class="fr-m">(${(vals[i] / T * 100).toFixed(0)}%)</span></li>`).join("")}</ul>`;
-  }
-  function colunas(el, items, c) {
-    const mx = Math.max(...items.map((x) => soma(x[1])));
-    $(el).innerHTML = items.map(([l, v]) => {
-      const t = soma(v);
-      return `<div title="${l}: ${t}"><span>${t}</span><div class="fr-st" style="height:${t / mx * 105}px">${v.map((x, i) => `<i style="height:${x / t * 100}%;background:${c[i]}"></i>`).join("")}</div><span>${l}</span></div>`;
-    }).join("");
-  }
-  const ok = (st, v) => !st.size || st.has(v);
-  const ag = (R, k, n) => { const a = Array(n).fill(0); R.forEach((r) => { a[r[k]] += r[6]; }); return a; };
+  const { D, A, M, V, TN } = DB;
+  const N = (n) => Math.round(n).toLocaleString("pt-BR");
+  const soma = (a) => a.reduce((x, y) => x + y, 0);
+  const pct = (a, b) => !b ? "0%" : a > 0 && a / b < .005 ? "<1%" : Math.round(a / b * 100) + "%";
+  const FN = { c: ["Caracterizado padrão", "Descaracterizado", "Caracterizado ADM"], p: ["Próprio", "Alugado", "Cedido"], r: ["Capital", "RMS", "Interior"] };
+  const COR_P = ["#9AA5A7", "var(--tinta)", "#56625F"], COR_P_T = ["#111819", "#111819", "#E4EBE9"];
+  const DIMF = { tipo: ["Tipo de veículo", 5, TN], dep: ["Departamento", 0, D], prop: ["Propriedade", 2, FN.p], reg: ["Região", 3, FN.r], carac: ["Caracterização", 1, FN.c] };
+  const EST = { c: [], p: [], r: [], linhas: "tipo", modo: "matriz", abertos: new Set() };
+  const filtra = (r) => (!EST.c.length || EST.c.includes(r[1])) && (!EST.p.length || EST.p.includes(r[2])) && (!EST.r.length || EST.r.includes(r[3]));
+  const fv = () => V.filter(filtra);
+  const somaV = (R, fn = () => true) => soma(R.filter(fn).map((r) => r[9]));
+  const esc = escapeHTML;
 
-  function hero() {
-    const R = C.filter((r) => r[1] == 1), adm = R.filter((r) => A.includes(r[0])), oth = R.filter((r) => !A.includes(r[0]));
-    const sp = (x) => [0, 1, 2].map((p) => x.filter((r) => r[2] == p).reduce((a, r) => a + r[6], 0));
-    const a = sp(adm), o = sp(oth), sa = soma(a), so = soma(o);
-    const it = A.map((d) => [D[d], sp(adm.filter((r) => r[0] == d)), "", 1]).map((x) => { x[2] = x[1][1] ? x[1][1] + " alugado" + (x[1][1] > 1 ? "s" : "") : "nenhum alugado"; return x; }).sort((x, y) => soma(y[1]) - soma(x[1]));
-    $("hero").innerHTML = `<div class="fr-kg" style="grid-template-columns:repeat(auto-fit,minmax(130px,1fr));margin-bottom:10px"><div class="fr-k" style="--kc:var(--k2)"><b>${sa}</b><span class="fr-m">descaracterizados nas 8 unidades adm.</span></div><div class="fr-k" style="--kc:var(--a)"><b>${a[1]}</b><span class="fr-m">alugados (${(a[1] / sa * 100).toFixed(0)}%)</span></div><div class="fr-k" style="--kc:var(--p)"><b>${a[0]}</b><span class="fr-m">próprios</span></div><div class="fr-k" style="--kc:var(--c)"><b>${a[2]}</b><span class="fr-m">cedidos</span></div><div class="fr-k" style="--kc:var(--k3)"><b>${N(so)}</b><span class="fr-m">nas demais unidades (${o[1]} alugados, ${o[2]} cedidos)</span></div></div><div class="fr-lg">${lg(PN, PC)}</div>${rows(it, PC, Math.max(...it.map((x) => soma(x[1]))))}`;
+  const grupoBtn = (id, ops, atual) => `<div class="dash-toggle" role="group">${ops.map(([k, l]) => `<button type="button" class="dash-toggle-btn${k === atual ? " active" : ""}" data-fv2-troca="${id}" data-v="${k}" aria-pressed="${k === atual}">${l}</button>`).join("")}</div>`;
+  function empilhadas(rows, cols, cores, cortes) {
+    const rt = rows.map((r) => soma(r.v)), mx = Math.max(...rt, 1);
+    return rows.map((r, i) => `<div class="v2-lin"><span class="v2-lin-r" title="${esc(r.l)}">${esc(r.l)}</span><div class="v2-lin-t"><div class="v2-lin-b" style="width:${rt[i] / mx * 100}%">${r.v.map((x, j) => x ? `<b style="flex:${x};background:${cores[j]};color:${cortes[j]}" title="${esc(cols[j])}: ${N(x)}">${i === 0 && x / rt[i] > .22 ? esc(cols[j]) : ""}</b>` : "").join("")}</div></div><span class="v2-lin-v">${N(rt[i])}</span></div>`).join("");
   }
-  function draw() {
-    const R = C.filter((r) => ok(F.c, r[1]) && ok(F.p, r[2]) && ok(F.r, r[3]) && ok(F.x, r[4]) && ok(F.d, r[0]));
-    const T = R.reduce((a, r) => a + r[6], 0) || 1, c = ag(R, 1, 3), p = ag(R, 2, 3), r = ag(R, 3, 3), x = ag(R, 4, 2);
-    const K = [["Total de veículos", T, "", 1, "var(--ink)"], ["Descaracterizados", c[1], c[1] / T, 0, CC[1]], ["Caracterizados (padrão + ADM)", c[0] + c[2], (c[0] + c[2]) / T, 0, CC[0]], ["↳ dos quais ADM (símbolo do Estado)", c[2], c[2] / T, 0, CC[2]], ["Próprios", p[0], p[0] / T, 0, PC[0]], ["Alugados", p[1], p[1] / T, 0, PC[1]], ["Cedidos", p[2], p[2] / T, 0, PC[2]], ["Com cela", x[1], x[1] / T, 0, "var(--ink)"]];
-    $("kpi").innerHTML = K.map((k) => `<div class="fr-k ${k[3] ? "fr-w" : ""}" style="--kc:${k[4]}"><b>${N(k[1])}</b><span class="fr-m">${k[0]}${k[2] !== "" ? " · " + (k[2] * 100).toFixed(0) + "%" : ""}</span></div>`).join("");
-    const dp = D.map((n, i) => [n, ag(R.filter((q) => q[0] == i), 2, 3), "", A.includes(i)]).filter((z) => soma(z[1])).sort((a, b) => soma(b[1]) - soma(a[1]));
-    $("lgP").innerHTML = lg(PN, PC);
-    $("dep").innerHTML = rows(dp, PC, dp.length ? soma(dp[0][1]) : 1);
-    donut("dC", CN, c, CC); donut("dP", PN, p, PC); donut("dX", XN, x, ["var(--k3)", "var(--ink)"]);
-    $("lgC").innerHTML = lg(CN, CC);
-    const rg = RN.map((n, i) => [n, ag(R.filter((q) => q[3] == i), 1, 3)]);
-    $("reg").innerHTML = rows(rg, CC, Math.max(...rg.map((z) => soma(z[1])), 1));
-    const tp = TN.map((n, i) => [n, ag(R.filter((q) => q[5] == i), 2, 3)]).filter((z) => soma(z[1])).sort((a, b) => soma(b[1]) - soma(a[1]));
-    $("tip").innerHTML = `<div class="fr-lg">${lg(PN, PC)}</div>` + rows(tp, PC, tp.length ? soma(tp[0][1]) : 1);
-    const yr = {};
-    Y.filter((q) => ok(F.c, q[0]) && ok(F.p, q[1])).forEach((q) => { (yr[q[2]] = yr[q[2]] || [0, 0, 0])[q[1]] += q[3]; });
-    colunas("ano", Object.keys(yr).sort().map((k) => [String(k).slice(2), yr[k]]), PC);
-    matrizes();
-  }
-  // ---------- matrizes (modelo × linha escolhida; ano de fabricação × ano de entrega) ----------
-  // V = [depto, caracterização, propriedade, região, cela, tipo, modelo, anoFab, anoEntrega(0=sem data), qtd]
-  const V = DB.V || [], M = DB.M || [];
-  const DIMS = { tipo: ["Tipo de veículo", 5, TN], dep: ["Departamento", 0, D], prop: ["Propriedade", 2, PN], reg: ["Região", 3, RN], carac: ["Caracterização", 1, CN] };
-  const MX = { mod: { modo: "matriz", dim: "tipo" }, ae: { modo: "matriz" } };
-  const MXD = {};
-  const PAL = ["#1d6f6b", "#d9822b", "#7a6fb5", "#2e5e9e", "#c2493d", "#8a8f98", "#3f9d97", "#e8ab6b", "#a79fd1", "#6b8fc4", "#d98277", "#b3b7bd", "#2d4f4c", "#8c5a1d", "#4d4478"];
-  const filtra = (r) => ok(F.c, r[1]) && ok(F.p, r[2]) && ok(F.r, r[3]) && ok(F.x, r[4]) && ok(F.d, r[0]);
-  const ICO_FS = `<svg viewBox="0 0 16 16"><path d="M1 6V1h5M10 1h5v5M15 10v5h-5M6 15H1v-5"/></svg>`;
-  const ICO_DL = `<svg viewBox="0 0 16 16"><path d="M8 1v9M4 7l4 4 4-4M2 14h12"/></svg>`;
-  const pctTxt = (v) => (v > 0 && v < 0.5 ? "<1" : String(Math.round(v)));
-
-  function renderMx(ch, cfg) {
-    // cfg: { rows:[{l, v:[...]}], cols:[...], ordenar }
-    MXD[ch] = cfg;
-    const { rows: rw, cols: cl } = cfg, modo = MX[ch].modo;
-    const rt = rw.map((r) => soma(r.v)), ct = cl.map((_, j) => rw.reduce((a, r) => a + r.v[j], 0)), geral = soma(rt);
-    $(ch + "-tot").textContent = N(geral);
-    $(ch + "-ctl").innerHTML = `<div class="fr-seg">${[["matriz", "MATRIZ"], ["barras", "BARRAS"], ["prop", "% PROPORÇÃO"]].map(([m, l]) => `<button class="${modo === m ? "on" : ""}" data-mx="${ch}" data-modo="${m}">${l}</button>`).join("")}</div><div class="fr-ics"><button class="fr-ic" title="Tela cheia" data-mx="${ch}" data-fs="1">${ICO_FS}</button><button class="fr-ic" title="Baixar CSV" data-mx="${ch}" data-dl="1">${ICO_DL}</button></div>`;
-    const alvo = $(ch), leg = $(ch + "-leg");
-    if (!geral) { alvo.innerHTML = `<div class="fr-m" style="padding:14px 0">Nenhum veículo com os filtros escolhidos.</div>`; leg.innerHTML = ""; return; }
-    if (modo === "barras") {
-      leg.innerHTML = `<div class="fr-lg">${lg(cl, cl.map((_, i) => PAL[i % PAL.length]))}</div>`;
-      alvo.innerHTML = rows(rw.map((r) => [r.l, r.v, "", false]), cl.map((_, i) => PAL[i % PAL.length]), Math.max(...rt, 1));
-      return;
-    }
-    leg.innerHTML = "";
-    const pc = modo === "prop";
-    const val = (r, j, t) => (pc ? (t ? r.v[j] / t * 100 : 0) : r.v[j]);
-    const neu = cfg.neutra ?? -1; // coluna "sem dado": aparece, mas não entra na escala de cor
-    const mx = Math.max(...rw.map((r, i) => Math.max(...r.v.map((x, j) => (j === neu ? 0 : val({ v: r.v }, j, rt[i]))))), 1);
+  function matriz(rows, cols, modo, neutra = -1) {
+    const rt = rows.map((r) => soma(r.v)), ct = cols.map((_, j) => soma(rows.map((r) => r.v[j]))), g = soma(rt);
+    if (!g) return `<p class="vazio-v2">Nenhum veículo com esses filtros.</p>`;
+    const pc = modo === "prop", val = (i, j) => pc ? (rt[i] ? rows[i].v[j] / rt[i] * 100 : 0) : rows[i].v[j];
+    const mx = Math.max(...rows.map((_, i) => Math.max(...cols.map((__, j) => j === neutra ? 0 : val(i, j)))), 1);
+    const p1 = (v) => v > 0 && v < .5 ? "<1" : String(Math.round(v));
     const cel = (v, txt, j) => {
-      if (!v) return `<td class="fr-z"></td>`;
-      if (j === neu) return `<td class="fr-z" style="color:var(--mut)">${txt}</td>`;
-      const k = Math.round(12 + 88 * Math.pow(v / mx, 0.6));
-      return `<td style="background:color-mix(in srgb,var(--p) ${k}%,var(--card));color:${k > 52 ? "#fff" : "var(--ink)"}">${txt}</td>`;
+      if (!v) return `<td class="z"></td>`;
+      if (j === neutra) return `<td class="z" style="color:#9AA3B2">${txt}</td>`;
+      const k = Math.round(14 + 86 * Math.pow(v / mx, 0.6));
+      return `<td style="background:color-mix(in srgb,var(--tinta) ${k}%,var(--surface));color:${k > 55 ? "#111819" : "var(--carvao)"}">${txt}</td>`;
     };
-    const cab = cl.map((c) => `<th class="fr-rot"><div>${c}</div></th>`).join("") + `<th class="fr-rot fr-tt"><div>TOTAL</div></th>`;
-    const corpo = rw.map((r, i) => `<tr><th class="fr-rl" title="${r.l}">${r.l}</th>${r.v.map((x, j) => { const v = val(r, j, rt[i]); return cel(v, pc ? pctTxt(v) : N(x), j); }).join("")}<td class="fr-t">${pc ? "100" : N(rt[i])}</td></tr>`).join("");
-    const rodape = `<tr><th class="fr-rl"><b>TOTAL</b></th>${ct.map((x) => `<td class="fr-t">${pc ? pctTxt(x / geral * 100) : N(x)}</td>`).join("")}<td class="fr-t">${pc ? "100" : N(geral)}</td></tr>`;
-    alvo.innerHTML = `<table class="fr-mxt"><thead><tr><th></th>${cab}</tr></thead><tbody>${corpo}${rodape}</tbody></table>`;
+    return `<div class="v2-mx-rol"><table class="v2-mx"><thead><tr><th></th>${cols.map((c) => `<th class="rot"><div>${esc(c)}</div></th>`).join("")}<th class="rot"><div><b>Total</b></div></th></tr></thead><tbody>` +
+      rows.map((r, i) => `<tr><th class="rl" title="${esc(r.l)}">${esc(r.l)}</th>${r.v.map((x, j) => { const v = val(i, j); return cel(v, pc ? p1(v) : N(x), j); }).join("")}<td class="t">${pc ? "100" : N(rt[i])}</td></tr>`).join("") +
+      `<tr><th class="rl"><b>Total</b></th>${ct.map((x) => `<td class="t">${pc ? p1(x / g * 100) : N(x)}</td>`).join("")}<td class="t">${pc ? "100" : N(g)}</td></tr></tbody></table></div>`;
   }
+  const comoLer = (t) => `<details class="painel-detalhes" style="margin-top:10px"><summary>Como ler</summary><p style="margin-top:8px">${t}</p></details>`;
 
-  function matrizes() {
-    if (!V.length) return;
-    const R = V.filter(filtra);
-    // 1) modelos
-    const porModelo = new Map();
-    R.forEach((r) => porModelo.set(r[6], (porModelo.get(r[6]) || 0) + r[9]));
-    const ord = [...porModelo.entries()].sort((a, b) => b[1] - a[1]);
-    const top = ord.slice(0, 14).map((z) => z[0]), outros = ord.length > 14;
-    const cols = top.map((i) => M[i]).concat(outros ? ["Outros modelos"] : []);
-    const [, k, labels] = DIMS[MX.mod.dim];
-    const cel = labels.map(() => Array(cols.length).fill(0));
-    R.forEach((r) => { const ci = top.indexOf(r[6]); cel[r[k]][ci >= 0 ? ci : cols.length - 1] += r[9]; });
-    const linhas = labels.map((l, i) => ({ l, v: cel[i] })).filter((z) => soma(z.v)).sort((a, b) => soma(b.v) - soma(a.v));
-    $("mod-dim").innerHTML = `<span>Linhas:</span>` + Object.entries(DIMS).map(([c, d]) => `<button class="${MX.mod.dim === c ? "on" : ""}" data-mx="mod" data-dim="${c}">${d[0]}</button>`).join("");
-    renderMx("mod", { rows: linhas, cols, nome: "modelos-por-" + MX.mod.dim });
-    // 2) ano de fabricação × ano de entrega
-    const anosF = [...new Set(R.map((r) => r[7]))].sort((a, b) => a - b);
-    const anosE = [...new Set(R.filter((r) => r[8] > 0).map((r) => r[8]))].sort((a, b) => a - b);
-    const semData = R.some((r) => r[8] === 0);
-    const colsE = anosE.map(String).concat(semData ? ["Sem data de entrega"] : []);
-    const celE = anosF.map(() => Array(colsE.length).fill(0));
-    R.forEach((r) => { const j = r[8] > 0 ? anosE.indexOf(r[8]) : colsE.length - 1; celE[anosF.indexOf(r[7])][j] += r[9]; });
-    renderMx("ae", { rows: anosF.map((a, i) => ({ l: String(a), v: celE[i] })), cols: colsE, neutra: semData ? colsE.length - 1 : -1, nome: "ano-fabricacao-x-ano-entrega" });
-    const com = R.filter((r) => r[8] > 0), nCom = soma(com.map((r) => r[9])), nSem = soma(R.filter((r) => r[8] === 0).map((r) => r[9]));
-    const por = (f) => soma(com.filter(f).map((r) => r[9]));
-    const ins = $("ae-ins");
-    ins.innerHTML = nCom
-      ? `Dos <b>${N(nCom)}</b> veículos com data de entrega registrada, <b>${(por((r) => r[8] <= r[7]) / nCom * 100).toFixed(0)}%</b> foram entregues no mesmo ano de fabricação, <b>${(por((r) => r[8] - r[7] === 1) / nCom * 100).toFixed(0)}%</b> no ano seguinte e <b>${(por((r) => r[8] - r[7] >= 2) / nCom * 100).toFixed(0)}%</b> dois ou mais anos depois. Os outros <b>${N(nSem)}</b> não têm data de entrega na planilha.`
-      : `Nenhum veículo com data de entrega registrada nos filtros escolhidos.`;
-  }
+  const GRUPOS = [
+    { id: "dep", tipo: "Quantidades", t: "Viaturas por departamento", r() {
+      const R = fv(), deps = D.map((n, i) => ({ l: (A.includes(i) ? "[adm] " : "") + n, v: [0, 1, 2].map((p) => somaV(R, (r) => r[0] === i && r[2] === p)) })).filter((d) => soma(d.v)).sort((a, b) => soma(b.v) - soma(a.v));
+      return empilhadas(deps.slice(0, 10), FN.p, COR_P, COR_P_T) + `<p class="vazio-v2">Os 10 maiores de ${deps.length} departamentos.</p>` + comoLer("Cada barra é um departamento, dividido em própria, alugada e cedida. O número à direita é o total. [adm] marca as unidades administrativas (GDG, DILOG, ACADEPOL, DGTI, ISPE, DEPAF, DPSV e Ouvidoria).");
+    } },
+    { id: "reg", tipo: "Onde estão", t: "Viaturas por região", r() {
+      const R = fv();
+      return empilhadas(FN.r.map((n, i) => ({ l: n, v: [0, 1, 2].map((p) => somaV(R, (r) => r[3] === i && r[2] === p)) })), FN.p, COR_P, COR_P_T) + comoLer("Capital, região metropolitana de Salvador (RMS) e interior, divididos por propriedade.");
+    } },
+    { id: "mod", tipo: "Quantidades", t: "Modelos da frota", r() {
+      const R = fv(), porM = {}; R.forEach((r) => { porM[r[6]] = (porM[r[6]] || 0) + r[9]; });
+      const ord = Object.entries(porM).sort((a, b) => b[1] - a[1]), nTop = 12, top = ord.slice(0, nTop).map((z) => +z[0]), outros = ord.length > nTop;
+      const cols = top.map((i) => M[i]).concat(outros ? ["Outros modelos"] : []);
+      const [, k, labels] = DIMF[EST.linhas], cel = labels.map(() => Array(cols.length).fill(0));
+      R.forEach((r) => { const ci = top.indexOf(r[6]); cel[r[k]][ci >= 0 ? ci : cols.length - 1] += r[9]; });
+      const rows = labels.map((l, i) => ({ l, v: cel[i] })).filter((z) => soma(z.v)).sort((a, b) => soma(b.v) - soma(a.v)).slice(0, 12);
+      return `<div class="frota-ctl">${grupoBtn("modo", [["matriz", "Matriz"], ["prop", "% da linha"]], EST.modo)}<label>Linhas <select data-fv2-linhas aria-label="O que mostrar nas linhas">${Object.entries(DIMF).map(([c, d]) => `<option value="${c}" ${EST.linhas === c ? "selected" : ""}>${d[0]}</option>`).join("")}</select></label></div>` + matriz(rows, cols, EST.modo) + comoLer("Colunas são os modelos mais comuns; o restante soma em Outros modelos. As linhas mudam conforme a escolha. Quanto mais clara a célula, mais veículos. A marca foi deduzida do modelo, porque a planilha informa só o modelo.");
+    } },
+    { id: "ano", tipo: "Prazos", t: "Ano de fabricação e ano de entrega", r() {
+      const R = fv(), anosF = [...new Set(R.map((r) => r[7]))].sort((a, b) => a - b), anosE = [...new Set(R.filter((r) => r[8] > 0).map((r) => r[8]))].sort((a, b) => a - b), sem = R.some((r) => r[8] === 0);
+      const cols = anosE.map(String).concat(sem ? ["Sem data de entrega"] : []), cel = anosF.map(() => Array(cols.length).fill(0));
+      R.forEach((r) => { cel[anosF.indexOf(r[7])][r[8] > 0 ? anosE.indexOf(r[8]) : cols.length - 1] += r[9]; });
+      const com = R.filter((r) => r[8] > 0), nCom = somaV(com), nSem = somaV(R, (r) => r[8] === 0), por = (fn) => somaV(com, fn);
+      return `<p style="max-width:64ch;margin-bottom:10px">${nCom ? `Dos ${N(nCom)} veículos com data de entrega, ${pct(por((r) => r[8] <= r[7]), nCom)} foram entregues no ano de fabricação, ${pct(por((r) => r[8] - r[7] === 1), nCom)} no ano seguinte e ${pct(por((r) => r[8] - r[7] >= 2), nCom)} dois ou mais anos depois. ${N(nSem)} não têm data de entrega.` : "Nenhum veículo com data de entrega nesses filtros."}</p>` + matriz(anosF.map((a, i) => ({ l: String(a), v: cel[i] })), cols, "matriz", sem ? cols.length - 1 : -1) + comoLer("O ano da planilha é o de fabricação. A matriz cruza esse ano com o ano em que o veículo foi entregue. A coluna cinza reúne os veículos sem data de entrega.");
+    } },
+    { id: "adm", tipo: "Situação", t: "Descaracterizados nas unidades administrativas", r() {
+      const R = V.filter((r) => r[1] === 1 && A.includes(r[0])), rows = A.map((d) => ({ l: D[d], v: [0, 1, 2].map((p) => somaV(R, (r) => r[0] === d && r[2] === p)) })).filter((x) => soma(x.v)).sort((a, b) => soma(b.v) - soma(a.v));
+      return `<p style="margin-bottom:10px">${N(somaV(R))} veículos descaracterizados nas oito unidades administrativas, ${N(somaV(R, (r) => r[2] === 1))} deles alugados.</p>` + empilhadas(rows, FN.p, COR_P, COR_P_T) + comoLer("Mostra só os veículos descaracterizados das unidades administrativas, divididos por propriedade. Não muda com os filtros acima.");
+    } },
+  ];
 
-  function baixarMx(ch) {
-    const c = MXD[ch];
-    if (!c) return;
-    const aspas = (t) => `"${String(t).replace(/"/g, '""')}"`;
-    const linhas = [["", ...c.cols, "TOTAL"].map(aspas).join(";")].concat(c.rows.map((r) => [aspas(r.l), ...r.v, soma(r.v)].join(";")));
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(new Blob(["\ufeff" + linhas.join("\r\n")], { type: "text/csv;charset=utf-8" }));
-    a.download = `frota-${c.nome}.csv`;
-    document.body.appendChild(a); a.click(); a.remove();
-    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  function desenhar() {
+    const R = fv(), T = somaV(R), por = (i, v) => somaV(R, (r) => r[i] === v);
+    const des = por(1, 1), alu = por(2, 1), tem = EST.c.length || EST.p.length || EST.r.length;
+    const filtro = (g, t) => `<label>${t} <div class="dash-toggle" role="group">${FN[g].map((n, i) => `<button type="button" class="dash-toggle-btn${EST[g].includes(i) ? " active" : ""}" data-fv2-chip="${g}" data-k="${i}" aria-pressed="${EST[g].includes(i)}">${n}</button>`).join("")}</div></label>`;
+    const seg = [0, 1, 2].map((p) => ({ k: String(p), l: FN.p[p], n: por(2, p), bg: COR_P[p], fg: COR_P_T[p], semAcao: true }));
+    const todos = GRUPOS.every((g) => EST.abertos.has(g.id));
+    raiz.innerHTML = `
+      <header class="cab-v2"><div class="rot-v2">Frota · Frota de viaturas</div><h1 class="tit-v2">${N(T)} veículos, ${pct(des, T)} descaracterizados e ${pct(alu, T)} alugados.</h1></header>
+      <div class="dash-filtros frota-ctl">${filtro("c", "Caracterização")}${filtro("p", "Propriedade")}${filtro("r", "Região")}${tem ? `<button type="button" class="dash-toggle-btn" data-fv2-limpa>Limpar filtros</button>` : ""}</div>
+      <section class="nota-v2"><div class="k">Hoje</div><div class="v"><div class="hoje-v2">
+        <button type="button" data-fv2-kpi="c1"><div class="n">${N(des)}</div><div class="l">Descaracterizados</div><div class="s">${pct(des, T)} da frota</div></button>
+        <button type="button" data-fv2-kpi="p1"><div class="n">${N(alu)}</div><div class="l">Alugados</div><div class="s">${pct(alu, T)} da frota</div></button></div></div></section>
+      <section class="nota-v2" id="frota-situacao"><div class="k">Situação</div><div class="v"><h3>Propriedade das ${N(T)} viaturas</h3>${v2Pilha(seg)}</div></section>
+      <div class="grupos-v2"><div class="cab-outros-v2" style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap"><h2>Outras informações deste painel</h2><button type="button" class="dash-toggle-btn" data-fv2-todos="${todos ? 0 : 1}">${todos ? "Fechar todas" : "Abrir todas"}</button></div>
+      ${GRUPOS.map((g) => { const ab = EST.abertos.has(g.id); return `<section class="nota-v2 grupo-v2${ab ? " aberto" : ""}" id="frota-g-${g.id}"><div class="k">${g.tipo}</div><div class="v"><div class="grupo-cab-v2"><h3>${esc(g.t)}</h3><button type="button" class="dash-toggle-btn" data-fv2-grupo="${g.id}" aria-expanded="${ab}">${ab ? "Fechar" : "Abrir"}</button></div>${ab ? `<div class="grupo-corpo-v2">${g.r()}</div>` : ""}</div></section>`; }).join("")}</div>`;
   }
-  function telaCheia(ch) {
-    const card = $("card-" + ch), on = !card.classList.contains("fr-fs");
-    card.classList.toggle("fr-fs", on);
-    const sai = (ev) => { if (ev.key === "Escape" || !raiz.isConnected) { card.classList.remove("fr-fs"); document.removeEventListener("keydown", sai); } };
-    if (on) document.addEventListener("keydown", sai);
-  }
-  const AD = new Set(A), OT = D.map((_, i) => i).filter((i) => !AD.has(i));
-  function chips() {
-    const b = (k, i, l) => `<button class="${F[k].has(i) ? "on" : ""}" data-act="tg" data-k="${k}" data-i="${i}">${l}</button>`;
-    const pb = (k, l, v) => `<button style="border-style:dashed" data-act="ps" data-k="${k}" data-v="${v}">${l}</button>`;
-    $("flt").innerHTML = FD.map(([k, t, n, pr]) => `<div class="fr-fl"><div>${t} <span class="fr-m">(vazio = todos)</span></div><div class="fr-ch">${n.map((l, i) => b(k, i, l)).join("")}${pr.map((z) => pb(k, z[0], z[1])).join("")}${F[k].size ? pb(k, "limpar", "") : ""}</div></div>`).join("") +
-      `<div class="fr-fl"><div>Departamentos <span class="fr-m">(◆ = unidade administrativa; escolha quantos quiser)</span></div><div class="fr-ch" style="margin-bottom:4px">${pb("d", "◆ Administrativas", A)}${pb("d", "Demais", OT)}${F.d.size ? pb("d", "limpar", "") : ""}</div><div class="fr-ch">${[...D.keys()].sort((a, b2) => (AD.has(b2) - AD.has(a)) || a - b2).map((i) => b("d", i, (AD.has(i) ? "◆ " : "") + D[i])).join("")}</div></div>`;
-  }
-  // Os botões são redesenhados a cada clique; um único ouvinte no painel
-  // resolve todos (nada de onclick inline nem de funções globais).
+  const redesenhar = () => { const y = window.scrollY; desenhar(); window.scrollTo(0, y); };
   raiz.addEventListener("click", (ev) => {
-    const mxb = ev.target.closest("[data-mx]");
-    if (mxb && raiz.contains(mxb)) {
-      const ch = mxb.dataset.mx;
-      if (mxb.dataset.modo) MX[ch].modo = mxb.dataset.modo;
-      else if (mxb.dataset.dim) MX[ch].dim = mxb.dataset.dim;
-      else if (mxb.dataset.fs) { telaCheia(ch); return; }
-      else if (mxb.dataset.dl) { baixarMx(ch); return; }
-      matrizes();
-      return;
-    }
-    const bt = ev.target.closest("[data-act]");
-    if (!bt || !raiz.contains(bt)) return;
-    const k = bt.dataset.k;
-    if (bt.dataset.act === "tg") {
-      const v = Number(bt.dataset.i);
-      F[k].has(v) ? F[k].delete(v) : F[k].add(v);
-    } else {
-      F[k] = new Set(bt.dataset.v ? bt.dataset.v.split(",").map(Number) : []);
-    }
-    chips(); draw();
+    let b;
+    if ((b = ev.target.closest("[data-fv2-chip]"))) { const g = b.dataset.fv2Chip, i = +b.dataset.k; EST[g] = EST[g].includes(i) ? EST[g].filter((x) => x !== i) : [...EST[g], i]; }
+    else if ((b = ev.target.closest("[data-fv2-kpi]"))) { const g = b.dataset.fv2Kpi[0], i = +b.dataset.fv2Kpi[1], atual = EST[g].length === 1 && EST[g][0] === i; EST.c = []; EST.p = []; EST.r = []; if (!atual) EST[g] = [i]; }
+    else if (ev.target.closest("[data-fv2-limpa]")) { EST.c = []; EST.p = []; EST.r = []; }
+    else if ((b = ev.target.closest("[data-fv2-grupo]"))) { const g = b.dataset.fv2Grupo; EST.abertos.has(g) ? EST.abertos.delete(g) : EST.abertos.add(g); }
+    else if ((b = ev.target.closest("[data-fv2-todos]"))) { GRUPOS.forEach((g) => (b.dataset.fv2Todos === "1" ? EST.abertos.add(g.id) : EST.abertos.delete(g.id))); }
+    else if ((b = ev.target.closest("[data-fv2-troca]"))) { EST[b.dataset.fv2Troca] = b.dataset.v; }
+    else return;
+    redesenhar();
   });
-
-  const cv = S.cov, pr = cv[0], totalVeic = soma(cv.map((z) => z[1]));
-  $("note").innerHTML = `Fonte, valor e data só existem para <b>${N(S.nf)}</b> de ${N(totalVeic)} veículos (${(S.nf / totalVeic * 100).toFixed(0)}%). Alugados não têm esses campos por natureza; entre os próprios, ${(pr[2] / pr[1] * 100).toFixed(0)}% estão preenchidos. Por isso estes gráficos mostram apenas o que foi registrado — <b>não representam a frota inteira</b>. Total registrado: R$ ${S.tot.toLocaleString("pt-BR")} mi em ${N(S.nv)} veículos.`;
-  $("cov").innerHTML = cv.map(([n, t, f], i) => `<div class="fr-r"><span>${n}</span><div class="fr-w"><div style="width:80%"><div class="fr-s" style="background:var(--line)"><i style="width:${f / t * 100}%;background:${PC[i]}"></i></div></div><em>${N(f)} de ${N(t)}</em></div></div>`).join("");
-  const fm = Math.max(...S.F.map((z) => z[2]));
-  $("fon").innerHTML = S.F.map(([n, q, v]) => `<div class="fr-r"><span>${n}</span><div class="fr-w"><div style="width:${v / fm * 70}%;min-width:2px"><div class="fr-s"><i style="flex:1;background:var(--k1)"></i></div></div><em>${v ? "R$ " + v.toLocaleString("pt-BR") + " mi · " : ""}${q} veíc.</em></div></div>`).join("");
-  colunas("qt", S.Q.map(([l, n]) => [l, [n]]), ["var(--k1)"]);
-  chips(); draw(); hero();
+  raiz.addEventListener("change", (ev) => { const sel = ev.target.closest("[data-fv2-linhas]"); if (sel) { EST.linhas = sel.value; redesenhar(); } });
+  // A busca do início abre o grupo certo antes de rolar até ele.
+  window.__frotaAbrirGrupo = (id) => { EST.abertos.add(id); redesenhar(); };
+  desenhar();
 }
 
 async function carregarObrasPortal(portalSlug) {
@@ -11186,6 +11270,7 @@ async function carregarObrasPortal(portalSlug) {
   ];
 
   painel.innerHTML = `
+    <header class="cab-v2"><div class="rot-v2">Infraestrutura · Obras e manutenção</div><h1 class="tit-v2" id="obras-manchete"></h1></header>
     <div class="tabs" id="obras-subtabs" style="margin-bottom:14px">
       ${SUBABAS_OBRAS.map((s, i) => `<button type="button" class="tab-btn${i === 0 ? " active" : ""}" data-subtab-obras="${s.chave}">${s.rotulo}</button>`).join("")}
     </div>
@@ -11321,6 +11406,17 @@ async function carregarObrasPortal(portalSlug) {
     if (!btn) return;
     document.querySelectorAll("#obras-subtabs .tab-btn").forEach((b) => b.classList.toggle("active", b === btn));
     SUBABAS_OBRAS.forEach((s) => { document.getElementById(`obras-sub-${s.chave}`).hidden = s.chave !== btn.dataset.subtabObras; });
+  });
+  document.getElementById("obras-manchete").textContent = `${unidades.length.toLocaleString("pt-BR")} unidades policiais, ${manutencaoTodas.length.toLocaleString("pt-BR")} ordens de manutenção e ${ceirfAmpliado.length.toLocaleString("pt-BR")} intervenções do CEIRF.`;
+  abasComoGrupos(painel, {
+    dataKey: "subtabObras",
+    painelSel: (k) => `#obras-sub-${k}`,
+    abertoInicial: "geral",
+    grupos: [
+      { k: "geral", tipo: "Situação", titulo: "Obras e imóveis por unidade policial" },
+      { k: "manutencao", tipo: "Quantidades", titulo: "Ordens de manutenção das unidades" },
+      { k: "ceirf", tipo: "Quantidades", titulo: "Intervenções do CEIRF" },
+    ],
   });
 
   // Clique delegado UMA vez, nos containers estáveis (não recriados a cada
@@ -12176,7 +12272,7 @@ function donutCfcrSVG(categorias, selecionado, opcoes = {}) {
   }).join("");
   const totalTexto = total.toLocaleString("pt-BR");
   const totalFontSize = totalTexto.length <= 5 ? 22 : totalTexto.length <= 7 ? 17 : 13;
-  return `<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">${fatias}${rotulosFatia}<text x="${cx}" y="${(cy - 3).toFixed(1)}" text-anchor="middle" font-family="'Space Grotesk',sans-serif" font-size="${totalFontSize}" font-weight="700" fill="var(--carvao)">${escapeHTML(totalTexto)}</text><text x="${cx}" y="${(cy + 13).toFixed(1)}" text-anchor="middle" font-family="monospace" font-size="7.5" letter-spacing="1.5" fill="var(--carvao)" fill-opacity="0.6">${escapeHTML(rotuloCentro)}</text></svg><div class="donut-legenda">${legenda}</div>`;
+  return `<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">${fatias}${rotulosFatia}<text x="${cx}" y="${(cy - 3).toFixed(1)}" text-anchor="middle" font-family="'Spectral',sans-serif" font-size="${totalFontSize}" font-weight="700" fill="var(--carvao)">${escapeHTML(totalTexto)}</text><text x="${cx}" y="${(cy + 13).toFixed(1)}" text-anchor="middle" font-family="monospace" font-size="7.5" letter-spacing="1.5" fill="var(--carvao)" fill-opacity="0.6">${escapeHTML(rotuloCentro)}</text></svg><div class="donut-legenda">${legenda}</div>`;
 }
 
 // Pedido direto: "eu fiquei pensando se nós não poderíamos manter esses
@@ -12941,12 +13037,10 @@ async function carregarCfcrPortal(portalSlug) {
   ];
 
   painel.innerHTML = `
+    <header class="cab-v2"><div class="rot-v2">Orçamento e Finanças · Termos de cooperação técnica (DEPIN, DEPOM e DPMCV)</div><h1 class="tit-v2" id="cfcr-manchete"></h1></header>
     <div style="display:flex;justify-content:flex-end;margin-bottom:10px">
       <button type="button" class="dash-toggle-btn" id="cfcr-baixar-relatorio">${iconeInline("download", 12, -2)} BAIXAR RELATÓRIO (PDF)</button>
     </div>
-    <p class="tela-intro">Termos de Cooperação Técnica · DEPIN · DEPOM · DPMCV. Parcerias institucionais do GDG (acordos congêneres) ficam na aba "CFCR - Acordos Congêneres", ao lado.</p>
-    <p class="dash-chart-hint">Critério de situação: pela <b>data de término da vigência</b> informada na planilha — recalculado sozinho toda vez que a página carrega, sem precisar de ninguém marcar nada (igual em Contratos). Não é o status declarado na coluna original da planilha.</p>
-    <p class="dash-chart-hint">Os cartões de "termos" contam cada termo (um por departamento); "Municípios da Bahia (417)" conta cada município uma única vez — por isso os dois números não precisam bater. <span id="cfcr-termo-municipio-diff"></span></p>
     <div class="dash-filtros" style="margin-bottom:14px">
       <div class="dash-filtro" style="flex:1;min-width:260px">
         <label>BUSCAR MUNICÍPIO (Ex.: "Anguera tem o quê?")</label>
@@ -12954,6 +13048,11 @@ async function carregarCfcrPortal(portalSlug) {
       </div>
     </div>
     <div id="cfcr-busca-resultado"></div>
+    <details class="painel-detalhes" style="margin-bottom:14px"><summary>Critérios e como ler as contagens</summary><div style="margin-top:10px">
+    <p class="tela-intro">Termos de Cooperação Técnica · DEPIN · DEPOM · DPMCV. Parcerias institucionais do GDG (acordos congêneres) ficam na aba "CFCR - Acordos Congêneres", ao lado.</p>
+    <p class="dash-chart-hint">Critério de situação: pela <b>data de término da vigência</b> informada na planilha — recalculado sozinho toda vez que a página carrega, sem precisar de ninguém marcar nada (igual em Contratos). Não é o status declarado na coluna original da planilha.</p>
+    <p class="dash-chart-hint">Os cartões de "termos" contam cada termo (um por departamento); "Municípios da Bahia (417)" conta cada município uma única vez — por isso os dois números não precisam bater. <span id="cfcr-termo-municipio-diff"></span></p>
+    </div></details>
     <div class="tabs" id="cfcr-subtabs" style="margin-bottom:14px">
       ${SUBABAS_CFCR.map((s, i) => `<button type="button" class="tab-btn${i === 0 ? " active" : ""}" data-subtab-cfcr="${s.chave}">${s.rotulo}</button>`).join("")}
     </div>
@@ -13094,6 +13193,24 @@ async function carregarCfcrPortal(portalSlug) {
   function irParaSubabaCfcr(chave) {
     document.querySelector(`#cfcr-subtabs [data-subtab-cfcr="${chave}"]`)?.click();
   }
+
+  // Manchete: quantos municípios têm cooperação ativa (pelo mesmo critério
+  // da Visão Geral) e quantos não têm.
+  try {
+    const munReal = classificarMunicipiosRealCfcr(termosTCT);
+    const ativos = munReal.filter((m) => m.situacao === "Com termo vigente").length, totalMun = munReal.length;
+    document.getElementById("cfcr-manchete").textContent = `${ativos.toLocaleString("pt-BR")} de ${totalMun.toLocaleString("pt-BR")} municípios têm cooperação ativa. Os outros ${(totalMun - ativos).toLocaleString("pt-BR")} não têm.`;
+  } catch (erro) { console.error(erro); }
+  abasComoGrupos(painel, {
+    dataKey: "subtabCfcr",
+    painelSel: (k) => `#cfcr-sub-${k}`,
+    abertoInicial: "visaogeral",
+    grupos: [
+      { k: "visaogeral", tipo: "Situação", titulo: "Municípios e termos por situação, unidade e mapa" },
+      { k: "objetosmunicipios", tipo: "Quantidades", titulo: "Objetos acordados com os municípios" },
+      { k: "semvigente", tipo: "Onde estão", titulo: "Municípios sem cooperação ativa, por território" },
+    ],
+  });
 
   // ================= VISÃO GERAL =================
   const total = termosTCT.length;
@@ -13946,6 +14063,7 @@ async function carregarContratosPortal(portalSlug) {
   // área, cai num perfil com abas temáticas), pedido direto depois de ela
   // usar aquele painel e comparar com este.
   painel.innerHTML = `
+    <header class="cab-v2"><div class="rot-v2">Orçamento e Finanças · Contratos</div><h1 class="tit-v2" id="contratos-manchete"></h1></header>
     <div style="display:flex;justify-content:flex-end;margin-bottom:10px"><button type="button" class="dash-toggle-btn" id="contratos-baixar-relatorio">${iconeInline("download", 12, -2)} BAIXAR RELATÓRIO (PDF)</button></div>
     ${UNIDADES_GESTORAS_DISPONIVEIS.length > 1 ? `
     <div class="dash-filtros" style="margin-bottom:12px">
@@ -13969,12 +14087,12 @@ async function carregarContratosPortal(portalSlug) {
         <select id="contratos-filtro-dirpin-topo"><option value="">Todas</option>${DIRPINS_DISPONIVEIS.map((d) => `<option value="${escapeAttr(d)}">${escapeHTML(d)}</option>`).join("")}</select>
       </div>
     </div>
-    <!-- Pedido direto: "risco de vencimento é a razão de existir do
-    dashboard; valor gasto é contexto. A ordem hoje inverte isso" — alerta
-    de vencimento agora vem ANTES do Resumo Rápido (onde mais se gasta),
-    não depois. -->
-    <div id="contratos-alerta"></div>
+    <!-- Ordem do tema V2: resumo (vencidos e a vencer em destaque), situação
+    da carteira, lista dos contratos que pedem atenção e só depois os
+    grupos de informação, que abrem sob demanda. -->
     <div id="contratos-resumo-rapido"></div>
+    <div id="contratos-v2-situacao"></div>
+    <div id="contratos-alerta"></div>
     ${dicaLeituraContratosHTML()}
     <div class="tabs" style="margin-bottom:0">
       <button class="tab-btn active" data-subtab-contratos="gerencial">${ICONS.painel_dashboard}GERENCIAL</button>
@@ -14014,6 +14132,8 @@ async function carregarContratosPortal(portalSlug) {
   // deve aparecer agora (tudo, ou só a unidade escolhida). Chamada na
   // carga inicial E toda vez que o seletor de unidade muda.
   function montarAbas(listaExibida, resumoExibido, unidadeGestoraAtiva) {
+    renderCabecalhoContratos(listaExibida, resumoExibido, unidadeGestoraAtiva);
+    renderSituacaoContratos(listaExibida, resumoExibido);
     renderAlertaVencimentoContratos(listaExibida, new Map(listaExibida.map((c) => [c.id, c])), decisoesRenovacao);
 
     // Pedido direto: "não faz muito sentido... ter Setor Demandante como
@@ -14047,8 +14167,9 @@ async function carregarContratosPortal(portalSlug) {
     // Gerencial — ficar num filtro isolado de uma unidade que nem está
     // mais em tela não faz sentido.
     subabaContratosAtiva = "gerencial";
-    painel.querySelectorAll("[data-subtab-contratos]").forEach((b) => b.classList.toggle("active", b.dataset.subtabContratos === "gerencial"));
-    SUBABAS_CONTRATOS.forEach((nome) => { painel.querySelector(`#contratos-sub-${nome}`).hidden = nome !== "gerencial"; });
+    // Tema V2: trocar a base fecha todos os grupos (antes abria o Gerencial).
+    painel.querySelectorAll("[data-subtab-contratos]").forEach((b) => b.classList.remove("active"));
+    SUBABAS_CONTRATOS.forEach((nome) => { painel.querySelector(`#contratos-sub-${nome}`).hidden = true; });
 
     // Depois de Gerencial/Por Área já existirem no DOM — os cliques do
     // Resumo Rápido disparam eventos em cima dos elementos DELES (cartão
@@ -14068,6 +14189,19 @@ async function carregarContratosPortal(portalSlug) {
     });
   });
 
+  abasComoGrupos(painel, {
+    dataKey: "subtabContratos",
+    painelSel: (k) => `#contratos-sub-${k}`,
+    grupos: [
+      { k: "gerencial", tipo: "Valores", titulo: "Valor, maiores contratos e variação de valor" },
+      { k: "tatico", tipo: "Prazos", titulo: "Controle de prazos e quem precisa agir" },
+      { k: "operacional", tipo: "Pessoas", titulo: "Gestor, fiscal e acompanhamento da renovação" },
+      { k: "porarea", tipo: "Onde estão", titulo: "Contratos por setor demandante", tituloDinamico: () => (document.getElementById("contratos-tab-porarea-label")?.textContent === "UNIDADES ATENDIDAS" ? "Contratos por unidade atendida" : "Contratos por setor demandante") },
+      { k: "porcategoria", tipo: "Valores", titulo: "Contratos por categoria de objeto" },
+      { k: "porpessoas", tipo: "Pessoas", titulo: "Contratos por gestor e por fiscal" },
+      { k: "atualizados", tipo: "Situação", titulo: "Contratos atualizados recentemente" },
+    ],
+  });
   montarAbas(lista, resumo);
 
   document.getElementById("contratos-baixar-relatorio").addEventListener("click", () => {
@@ -14221,8 +14355,8 @@ async function abrirTela(id) {
   const avisoAbasOcultas = souAdmin() && PORTAIS_COM_ABAS_PADRAO_OCULTAS.includes(id)
     ? `<p class="dash-chart-hint" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
         <span>${ocultarAbasPadrao
-          ? "🔒 Só admin vê este aviso: as abas Visão Geral / Painéis / Planilhas Enviadas estão OCULTAS pra quem recebe o link deste portal."
-          : "👁 Só admin vê este aviso: as abas padrão estão VISÍVEIS pra quem abrir o link — inclusive quem não é admin."}</span>
+          ? "Só admin vê este aviso: as abas Visão Geral / Painéis / Planilhas Enviadas estão OCULTAS pra quem recebe o link deste portal."
+          : "Só admin vê este aviso: as abas padrão estão VISÍVEIS pra quem abrir o link — inclusive quem não é admin."}</span>
         <button type="button" class="dash-toggle-btn" id="btn-alternar-abas-ocultas">${ocultarAbasPadrao ? "MOSTRAR PRA MIM" : "OCULTAR DE NOVO"}</button>
       </p>`
     : "";
@@ -14624,6 +14758,36 @@ function fecharTela() {
 }
 
 voltarBtn.addEventListener("click", fecharTela);
+
+// Migalhas: o botão "Voltar ao portal" saiu; o caminho aparece embaixo do topo
+// ("Início / Orçamento e Finanças / Contratos") e "Início" volta à tela inicial.
+function atualizarMigalhas() {
+  const nav = document.getElementById("migalhas"); if (!nav) return;
+  if (!document.getElementById("tela-login").hidden) { nav.hidden = true; return; }
+  const partes = [];
+  const visivel = (el) => el && !el.hidden && el.style.display !== "none";
+  if (visivel(document.getElementById("tela-usuarios"))) partes.push("Acessos");
+  else if (visivel(document.getElementById("tela-upload"))) partes.push("Subir planilha");
+  else if (visivel(telaConteudo)) {
+    const portal = telaConteudo.querySelector(".tela-head h2")?.textContent.trim();
+    const sub = telaConteudo.querySelector(".tabs > .tab-btn.active[data-tab]")?.textContent.trim();
+    if (portal) partes.push(portal);
+    if (sub) partes.push(sub);
+  }
+  if (!partes.length) { nav.hidden = true; return; }
+  nav.hidden = false;
+  nav.innerHTML = `<a data-migalha-inicio>Início</a>` + partes.map((t, i) => `<span>/</span>${i === partes.length - 1 ? `<span aria-current="page">${escapeHTML(t)}</span>` : `<span>${escapeHTML(t)}</span>`}`).join("");
+}
+document.addEventListener("click", (e) => {
+  if (e.target.closest("[data-migalha-inicio]")) { fecharTela(); return; }
+  if (e.target.closest("#tela-conteudo .tab-btn")) setTimeout(atualizarMigalhas, 0);
+});
+(function observarTelasParaMigalhas() {
+  const mo = new MutationObserver(() => atualizarMigalhas());
+  ["tela-inicio", "tela-login", "tela-upload", "tela-usuarios"].forEach((id) => { const el = document.getElementById(id); if (el) mo.observe(el, { attributes: true, attributeFilter: ["hidden", "style"] }); });
+  mo.observe(document.getElementById("tela-conteudo"), { attributes: true, attributeFilter: ["hidden"], childList: true });
+})();
+
 document.getElementById("brand-home-btn").addEventListener("click", fecharTela);
 
 // =====================================================================
