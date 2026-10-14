@@ -200,7 +200,7 @@ body{background:var(--paper);color:var(--carvao);font-family:'Archivo',sans-seri
 .busca-res:hover,.busca-res[aria-selected="true"]{background:var(--carvao);color:var(--paper)}
 .busca-res:hover .k,.busca-res[aria-selected="true"] .k,.busca-res:hover small,.busca-res[aria-selected="true"] small{color:var(--paper-line)}
 .busca-vazia{padding:12px;color:#8B93A3;font-size:var(--fs-corpo)}
-.busca-sec{padding:8px 12px 4px;font-family:'IBM Plex Mono',monospace;font-size:var(--fs-ui-xs);letter-spacing:.14em;text-transform:uppercase;color:#8B93A3;border-bottom:1px solid var(--paper-line)}
+.busca-sec{position:sticky;top:0;z-index:1;padding:8px 12px;font-family:'IBM Plex Mono',monospace;font-size:var(--fs-ui-sm);letter-spacing:.12em;text-transform:uppercase;color:var(--carvao);background:var(--paper);border-top:2px solid var(--carvao);border-bottom:1px solid var(--paper-line);font-weight:700}
 .busca-res em{display:block;font-style:normal;font-size:var(--fs-ui-sm);color:#9AA3B2;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .busca-res:hover em,.busca-res[aria-selected="true"] em{color:var(--paper-line)}
 .busca-dica{padding:8px 12px;font-family:'IBM Plex Mono',monospace;font-size:var(--fs-ui-xs);color:#8B93A3;text-align:right}
@@ -2332,6 +2332,11 @@ const DESTINOS_BUSCA = [
   { id: "x-terr", tipo: "Onde estão", t: "Municípios sem cooperação ativa, por território", kw: "onde estao sem vigente territorio coorpin municipios lacuna", portal: "orcamento", sub: "cfcr", aba: ["cfcr", "semvigente"] },
   { id: "x-busca", tipo: "Onde estão", t: "Buscar um município e ver o que ele tem", kw: "municipio buscar busca anguera onde estao termo prefeitura", portal: "orcamento", sub: "cfcr", aba: ["cfcr", "visaogeral"], foco: "#cfcr-busca-input" },
   { id: "x-cong", tipo: "Situação", t: "Acordos congêneres, parcerias institucionais", kw: "acordos congeneres gdg parcerias institucionais termos", portal: "orcamento", sub: "cfcr-acordos" },
+  { id: "x-cong-sit", tipo: "Situação", t: "Acordos congêneres vigentes, vencidos e em construção", kw: "acordos congeneres situacao vigentes vencidos construcao indeterminado quantos", portal: "orcamento", sub: "cfcr-acordos", texto: "indeterminado" },
+  { id: "x-cong-tema", tipo: "Quantidades", t: "Acordos congêneres por tema", kw: "acordos congeneres tema assunto objeto quantos", portal: "orcamento", sub: "cfcr-acordos", titulo: "Por Tema" },
+  { id: "x-cong-parc", tipo: "Pessoas", t: "Parceiros que mais aparecem nos acordos", kw: "parceiros parceiro quem instituicoes acordos congeneres mais aparecem", portal: "orcamento", sub: "cfcr-acordos", titulo: "Parceiros que mais aparecem" },
+  { id: "x-cong-prazo", tipo: "Prazos", t: "Prazos dos acordos congêneres", kw: "prazos prazo vencem vigencia acordos congeneres quando", portal: "orcamento", sub: "cfcr-acordos", titulo: "Prazos" },
+  { id: "x-cong-lista", tipo: "Quantidades", t: "Lista dos acordos congêneres, um a um", kw: "lista acordos congeneres todos tabela parceria processo", portal: "orcamento", sub: "cfcr-acordos", titulo: "Acordos (" },
   // Obras
   { id: "o-geral", tipo: "Situação", t: "Obras e imóveis por unidade policial", kw: "obras obra imoveis unidades policiais situacao", portal: "infraestrutura", sub: "obras", aba: ["obras", "geral"] },
   { id: "o-man", tipo: "Quantidades", t: "Ordens de manutenção das unidades", kw: "manutencao ordens ordem reparo unidades quantas", portal: "infraestrutura", sub: "obras", aba: ["obras", "manutencao"] },
@@ -2368,7 +2373,7 @@ const todosDestinosBusca = () => [
   ...DESTINOS_BUSCA.filter(destinoDisponivel),
   ...PORTAIS.map((p) => ({ id: "p-" + p.id, tipo: "Área", t: `Abrir ${p.label}`, kw: `${p.label} area portal`, portal: p.id }))
 ];
-let buscaEst = { tipo: null, res: [], sel: 0 };
+let buscaEst = { tipo: null, area: null, res: [], sel: 0 };
 // Portal aberto agora (null no início). A busca dá prioridade ao que está nele.
 let PORTAL_ATUAL = null;
 const DICA_BUSCA_PORTAL = {
@@ -2481,6 +2486,21 @@ function carregarIndiceBusca() {
 }
 function reiniciarIndiceBusca() { INDICE_BUSCA.itens = []; INDICE_BUSCA.carregando = null; INDICE_BUSCA.pronto = false; }
 
+// Áreas do menu rápido: cada painel do sistema é uma área, com cabeçalho
+// próprio na lista, para ficar claro o que é CPG, CFCR, acordos congêneres,
+// obras e frota.
+const AREAS_BUSCA = [
+  { k: "cpg", rot: "CPG - Contratos", portal: "orcamento", sub: "contratos" },
+  { k: "cfcr", rot: "CFCR - TCT municipais", portal: "orcamento", sub: "cfcr" },
+  { k: "cong", rot: "CFCR - Acordos congêneres", portal: "orcamento", sub: "cfcr-acordos" },
+  { k: "obras", rot: "Painel de Obras", portal: "infraestrutura", sub: "obras" },
+  { k: "frota", rot: "Painel de Frota", portal: "frota", sub: "frota" }
+];
+function areaDe(d) {
+  const a = AREAS_BUSCA.find((x) => x.portal === d.portal && x.sub === d.sub);
+  if (a) return a;
+  return { k: "outras", rot: "Outras áreas", outras: true };
+}
 function resultadosBusca(q) {
   const toks = normBusca(q).split(/\s+/).filter((w) => w && !STOP_BUSCA.has(w));
   const atual = !telaConteudo.hidden ? PORTAL_ATUAL : null;
@@ -2489,7 +2509,7 @@ function resultadosBusca(q) {
     if (!toks.length && d.tipo === "Área") return null;
     const h = normBusca(`${d.t} ${d.kw} ${d.tipo}`), s = toks.filter((w) => h.includes(w)).length;
     if (toks.length && !s) return null;
-    return { ...d, s: s + (d.portal === atual ? 0.5 : 0), ord, aqui: d.portal === atual, caminho: rotuloCaminho(d) };
+    return { ...d, s: s + (d.portal === atual ? 0.5 : 0), ord, caminho: rotuloCaminho(d) };
   }).filter(Boolean);
   // Nomes e números só entram quando há o que procurar e nenhum tipo está escolhido.
   let ents = [];
@@ -2498,27 +2518,42 @@ function resultadosBusca(q) {
     ents = INDICE_BUSCA.itens.map((e, ord) => {
       if (!toks.every((w) => e.hay.includes(w))) return null;
       const tit = normBusca(e.t), noTitulo = toks.every((w) => tit.includes(w)) ? 1.5 : 0, exato = tit === toks.join(" ") ? 1 : 0;
-      return { ...e, id: "e-" + ord, s: toks.length * 2 + noTitulo + exato + (e.portal === atual ? 0.5 : 0), ord: 1000 + ord, aqui: e.portal === atual, caminho: rotuloCaminho(e) };
+      return { ...e, id: "e-" + ord, s: toks.length * 2 + noTitulo + exato + (e.portal === atual ? 0.5 : 0), ord: 1000 + ord, caminho: rotuloCaminho(e) };
     }).filter(Boolean).sort((a, b) => b.s - a.s || a.ord - b.ord)
-      .filter((e) => (porTipo[e.tipo + e.portal] = (porTipo[e.tipo + e.portal] || 0) + 1) <= 3).slice(0, 6);
+      .filter((e) => (porTipo[e.tipo + e.portal] = (porTipo[e.tipo + e.portal] || 0) + 1) <= 3);
   }
-  return [...ents, ...dest].sort((a, b) => b.s - a.s || a.ord - b.ord).slice(0, 9);
+  const grupos = new Map();
+  for (const r of [...ents, ...dest]) {
+    const a = areaDe(r);
+    if (buscaEst.area && (buscaEst.area === "outras" ? !a.outras : buscaEst.area !== a.k)) continue;
+    r.area = a;
+    if (!grupos.has(a.k)) grupos.set(a.k, { a, itens: [] });
+    grupos.get(a.k).itens.push(r);
+  }
+  // Sem consulta nem filtro, cada área mostra só o começo: o menu vira um índice do que existe.
+  const cap = buscaEst.area ? 9 : toks.length ? 4 : buscaEst.tipo ? 3 : 2;
+  const peso = (g) => (g.itens.some((i) => i.portal === atual) ? 0 : 1000) + (g.a.outras ? 500 : AREAS_BUSCA.indexOf(g.a)) - (toks.length ? Math.max(...g.itens.map((i) => i.s)) : 0);
+  return [...grupos.values()].sort((x, y) => peso(x) - peso(y))
+    .flatMap((g) => g.itens.sort((x, y) => y.s - x.s || x.ord - y.ord).slice(0, cap)).slice(0, 24);
 }
 function desenharListaBusca(caixa) {
   const inp = caixa.querySelector("[data-busca-in]"), lista = caixa.querySelector(".busca-lista");
   carregarIndiceBusca();
   buscaEst.res = resultadosBusca(inp.value);
   buscaEst.sel = Math.min(buscaEst.sel, Math.max(buscaEst.res.length - 1, 0));
-  const tipos = `<div class="busca-tipos"><div class="rotulo-busca">Tipo de informação</div><div class="busca-grupo">${TIPOS_BUSCA.map((t) => `<button type="button" data-busca-tipo="${t}" class="${buscaEst.tipo === t ? "on" : ""}" aria-pressed="${buscaEst.tipo === t}">${t}</button>`).join("")}</div></div>`;
-  const temAqui = buscaEst.res.some((r) => r.aqui), temFora = buscaEst.res.some((r) => !r.aqui);
-  const nomePortal = PORTAIS.find((x) => x.id === PORTAL_ATUAL)?.label || "";
+  const disponiveis = todosDestinosBusca().filter((d) => d.tipo !== "Área").map(areaDe);
+  const chipsArea = AREAS_BUSCA.filter((a) => disponiveis.some((x) => x.k === a.k)).concat(disponiveis.some((x) => x.outras) ? [{ k: "outras", rot: "Outras áreas" }] : []);
+  const chip = (attr, k, rot, on) => `<button type="button" ${attr}="${k}" class="${on ? "on" : ""}" aria-pressed="${on}">${escapeHTML(rot)}</button>`;
+  const filtros = `<div class="busca-tipos">
+    ${chipsArea.length > 1 ? `<div class="rotulo-busca">Área</div><div class="busca-grupo">${chipsArea.map((a) => chip("data-busca-area", a.k, a.rot, buscaEst.area === a.k)).join("")}</div>` : ""}
+    <div class="rotulo-busca"${chipsArea.length > 1 ? ' style="margin-top:10px"' : ""}>Tipo de informação</div><div class="busca-grupo">${TIPOS_BUSCA.map((t) => chip("data-busca-tipo", t, t, buscaEst.tipo === t)).join("")}</div></div>`;
   let corpo = "";
   buscaEst.res.forEach((r, i) => {
-    if (temAqui && temFora && (i === 0 || r.aqui !== buscaEst.res[i - 1].aqui)) corpo += `<div class="busca-sec">${r.aqui ? `Em ${escapeHTML(nomePortal)}` : "Em outras áreas"}</div>`;
-    corpo += `<button type="button" class="busca-res" role="option" data-busca-res="${i}" aria-selected="${i === buscaEst.sel}"><span class="k">${escapeHTML(r.tipo)}</span><span><b>${escapeHTML(r.t)}</b>${r.d ? `<em>${escapeHTML(r.d)}</em>` : ""}<small>${escapeHTML(r.caminho)}</small></span></button>`;
+    if (i === 0 || r.area.k !== buscaEst.res[i - 1].area.k) corpo += `<div class="busca-sec">${escapeHTML(r.area.rot)}</div>`;
+    corpo += `<button type="button" class="busca-res" role="option" data-busca-res="${i}" aria-selected="${i === buscaEst.sel}"><span class="k">${escapeHTML(r.tipo)}</span><span><b>${escapeHTML(r.t)}</b>${r.d ? `<em>${escapeHTML(r.d)}</em>` : ""}${r.area.outras ? `<small>${escapeHTML(r.caminho)}</small>` : ""}</span></button>`;
   });
   const carregando = !INDICE_BUSCA.pronto && inp.value.trim() ? `<p class="busca-vazia">Carregando nomes e números…</p>` : "";
-  lista.innerHTML = tipos + (corpo || (INDICE_BUSCA.pronto || !inp.value.trim() ? `<p class="busca-vazia">Nenhum resultado nas áreas que o seu acesso permite.</p>` : "")) + carregando + `<p class="busca-dica">Atalho: Ctrl K ou /</p>`;
+  lista.innerHTML = filtros + (corpo || (INDICE_BUSCA.pronto || !inp.value.trim() ? `<p class="busca-vazia">Nenhum resultado nas áreas que o seu acesso permite.</p>` : "")) + carregando + `<p class="busca-dica">Atalho: Ctrl K ou /</p>`;
   lista.hidden = false;
   inp.setAttribute("aria-expanded", "true");
 }
@@ -2617,6 +2652,7 @@ document.addEventListener("click", (e) => {
   const t = e.target;
   if (!t.closest("[data-busca]")) fecharListasBusca();
   let b;
+  if ((b = t.closest("[data-busca-area]"))) { buscaEst.area = buscaEst.area === b.dataset.buscaArea ? null : b.dataset.buscaArea; const c = b.closest("[data-busca]"); desenharListaBusca(c); c.querySelector("[data-busca-in]").focus(); return; }
   if ((b = t.closest("[data-busca-tipo]"))) { buscaEst.tipo = buscaEst.tipo === b.dataset.buscaTipo ? null : b.dataset.buscaTipo; const c = b.closest("[data-busca]"); desenharListaBusca(c); c.querySelector("[data-busca-in]").focus(); return; }
   if ((b = t.closest("[data-busca-res]"))) { abrirResultadoBusca(+b.dataset.buscaRes); return; }
   if ((b = t.closest("[data-busca-exemplo]"))) { irParaInformacao(DESTINOS_BUSCA.find((d) => d.id === b.dataset.buscaExemplo)); }
