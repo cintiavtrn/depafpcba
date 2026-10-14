@@ -2285,6 +2285,7 @@ async function carregarPortais() {
     buildHub();
     reiniciarIndiceBusca();
     montarExemplosBusca();
+    atualizarPlaceholderBusca();
   } catch (erro) {
     // O parágrafo de apresentação do início saiu; o aviso vai pelo toast.
     console.error(erro);
@@ -2378,8 +2379,16 @@ const DICA_BUSCA_PORTAL = {
 function atualizarPlaceholderBusca() {
   const topo = document.getElementById("busca-topo"), home = document.getElementById("busca-home");
   const p = PORTAL_ATUAL && PORTAIS.find((x) => x.id === PORTAL_ATUAL);
-  if (topo) topo.placeholder = p ? `Buscar em ${p.label}: ${DICA_BUSCA_PORTAL[p.id] || "indicador ou painel"}` : "Buscar contrato, município, viatura ou unidade";
-  if (home) home.placeholder = "Ex.: quantos vão vencer e onde estão";
+  // No início, a dica lista só o que a conta enxerga.
+  const NOME_NO_INICIO = { infraestrutura: ["unidade"], frota: ["viatura"], projetos: ["projeto"] };
+  const temSub = (portal, tab) => PORTAIS.some((x) => x.id === portal) && subportaisDe(portal).some((sp) => sp.tab === tab);
+  const nomes = [...new Set([
+    ...(temSub("orcamento", "contratos") ? ["contrato"] : []),
+    ...(temSub("orcamento", "cfcr") ? ["município"] : []),
+    ...PORTAIS.flatMap((x) => (x.id === "orcamento" ? [] : NOME_NO_INICIO[x.id] || ["indicador"]))
+  ])];
+  const dicaInicio = nomes.length > 1 ? `${nomes.slice(0, -1).join(", ")} ou ${nomes[nomes.length - 1]}` : nomes[0] || "informação";
+  if (topo) topo.placeholder = p ? `Buscar em ${p.label}: ${DICA_BUSCA_PORTAL[p.id] || "indicador ou painel"}` : `Buscar ${dicaInicio}`;
 }
 
 // ---- Índice dos dados: nomes e números que a pessoa digita de cabeça
@@ -2576,11 +2585,33 @@ async function irParaInformacao(d) {
   mostrarToast(`Aberto: ${d.t}`, "sucesso", 3000);
 }
 function abrirResultadoBusca(i) { const r = buscaEst.res[i]; if (r) irParaInformacao(r); }
+// Consultas de exemplo do início, por portal (ordem de importância). A escolha
+// alterna entre os portais que a conta enxerga, para o início mostrar a
+// variedade do que existe e nunca algo fora do acesso dela.
+const EXEMPLOS_BUSCA = {
+  orcamento: [["Quantos contratos vencem e onde estão", "c-onde"], ["Municípios com e sem cooperação ativa", "x-cob"], ["Quem são os gestores e fiscais dos contratos", "c-pessoas"], ["O que foi acordado com os municípios", "x-obj"], ["Quanto os contratos custam por categoria", "c-valor"]],
+  infraestrutura: [["Ordens de manutenção das unidades", "o-man"], ["Quanto se gastou em obra e manutenção", "o-valor"], ["Unidades inauguradas e não ocupadas", "o-util"]],
+  frota: [["Quantas viaturas cada departamento tem", "f-dep"], ["Quantos veículos são próprios, alugados e cedidos", "f-prop"], ["Onde estão as viaturas, por região", "f-reg"]],
+  projetos: [["Projetos e o andamento de cada um", "p-proj"]],
+  pessoal: [["Servidores lotados, vacância e admissões", "pe-res"]],
+  normas: [["Normas emitidas e projetos de modernização", "n-res"]],
+  patrimonio: [["Itens tombados, requisições e bens sob guarda", "pa-res"]]
+};
+function exemplosDaConta(max = 4) {
+  const listas = Object.entries(EXEMPLOS_BUSCA)
+    .filter(([portal]) => PORTAIS.some((p) => p.id === portal))
+    .map(([, itens]) => itens.filter(([, id]) => { const d = DESTINOS_BUSCA.find((x) => x.id === id); return d && destinoDisponivel(d); }))
+    .filter((l) => l.length);
+  const out = [];
+  for (let i = 0; out.length < max && listas.some((l) => l[i]); i++) listas.forEach((l) => { if (l[i] && out.length < max) out.push(l[i]); });
+  return out;
+}
 function montarExemplosBusca() {
   const alvo = document.getElementById("exemplos-busca"); if (!alvo) return;
-  const ex = [["Quantos contratos vencem e onde estão", "c-onde"], ["Quem são os gestores e fiscais dos contratos", "c-pessoas"], ["Quantas viaturas cada departamento tem", "f-dep"], ["Municípios com e sem cooperação ativa", "x-cob"], ["Ordens de manutenção das unidades", "o-man"]]
-    .filter(([, id]) => destinoDisponivel(DESTINOS_BUSCA.find((d) => d.id === id))).slice(0, 3);
+  const ex = exemplosDaConta();
   alvo.innerHTML = ex.map(([t, id]) => `<button type="button" data-busca-exemplo="${id}">${t}</button>`).join("");
+  const home = document.getElementById("busca-home");
+  if (home) home.placeholder = ex.length ? `Ex.: ${ex[0][0].charAt(0).toLowerCase()}${ex[0][0].slice(1)}` : "Digite o que você precisa saber";
 }
 document.addEventListener("click", (e) => {
   const t = e.target;
