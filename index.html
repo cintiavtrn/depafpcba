@@ -1221,7 +1221,7 @@ footer{border-top:1px solid var(--paper-line)}
   transition:background-color var(--transition-ui),border-color var(--transition-ui),color var(--transition-ui)}
 .exemplos-busca button:hover{background:var(--tinta-glow);border-color:var(--tinta);color:var(--carvao)}
 
-@media (max-width:600px){#usuario-badge{display:none!important}.topbar .brand-text{font-size:9px}}
+@media (max-width:600px){.topbar .brand-text{font-size:9px}}
 
 /* ---------- TEMA V3 refinado: cartões com ícone, topo, menu recolhível ---------- */
 .kpi-icone{display:flex;flex:none;width:32px;height:32px;border-radius:10px;align-items:center;justify-content:center;
@@ -1264,7 +1264,9 @@ footer{border-top:1px solid var(--paper-line)}
 }
 @media (max-width:700px){#usuario-badge .perfil-nome{display:none}}
 /* início */
-.inicio-esq .intro h1{max-width:12ch}
+@media (min-width:1000px){.inicio-esq .intro h1{max-width:12ch}}
+.inicio-esq .intro h1{text-align:center}
+@media (min-width:1000px){.inicio-esq .intro h1{text-align:left}}
 /* menu lateral */
 .portal-layout{transition:grid-template-columns var(--transition-ui)}
 .portal-menu{padding:10px;background:linear-gradient(180deg,var(--surface),var(--paper));}
@@ -1285,6 +1287,43 @@ footer{border-top:1px solid var(--paper-line)}
 .portal-layout.recolhido .pm-seta{transform:rotate(180deg)}
 .portal-layout.recolhido .pm-portal-atual.pm-no-portal.atual::before,.portal-layout.recolhido .pm-portal-atual::before{display:none}
 @media (max-width:900px){.pm-rodape{display:none}.portal-layout.recolhido{grid-template-columns:1fr}.portal-layout.recolhido .pm-item>span:not(.pm-icone):not(.pm-seta){display:inline}}
+
+/* ---------- celular: login em uma coluna, topo em linhas, sem sobreposição ---------- */
+@media (max-width:860px){
+  .login-grade{grid-template-columns:1fr!important}
+  .login-id{padding:20px 20px 16px!important;gap:0!important;border-bottom:1px solid var(--border-subtle)!important}
+  .login-id::before{display:none}
+  .login-frase{display:block}
+  .login-frase h1{font-size:1.35rem!important;max-width:none!important;margin-top:14px}
+  .login-areas,.login-frase p{display:none!important}
+  .login-acesso{padding:24px 20px 40px!important;align-items:flex-start}
+  .login-caixa{max-width:none}
+  .login-google{width:100%;overflow:hidden}
+  .login-google>div{max-width:100%}
+  .login-ou{font-size:10px}
+}
+@media (max-width:700px){
+  .topbar{grid-template-columns:minmax(0,1fr)!important;row-gap:8px;padding:10px 16px}
+  .topo-esq{grid-column:1!important;grid-row:1;flex-wrap:nowrap;gap:10px}
+  .topbar .topbar-acoes{grid-column:1!important;grid-row:2;justify-content:space-between;width:100%;gap:2px}
+  .topbar .topbar-acoes .voltar{padding:7px 8px;font-size:var(--fs-ui-sm)}
+  .topbar .topo-busca-wrap{grid-column:1!important;grid-row:3}
+  .topbar .brand-text{white-space:nowrap;font-size:9px;letter-spacing:.08em}
+  .topbar .brand-text b{font-size:1.15rem}
+  .topbar .topo-portal-btn{max-width:100%;padding:7px 10px;font-size:var(--fs-ui)}
+  .topo-esq{min-width:0}
+  .topo-portal{min-width:0;flex:0 1 auto}
+  .topbar .brand{flex:none}
+  #usuario-badge{margin-right:auto}
+  .intro{padding:0 16px}
+  /* pares de colunas escritos no estilo do elemento empilham no celular */
+  [style*="grid-template-columns:1fr 1fr"],[style*="grid-template-columns: 1fr 1fr"]{grid-template-columns:minmax(0,1fr)!important}
+  [style*="grid-template-columns"]>*{min-width:0}
+  .grade-destaques,.dash-charts{grid-template-columns:minmax(0,1fr)!important}
+  .grupo-dashboard{padding-left:0!important;border-left:0!important}
+  .inicio-esq .intro h1{font-size:2rem;line-height:1.05}
+  .rotulo-rosa{padding:0 16px}
+}
 </style>
 </head>
 <body>
@@ -3184,6 +3223,8 @@ function iniciarApp() {
     theme: "outline",
     size: "large",
     text: "signin_with",
+    // largura do botão acompanha a tela (o padrão estoura em celulares estreitos)
+    width: Math.max(200, Math.min(360, window.innerWidth - 56)),
   });
 
   const sessao = obterSessao();
