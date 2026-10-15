@@ -1223,6 +1223,9 @@ footer{border-top:1px solid var(--paper-line)}
 
 @media (max-width:600px){.topbar .brand-text{font-size:9px}}
 
+.frota-v2 .v2-lin[data-fv2-multi]:hover,.frota-v2 .v2-lin.on{background:var(--paper-line)}
+.frota-v2 .v2-mx th[data-fv2-multi]:hover,.frota-v2 .v2-mx td[data-fv2-multi]:hover{outline:2px solid var(--tinta);outline-offset:-2px}
+.frota-v2 .v2-lin b[data-fv2-multi]{cursor:pointer}
 /* ---------- TEMA V3 refinado: cartões com ícone, topo, menu recolhível ---------- */
 .kpi-icone{display:flex;flex:none;width:32px;height:32px;border-radius:10px;align-items:center;justify-content:center;
   background:color-mix(in srgb,var(--kpi-cor,var(--tinta)) 16%,transparent);color:var(--kpi-cor,var(--tinta))}
@@ -7807,6 +7810,7 @@ function renderGerencialContratos(lista, resumo) {
     const qtdVencidos = filtrada.filter((c) => c.statusVigencia === "Vencido").length;
     const qtdAVencer = filtrada.filter((c) => c.statusVigencia === "A Vencer").length;
     const qtdAContratar = filtrada.filter((c) => c.statusVigencia === "A Contratar").length;
+    const qtdVigentes = filtrada.filter((c) => c.statusVigencia === "Vigente").length;
     const valorInicial = filtrada.reduce((a, c) => a + (c.valorGlobalInicial || 0), 0);
     const valorAtual = filtrada.reduce((a, c) => a + (c.valorGlobalAtual || 0), 0);
     // Pedido direto: "no DEPIN tem muitos contratos vencidos já... isso
@@ -8136,6 +8140,7 @@ function renderGerencialContratos(lista, resumo) {
     // em #ger-rodape, não precisa religar aqui.
     document.getElementById("ger-rodape").innerHTML = `
       <div class="kpi-card kpi-clicavel" data-criticidade="Baixo" title="Clique pra ver quais são" style="--kpi-cor:var(--crit-baixo);cursor:pointer;${filtroCriticidadeBaixo ? "outline:2px solid var(--crit-baixo);outline-offset:-2px" : ""}"><div class="kpi-cabeca">${kpiIcone("relogio")}<div class="kpi-label">% Contratos Baixo</div></div><div class="kpi-value">${pctBaixo.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}%</div></div>
+      <div class="kpi-card kpi-clicavel" data-status="Vigente" title="Clique pra ver quais são" style="--kpi-cor:var(--crit-baixo);cursor:pointer;${filtroStatusKpi === "Vigente" ? "outline:2px solid var(--crit-baixo);outline-offset:-2px" : ""}"><div class="kpi-cabeca">${kpiIcone("relogio")}<div class="kpi-label">Qtd Contratos Vigentes</div></div><div class="kpi-value">${qtdVigentes.toLocaleString("pt-BR")}</div></div>
       <div class="kpi-card kpi-clicavel" data-status="A Contratar" title="Clique pra ver quais são" style="--kpi-cor:var(--crit-neutro);cursor:pointer;${filtroStatusKpi === "A Contratar" ? "outline:2px solid var(--crit-neutro);outline-offset:-2px" : ""}"><div class="kpi-cabeca">${kpiIcone("calendario")}<div class="kpi-label">Qtd A Contratar</div></div><div class="kpi-value">${qtdAContratar.toLocaleString("pt-BR")}</div>${valorAContratar ? `<div class="kpi-valor-exato">R$ ${escapeHTML(formatarMoedaCompacta(valorAContratar))} estimado${qtdAContratar === 1 ? "" : "s"}</div>` : ""}</div>
       <div class="kpi-card kpi-clicavel" data-acao="aditivos" title="Clique pra ver a distribuição" style="cursor:pointer"><div class="kpi-cabeca">${kpiIcone("aditivo")}<div class="kpi-label">Qtd Total de Aditivos</div></div><div class="kpi-value">${qtdTotalAditivos.toLocaleString("pt-BR")}</div></div>
       <div class="kpi-card kpi-clicavel" data-acao="aditivos" title="Clique pra ver a distribuição" style="cursor:pointer"><div class="kpi-cabeca">${kpiIcone("aditivo")}<div class="kpi-label">Média de Aditivos / Contrato</div></div><div class="kpi-value">${mediaAditivos.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}</div><div class="kpi-valor-exato">${qtd3MaisAditivos.toLocaleString("pt-BR")} contrato${qtd3MaisAditivos === 1 ? "" : "s"} com 3+ aditivos</div></div>
@@ -8891,15 +8896,21 @@ function renderCabecalhoContratos(lista, resumo, unidade) {
 function renderSituacaoContratos(lista, resumo) {
   const alvo = document.getElementById("contratos-v2-situacao"); if (!alvo) return;
   const segs = [
-    { k: "NaoVencidoVigente", l: "Vigentes", n: resumo.qtdVigentes, bg: "#9AA5A7", fg: "#111819", semAcao: true },
+    { k: "NaoVencidoVigente", l: "Vigentes", n: resumo.qtdVigentes, bg: "#9AA5A7", fg: "#111819" },
     { k: "A Vencer", l: "A vencer em 90 dias", n: resumo.qtdAVencer, bg: "var(--mostarda)", fg: "#111819" },
     { k: "Vencido", l: "Vencidos", n: resumo.qtdVencidos, bg: "var(--terracota)", fg: "#111819" },
-    { k: "AContratar", l: "A contratar", n: resumo.qtdAContratar, bg: "#56625F", fg: "#E4EBE9", semAcao: true },
+    { k: "AContratar", l: "A contratar", n: resumo.qtdAContratar, bg: "#56625F", fg: "#E4EBE9" },
   ].filter((x) => x.n > 0);
   alvo.innerHTML = `<section class="nota-v2"><div class="k">Situação</div><div class="v"><h3>Situação dos ${resumo.qtdContratos.toLocaleString("pt-BR")} contratos</h3>${v2Pilha(segs, { acao: "situacao-contratos" })}</div></section>`;
 }
 document.addEventListener("click", (e) => {
   const b = e.target.closest("[data-v2-acao='situacao-contratos']"); if (!b) return;
+  const alvoStatus = { NaoVencidoVigente: "Vigente", AContratar: "A Contratar" }[b.dataset.k];
+  if (alvoStatus) {
+    document.querySelector('[data-subtab-contratos="gerencial"]')?.click();
+    document.querySelector(`#contratos-sub-gerencial [data-status="${alvoStatus}"]`)?.dispatchEvent(new Event("click", { bubbles: true }));
+    return;
+  }
   document.querySelector(`#contratos-resumo-rapido [data-resumo-status="${b.dataset.k}"]`)?.click();
 });
 
@@ -8920,31 +8931,34 @@ const V2C_STATUS_COR = [V2C_COR.vigente, V2C_COR.aVencer, V2C_COR.vencido, V2C_C
 function v2Barras(itens, { max, sel, acao } = {}) {
   const mx = max || Math.max(...itens.map((i) => i.v), 1);
   return itens.map((i) => {
-    const tag = i.clic === false || !acao ? "div" : "button";
+    const ac = i.acao || acao;
+    const tag = i.clic === false || !ac ? "div" : "button";
     const cor = sel === i.k ? "var(--tinta)" : i.cor || "#7E8A8C";
-    return `<${tag} class="v2-lin ${sel === i.k ? "on" : ""}" ${tag === "button" ? `type="button" data-v2c="${acao}" data-k="${escapeAttr(i.k)}"` : ""} title="${escapeAttr(i.l)}"><span class="v2-lin-r">${escapeHTML(i.l)}</span><div class="v2-lin-t"><div class="v2-lin-b" style="width:${i.v / mx * 100}%;background:${cor}"></div></div><span class="v2-lin-v">${i.txt}</span></${tag}>`;
+    return `<${tag} class="v2-lin ${sel === i.k ? "on" : ""}" ${tag === "button" ? `type="button" data-v2c="${ac}" data-k="${escapeAttr(i.k)}"` : ""} title="${escapeAttr(i.l)}"><span class="v2-lin-r">${escapeHTML(i.l)}</span><div class="v2-lin-t"><div class="v2-lin-b" style="width:${i.v / mx * 100}%;background:${cor}"></div></div><span class="v2-lin-v">${i.txt}</span></${tag}>`;
   }).join("");
 }
-function v2Empilhadas(rows, cols, cores) {
+function v2Empilhadas(rows, cols, cores, acao = "") {
   const rt = rows.map((r) => r.v.reduce((a, b) => a + b, 0)), mx = Math.max(...rt, 1);
-  return rows.map((r, i) => `<div class="v2-lin"><span class="v2-lin-r" title="${escapeAttr(r.l)}">${escapeHTML(r.l)}</span><div class="v2-lin-t"><div class="v2-lin-b" style="width:${rt[i] / mx * 100}%">${r.v.map((x, j) => x ? `<b style="flex:${x};background:${cores[j]};color:${j === 0 || j === 3 ? "#111819" : "#111819"}" title="${escapeAttr(cols[j])}: ${x}">${i === 0 && x / rt[i] > .22 ? escapeHTML(cols[j]) : ""}</b>` : "").join("")}</div></div><span class="v2-lin-v">${rt[i]}</span></div>`).join("");
+  return rows.map((r, i) => `<div class="v2-lin"${acao ? ` data-v2c="${acao}" data-r="${i}" style="cursor:pointer"` : ""}><span class="v2-lin-r" title="${escapeAttr(r.l)}">${escapeHTML(r.l)}</span><div class="v2-lin-t"><div class="v2-lin-b" style="width:${rt[i] / mx * 100}%">${r.v.map((x, j) => x ? `<b style="flex:${x};background:${cores[j]};color:${j === 0 || j === 3 ? "#111819" : "#111819"}" title="${escapeAttr(cols[j])}: ${x}">${i === 0 && x / rt[i] > .22 ? escapeHTML(cols[j]) : ""}</b>` : "").join("")}</div></div><span class="v2-lin-v">${rt[i]}</span></div>`).join("");
 }
-function v2Matriz(rows, cols, modo, { neutra = -1, cores = null } = {}) {
+function v2Matriz(rows, cols, modo, { neutra = -1, cores = null, acao = "", sel = null } = {}) {
   const N = (n) => Math.round(n).toLocaleString("pt-BR"), soma = (a) => a.reduce((x, y) => x + y, 0);
   const rt = rows.map((r) => soma(r.v)), ct = cols.map((_, j) => soma(rows.map((r) => r.v[j]))), g = soma(rt);
   if (!g) return `<p class="item-sub-v2">Nenhum contrato com esses filtros.</p>`;
-  if (modo === "barras" && cores) return v2Empilhadas(rows, cols, cores);
+  if (modo === "barras" && cores) return v2Empilhadas(rows, cols, cores, acao);
   const pc = modo === "prop", val = (i, j) => pc ? (rt[i] ? rows[i].v[j] / rt[i] * 100 : 0) : rows[i].v[j];
   const mx = Math.max(...rows.map((_, i) => Math.max(...cols.map((__, j) => j === neutra ? 0 : val(i, j)))), 1);
   const p1 = (v) => v > 0 && v < .5 ? "<1" : String(Math.round(v));
-  const cel = (v, txt, j) => {
+  const at = (i, j) => (acao ? ` data-v2c="${acao}" data-r="${i}" data-c="${j}" style="cursor:pointer"` : "");
+  const marca = (i, j) => (sel && sel.r === i && (sel.c === null || sel.c === j) ? "outline:2px solid var(--tinta);outline-offset:-2px;" : "");
+  const cel = (v, txt, j, i) => {
     if (!v) return `<td class="z"></td>`;
-    if (j === neutra) return `<td class="z" style="color:#9AA3B2">${txt}</td>`;
+    if (j === neutra) return `<td class="z"${at(i, j).replace(' style="cursor:pointer"', "")} style="${acao ? "cursor:pointer;" : ""}color:#9AA3B2;${marca(i, j)}">${txt}</td>`;
     const k = Math.round(14 + 86 * Math.pow(v / mx, 0.6));
-    return `<td style="background:color-mix(in srgb,var(--tinta) ${k}%,var(--surface));color:${k > 55 ? "#111819" : "var(--carvao)"}">${txt}</td>`;
+    return `<td${at(i, j).replace(' style="cursor:pointer"', "")} style="${acao ? "cursor:pointer;" : ""}background:color-mix(in srgb,var(--tinta) ${k}%,var(--surface));color:${k > 55 ? "#111819" : "var(--carvao)"};${marca(i, j)}">${txt}</td>`;
   };
   return `<div class="v2-mx-rol"><table class="v2-mx"><thead><tr><th></th>${cols.map((c) => `<th class="rot"><div>${escapeHTML(c)}</div></th>`).join("")}<th class="rot"><div><b>Total</b></div></th></tr></thead><tbody>` +
-    rows.map((r, i) => `<tr><th class="rl" title="${escapeAttr(r.l)}">${escapeHTML(r.l)}</th>${r.v.map((x, j) => { const v = val(i, j); return cel(v, pc ? p1(v) : N(x), j); }).join("")}<td class="t">${pc ? "100" : N(rt[i])}</td></tr>`).join("") +
+    rows.map((r, i) => `<tr><th class="rl" title="${escapeAttr(r.l)}"${acao ? ` data-v2c="${acao}" data-r="${i}" data-c="" style="cursor:pointer"` : ""}>${escapeHTML(r.l)}</th>${r.v.map((x, j) => { const v = val(i, j); return cel(v, pc ? p1(v) : N(x), j, i); }).join("")}<td class="t">${pc ? "100" : N(rt[i])}</td></tr>`).join("") +
     `<tr><th class="rl"><b>Total</b></th>${ct.map((x) => `<td class="t">${pc ? p1(x / g * 100) : N(x)}</td>`).join("")}<td class="t">${pc ? "100" : N(g)}</td></tr></tbody></table></div>`;
 }
 
@@ -9032,7 +9046,7 @@ function montarMenuContratos(painel, getContext) {
   const mes = (c) => (c.dataFim ? String(c.dataFim).slice(0, 7) : "");
   const MESES_ROT = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
   const mesRot = (ym) => (ym === "vencidos" ? "Vencidos" : `${MESES_ROT[+ym.slice(5, 7) - 1]}/${ym.slice(2, 4)}`);
-  const ST = { mes: null, cat: null, pes: null, onde: "todos", valorModo: "valor", pesPapel: "Gestor", mx: "matriz" };
+  const ST = { mes: null, cat: null, pes: null, onde: "todos", valorModo: "valor", pesPapel: "Gestor", mx: "matriz", valorTodas: false, dirpin: null, mxTodas: false, cel: null };
   const base = () => getContext().lista;
   const passa = (c, ign = {}) => {
     if (!ign.mes && ST.mes && (ST.mes === "vencidos" ? c.statusVigencia !== "Vencido" : mes(c) !== ST.mes || c.statusVigencia === "Vencido")) return false;
@@ -9049,7 +9063,7 @@ function montarMenuContratos(painel, getContext) {
     return p.length ? `<div class="v2c-ativos"><span class="rot-v2">Filtros ativos</span>${p.map(([k, t]) => `<span class="v2c-pilula">${escapeHTML(t)}<button type="button" data-v2c="limpa" data-k="${k}" aria-label="Remover filtro ${escapeAttr(t)}">×</button></span>`).join("")}<button type="button" class="dash-toggle-btn" data-v2c="limpa" data-k="tudo">Limpar filtros</button></div>` : "";
   };
   const grp = (id, ops, atual) => `<div class="dash-toggle" role="group">${ops.map(([k, l]) => `<button type="button" class="dash-toggle-btn${k === atual ? " active" : ""}" data-v2c="troca" data-id="${id}" data-k="${k}" aria-pressed="${k === atual}">${l}</button>`).join("")}</div>`;
-  const tabela = (lista, titulo, limite = 10) => {
+  const tabela = (lista, titulo, limite = 100) => {
     if (!lista.length) return `<p class="item-sub-v2">Nenhum contrato com esses filtros.</p>`;
     return `<h4 class="v2c-lista-tit">${escapeHTML(titulo)}${lista.length > limite ? ` <span class="etiqueta-v2">${limite} de ${N(lista.length)}</span>` : ""}</h4><div class="tabela-rolavel" style="max-height:340px" data-v2c-tab>${tabelaContratosHTML(lista.slice(0, limite))}</div>`;
   };
@@ -9090,9 +9104,11 @@ function montarMenuContratos(painel, getContext) {
     const lista = filtrada({ cat: true }), g = {};
     lista.forEach((c) => { const k = categoria(c); (g[k] ||= { n: 0, v: 0 }); g[k].n++; g[k].v += c.valorGlobalAtual || 0; });
     const v = ST.valorModo === "valor", todos = Object.entries(g).map(([k, x]) => ({ k, ...x })).sort((a, b) => (v ? b.v - a.v : b.n - a.n));
-    const itens = todos.slice(0, 7).map((d) => ({ k: d.k, l: d.k, v: v ? d.v : d.n, txt: v ? moedaC(d.v) : N(d.n) }));
-    const resto = todos.slice(7);
-    if (resto.length) { const vr = soma(resto.map((d) => (v ? d.v : d.n))); itens.push({ k: "outras", l: `Outras ${resto.length} categorias`, v: vr, txt: v ? moedaC(vr) : N(vr), cor: "#56625F", clic: false }); }
+    const LIM = 7, mostrar = ST.valorTodas ? todos : todos.slice(0, LIM);
+    const itens = mostrar.map((d) => ({ k: d.k, l: d.k, v: v ? d.v : d.n, txt: v ? moedaC(d.v) : N(d.n) }));
+    const resto = todos.slice(LIM);
+    if (resto.length && !ST.valorTodas) { const vr = soma(resto.map((d) => (v ? d.v : d.n))); itens.push({ k: "mais", l: `Outras ${resto.length} categorias (ver todas)`, v: vr, txt: v ? moedaC(vr) : N(vr), cor: "#56625F", acao: "maisCat" }); }
+    else if (resto.length && ST.valorTodas) itens.push({ k: "menos", l: `Mostrar só as ${LIM} maiores`, v: 0, txt: "", cor: "#56625F", acao: "maisCat" });
     const sel = ST.cat === null ? null : ST.cat;
     return `${pilulas()}<div class="v2c-ctl">${grp("valorModo", [["valor", "Por valor"], ["qtd", "Por quantidade"]], ST.valorModo)}</div>${itens.length ? v2Barras(itens, { sel, acao: "cat" }) : `<p class="item-sub-v2">Nenhum contrato com esses filtros.</p>`}
       <div data-v2c-lista>${ST.cat !== null ? tabela([...filtrada()].sort((a, b) => (b.valorGlobalAtual || 0) - (a.valorGlobalAtual || 0)), `Contratos de ${ST.cat}, do maior valor para o menor`) : ""}</div>`;
@@ -9111,16 +9127,25 @@ function montarMenuContratos(painel, getContext) {
   function itemRegional() {
     const so = ST.onde === "avencer", lista = filtrada().filter((c) => !so || c.statusVigencia === "A Vencer");
     const nomes = [...new Set(base().flatMap(dirpinsDoContrato))].sort();
-    const itens = nomes.map((d) => ({ k: d, l: "DIRPIN " + d, v: lista.filter((c) => dirpinsDoContrato(c).includes(d)).length })).filter((x) => x.v).sort((a, b) => b.v - a.v).map((x) => ({ ...x, txt: N(x.v), clic: false }));
+    const itens = nomes.map((d) => ({ k: d, l: "DIRPIN " + d, v: lista.filter((c) => dirpinsDoContrato(c).includes(d)).length })).filter((x) => x.v).sort((a, b) => b.v - a.v).map((x) => ({ ...x, txt: N(x.v) }));
     const sem = lista.filter((c) => !dirpinsDoContrato(c).length).length;
-    if (sem) itens.push({ k: "sem", l: "Sem regional definida", v: sem, txt: N(sem), cor: "#56625F", clic: false });
-    return `<div class="v2c-ctl">${grp("onde", [["todos", "Todos os contratos"], ["avencer", "Só os a vencer em 90 dias"]], ST.onde)}</div>` + (itens.length ? v2Barras(itens) + `<p class="item-sub-v2">Um contrato da DEPIN pode atender mais de uma diretoria regional e entra em cada uma. Contratos que não são da DEPIN não têm regional.</p>` : `<p class="item-sub-v2">Nenhum contrato com esses filtros.</p>`);
+    if (sem) itens.push({ k: "sem", l: "Sem regional definida", v: sem, txt: N(sem), cor: "#56625F" });
+    const doRecorte = ST.dirpin === null ? [] : lista.filter((c) => (ST.dirpin === "sem" ? !dirpinsDoContrato(c).length : dirpinsDoContrato(c).includes(ST.dirpin))).sort((a, b) => (a.diasParaVencer ?? 1e9) - (b.diasParaVencer ?? 1e9));
+    const tituloRegional = ST.dirpin === null ? "" : ST.dirpin === "sem" ? "Contratos sem regional definida, dos mais urgentes aos menos" : `Contratos da DIRPIN ${ST.dirpin}, dos mais urgentes aos menos`;
+    return `<div class="v2c-ctl">${grp("onde", [["todos", "Todos os contratos"], ["avencer", "Só os a vencer em 90 dias"]], ST.onde)}</div>` + (itens.length ? v2Barras(itens, { acao: "dirpin", sel: ST.dirpin }) + `<p class="item-sub-v2">Um contrato da DEPIN pode atender mais de uma diretoria regional e entra em cada uma. Contratos que não são da DEPIN não têm regional. Clique numa barra para ver os contratos dela.</p>` + `<div data-v2c-lista>${ST.dirpin !== null ? tabela(doRecorte, tituloRegional) : ""}</div>` : `<p class="item-sub-v2">Nenhum contrato com esses filtros.</p>`);
   }
   // ---- Situação: categoria x situação
   function itemMatriz() {
     const g = {}; filtrada().forEach((c) => { const k = categoria(c), j = Math.max(V2C_STATUS.indexOf(c.statusVigencia), 0); (g[k] ||= [0, 0, 0, 0])[j]++; });
-    const rows = Object.entries(g).map(([l, v]) => ({ l, v })).sort((a, b) => soma(b.v) - soma(a.v)).slice(0, 12);
-    return `${pilulas()}<div class="v2c-ctl">${grp("mx", [["matriz", "Matriz"], ["barras", "Barras"], ["prop", "% da linha"]], ST.mx)}</div>` + v2Matriz(rows, V2C_STATUS_ROT, ST.mx, { cores: V2C_STATUS_COR });
+    const todas = Object.entries(g).map(([l, v]) => ({ l, v })).sort((a, b) => soma(b.v) - soma(a.v));
+    const rows = ST.mxTodas ? todas : todas.slice(0, 12);
+    ST.mxRows = rows;
+    const sel = ST.cel && rows[ST.cel.r] ? { r: ST.cel.r, c: ST.cel.c } : null;
+    const lstCel = ST.cel && rows[ST.cel.r] ? filtrada().filter((c) => categoria(c) === rows[ST.cel.r].l && (ST.cel.c === null || Math.max(V2C_STATUS.indexOf(c.statusVigencia), 0) === ST.cel.c)).sort((a, b) => (a.diasParaVencer ?? 1e9) - (b.diasParaVencer ?? 1e9)) : [];
+    const tituloCel = sel ? `${rows[sel.r].l}${sel.c === null ? "" : `, ${V2C_STATUS_ROT[sel.c].toLowerCase()}`}` : "";
+    return `${pilulas()}<div class="v2c-ctl">${grp("mx", [["matriz", "Matriz"], ["barras", "Barras"], ["prop", "% da linha"]], ST.mx)}</div>` + v2Matriz(rows, V2C_STATUS_ROT, ST.mx, { cores: V2C_STATUS_COR, acao: "cel", sel })
+      + (todas.length > 12 ? `<div class="v2c-ctl" style="margin-top:10px"><button type="button" class="dash-toggle-btn" data-v2c="maisMx">${ST.mxTodas ? "Mostrar só as 12 maiores categorias" : `Ver as ${todas.length} categorias`}</button></div>` : "")
+      + `<p class="item-sub-v2">Clique numa célula para ver os contratos daquela categoria e situação, ou no nome da categoria para ver todos.</p><div data-v2c-lista>${sel ? tabela(lstCel, tituloCel) : ""}</div>`;
   }
 
   const raizMenu = menuPorTipo(painel, {
@@ -9142,11 +9167,11 @@ function montarMenuContratos(painel, getContext) {
         { id: "porpessoas", titulo: "Perfil de cada gestor e fiscal", etiqueta: "Por pessoas", legado: "porpessoas" },
       ] },
       { tipo: "Onde estão", itens: [
-        { id: "regional", titulo: "Contratos por diretoria regional", render: itemRegional },
+        { id: "regional", titulo: "Contratos por diretoria regional", render: itemRegional, depois: (c) => ligarTabela(c, ultimaLista.mes) },
         { id: "porarea", titulo: "Contratos por setor demandante", etiqueta: "Por área", legado: "porarea", tituloDinamico: () => (document.getElementById("contratos-tab-porarea-label")?.textContent === "UNIDADES ATENDIDAS" ? "Contratos por unidade atendida" : "Contratos por setor demandante") },
       ] },
       { tipo: "Situação", itens: [
-        { id: "matriz", titulo: "Situação dos contratos em cada categoria", render: itemMatriz },
+        { id: "matriz", titulo: "Situação dos contratos em cada categoria", render: itemMatriz, depois: (c) => ligarTabela(c, ultimaLista.mes) },
         { id: "atualizados", titulo: "Contratos atualizados recentemente", etiqueta: "Histórico", legado: "atualizados" },
       ] },
     ],
@@ -9161,6 +9186,13 @@ function montarMenuContratos(painel, getContext) {
     else if (a === "cat") ST.cat = ST.cat === k ? null : k;
     else if (a === "pessoa") ST.pes = ST.pes && ST.pes.nome === k && ST.pes.papel === ST.pesPapel ? null : { nome: k, papel: ST.pesPapel };
     else if (a === "troca") { ST[b.dataset.id] = k; }
+    else if (a === "maisCat") ST.valorTodas = !ST.valorTodas;
+    else if (a === "maisMx") ST.mxTodas = !ST.mxTodas;
+    else if (a === "dirpin") ST.dirpin = ST.dirpin === k ? null : k;
+    else if (a === "cel") {
+      const r = +b.dataset.r, c = b.dataset.c === "" || b.dataset.c === undefined ? null : +b.dataset.c;
+      ST.cel = ST.cel && ST.cel.r === r && ST.cel.c === c ? null : { r, c };
+    }
     else if (a === "limpa") { if (k === "tudo") { ST.mes = null; ST.cat = null; ST.pes = null; } else ST[k] = null; }
     raizMenu.renderAberto();
   });
@@ -9170,7 +9202,7 @@ function montarMenuContratos(painel, getContext) {
   return {
     ...raizMenu,
     // Base nova (outra unidade gestora ou DIRPIN): zera os filtros locais.
-    novaBase() { ST.mes = null; ST.cat = null; ST.pes = null; raizMenu.fechar(); },
+    novaBase() { ST.mes = null; ST.cat = null; ST.pes = null; ST.dirpin = null; ST.cel = null; ST.valorTodas = false; ST.mxTodas = false; raizMenu.fechar(); },
   };
 }
 
@@ -12158,43 +12190,59 @@ function montarPainelFrota(raiz, DB) {
   const FN = { c: ["Caracterizado padrão", "Descaracterizado", "Caracterizado ADM"], p: ["Próprio", "Alugado", "Cedido"], r: ["Capital", "RMS", "Interior"] };
   const COR_P = ["#9AA5A7", "var(--tinta)", "#56625F"], COR_P_T = ["#111819", "#111819", "#E4EBE9"];
   const DIMF = { tipo: ["Tipo de veículo", 5, TN], dep: ["Departamento", 0, D], prop: ["Propriedade", 2, FN.p], reg: ["Região", 3, FN.r], carac: ["Caracterização", 1, FN.c] };
-  const EST = { c: [], p: [], r: [], linhas: "tipo", modo: "matriz", abertos: new Set() };
-  const filtra = (r) => (!EST.c.length || EST.c.includes(r[1])) && (!EST.p.length || EST.p.includes(r[2])) && (!EST.r.length || EST.r.includes(r[3]));
-  const fv = () => V.filter(filtra);
+  // c/p/r são os filtros do topo; x guarda os que nascem do clique nos gráficos
+  // (departamento, modelo, tipo, ano de fabricação, ano de entrega).
+  const EST = { c: [], p: [], r: [], x: { dep: [], mod: [], tipo: [], af: [], ae: [] }, linhas: "tipo", modo: "matriz", abertos: new Set(), depTodos: false };
+  const IDX = { c: 1, p: 2, r: 3, dep: 0, tipo: 5, mod: 6, af: 7, ae: 8 };
+  const FNOME = { tipo: "tipo", dep: "dep", prop: "p", reg: "r", carac: "c" };
+  const lista = (d) => (["c", "p", "r"].includes(d) ? EST[d] : EST.x[d]);
+  const filtra = (r, ign = "") => Object.keys(IDX).every((d) => d === ign || !lista(d).length || lista(d).includes(r[IDX[d]]));
+  const temX = () => Object.values(EST.x).some((a) => a.length);
+  const fv = (ign = "") => V.filter((r) => filtra(r, ign));
   const somaV = (R, fn = () => true) => soma(R.filter(fn).map((r) => r[9]));
   const esc = escapeHTML;
 
   const grupoBtn = (id, ops, atual) => `<div class="dash-toggle" role="group">${ops.map(([k, l]) => `<button type="button" class="dash-toggle-btn${k === atual ? " active" : ""}" data-fv2-troca="${id}" data-v="${k}" aria-pressed="${k === atual}">${l}</button>`).join("")}</div>`;
-  function empilhadas(rows, cols, cores, cortes) {
+  // meta: { dim, segDim, extra } faz a linha filtrar por dim e cada segmento por dim + segDim.
+  function empilhadas(rows, cols, cores, cortes, meta = null) {
     const rt = rows.map((r) => soma(r.v)), mx = Math.max(...rt, 1);
-    return rows.map((r, i) => `<div class="v2-lin"><span class="v2-lin-r" title="${esc(r.l)}">${esc(r.l)}</span><div class="v2-lin-t"><div class="v2-lin-b" style="width:${rt[i] / mx * 100}%">${r.v.map((x, j) => x ? `<b style="flex:${x};background:${cores[j]};color:${cortes[j]}" title="${esc(cols[j])}: ${N(x)}">${i === 0 && x / rt[i] > .22 ? esc(cols[j]) : ""}</b>` : "").join("")}</div></div><span class="v2-lin-v">${N(rt[i])}</span></div>`).join("");
+    const ativa = (par) => par.split(",").every((x) => { const [d, k] = x.split(":"); return lista(d).includes(+k); });
+    return rows.map((r, i) => {
+      const base = meta ? `${meta.dim}:${r.k}${meta.extra ? "," + meta.extra : ""}` : "";
+      return `<div class="v2-lin${meta && ativa(base) ? " on" : ""}"${meta ? ` data-fv2-multi="${base}" style="cursor:pointer" title="Filtrar por ${esc(r.l)}"` : ""}><span class="v2-lin-r" title="${esc(r.l)}">${esc(r.l)}</span><div class="v2-lin-t"><div class="v2-lin-b" style="width:${rt[i] / mx * 100}%">${r.v.map((x, j) => x ? `<b${meta ? ` data-fv2-multi="${base},${meta.segDim}:${j}"` : ""} style="flex:${x};background:${cores[j]};color:${cortes[j]}" title="${esc(cols[j])}: ${N(x)}">${i === 0 && x / rt[i] > .22 ? esc(cols[j]) : ""}</b>` : "").join("")}</div></div><span class="v2-lin-v">${N(rt[i])}</span></div>`;
+    }).join("");
   }
-  function matriz(rows, cols, modo, neutra = -1) {
+  // meta: { rowDim, colDim, colKeys } deixa linhas, colunas e células filtrarem o painel.
+  function matriz(rows, cols, modo, neutra = -1, meta = null) {
     const rt = rows.map((r) => soma(r.v)), ct = cols.map((_, j) => soma(rows.map((r) => r.v[j]))), g = soma(rt);
     if (!g) return `<p class="vazio-v2">Nenhum veículo com esses filtros.</p>`;
     const pc = modo === "prop", val = (i, j) => pc ? (rt[i] ? rows[i].v[j] / rt[i] * 100 : 0) : rows[i].v[j];
     const mx = Math.max(...rows.map((_, i) => Math.max(...cols.map((__, j) => j === neutra ? 0 : val(i, j)))), 1);
     const p1 = (v) => v > 0 && v < .5 ? "<1" : String(Math.round(v));
-    const cel = (v, txt, j) => {
+    const chaveCol = (j) => (meta && meta.colKeys[j] !== undefined && meta.colKeys[j] !== null ? `${meta.colDim}:${meta.colKeys[j]}` : "");
+    const par = (i, j) => (meta ? [`${meta.rowDim}:${rows[i].k}`, j === null ? "" : chaveCol(j)].filter(Boolean).join(",") : "");
+    const at = (i, j) => (meta ? ` data-fv2-multi="${par(i, j)}" style="cursor:pointer"` : "");
+    const cel = (v, txt, j, i) => {
       if (!v) return `<td class="z"></td>`;
-      if (j === neutra) return `<td class="z" style="color:#9AA3B2">${txt}</td>`;
+      if (j === neutra) return `<td class="z"${at(i, j).replace(' style="cursor:pointer"', "")} style="${meta ? "cursor:pointer;" : ""}color:#9AA3B2">${txt}</td>`;
       const k = Math.round(14 + 86 * Math.pow(v / mx, 0.6));
-      return `<td style="background:color-mix(in srgb,var(--tinta) ${k}%,var(--surface));color:${k > 55 ? "#111819" : "var(--carvao)"}">${txt}</td>`;
+      return `<td${at(i, j).replace(' style="cursor:pointer"', "")} style="${meta ? "cursor:pointer;" : ""}background:color-mix(in srgb,var(--tinta) ${k}%,var(--surface));color:${k > 55 ? "#111819" : "var(--carvao)"}">${txt}</td>`;
     };
-    return `<div class="v2-mx-rol"><table class="v2-mx"><thead><tr><th></th>${cols.map((c) => `<th class="rot"><div>${esc(c)}</div></th>`).join("")}<th class="rot"><div><b>Total</b></div></th></tr></thead><tbody>` +
-      rows.map((r, i) => `<tr><th class="rl" title="${esc(r.l)}">${esc(r.l)}</th>${r.v.map((x, j) => { const v = val(i, j); return cel(v, pc ? p1(v) : N(x), j); }).join("")}<td class="t">${pc ? "100" : N(rt[i])}</td></tr>`).join("") +
+    return `<div class="v2-mx-rol"><table class="v2-mx"><thead><tr><th></th>${cols.map((c, j) => `<th class="rot"${meta && chaveCol(j) ? ` data-fv2-multi="${chaveCol(j)}" style="cursor:pointer" title="Filtrar por ${esc(c)}"` : ""}><div>${esc(c)}</div></th>`).join("")}<th class="rot"><div><b>Total</b></div></th></tr></thead><tbody>` +
+      rows.map((r, i) => `<tr><th class="rl" title="${esc(r.l)}"${meta ? ` data-fv2-multi="${par(i, null)}" style="cursor:pointer"` : ""}>${esc(r.l)}</th>${r.v.map((x, j) => { const v = val(i, j); return cel(v, pc ? p1(v) : N(x), j, i); }).join("")}<td class="t">${pc ? "100" : N(rt[i])}</td></tr>`).join("") +
       `<tr><th class="rl"><b>Total</b></th>${ct.map((x) => `<td class="t">${pc ? p1(x / g * 100) : N(x)}</td>`).join("")}<td class="t">${pc ? "100" : N(g)}</td></tr></tbody></table></div>`;
   }
   const comoLer = (t) => `<details class="painel-detalhes" style="margin-top:10px"><summary>Como ler</summary><p style="margin-top:8px">${t}</p></details>`;
 
   const GRUPOS = [
     { id: "dep", tipo: "Quantidades", t: "Viaturas por departamento", r() {
-      const R = fv(), deps = D.map((n, i) => ({ l: (A.includes(i) ? "[adm] " : "") + n, v: [0, 1, 2].map((p) => somaV(R, (r) => r[0] === i && r[2] === p)) })).filter((d) => soma(d.v)).sort((a, b) => soma(b.v) - soma(a.v));
-      return empilhadas(deps.slice(0, 10), FN.p, COR_P, COR_P_T) + `<p class="vazio-v2">Os 10 maiores de ${deps.length} departamentos.</p>` + comoLer("Cada barra é um departamento, dividido em própria, alugada e cedida. O número à direita é o total. [adm] marca as unidades administrativas (GDG, DILOG, ACADEPOL, DGTI, ISPE, DEPAF, DPSV e Ouvidoria).");
+      const R = fv(), deps = D.map((n, i) => ({ k: i, l: (A.includes(i) ? "[adm] " : "") + n, v: [0, 1, 2].map((p) => somaV(R, (r) => r[0] === i && r[2] === p)) })).filter((d) => soma(d.v)).sort((a, b) => soma(b.v) - soma(a.v));
+      const mostrar = EST.depTodos ? deps : deps.slice(0, 10);
+      return empilhadas(mostrar, FN.p, COR_P, COR_P_T, { dim: "dep", segDim: "p" }) + (deps.length > 10 ? `<div class="frota-ctl" style="margin-top:10px"><button type="button" class="dash-toggle-btn" data-fv2-dep-todos="1">${EST.depTodos ? "Mostrar só os 10 maiores" : `Ver os ${deps.length} departamentos`}</button></div>` : "") + comoLer("Clique numa barra para filtrar o painel por aquele departamento, ou num trecho para filtrar também pela propriedade. " + "Cada barra é um departamento, dividido em própria, alugada e cedida. O número à direita é o total. [adm] marca as unidades administrativas (GDG, DILOG, ACADEPOL, DGTI, ISPE, DEPAF, DPSV e Ouvidoria).");
     } },
     { id: "reg", tipo: "Onde estão", t: "Viaturas por região", r() {
       const R = fv();
-      return empilhadas(FN.r.map((n, i) => ({ l: n, v: [0, 1, 2].map((p) => somaV(R, (r) => r[3] === i && r[2] === p)) })), FN.p, COR_P, COR_P_T) + comoLer("Capital, região metropolitana de Salvador (RMS) e interior, divididos por propriedade.");
+      return empilhadas(FN.r.map((n, i) => ({ k: i, l: n, v: [0, 1, 2].map((p) => somaV(R, (r) => r[3] === i && r[2] === p)) })), FN.p, COR_P, COR_P_T, { dim: "r", segDim: "p" }) + comoLer("Capital, região metropolitana de Salvador (RMS) e interior, divididos por propriedade.");
     } },
     { id: "mod", tipo: "Quantidades", t: "Modelos da frota", r() {
       const R = fv(), porM = {}; R.forEach((r) => { porM[r[6]] = (porM[r[6]] || 0) + r[9]; });
@@ -12202,44 +12250,57 @@ function montarPainelFrota(raiz, DB) {
       const cols = top.map((i) => M[i]).concat(outros ? ["Outros modelos"] : []);
       const [, k, labels] = DIMF[EST.linhas], cel = labels.map(() => Array(cols.length).fill(0));
       R.forEach((r) => { const ci = top.indexOf(r[6]); cel[r[k]][ci >= 0 ? ci : cols.length - 1] += r[9]; });
-      const rows = labels.map((l, i) => ({ l, v: cel[i] })).filter((z) => soma(z.v)).sort((a, b) => soma(b.v) - soma(a.v)).slice(0, 12);
-      return `<div class="frota-ctl">${grupoBtn("modo", [["matriz", "Matriz"], ["prop", "% da linha"]], EST.modo)}<label>Linhas <select data-fv2-linhas aria-label="O que mostrar nas linhas">${Object.entries(DIMF).map(([c, d]) => `<option value="${c}" ${EST.linhas === c ? "selected" : ""}>${d[0]}</option>`).join("")}</select></label></div>` + matriz(rows, cols, EST.modo) + comoLer("Colunas são os modelos mais comuns; o restante soma em Outros modelos. As linhas mudam conforme a escolha. Quanto mais clara a célula, mais veículos. A marca foi deduzida do modelo, porque a planilha informa só o modelo.");
+      const rows = labels.map((l, i) => ({ k: i, l, v: cel[i] })).filter((z) => soma(z.v)).sort((a, b) => soma(b.v) - soma(a.v)).slice(0, 12);
+      const todosModelos = ord.map(([i, n]) => `<button type="button" class="v2-lin${EST.x.mod.includes(+i) ? " on" : ""}" data-fv2-multi="mod:${i}" title="Filtrar por ${esc(M[i])}"><span class="v2-lin-r">${esc(M[i])}</span><div class="v2-lin-t"><div class="v2-lin-b" style="width:${n / (ord[0]?.[1] || 1) * 100}%;background:${EST.x.mod.includes(+i) ? "var(--tinta)" : "#7E8A8C"}"></div></div><span class="v2-lin-v">${N(n)}</span></button>`).join("");
+      const metaMod = { rowDim: FNOME[EST.linhas], colDim: "mod", colKeys: cols.map((_, ci) => (ci < top.length ? top[ci] : null)) };
+      return `<div class="frota-ctl">${grupoBtn("modo", [["matriz", "Matriz"], ["prop", "% da linha"]], EST.modo)}<label>Linhas <select data-fv2-linhas aria-label="O que mostrar nas linhas">${Object.entries(DIMF).map(([c, d]) => `<option value="${c}" ${EST.linhas === c ? "selected" : ""}>${d[0]}</option>`).join("")}</select></label></div>` + matriz(rows, cols, EST.modo, -1, metaMod) + `<details class="painel-detalhes" style="margin-top:10px"${EST.x.mod.length ? " open" : ""}><summary>Todos os ${ord.length} modelos</summary><div style="margin-top:8px;max-height:360px;overflow:auto">${todosModelos}</div></details>` + comoLer("Clique numa célula, numa linha ou num modelo para filtrar o painel. Colunas são os modelos mais comuns; o restante soma em Outros modelos. As linhas mudam conforme a escolha. Quanto mais clara a célula, mais veículos. A marca foi deduzida do modelo, porque a planilha informa só o modelo.");
     } },
     { id: "ano", tipo: "Prazos", t: "Ano de fabricação e ano de entrega", r() {
       const R = fv(), anosF = [...new Set(R.map((r) => r[7]))].sort((a, b) => a - b), anosE = [...new Set(R.filter((r) => r[8] > 0).map((r) => r[8]))].sort((a, b) => a - b), sem = R.some((r) => r[8] === 0);
       const cols = anosE.map(String).concat(sem ? ["Sem data de entrega"] : []), cel = anosF.map(() => Array(cols.length).fill(0));
       R.forEach((r) => { cel[anosF.indexOf(r[7])][r[8] > 0 ? anosE.indexOf(r[8]) : cols.length - 1] += r[9]; });
       const com = R.filter((r) => r[8] > 0), nCom = somaV(com), nSem = somaV(R, (r) => r[8] === 0), por = (fn) => somaV(com, fn);
-      return `<p style="max-width:64ch;margin-bottom:10px">${nCom ? `Dos ${N(nCom)} veículos com data de entrega, ${pct(por((r) => r[8] <= r[7]), nCom)} foram entregues no ano de fabricação, ${pct(por((r) => r[8] - r[7] === 1), nCom)} no ano seguinte e ${pct(por((r) => r[8] - r[7] >= 2), nCom)} dois ou mais anos depois. ${N(nSem)} não têm data de entrega.` : "Nenhum veículo com data de entrega nesses filtros."}</p>` + matriz(anosF.map((a, i) => ({ l: String(a), v: cel[i] })), cols, "matriz", sem ? cols.length - 1 : -1) + comoLer("O ano da planilha é o de fabricação. A matriz cruza esse ano com o ano em que o veículo foi entregue. A coluna cinza reúne os veículos sem data de entrega.");
+      const metaAno = { rowDim: "af", colDim: "ae", colKeys: anosE.concat(sem ? [0] : []) };
+      return `<p style="max-width:64ch;margin-bottom:10px">${nCom ? `Dos ${N(nCom)} veículos com data de entrega, ${pct(por((r) => r[8] <= r[7]), nCom)} foram entregues no ano de fabricação, ${pct(por((r) => r[8] - r[7] === 1), nCom)} no ano seguinte e ${pct(por((r) => r[8] - r[7] >= 2), nCom)} dois ou mais anos depois. ${N(nSem)} não têm data de entrega.` : "Nenhum veículo com data de entrega nesses filtros."}</p>` + matriz(anosF.map((a, i) => ({ k: a, l: String(a), v: cel[i] })), cols, "matriz", sem ? cols.length - 1 : -1, metaAno) + comoLer("Clique numa célula, num ano de fabricação ou num ano de entrega para filtrar o painel. O ano da planilha é o de fabricação. A matriz cruza esse ano com o ano em que o veículo foi entregue. A coluna cinza reúne os veículos sem data de entrega.");
     } },
     { id: "adm", tipo: "Situação", t: "Descaracterizados nas unidades administrativas", r() {
-      const R = V.filter((r) => r[1] === 1 && A.includes(r[0])), rows = A.map((d) => ({ l: D[d], v: [0, 1, 2].map((p) => somaV(R, (r) => r[0] === d && r[2] === p)) })).filter((x) => soma(x.v)).sort((a, b) => soma(b.v) - soma(a.v));
-      return `<p style="margin-bottom:10px">${N(somaV(R))} veículos descaracterizados nas oito unidades administrativas, ${N(somaV(R, (r) => r[2] === 1))} deles alugados.</p>` + empilhadas(rows, FN.p, COR_P, COR_P_T) + comoLer("Mostra só os veículos descaracterizados das unidades administrativas, divididos por propriedade. Não muda com os filtros acima.");
+      const R = V.filter((r) => r[1] === 1 && A.includes(r[0])), rows = A.map((d) => ({ k: d, l: D[d], v: [0, 1, 2].map((p) => somaV(R, (r) => r[0] === d && r[2] === p)) })).filter((x) => soma(x.v)).sort((a, b) => soma(b.v) - soma(a.v));
+      return `<p style="margin-bottom:10px">${N(somaV(R))} veículos descaracterizados nas oito unidades administrativas, ${N(somaV(R, (r) => r[2] === 1))} deles alugados.</p>` + empilhadas(rows, FN.p, COR_P, COR_P_T, { dim: "dep", segDim: "p", extra: "c:1" }) + comoLer("Mostra só os veículos descaracterizados das unidades administrativas, divididos por propriedade. Não muda com os filtros acima. Clicar numa barra filtra o painel por aquele departamento e por descaracterizados.");
     } },
   ];
 
   function desenhar() {
     const R = fv(), T = somaV(R), por = (i, v) => somaV(R, (r) => r[i] === v);
-    const des = por(1, 1), alu = por(2, 1), tem = EST.c.length || EST.p.length || EST.r.length;
+    const des = por(1, 1), alu = por(2, 1), tem = EST.c.length || EST.p.length || EST.r.length || temX();
+    const RP = fv("p"), porP = (p) => somaV(RP, (r) => r[2] === p);
+    const ROT_X = { dep: (k) => D[k], mod: (k) => M[k], tipo: (k) => TN[k], af: (k) => `Fabricado em ${k}`, ae: (k) => (k === 0 ? "Sem data de entrega" : `Entregue em ${k}`) };
+    const chipsX = Object.keys(EST.x).flatMap((d) => EST.x[d].map((k) => `<button type="button" class="dash-toggle-btn active" data-fv2-multi="${d}:${k}" title="Remover este filtro" aria-pressed="true">${esc(ROT_X[d](k))} ×</button>`)).join("");
     const filtro = (g, t) => `<label>${t} <div class="dash-toggle" role="group">${FN[g].map((n, i) => `<button type="button" class="dash-toggle-btn${EST[g].includes(i) ? " active" : ""}" data-fv2-chip="${g}" data-k="${i}" aria-pressed="${EST[g].includes(i)}">${n}</button>`).join("")}</div></label>`;
-    const seg = [0, 1, 2].map((p) => ({ k: String(p), l: FN.p[p], n: por(2, p), bg: COR_P[p], fg: COR_P_T[p], semAcao: true }));
+    const seg = [0, 1, 2].map((p) => ({ k: String(p), l: FN.p[p], n: porP(p), bg: COR_P[p], fg: COR_P_T[p] }));
     const todos = GRUPOS.every((g) => EST.abertos.has(g.id));
     raiz.innerHTML = `
       <header class="cab-v2"><div class="rot-v2">Frota · Frota de viaturas</div><h1 class="tit-v2">${N(T)} veículos, ${pct(des, T)} descaracterizados e ${pct(alu, T)} alugados.</h1></header>
-      <div class="dash-filtros frota-ctl">${filtro("c", "Caracterização")}${filtro("p", "Propriedade")}${filtro("r", "Região")}${tem ? `<button type="button" class="dash-toggle-btn" data-fv2-limpa>Limpar filtros</button>` : ""}</div>
+      <div class="dash-filtros frota-ctl">${filtro("c", "Caracterização")}${filtro("p", "Propriedade")}${filtro("r", "Região")}${temX() ? `<label>Também filtrando <div class="dash-toggle" role="group">${chipsX}</div></label>` : ""}${tem ? `<button type="button" class="dash-toggle-btn" data-fv2-limpa>Limpar filtros</button>` : ""}</div>
       <section class="nota-v2"><div class="k">Hoje</div><div class="v"><div class="hoje-v2">
         <button type="button" data-fv2-kpi="c1"><div class="n">${N(des)}</div><div class="l">Descaracterizados</div><div class="s">${pct(des, T)} da frota</div></button>
         <button type="button" data-fv2-kpi="p1"><div class="n">${N(alu)}</div><div class="l">Alugados</div><div class="s">${pct(alu, T)} da frota</div></button></div></div></section>
-      <section class="nota-v2" id="frota-situacao"><div class="k">Situação</div><div class="v"><h3>Propriedade das ${N(T)} viaturas</h3>${v2Pilha(seg)}</div></section>
+      <section class="nota-v2" id="frota-situacao"><div class="k">Situação</div><div class="v"><h3>Propriedade das ${N(T)} viaturas</h3>${v2Pilha(seg, { acao: "frota-p" })}</div></section>
       <div class="grupos-v2"><div class="cab-outros-v2" style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap"><h2>Outras informações deste painel</h2><button type="button" class="dash-toggle-btn" data-fv2-todos="${todos ? 0 : 1}">${todos ? "Fechar todas" : "Abrir todas"}</button></div>
       ${GRUPOS.map((g) => { const ab = EST.abertos.has(g.id); return `<section class="nota-v2 grupo-v2${ab ? " aberto" : ""}" id="frota-g-${g.id}"><div class="k">${g.tipo}</div><div class="v"><div class="grupo-cab-v2"><h3>${esc(g.t)}</h3><button type="button" class="dash-toggle-btn" data-fv2-grupo="${g.id}" aria-expanded="${ab}">${ab ? "Fechar" : "Abrir"}</button></div>${ab ? `<div class="grupo-corpo-v2">${g.r()}</div>` : ""}</div></section>`; }).join("")}</div>`;
   }
   const redesenhar = () => { const y = window.scrollY; desenhar(); window.scrollTo(0, y); };
   raiz.addEventListener("click", (ev) => {
     let b;
-    if ((b = ev.target.closest("[data-fv2-chip]"))) { const g = b.dataset.fv2Chip, i = +b.dataset.k; EST[g] = EST[g].includes(i) ? EST[g].filter((x) => x !== i) : [...EST[g], i]; }
+    if ((b = ev.target.closest('[data-v2-acao="frota-p"]'))) { const i = +b.dataset.k; EST.p = EST.p.includes(i) ? EST.p.filter((x) => x !== i) : [...EST.p, i]; }
+    else if ((b = ev.target.closest("[data-fv2-dep-todos]"))) { EST.depTodos = !EST.depTodos; }
+    else if ((b = ev.target.closest("[data-fv2-multi]"))) {
+      const pares = b.dataset.fv2Multi.split(",").map((x) => x.split(":")).map(([d, k]) => [d, +k]);
+      const todosAtivos = pares.every(([d, k]) => lista(d).includes(k));
+      pares.forEach(([d, k]) => { const a = lista(d); const i = a.indexOf(k); if (todosAtivos) { if (i >= 0) a.splice(i, 1); } else if (i < 0) a.push(k); });
+    }
+    else if ((b = ev.target.closest("[data-fv2-chip]"))) { const g = b.dataset.fv2Chip, i = +b.dataset.k; EST[g] = EST[g].includes(i) ? EST[g].filter((x) => x !== i) : [...EST[g], i]; }
     else if ((b = ev.target.closest("[data-fv2-kpi]"))) { const g = b.dataset.fv2Kpi[0], i = +b.dataset.fv2Kpi[1], atual = EST[g].length === 1 && EST[g][0] === i; EST.c = []; EST.p = []; EST.r = []; if (!atual) EST[g] = [i]; }
-    else if (ev.target.closest("[data-fv2-limpa]")) { EST.c = []; EST.p = []; EST.r = []; }
+    else if (ev.target.closest("[data-fv2-limpa]")) { EST.c = []; EST.p = []; EST.r = []; Object.keys(EST.x).forEach((d) => { EST.x[d] = []; }); }
     else if ((b = ev.target.closest("[data-fv2-grupo]"))) { const g = b.dataset.fv2Grupo; EST.abertos.has(g) ? EST.abertos.delete(g) : EST.abertos.add(g); }
     else if ((b = ev.target.closest("[data-fv2-todos]"))) { GRUPOS.forEach((g) => (b.dataset.fv2Todos === "1" ? EST.abertos.add(g.id) : EST.abertos.delete(g.id))); }
     else if ((b = ev.target.closest("[data-fv2-troca]"))) { EST[b.dataset.fv2Troca] = b.dataset.v; }
