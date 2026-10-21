@@ -1355,6 +1355,7 @@ svg.mosaico-login .sh.on{transform:scale(1.3)}
 @media (max-width:860px){.login-mosaico{display:none}}
 .login-mosaico canvas{display:block;width:100%;max-width:520px;height:auto;touch-action:pan-y}
 @media (min-width:861px){.login-marca{display:none}.login-id{justify-content:space-between}.login-mosaico{margin:0}}
+#tela-login.sem-mosaico .login-marca{display:flex}
 /* régua de formas: no lugar das linhas de divisão */
 .tela-head,.grupos-v2 .cab-outros-v2,.menu-tipos .cab-outros-v2{border-bottom:0;border-top:0}
 .tela-head::after,.grupos-v2 .cab-outros-v2::before,.menu-tipos .cab-outros-v2::before{content:"";display:block;height:14px;margin:16px 0 4px;
@@ -5882,7 +5883,9 @@ async function montarMosaicoLogin() {
   const alvo = document.getElementById("login-mosaico"); if (!alvo) return;
   const cel = 5, cols = 95, linhas = 42, W = cols * cel, H = linhas * cel, dpr = Math.min(2, window.devicePixelRatio || 1);
   alvo.innerHTML = `<canvas width="${W * dpr}" height="${H * dpr}" role="img" aria-label="Emblema da Polícia Civil da Bahia seguido de DEPAF, desenhado com losangos"></canvas>`;
-  const cv = alvo.querySelector("canvas"), ctx = cv.getContext("2d");
+  const cv = alvo.querySelector("canvas"), ctx = cv.getContext && cv.getContext("2d");
+  // sem canvas (navegador restrito): mantém a marca estática de sempre
+  if (!ctx) { alvo.innerHTML = ""; document.getElementById("tela-login")?.classList.add("sem-mosaico"); return; }
   ctx.scale(dpr, dpr);
   const reduz = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
   let pecas = null, fundo = null, rodando = false, ponteiro = null, iniciou = false;
@@ -5890,8 +5893,10 @@ async function montarMosaicoLogin() {
   async function preparar() {
     const fonte = document.querySelector(".login-brasao img");
     const img = new Image(); img.src = fonte ? fonte.src : "";
-    try { await img.decode(); } catch { /* sem emblema: só a palavra */ }
-    try { await document.fonts.load("700 88px Spectral"); } catch { /* usa a serifa do sistema */ }
+    // nenhuma espera pode travar a tela: rede lenta usa a serifa do sistema e segue
+    const ate = (pr, ms) => Promise.race([pr, new Promise((r) => setTimeout(r, ms))]);
+    try { await ate(img.decode(), 2500); } catch { /* sem emblema: só a palavra */ }
+    try { await ate(document.fonts.load("700 88px Spectral"), 1500); } catch { /* usa a serifa do sistema */ }
     const off = document.createElement("canvas"); off.width = W; off.height = H;
     const o = off.getContext("2d", { willReadFrequently: true });
     let x0 = 4;
@@ -5967,7 +5972,7 @@ async function montarMosaicoLogin() {
   function acordar() { if (!rodando && pecas && !reduz) { rodando = true; requestAnimationFrame(quadro); } }
   async function iniciar() {
     if (iniciou) return; iniciou = true;
-    await preparar();
+    try { await preparar(); } catch (e) { console.warn("Mosaico do login indisponível:", e); document.getElementById("tela-login")?.classList.add("sem-mosaico"); alvo.innerHTML = ""; return; }
     if (reduz) { desenhar(); return; }
     t0 = 0; rodando = true; requestAnimationFrame(quadro);
   }
