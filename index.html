@@ -1353,6 +1353,8 @@ svg.mosaico-login .sh.on .vazio{opacity:0}
 svg.mosaico-login .sh.on{transform:scale(1.3)}
 .mg-nota{margin-top:10px;font:500 var(--fs-ui-sm)/1.5 'IBM Plex Mono',monospace;color:#8B93A3;max-width:46ch}
 @media (max-width:860px){.login-mosaico{display:none}}
+.login-mosaico canvas{display:block;width:100%;max-width:520px;height:auto;touch-action:pan-y}
+@media (min-width:861px){.login-marca{display:none}.login-id{justify-content:space-between}.login-mosaico{margin:0}}
 /* régua de formas: no lugar das linhas de divisão */
 .tela-head,.grupos-v2 .cab-outros-v2,.menu-tipos .cab-outros-v2{border-bottom:0;border-top:0}
 .tela-head::after,.grupos-v2 .cab-outros-v2::before,.menu-tipos .cab-outros-v2::before{content:"";display:block;height:14px;margin:16px 0 4px;
@@ -5872,17 +5874,114 @@ document.addEventListener("pointerout", (ev) => {
   if (!svg.classList.contains("mosaico-login")) { wrap.classList.remove("dim"); atualizarLeituraMosaico(wrap, null); }
   svg.querySelectorAll(".sh").forEach((g) => g.classList.remove("on"));
 });
-// Mosaico apagado do login: o cursor acende os losangos. Sem dado nenhum,
-// escrito como exemplo (a carteira real só aparece depois do login).
-function montarMosaicoLogin() {
+// Login: os losangos se juntam e formam o emblema da Polícia Civil seguido de
+// DEPAF (letra feita de peças). Acontece uma vez, quando a tela de login
+// aparece; depois fica quieta. Passar o cursor solta as peças, que voltam ao
+// lugar quando ele sai. Com "reduzir movimento", mostra só o resultado.
+async function montarMosaicoLogin() {
   const alvo = document.getElementById("login-mosaico"); if (!alvo) return;
-  const cols = 15, linhas = 7, cel = 30;
-  let g = "";
-  for (let i = 0; i < cols * linhas; i++) {
-    const x = (i % cols) * cel + cel / 2, y = Math.floor(i / cols) * cel + cel / 2;
-    g += `<g class="sh" data-x="${x}" data-y="${y}"><svg x="${x - 10}" y="${y - 10}" width="20" height="20" viewBox="0 0 20 20"><g class="vazio">${formaGeoInterna("losango", "vazio", "#8B93A3")}</g><g class="cheio">${formaGeoInterna("losango", "cheio", "var(--tinta)")}</g></svg></g>`;
+  const cel = 5, cols = 95, linhas = 42, W = cols * cel, H = linhas * cel, dpr = Math.min(2, window.devicePixelRatio || 1);
+  alvo.innerHTML = `<canvas width="${W * dpr}" height="${H * dpr}" role="img" aria-label="Emblema da Polícia Civil da Bahia seguido de DEPAF, desenhado com losangos"></canvas>`;
+  const cv = alvo.querySelector("canvas"), ctx = cv.getContext("2d");
+  ctx.scale(dpr, dpr);
+  const reduz = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+  let pecas = null, fundo = null, rodando = false, ponteiro = null, iniciou = false;
+
+  async function preparar() {
+    const fonte = document.querySelector(".login-brasao img");
+    const img = new Image(); img.src = fonte ? fonte.src : "";
+    try { await img.decode(); } catch { /* sem emblema: só a palavra */ }
+    try { await document.fonts.load("700 88px Spectral"); } catch { /* usa a serifa do sistema */ }
+    const off = document.createElement("canvas"); off.width = W; off.height = H;
+    const o = off.getContext("2d", { willReadFrequently: true });
+    let x0 = 4;
+    if (img.naturalWidth) { const eh = 192, ew = eh * img.naturalWidth / img.naturalHeight; o.drawImage(img, x0, (H - eh) / 2, ew, eh); x0 += ew + 18; }
+    let fs = 90; o.font = `700 ${fs}px Spectral, serif`;
+    const espaco = (f) => `${Math.round(f * 0.07)}px`;
+    o.letterSpacing = espaco(fs);
+    const larg = o.measureText("DEPAF").width, livre = W - x0 - 4;
+    if (larg > livre - 8) { fs = Math.floor(fs * (livre - 8) / larg); o.font = `700 ${fs}px Spectral, serif`; o.letterSpacing = espaco(fs); }
+    o.fillStyle = "#E4EBE9"; o.strokeStyle = "#E4EBE9"; o.textBaseline = "alphabetic"; o.lineJoin = "round"; o.lineWidth = fs * 0.025;
+    o.strokeText("DEPAF", x0 + 2, H / 2 + fs * 0.33);
+    o.fillText("DEPAF", x0 + 2, H / 2 + fs * 0.33);
+    const dados = o.getImageData(0, 0, W, H).data;
+    const lista = [], bg = [];
+    for (let cy = 0; cy < linhas; cy++) for (let cx = 0; cx < cols; cx++) {
+      let a = 0, r = 0, g = 0, b = 0;
+      for (let py = 0; py < cel; py++) for (let px = 0; px < cel; px++) {
+        const i = ((cy * cel + py) * W + cx * cel + px) * 4, al = dados[i + 3];
+        a += al; r += dados[i] * al; g += dados[i + 1] * al; b += dados[i + 2] * al;
+      }
+      const cobertura = a / (cel * cel * 255);
+      const x = cx * cel + cel / 2, y = cy * cel + cel / 2;
+      if (cobertura > 0.34 && a > 0) lista.push({ tx: x, ty: y, cor: `rgb(${Math.round(r / a)},${Math.round(g / a)},${Math.round(b / a)})` });
+      else bg.push([x, y]);
+    }
+    // fundo fixo e discreto: a grade de losangos que não entrou no desenho
+    fundo = document.createElement("canvas"); fundo.width = W * dpr; fundo.height = H * dpr;
+    const f = fundo.getContext("2d"); f.scale(dpr, dpr); f.strokeStyle = "rgba(139,147,163,.22)"; f.lineWidth = 1;
+    bg.forEach(([x, y]) => { f.beginPath(); f.moveTo(x, y - 1.8); f.lineTo(x + 1.8, y); f.lineTo(x, y + 1.8); f.lineTo(x - 1.8, y); f.closePath(); f.stroke(); });
+    pecas = lista.map((q) => ({ ...q, x: reduz ? q.tx : Math.random() * W, y: reduz ? q.ty : Math.random() * H, x0: 0, y0: 0, vx: 0, vy: 0, atraso: (q.tx / W) * 1100 + Math.random() * 260, a: reduz ? 1 : 0 }));
+    pecas.forEach((q) => { q.x0 = q.x; q.y0 = q.y; });
   }
-  alvo.innerHTML = `<svg class="mosaico-login" data-r="${cel * 2.4}" viewBox="0 0 ${cols * cel} ${linhas * cel}" role="img" aria-label="Exemplo: mosaico de losangos, um por contrato">${g}<circle class="mg-cursor" r="0" pointer-events="none"/></svg><p class="mg-nota">Cada losango é um contrato (exemplo). Depois do login, a carteira real aparece nos painéis.</p>`;
+  const ease = (u) => 1 - Math.pow(1 - u, 3);
+  function desenhar() {
+    ctx.clearRect(0, 0, W, H);
+    ctx.drawImage(fundo, 0, 0, W, H);
+    pecas.forEach((q) => {
+      if (q.a <= 0) return;
+      ctx.globalAlpha = q.a; ctx.fillStyle = q.cor;
+      const r = 2.5;
+      ctx.beginPath(); ctx.moveTo(q.x, q.y - r); ctx.lineTo(q.x + r, q.y); ctx.lineTo(q.x, q.y + r); ctx.lineTo(q.x - r, q.y); ctx.closePath(); ctx.fill();
+    });
+    ctx.globalAlpha = 1;
+  }
+  let t0 = 0;
+  function quadro(agora) {
+    if (!t0) t0 = agora;
+    let mexendo = false;
+    const dec = agora - t0;
+    pecas.forEach((q) => {
+      if (dec < 1700 + 1400 && q.a < 1 && !q.chegou) {
+        const u = Math.min(1, Math.max(0, (dec - q.atraso) / 1100));
+        q.x = q.x0 + (q.tx - q.x0) * ease(u); q.y = q.y0 + (q.ty - q.y0) * ease(u); q.a = u;
+        if (u < 1) mexendo = true; else q.chegou = true;
+        return;
+      }
+      if (!q.chegou) { q.chegou = true; q.a = 1; q.x = q.tx; q.y = q.ty; }
+      // depois de montado: o cursor solta as peças, que voltam ao lugar
+      if (ponteiro) {
+        const dx = q.x - ponteiro.x, dy = q.y - ponteiro.y, d = Math.hypot(dx, dy);
+        if (d < 34 && d > 0.01) { const f = (34 - d) / 34 * 2.4; q.vx += dx / d * f; q.vy += dy / d * f; }
+      }
+      q.vx += (q.tx - q.x) * 0.09; q.vy += (q.ty - q.y) * 0.09;
+      q.vx *= 0.8; q.vy *= 0.8;
+      q.x += q.vx; q.y += q.vy;
+      // perto o bastante e quase parada: encaixa no ponto exato
+      if (Math.hypot(q.tx - q.x, q.ty - q.y) < 0.25 && Math.abs(q.vx) < 0.08 && Math.abs(q.vy) < 0.08) { q.x = q.tx; q.y = q.ty; q.vx = 0; q.vy = 0; return; }
+      if (Math.abs(q.vx) > 0.03 || Math.abs(q.vy) > 0.03 || Math.abs(q.tx - q.x) > 0.1 || Math.abs(q.ty - q.y) > 0.1) mexendo = true;
+    });
+    desenhar();
+    if (mexendo || ponteiro) requestAnimationFrame(quadro); else rodando = false;
+  }
+  function acordar() { if (!rodando && pecas && !reduz) { rodando = true; requestAnimationFrame(quadro); } }
+  async function iniciar() {
+    if (iniciou) return; iniciou = true;
+    await preparar();
+    if (reduz) { desenhar(); return; }
+    t0 = 0; rodando = true; requestAnimationFrame(quadro);
+  }
+  cv.addEventListener("pointermove", (ev) => {
+    const r = cv.getBoundingClientRect(), k = W / r.width;
+    ponteiro = { x: (ev.clientX - r.left) * k, y: (ev.clientY - r.top) * k };
+    acordar();
+  });
+  cv.addEventListener("pointerleave", () => { ponteiro = null; acordar(); });
+  // só começa quando a tela de login está visível (e só uma vez)
+  if ("IntersectionObserver" in window) {
+    const ob = new IntersectionObserver((es) => { if (es.some((e) => e.isIntersecting)) { iniciar(); ob.disconnect(); } });
+    ob.observe(alvo);
+  } else iniciar();
 }
 // Obras: um quadrado por intervenção (CEIRF) ou por ordem de serviço (Manutenção);
 // o estado do andamento está na forma. `ordem` fixa a sequência da legenda.
