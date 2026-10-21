@@ -5801,11 +5801,15 @@ function formaGeoInterna(tipo, estado, cor) {
   if (estado === "cheio") return f(`fill="${cor}"`);
   if (estado === "anel") return f(`fill="none" stroke="${cor}" stroke-width="1.8"`) + `<g transform="translate(10 10) scale(.45) translate(-10 -10)">${f(`fill="${cor}"`)}</g>`;
   if (estado === "riscado") return f(`fill="none" stroke="${cor}" stroke-width="1.8"`) + `<line x1="2" y1="18" x2="18" y2="2" stroke="${cor}" stroke-width="2"/>`;
+  if (estado === "metade") return f(`fill="none" stroke="${cor}" stroke-width="1.8"`) + f(`fill="${cor}" clip-path="url(#mg-meia)"`);
+  if (estado === "pontilhado") return f(`fill="none" stroke="${cor}" stroke-width="1.8" stroke-dasharray="2.2 2.2"`);
   return f(`fill="none" stroke="${cor}" stroke-width="1.3" opacity=".75"`);
 }
 function formaGeo(tipo, estado, cor = "currentColor", tam = 16) {
   return `<svg width="${tam}" height="${tam}" viewBox="0 0 20 20" aria-hidden="true" focusable="false">${formaGeoInterna(tipo, estado, cor)}</svg>`;
 }
+// recorte da metade esquerda, usado pelo estado "metade"
+document.body.insertAdjacentHTML("beforeend", `<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><defs><clipPath id="mg-meia" clipPathUnits="userSpaceOnUse"><rect x="0" y="0" width="10" height="20"/></clipPath></defs></svg>`);
 // Cada área do sistema tem a sua forma (ou duas, em Orçamento).
 const FORMA_AREA = { orcamento: [["losango", "cheio"], ["circulo", "cheio"]], infraestrutura: [["quadrado", "cheio"]], frota: [["triangulo", "cheio"]] };
 function formaArea(id, tam = 14) {
@@ -5880,6 +5884,17 @@ function montarMosaicoLogin() {
   }
   alvo.innerHTML = `<svg class="mosaico-login" data-r="${cel * 2.4}" viewBox="0 0 ${cols * cel} ${linhas * cel}" role="img" aria-label="Exemplo: mosaico de losangos, um por contrato">${g}<circle class="mg-cursor" r="0" pointer-events="none"/></svg><p class="mg-nota">Cada losango é um contrato (exemplo). Depois do login, a carteira real aparece nos painéis.</p>`;
 }
+// Obras: um quadrado por intervenção (CEIRF) ou por ordem de serviço (Manutenção);
+// o estado do andamento está na forma. `ordem` fixa a sequência da legenda.
+function mosaicoObras({ linhas, rotulo, ordem, formas, selecionado, unidade }) {
+  const cont = {};
+  linhas.forEach((r) => { const l = rotulo(r); if (l) cont[l] = (cont[l] || 0) + 1; });
+  const itens = ordem.filter((l) => cont[l]).map((l) => ({ k: l, rot: l, n: cont[l], qtd: cont[l], estado: formas[l][0], cor: formas[l][1], attrs: ` data-cat="${escapeAttr(l)}"` }));
+  const extras = Object.keys(cont).filter((l) => !ordem.includes(l)).map((l) => ({ k: l, rot: l, n: cont[l], qtd: cont[l], estado: "vazio", cor: "#8E9B9D", attrs: ` data-cat="${escapeAttr(l)}"` }));
+  return mosaicoGeo({ itens: [...itens, ...extras], tipo: "quadrado", cols: Math.min(20, Math.max(8, Math.ceil(Math.sqrt(linhas.length * 2)))), cel: 24, unidade, selecionado: selecionado || null, aria: `Mosaico de ${linhas.length} quadrados, um para cada ${unidade === "intervenções" ? "intervenção" : "ordem de serviço"}, agrupados pelo andamento` });
+}
+const FORMAS_STATUS_CEIRF = { "Inaugurada": ["cheio", "#A9B6B8"], "Concluída": ["metade", "#A9B6B8"], "Em Execução": ["anel", "var(--mostarda)"], "A Iniciar": ["vazio", "#8E9B9D"], "Paralisada": ["riscado", "var(--terracota)"], "Suprimida": ["pontilhado", "#8E9B9D"] };
+const FORMAS_STATUS_MANUT = { "Concluído": ["cheio", "#A9B6B8"], "Em Andamento": ["anel", "var(--mostarda)"], "Não Iniciado": ["vazio", "#8E9B9D"] };
 // Ícones dos cartões de situação: a forma do estado no lugar do pictograma.
 const FORMA_STATUS = { Vigente: ["cheio", "#A9B6B8"], NaoVencido: ["cheio", "#A9B6B8"], Todos: ["cheio", "#E4EBE9"], "A Vencer": ["anel", "var(--mostarda)"], Vencido: ["riscado", "var(--terracota)"], "A Contratar": ["vazio", "#8E9B9D"] };
 function aplicarFormasKpi() {
@@ -12616,6 +12631,7 @@ async function carregarObrasPortal(portalSlug) {
         </div>
       </div>
       <div id="manut-chips"></div>
+      <div class="dash-chart-box" id="manut-mosaico-caixa" style="margin-bottom:16px"><h4 id="manut-mosaico-tit"></h4><div id="manut-mosaico"></div></div>
       <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start">
         <div id="manut-kpis" style="flex:0 0 220px;min-width:200px;display:flex;flex-direction:column;gap:12px"></div>
         <div class="dash-charts" style="flex:1;min-width:280px;grid-template-columns:1fr 1fr">
@@ -12652,6 +12668,7 @@ async function carregarObrasPortal(portalSlug) {
         </div>
       </div>
       <div id="ceirf-chips"></div>
+      <div class="dash-chart-box" id="ceirf-mosaico-caixa" style="margin-bottom:16px"><h4 id="ceirf-mosaico-tit"></h4><div id="ceirf-mosaico"></div></div>
       <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start">
         <div id="ceirf-kpis" style="flex:0 0 220px;min-width:200px;display:flex;flex-direction:column;gap:12px"></div>
         <div class="dash-charts" style="flex:1;min-width:280px;grid-template-columns:1fr 1fr">
@@ -12722,6 +12739,16 @@ async function carregarObrasPortal(portalSlug) {
     });
   });
 
+  document.getElementById("ceirf-mosaico").addEventListener("click", (ev) => {
+    const a = ev.target.closest("[data-cat]"); if (!a) return;
+    motorCeirf.filtros.status = motorCeirf.filtros.status === a.dataset.cat ? "" : a.dataset.cat;
+    atualizarCeirf();
+  });
+  document.getElementById("manut-mosaico").addEventListener("click", (ev) => {
+    const a = ev.target.closest("[data-cat]"); if (!a) return;
+    motorManutencao.filtros.grupoStatus = motorManutencao.filtros.grupoStatus === a.dataset.cat ? "" : a.dataset.cat;
+    atualizarManutencao();
+  });
   DIMENSOES_CEIRF.forEach((d) => {
     document.getElementById(d.containerId).addEventListener("click", (ev) => {
       const alvoClicado = ev.target.closest("[data-cat]");
@@ -12760,6 +12787,9 @@ async function carregarObrasPortal(portalSlug) {
 
   function atualizarCeirf() {
     const filtrada = motorCeirf.filtrar();
+    const linhasMosCeirf = ceirfAmpliado.filter((r) => motorCeirf.bateFiltro(r, "status"));
+    document.getElementById("ceirf-mosaico-tit").textContent = `Andamento das ${linhasMosCeirf.length} intervenções`;
+    document.getElementById("ceirf-mosaico").innerHTML = mosaicoObras({ linhas: linhasMosCeirf, rotulo: (r) => normalizarStatusCeirf(r.status), ordem: Object.keys(FORMAS_STATUS_CEIRF), formas: FORMAS_STATUS_CEIRF, selecionado: motorCeirf.filtros.status, unidade: "intervenções" });
     const chipsAtivos = DIMENSOES_CEIRF
       .filter((d) => motorCeirf.filtros[d.chave])
       .map((d) => ({ rotulo: `${d.rotulo.toLowerCase()}: ${motorCeirf.filtros[d.chave]}`, limpar: () => { motorCeirf.filtros[d.chave] = ""; atualizarCeirf(); } }));
@@ -12886,6 +12916,9 @@ async function carregarObrasPortal(portalSlug) {
 
   function atualizarManutencao() {
     const filtrada = motorManutencao.filtrar();
+    const linhasMosManut = manutencaoTodas.filter((r) => motorManutencao.bateFiltro(r, "grupoStatus"));
+    document.getElementById("manut-mosaico-tit").textContent = `Andamento das ${linhasMosManut.length} ordens de serviço`;
+    document.getElementById("manut-mosaico").innerHTML = mosaicoObras({ linhas: linhasMosManut, rotulo: (r) => normalizarGrupoStatusManutencao(r.grupoStatus), ordem: Object.keys(FORMAS_STATUS_MANUT), formas: FORMAS_STATUS_MANUT, selecionado: motorManutencao.filtros.grupoStatus, unidade: "ordens de serviço" });
     const chipsAtivos = DIMENSOES_MANUTENCAO
       .filter((d) => motorManutencao.filtros[d.chave])
       .map((d) => ({ rotulo: `${d.rotulo.toLowerCase()}: ${motorManutencao.filtros[d.chave]}`, limpar: () => { motorManutencao.filtros[d.chave] = ""; atualizarManutencao(); } }));
