@@ -572,6 +572,33 @@ body{background:var(--paper);color:var(--carvao);font-family:'Archivo',sans-seri
 .modal-caixa .modal-alvo{color:var(--carvao);font-weight:700;word-break:break-word}
 .modal-caixa .modal-selo{width:34px;height:34px;opacity:.85}
 .modal-caixa .modal-selo svg{width:100%;height:100%}
+/* Atualizar planilhas de contratos (admin) */
+.modal-caixa.imp-caixa{max-width:900px;max-height:92vh;overflow:auto;border-top-color:var(--tinta)}
+.imp-abas{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}
+.imp-aba{font-family:'IBM Plex Mono',monospace;font-size:var(--fs-ui-xs);letter-spacing:.04em;background:none;color:var(--carvao);border:1.5px solid var(--paper-line);padding:8px 12px;cursor:pointer;text-align:left}
+.imp-aba.active{border-color:var(--tinta);background:var(--tinta-glow)}
+.imp-aba small{display:block;color:#9AA3B2;margin-top:3px;letter-spacing:0}
+.imp-envio{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:10px 0}
+.imp-envio input[type=file]{font-family:'IBM Plex Mono',monospace;font-size:var(--fs-ui-xs);color:var(--carvao);max-width:100%}
+.imp-bloco{border-left:3px solid var(--paper-line);padding:8px 12px;margin:10px 0;background:var(--paper)}
+.imp-bloco.bloqueio{border-left-color:var(--terracota)}
+.imp-bloco.confirmar{border-left-color:var(--mostarda)}
+.imp-bloco.aviso{border-left-color:#56625F}
+.imp-bloco h4{font-family:'IBM Plex Mono',monospace;font-size:var(--fs-ui-xs);letter-spacing:.06em;text-transform:uppercase;margin:0 0 4px;color:var(--carvao)}
+.imp-bloco ul{margin:4px 0 0 16px;padding:0}
+.imp-bloco li{font-family:'IBM Plex Mono',monospace;font-size:var(--fs-ui-sm);line-height:1.5;color:#B8C0CE}
+.imp-resumo{display:flex;gap:10px;flex-wrap:wrap;margin:12px 0}
+.imp-num{border:1.5px solid var(--paper-line);padding:8px 12px;min-width:110px}
+.imp-num b{display:block;font-family:'Space Grotesk',sans-serif;font-size:22px;color:var(--carvao)}
+.imp-num span{font-family:'IBM Plex Mono',monospace;font-size:var(--fs-ui-xs);color:#9AA3B2;text-transform:uppercase;letter-spacing:.04em}
+.imp-detalhe{margin:8px 0;border:1px solid var(--paper-line)}
+.imp-detalhe summary{cursor:pointer;padding:8px 12px;font-family:'IBM Plex Mono',monospace;font-size:var(--fs-ui-sm);color:var(--carvao)}
+.imp-detalhe .imp-lista{padding:4px 12px 10px;max-height:300px;overflow:auto}
+.imp-item{font-family:'IBM Plex Mono',monospace;font-size:var(--fs-ui-sm);line-height:1.5;color:#B8C0CE;padding:5px 0;border-bottom:1px solid var(--paper-line)}
+.imp-item b{color:var(--carvao)}
+.imp-campo{display:block;padding-left:12px;color:#9AA3B2;word-break:break-word}
+.imp-confirmar{display:flex;gap:8px;align-items:flex-start;margin:10px 0;font-family:'IBM Plex Mono',monospace;font-size:var(--fs-ui-sm);color:var(--carvao)}
+.imp-confirmar input{margin-top:3px}
 .modal-botoes{display:flex;gap:8px;justify-content:flex-end;margin-top:18px;flex-wrap:wrap}
 .dash-tabela th.sortable{cursor:pointer;user-select:none}
 .dash-tabela th.sortable:hover{color:var(--carvao)}
@@ -15069,7 +15096,7 @@ async function carregarCfcrPortal(portalSlug) {
       </div>`;
   });
   document.getElementById("cfcr-baixar-relatorio").addEventListener("click", () => {
-    abrirRelatorioImprimivel("CFCR — Relatório de Termos de Cooperação Técnica", montarRelatorioCfcr(termosTodos, termosTCT));
+    abrirRelatorioImprimivel("CFCR · Relatório de Termos de Cooperação Técnica", montarRelatorioCfcr(termosTodos, termosTCT));
   });
 }
 
@@ -15383,6 +15410,175 @@ function montarRelatorioContratos(resumo, lista, unidadeGestoraTopo) {
   `;
 }
 
+// Atualizar as planilhas de contratos pelo site (só admin). Pedido direto:
+// "pode ser esse botão de atualizar no site... adicione travas de todo jeito,
+// porque eles apagam da planilha mas é o histórico e não vamos apagar do
+// sistema". Fluxo em duas etapas: CONFERIR (o servidor lê o arquivo e mostra
+// o que mudaria, sem gravar nada) e GRAVAR (só depois, com as travas
+// resolvidas). Nada é apagado: contrato que sumiu da planilha continua.
+function formatarValorImportacao(campo, v) {
+  if (v === null || v === undefined || v === "") return "(vazio)";
+  if (typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v)) return v.split("-").reverse().join("/");
+  if (typeof v === "number" && /valor/i.test(campo)) return "R$ " + v.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  if (typeof v === "boolean") return v ? "sim" : "não";
+  const t = String(v);
+  return t.length > 90 ? t.slice(0, 90) + "..." : t;
+}
+
+function abrirAtualizacaoPlanilhasContratos(portalSlug, aoConcluir) {
+  const TIPOS = [
+    { chave: "geral", rotulo: "PLANILHA GERAL (DEPAF)", dica: "CONTRATOS - Informações Gerais" },
+    { chave: "depin", rotulo: "PLANILHA DA DEPIN", dica: "Contratos DEPIN, com as 6 abas" },
+  ];
+  const base = `/api/portais/${encodeURIComponent(portalSlug)}/contratos/importacao`;
+  let tipo = "geral";
+  let previa = null;
+  let arquivo = null;
+  let ocupado = false;
+  let status = {};
+
+  const fundo = document.createElement("div");
+  fundo.className = "modal-fundo";
+  fundo.innerHTML = `
+    <div class="modal-caixa imp-caixa" role="dialog" aria-modal="true" aria-label="Atualizar planilhas de contratos">
+      <h3>Atualizar planilhas de contratos</h3>
+      <p>Escolha a planilha, envie o arquivo e confira o que vai mudar antes de gravar. Contrato que sumiu da planilha continua no sistema como histórico. Nada é apagado.</p>
+      <div class="imp-abas" id="imp-abas"></div>
+      <div class="imp-envio">
+        <input type="file" id="imp-arquivo" accept=".xlsx" aria-label="Arquivo da planilha (.xlsx)">
+        <button type="button" class="dash-toggle-btn" id="imp-conferir" disabled>CONFERIR PLANILHA</button>
+      </div>
+      <div id="imp-resultado"></div>
+      <div class="modal-botoes">
+        <button class="btn-secundario" id="imp-fechar" type="button">FECHAR</button>
+        <button class="dash-toggle-btn" id="imp-gravar" type="button" disabled>GRAVAR ATUALIZAÇÃO</button>
+      </div>
+    </div>`;
+  const q = (s) => fundo.querySelector(s);
+  const encerrar = () => { document.removeEventListener("keydown", aoTeclar); fundo.remove(); };
+  const aoTeclar = (ev) => { if (ev.key === "Escape" && !ocupado) encerrar(); };
+
+  function desenharAbas() {
+    q("#imp-abas").innerHTML = TIPOS.map((t) => {
+      const s = status[t.chave];
+      const quando = s ? `Última atualização ${new Date(s.em).toLocaleString("pt-BR")}${s.por ? " por " + escapeHTML(s.por) : ""}` : "Ainda não atualizada por aqui";
+      return `<button type="button" class="imp-aba${t.chave === tipo ? " active" : ""}" data-tipo="${t.chave}">${t.rotulo}<small>${escapeHTML(t.dica)}</small><small>${quando}</small></button>`;
+    }).join("");
+  }
+
+  function lista(titulo, itens, classe) {
+    if (!itens.length) return "";
+    return `<div class="imp-bloco ${classe}"><h4>${titulo}</h4><ul>${itens.map((i) => `<li>${escapeHTML(i)}</li>`).join("")}</ul></div>`;
+  }
+
+  function detalhe(titulo, qtd, corpo, aberto = false) {
+    if (!qtd) return "";
+    return `<details class="imp-detalhe"${aberto ? " open" : ""}><summary>${titulo} (${qtd})</summary><div class="imp-lista">${corpo}</div></details>`;
+  }
+
+  function atualizarBotaoGravar() {
+    const t = previa?.travas;
+    const confirmado = q("#imp-confirmar")?.checked;
+    q("#imp-gravar").disabled = ocupado || !previa || t.bloqueios.length > 0 || (t.confirmaveis.length > 0 && !confirmado);
+  }
+
+  function desenharPrevia() {
+    const p = previa;
+    const r = p.resumo || {};
+    const chips = [
+      ["lidos", "Contratos lidos"], ["novos", "Novos"], ["alterados", "Com alteração"], ["semAlteracao", "Sem alteração"],
+      ["saiuDaPlanilha", "Fora da planilha"], ["revisaoManual", "Revisão manual"],
+    ].filter(([k]) => r[k] !== undefined).map(([k, rot]) => `<div class="imp-num"><b>${r[k]}</b><span>${rot}</span></div>`).join("");
+    const novos = p.registros.filter((x) => x.novo);
+    const alterados = p.registros.filter((x) => !x.novo && x.mudancas.length);
+    const suspeitos = p.registros.filter((x) => x.avisos.length && !x.novo && !x.mudancas.length);
+    const itemContrato = (x) => `<div class="imp-item"><b>${escapeHTML(x.numero)}</b> · ${escapeHTML(x.empresa)}${x.aba ? ` · ${escapeHTML(x.aba)}` : ""}${
+      x.mudancas.map((m) => `<span class="imp-campo">${escapeHTML(m.campo)}: ${escapeHTML(formatarValorImportacao(m.campo, m.antes))} para ${escapeHTML(formatarValorImportacao(m.campo, m.depois))}</span>`).join("")}${
+      x.avisos.map((a) => `<span class="imp-campo" style="color:var(--mostarda)">atenção, ${escapeHTML(a)}</span>`).join("")}</div>`;
+    const t = p.travas;
+    q("#imp-resultado").innerHTML = `
+      ${lista("Bloqueado, nada será gravado", t.bloqueios, "bloqueio")}
+      ${lista("Precisa de conferência antes de gravar", t.confirmaveis, "confirmar")}
+      ${t.confirmaveis.length && !t.bloqueios.length ? `<label class="imp-confirmar"><input type="checkbox" id="imp-confirmar"> Conferi os pontos acima e quero gravar mesmo assim.</label>` : ""}
+      ${lista("Avisos", t.avisos, "aviso")}
+      ${t.bloqueios.length ? "" : `<div class="imp-resumo">${chips}</div>`}
+      ${t.bloqueios.length ? "" : detalhe("Contratos novos", novos.length, novos.map(itemContrato).join(""), true)}
+      ${t.bloqueios.length ? "" : detalhe("Contratos com alteração", alterados.length, alterados.map(itemContrato).join(""), true)}
+      ${t.bloqueios.length ? "" : detalhe("Dados suspeitos", suspeitos.length, suspeitos.map(itemContrato).join(""), true)}
+      ${t.bloqueios.length ? "" : detalhe("Revisão manual: a planilha mudou, mas o banco tem ajuste feito à mão e não foi alterado", (p.revisaoManual || []).length,
+        (p.revisaoManual || []).map((x) => `<div class="imp-item"><b>${escapeHTML(x.numero)}</b> · ${escapeHTML(x.empresa)}<span class="imp-campo">${escapeHTML(x.campo)}: planilha ${escapeHTML(formatarValorImportacao(x.campo, x.planilhaAntes))} para ${escapeHTML(formatarValorImportacao(x.campo, x.planilhaAgora))}; no sistema ${escapeHTML(formatarValorImportacao(x.campo, x.banco))}</span></div>`).join(""), true)}
+      ${t.bloqueios.length ? "" : detalhe("Fora da planilha, mantidos no sistema como histórico", p.saiuDaPlanilha.length,
+        p.saiuDaPlanilha.map((x) => `<div class="imp-item"><b>${escapeHTML(x.numero)}</b> · ${escapeHTML(x.empresa)}${x.dataFim ? `<span class="imp-campo">vigência até ${escapeHTML(formatarValorImportacao("data", x.dataFim))}</span>` : ""}</div>`).join(""))}
+      ${t.bloqueios.length ? "" : detalhe("Linhas ignoradas", (p.ignoradas || []).length, (p.ignoradas || []).map((x) => `<div class="imp-item">${escapeHTML(x)}</div>`).join(""))}
+      ${!t.bloqueios.length && !novos.length && !alterados.length && !(p.revisaoManual || []).length ? `<div class="imp-bloco aviso"><h4>Nada a atualizar</h4><ul><li>A planilha está igual ao que já está no sistema.</li></ul></div>` : ""}`;
+    q("#imp-confirmar")?.addEventListener("change", atualizarBotaoGravar);
+    atualizarBotaoGravar();
+  }
+
+  async function conferir() {
+    if (!arquivo) return;
+    ocupado = true; previa = null;
+    q("#imp-conferir").disabled = true; q("#imp-gravar").disabled = true;
+    q("#imp-resultado").innerHTML = htmlCarregando("Conferindo a planilha");
+    try {
+      const fd = new FormData();
+      fd.append("planilha", arquivo);
+      previa = await apiFetch(`${base}/${tipo}/previa`, { method: "POST", body: fd });
+      desenharPrevia();
+    } catch (erro) {
+      q("#imp-resultado").innerHTML = lista("Não foi possível conferir", [erro.message], "bloqueio");
+    } finally {
+      ocupado = false;
+      q("#imp-conferir").disabled = !arquivo;
+      atualizarBotaoGravar();
+    }
+  }
+
+  async function gravar() {
+    if (!previa || !arquivo) return;
+    ocupado = true; q("#imp-gravar").disabled = true; q("#imp-conferir").disabled = true;
+    const rotuloAnterior = q("#imp-gravar").textContent;
+    q("#imp-gravar").textContent = "GRAVANDO...";
+    try {
+      const fd = new FormData();
+      fd.append("hash", previa.hash);
+      fd.append("confirmar", q("#imp-confirmar")?.checked ? "true" : "false");
+      fd.append("planilha", arquivo);
+      const res = await apiFetch(`${base}/${tipo}/aplicar`, { method: "POST", body: fd });
+      toastOk(`Planilha atualizada: ${res.criados} contrato(s) novo(s), ${res.atualizados} alterado(s).`);
+      encerrar();
+      if (aoConcluir) aoConcluir();
+    } catch (erro) {
+      toastErro(erro.message);
+      q("#imp-gravar").textContent = rotuloAnterior;
+      ocupado = false;
+      q("#imp-conferir").disabled = false;
+      atualizarBotaoGravar();
+    }
+  }
+
+  fundo.addEventListener("click", (ev) => {
+    if (ev.target === fundo && !ocupado) encerrar();
+    const aba = ev.target.closest("[data-tipo]");
+    if (aba && !ocupado) {
+      tipo = aba.dataset.tipo; previa = null; arquivo = null;
+      q("#imp-arquivo").value = ""; q("#imp-conferir").disabled = true; q("#imp-resultado").innerHTML = "";
+      desenharAbas(); atualizarBotaoGravar();
+    }
+  });
+  q("#imp-arquivo").addEventListener("change", (ev) => {
+    arquivo = ev.target.files[0] || null; previa = null; q("#imp-resultado").innerHTML = "";
+    q("#imp-conferir").disabled = !arquivo; atualizarBotaoGravar();
+  });
+  q("#imp-conferir").addEventListener("click", conferir);
+  q("#imp-gravar").addEventListener("click", gravar);
+  q("#imp-fechar").addEventListener("click", () => { if (!ocupado) encerrar(); });
+  document.addEventListener("keydown", aoTeclar);
+  desenharAbas();
+  document.body.appendChild(fundo);
+  apiFetch(`${base}/status`).then((s) => { status = s || {}; desenharAbas(); }).catch(() => {});
+}
+
 async function carregarContratosPortal(portalSlug) {
   const painel = document.getElementById("tab-contratos");
   painel.innerHTML = `<p class="tela-intro">Carregando contratos...</p>`;
@@ -15504,7 +15700,7 @@ async function carregarContratosPortal(portalSlug) {
   // usar aquele painel e comparar com este.
   painel.innerHTML = `
     <header class="cab-v2"><div class="rot-v2">Orçamento e Finanças · Contratos</div><h1 class="tit-v2" id="contratos-manchete"></h1></header>
-    <div style="display:flex;justify-content:flex-end;margin-bottom:10px"><button type="button" class="dash-toggle-btn" id="contratos-baixar-relatorio">${iconeInline("download", 12, -2)} BAIXAR RELATÓRIO (PDF)</button></div>
+    <div style="display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap;margin-bottom:10px">${souAdmin() ? `<button type="button" class="dash-toggle-btn" id="contratos-atualizar-planilhas">${iconeInline("upload", 12, -2)} ATUALIZAR PLANILHAS</button>` : ""}<button type="button" class="dash-toggle-btn" id="contratos-baixar-relatorio">${iconeInline("download", 12, -2)} BAIXAR RELATÓRIO (PDF)</button></div>
     ${UNIDADES_GESTORAS_DISPONIVEIS.length > 1 ? `
     <div class="dash-filtros" style="margin-bottom:12px">
       <div class="dash-filtro" style="flex:1;min-width:0">
@@ -15638,7 +15834,10 @@ async function carregarContratosPortal(portalSlug) {
   montarAbas(lista, resumo);
 
   document.getElementById("contratos-baixar-relatorio").addEventListener("click", () => {
-    abrirRelatorioImprimivel("CPG - Contratos — Relatório de Prazos e Garantias", montarRelatorioContratos(resumo, lista, unidadeGestoraTopo));
+    abrirRelatorioImprimivel("CPG - Contratos · Relatório de Prazos e Garantias", montarRelatorioContratos(resumo, lista, unidadeGestoraTopo));
+  });
+  document.getElementById("contratos-atualizar-planilhas")?.addEventListener("click", () => {
+    abrirAtualizacaoPlanilhasContratos(portalSlug, () => carregarContratosPortal(portalSlug));
   });
 
   const seletorUnidadeGestora = document.getElementById("contratos-filtro-unidade-gestora");
