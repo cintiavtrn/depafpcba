@@ -12882,7 +12882,7 @@ function montarEstudoFrota(raiz, E) {
     const necessario = Math.ceil(total / (meta - T0)), custoMed = base ? Cs.custoA / base : EST.precoB;
 
     let s = sCab("O ritmo de reposição cobre a baixa?");
-    s += sRot(30, 90, "ANO A ANO: O QUE ENTRA E O QUE SAI") + sRot(530, 90, "ESTOQUE A REPOR SE O RITMO SE MANTIVER");
+    s += sRot(30, 90, "ANO A ANO: ENTREGUES E QUE COMPLETAM 8 ANOS") + sRot(530, 90, "ESTOQUE A REPOR SE O RITMO SE MANTIVER");
     // colunas duplas
     const anos = [2023, 2024, 2025, 2026, 2027, 2028, 2029], xe = 40, we = 440, yT = 118, yB = 340, gw = we / anos.length;
     const maxV = Math.max(1, ...anos.map((y) => entradas(y) || 0), ...anosEnt.map((y) => ent[y]));
@@ -12893,7 +12893,7 @@ function montarEstudoFrota(raiz, E) {
       s += col(vs, cx - 24, "var(--oliva)", "veladas entregues") + col(vb, cx + 2, "var(--terracota)", "viaturas completam 8 anos");
       s += sTxt(cx, yB + 16, String(y), 10, 'text-anchor="middle"');
     });
-    s += sLegenda(40, 376, [["var(--oliva)", "Veladas entregues no ano (a planilha só tem até 2026)"], ["var(--terracota)", "Viaturas cuja safra completa 8 anos naquele ano"]]);
+    s += sLegenda(40, 376, [["var(--oliva)", "Veladas entregues no ano (a planilha só tem até 2026)"], ["var(--terracota)", "Completam 8 anos no ano (elegíveis à baixa, não é baixa feita)"]]);
     // linhas do estoque
     const xl = 560, wl = 400, ys = Math.max(1, ...linhas.flatMap((l) => l.pts.map((p) => p.v)));
     const px = (i) => xl + wl * i / 8, py = (v) => yB - v / ys * (yB - yT - 10);
