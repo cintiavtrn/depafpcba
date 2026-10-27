@@ -6521,6 +6521,35 @@ function agruparPorQtdAditivos(lista) {
     .map(([qtd, total]) => ({ label: `${qtd} aditivo${qtd === 1 ? "" : "s"}`, valor: qtd, total }));
 }
 
+// Duração somada do contrato (original mais aditivos), em meses. 72 é o teto de
+// 60 meses mais 12 excepcionais para serviços contínuos (Lei 8.666/93, art. 57,
+// II e §4º); contratos da Lei 14.133 têm outro teto e aluguel de imóvel pode nem
+// seguir essa regra, então a faixa é um alerta para conferir, não uma sentença.
+// Uma prorrogação típica soma 12 meses, por isso "perto" começa em 61: quem já
+// passou de 60 não cabe em mais um ano.
+const LIMITE_MESES = 72;
+const FAIXAS_MESES = [
+  { chave: "ate36", label: "Até 36 meses", min: 0, max: 36 },
+  { chave: "37a48", label: "37 a 48 meses", min: 37, max: 48 },
+  { chave: "49a60", label: "49 a 60 meses", min: 49, max: 60 },
+  { chave: "61a72", label: "61 a 72 meses", min: 61, max: LIMITE_MESES },
+  { chave: "acima72", label: "Acima de 72 meses", min: LIMITE_MESES + 1, max: 9999 },
+];
+function faixaDeMeses(c) {
+  return c.mesesTotais == null ? null : FAIXAS_MESES.find((f) => c.mesesTotais >= f.min && c.mesesTotais <= f.max) || null;
+}
+function agruparPorFaixaMeses(lista) {
+  return FAIXAS_MESES.map((f) => ({ label: f.label, valor: f.chave, total: lista.filter((c) => faixaDeMeses(c)?.chave === f.chave).length }));
+}
+function celulaMesesContrato(c) {
+  const m = c.mesesTotais;
+  if (m == null) return `<td class="num">—</td>`;
+  const falta = LIMITE_MESES - m;
+  const dica = `${m} meses desde o início do contrato original, somando os aditivos. ${falta >= 0 ? `Faltam ${falta} para o teto de ${LIMITE_MESES}.` : `Passou ${-falta} meses do teto de ${LIMITE_MESES}.`}`;
+  const cor = m > LIMITE_MESES ? "var(--crit-vencido)" : m > 60 ? "var(--crit-alto)" : "";
+  return `<td class="num" title="${escapeAttr(dica)}"${cor ? ` style="color:${cor};font-weight:700"` : ""}>${m}</td>`;
+}
+
 function agruparTopContratosPorValor(lista, n = 10) {
   return [...lista]
     .filter((c) => c.valorGlobalAtual != null)
@@ -7451,6 +7480,7 @@ function tooltipContratoHTML(c) {
       <dt>Processo</dt><dd>${escapeHTML(c.processo || "—")}</dd>
       <dt>Início</dt><dd>${formatarDataBR(c.dataInicio)}</dd>
       <dt>Término</dt><dd>${formatarDataBR(c.dataFim)}</dd>
+      ${c.mesesTotais != null ? `<dt>Duração</dt><dd>${c.mesesTotais} meses${c.mesesParaLimite >= 0 ? `, faltam ${c.mesesParaLimite} para o teto de ${LIMITE_MESES}` : `, ${-c.mesesParaLimite} acima do teto de ${LIMITE_MESES}`}</dd>` : ""}
       <dt>Situação</dt><dd>${formatarDiasBR(c.diasParaVencer)}</dd>
       <dt>Gestor</dt><dd>${escapeHTML(pessoasPorPapel("Gestor"))}</dd>
       <dt>Fiscal</dt><dd>${escapeHTML(pessoasPorPapel("Fiscal"))}</dd>
@@ -7523,7 +7553,7 @@ function tabelaContratosHTML(lista, opcoes = {}) {
   // status/prazo/financeiro/pessoas, "Detalhamento dos Contratos" de cada
   // setor/categoria/DIRPIN), não só uma tela isolada.
   return `<table class="dash-tabela">
-      <thead><tr><th>Nº CONTRATO</th><th>SETOR DEMANDANTE</th><th>EMPRESA</th><th>DIAS PARA VENCER</th><th>CRITICIDADE</th><th>VALOR ATUAL</th>${comSei ? "<th>SEI DOS ADITIVOS</th>" : ""}</tr></thead>
+      <thead><tr><th>Nº CONTRATO</th><th>SETOR DEMANDANTE</th><th>EMPRESA</th><th>MESES</th><th>DIAS PARA VENCER</th><th>CRITICIDADE</th><th>VALOR ATUAL</th>${comSei ? "<th>SEI DOS ADITIVOS</th>" : ""}</tr></thead>
       <tbody>${lista.map((c) => {
         // Pedido direto: "pensei que vc fosse na hora que filtra por
         // dirpin dizer algo como esse contrato está compartilhado com x"
@@ -7541,7 +7571,7 @@ function tabelaContratosHTML(lista, opcoes = {}) {
           : "";
         return `
         <tr class="linha-contrato" data-contrato-id="${escapeAttr(c.id)}">
-          <td>${escapeHTML(c.numeroContrato)}${badgeRenovado(c)}${selosCompartilhado}</td><td>${escapeHTML(setorDemandanteExibicao(c) || "—")}</td><td>${escapeHTML(c.empresa)}</td><td class="num">${formatarDiasBR(c.diasParaVencer)}</td><td>${pillCriticidade(c.criticidade)}</td><td class="num">R$ ${escapeHTML(formatarMoedaCompacta(c.valorGlobalAtual || 0))}</td>${comSei ? `<td>${(c.aditivos || []).map((a) => `${a.numeroAditivo}º: ${escapeHTML(a.processoSeiAditivo || "—")}`).join("<br>") || "—"}</td>` : ""}
+          <td>${escapeHTML(c.numeroContrato)}${badgeRenovado(c)}${selosCompartilhado}</td><td>${escapeHTML(setorDemandanteExibicao(c) || "—")}</td><td>${escapeHTML(c.empresa)}</td>${celulaMesesContrato(c)}<td class="num">${formatarDiasBR(c.diasParaVencer)}</td><td>${pillCriticidade(c.criticidade)}</td><td class="num">R$ ${escapeHTML(formatarMoedaCompacta(c.valorGlobalAtual || 0))}</td>${comSei ? `<td>${(c.aditivos || []).map((a) => `${a.numeroAditivo}º: ${escapeHTML(a.processoSeiAditivo || "—")}`).join("<br>") || "—"}</td>` : ""}
         </tr>`;
       }).join("")}</tbody>
     </table>`;
@@ -7690,6 +7720,7 @@ function renderGerencialContratos(lista, resumo) {
   let filtroAditivos = null; // número puro (0, 1, 2...) ou null — 0 é um filtro válido, não "vazio"
   let filtroGarantia = false;
   let filtroCriticidadeBaixo = false;
+  let filtroMeses = ""; // chave de FAIXAS_MESES, ou "limite" (mais de 60 meses)
   let modoBarra = lerGraficoSalvo("cpg-gerencial-barra") || "proporcao";
 
   // Pedido direto: "na DEPIN, a área gestora/requisitante é sempre 'DEPIN'
@@ -7784,6 +7815,14 @@ function renderGerencialContratos(lista, resumo) {
           <p class="dash-chart-hint" id="ger-aditivos-insight" style="margin-top:8px"></p>
         </div>
         <details class="painel-detalhes"><summary>Como ler</summary><p class="dash-chart-hint">Clique num nome para ver os contratos sob responsabilidade dele. Em Nº de aditivos, clique numa barra para ver quais contratos são e o número do SEI de cada aditivo. A contagem de aditivos não é uma linha do tempo, porque a planilha ainda não traz a data de cada um.</p></details>
+      </div>
+    </div>
+    <div class="dash-charts" style="grid-template-columns:1fr">
+      <div class="dash-chart-box" id="ger-meses-caixa">
+        <h4>Tempo acumulado de contrato, em meses</h4>
+        <div id="ger-meses"></div>
+        <p class="dash-chart-hint" id="ger-meses-insight" style="margin-top:8px"></p>
+        <details class="painel-detalhes"><summary>Como ler</summary><p class="dash-chart-hint">Conta os meses do início do contrato original até o fim da vigência atual, somando todos os aditivos. Clique numa barra para ver os contratos daquela faixa, do mais antigo para o mais novo. O teto de 72 meses é 60 meses mais 12 de prorrogação excepcional para serviços contínuos (Lei 8.666/93, art. 57, II e §4º). Contratos da Lei 14.133 têm outro teto e aluguel de imóvel pode não seguir essa regra, então confira o regime de cada contrato antes de decidir. Como uma prorrogação costuma somar 12 meses, quem já passou de 60 não cabe em mais um ano.</p></details>
       </div>
     </div>
     <div class="dash-charts" style="grid-template-columns:1fr 1fr">
@@ -7891,6 +7930,11 @@ function renderGerencialContratos(lista, resumo) {
     atualizar();
     rolarParaTopoGerencial();
   }
+  function selecionarMeses(chave) {
+    filtroMeses = filtroMeses === chave ? "" : chave;
+    atualizar();
+    rolarParaTopoGerencial();
+  }
   function selecionarGarantia() {
     filtroGarantia = !filtroGarantia;
     atualizar();
@@ -7928,6 +7972,8 @@ function renderGerencialContratos(lista, resumo) {
     rolarParaTopoGerencial();
   }
   document.getElementById("ger-kpis").addEventListener("click", (ev) => {
+    const cardMeses = ev.target.closest("[data-meses]");
+    if (cardMeses) return selecionarMeses(cardMeses.dataset.meses);
     const card = ev.target.closest("[data-status]");
     if (card) return selecionarStatusKpi(card.dataset.status);
     // "Valor Global Atual Total" não isola nada (não tem um "subconjunto"
@@ -8077,6 +8123,10 @@ function renderGerencialContratos(lista, resumo) {
     const alvoClicado = ev.target.closest("[data-cat]");
     if (alvoClicado) selecionarFiscal(alvoClicado.dataset.cat);
   });
+  document.getElementById("ger-meses").addEventListener("click", (ev) => {
+    const alvoClicado = ev.target.closest("[data-valor]");
+    if (alvoClicado) selecionarMeses(alvoClicado.dataset.valor);
+  });
   document.getElementById("ger-aditivos").addEventListener("click", (ev) => {
     const alvoClicado = ev.target.closest("[data-valor]");
     if (alvoClicado) selecionarAditivos(+alvoClicado.dataset.valor);
@@ -8094,6 +8144,7 @@ function renderGerencialContratos(lista, resumo) {
       (!filtroFiscal || (c.pessoas || []).some((p) => p.papel === "Fiscal" && p.nomePessoa === filtroFiscal)) &&
       (!filtroFornecedor || (c.empresa || "(empresa não identificada)") === filtroFornecedor) &&
       (filtroAditivos === null || (c.qtdAditivos ?? 0) === filtroAditivos) &&
+      (!filtroMeses || (filtroMeses === "limite" ? (c.mesesTotais ?? 0) > 60 : faixaDeMeses(c)?.chave === filtroMeses)) &&
       (!filtroGarantia || c.garantiaExigida === "Sim") &&
       (!filtroCriticidadeBaixo || c.criticidade === "Baixo (>90 dias)")
     );
@@ -8111,6 +8162,7 @@ function renderGerencialContratos(lista, resumo) {
       filtroFiscal && { rotulo: `fiscal: ${filtroFiscal}`, limpar: () => selecionarFiscal(filtroFiscal) },
       filtroFornecedor && { rotulo: `fornecedor: ${filtroFornecedor}`, limpar: () => selecionarFornecedor(filtroFornecedor) },
       filtroAditivos !== null && { rotulo: `${filtroAditivos} aditivo${filtroAditivos === 1 ? "" : "s"}`, limpar: () => selecionarAditivos(filtroAditivos) },
+      filtroMeses && { rotulo: filtroMeses === "limite" ? "mais de 60 meses (perto ou acima de 72)" : (FAIXAS_MESES.find((f) => f.chave === filtroMeses)?.label || filtroMeses), limpar: () => selecionarMeses(filtroMeses) },
       filtroGarantia && { rotulo: `garantia exigida: Sim`, limpar: () => selecionarGarantia() },
       filtroCriticidadeBaixo && { rotulo: `criticidade: Baixo (>90 dias)`, limpar: () => selecionarCriticidadeBaixo() },
     ].filter(Boolean);
@@ -8137,6 +8189,8 @@ function renderGerencialContratos(lista, resumo) {
     const valorAtualNaoVencidos = naoVencidos.reduce((a, c) => a + (c.valorGlobalAtual || 0), 0);
     const qtdBaixo = filtrada.filter((c) => c.criticidade === "Baixo (>90 dias)").length;
     const pctBaixo = filtrada.length ? (qtdBaixo / filtrada.length) * 100 : 0;
+    const qtdAcimaLimite = filtrada.filter((c) => (c.mesesTotais ?? 0) > LIMITE_MESES).length;
+    const qtdPertoLimite = filtrada.filter((c) => (c.mesesTotais ?? 0) > 60 && c.mesesTotais <= LIMITE_MESES).length;
     const qtdTotalAditivos = filtrada.reduce((a, c) => a + (c.qtdAditivos || 0), 0);
     const mediaAditivos = filtrada.length ? qtdTotalAditivos / filtrada.length : 0;
     // Pedido direto (crítica externa que ela trouxe): "a média esconde a
@@ -8184,6 +8238,7 @@ function renderGerencialContratos(lista, resumo) {
         <div class="kpi-card kpi-clicavel" data-status="Todos" title="Clique pra ver a lista completa" style="cursor:pointer;${filtroStatusKpi === "Todos" ? "outline:2px solid var(--carvao);outline-offset:-2px" : ""}"><div class="kpi-cabeca">${kpiIcone("competencia_normas")}<div class="kpi-label">Qtd Contratos</div></div><div class="kpi-value">${filtrada.length.toLocaleString("pt-BR")}</div></div>
         <div class="kpi-card kpi-clicavel" data-status="Vencido" title="Clique pra ver quais são" style="--kpi-cor:var(--crit-vencido);cursor:pointer;${filtroStatusKpi === "Vencido" ? "outline:2px solid var(--crit-vencido);outline-offset:-2px" : ""}"><div class="kpi-cabeca">${kpiIcone("relogio")}<div class="kpi-label">Qtd Contratos Vencidos</div></div><div class="kpi-value">${qtdVencidos.toLocaleString("pt-BR")}</div></div>
         <div class="kpi-card kpi-clicavel" data-status="A Vencer" title="Clique pra ver quais são" style="--kpi-cor:var(--crit-alto);cursor:pointer;${filtroStatusKpi === "A Vencer" ? "outline:2px solid var(--crit-alto);outline-offset:-2px" : ""}"><div class="kpi-cabeca">${kpiIcone("relogio")}<div class="kpi-label">Qtd Contratos A Vencer</div></div><div class="kpi-value">${qtdAVencer.toLocaleString("pt-BR")}</div></div>
+        <div class="kpi-card kpi-clicavel" data-meses="limite" title="Clique pra ver quais são, do mais antigo para o mais novo" style="--kpi-cor:var(--crit-alto);cursor:pointer;${filtroMeses === "limite" ? "outline:2px solid var(--crit-alto);outline-offset:-2px" : ""}"><div class="kpi-cabeca">${kpiIcone("calendario")}<div class="kpi-label">Perto ou acima de ${LIMITE_MESES} meses</div></div><div class="kpi-value">${(qtdAcimaLimite + qtdPertoLimite).toLocaleString("pt-BR")}</div><div class="kpi-valor-exato">${qtdAcimaLimite} acima de ${LIMITE_MESES}, ${qtdPertoLimite} de 61 a ${LIMITE_MESES}</div></div>
         <div class="kpi-card"><div class="kpi-cabeca">${kpiIcone("moeda")}<div class="kpi-label">Valor Global Inicial Total</div></div><div class="kpi-value">R$ ${formatarMoedaCompacta(valorInicial)}</div><div class="kpi-valor-exato">${formatarMoedaBR(valorInicial)}</div></div>
         <div class="kpi-card kpi-clicavel" data-acao="variacao-valor" title="Clique pra ver quais contratos variaram de valor" style="cursor:pointer"><div class="kpi-cabeca">${kpiIcone("moeda")}<div class="kpi-label">Valor Global Atual Total</div></div><div class="kpi-value">R$ ${formatarMoedaCompacta(valorAtual)}</div><div class="kpi-valor-exato">${formatarMoedaBR(valorAtual)}</div><div class="kpi-delta ${deltaClasse}">${deltaTexto}</div>${notaVariacaoCartao}</div>
       </div>`;
@@ -8199,9 +8254,10 @@ function renderGerencialContratos(lista, resumo) {
     else if (filtroStatusKpi === "NaoVencido") partesTitulo.push("não vencidos");
     else if (filtroStatusKpi) partesTitulo.push(filtroStatusKpi.toLowerCase());
     if (partesTitulo.length) {
-      const contratosTabela = filtroStatusKpi === "NaoVencido"
+      const baseTabela = filtroStatusKpi === "NaoVencido"
         ? filtrada.filter((c) => c.statusVigencia !== "Vencido")
         : filtroStatusKpi && filtroStatusKpi !== "Todos" ? filtrada.filter((c) => c.statusVigencia === filtroStatusKpi) : filtrada;
+      const contratosTabela = filtroMeses ? [...baseTabela].sort((a, b) => (b.mesesTotais ?? 0) - (a.mesesTotais ?? 0)) : baseTabela;
       // Coluna extra só quando o filtro é justamente por Nº de Aditivos —
       // é aí que a pergunta "qual é o número do SEI desse aditivo" faz
       // sentido; nas outras tabelas seria uma coluna vazia poluindo à toa.
@@ -8378,6 +8434,16 @@ function renderGerencialContratos(lista, resumo) {
     } else {
       insightAditivos.innerHTML = "";
     }
+    document.getElementById("ger-meses").innerHTML = barraContagemHorizontalSVG(agruparPorFaixaMeses(filtrada), {
+      maxRotulo: 22,
+      limite: 8,
+      tituloTooltip: (l) => `${l.label}: ${l.total} contrato(s)`,
+      destacarFn: (l) => !!filtroMeses && (filtroMeses === "limite" ? l.valor === "61a72" || l.valor === "acima72" : l.valor === filtroMeses),
+    });
+    const qtdMais60 = qtdAcimaLimite + qtdPertoLimite;
+    document.getElementById("ger-meses-insight").innerHTML = qtdMais60
+      ? `${iconeInline("informacao", 11, -1)} ${qtdMais60} contrato${qtdMais60 === 1 ? "" : "s"} já ${qtdMais60 === 1 ? "tem" : "têm"} mais de 60 meses, então uma nova prorrogação de 12 meses passaria de ${LIMITE_MESES}. ${qtdAcimaLimite ? `${qtdAcimaLimite} já ${qtdAcimaLimite === 1 ? "passou" : "passaram"} do teto.` : "Nenhum passou do teto ainda."}`
+      : "Nenhum contrato com mais de 60 meses neste recorte.";
     document.getElementById("ger-gestor").innerHTML = barraOuTabelaSVG(
       agruparContratosPorPessoa(filtrada, "Gestor"),
       {
@@ -8436,6 +8502,7 @@ function renderGerencialContratos(lista, resumo) {
     adicionarControlesGrafico(document.getElementById("ger-tipo"));
     adicionarControlesGrafico(document.getElementById("ger-analista"));
     adicionarControlesGrafico(document.getElementById("ger-aditivos"));
+    adicionarControlesGrafico(document.getElementById("ger-meses"));
     adicionarControlesGrafico(document.getElementById("ger-gestor"));
     adicionarControlesGrafico(document.getElementById("ger-fiscal"));
     adicionarControlesGrafico(document.getElementById("ger-top-contratos"));
@@ -8478,7 +8545,7 @@ function renderGerencialContratos(lista, resumo) {
   return {
     resetar() {
       filtroArea = ""; filtroTipo = ""; filtroAnalista = ""; filtroGestor = ""; filtroFiscal = "";
-      filtroFornecedor = ""; filtroAditivos = null; filtroGarantia = false; filtroCriticidadeBaixo = false;
+      filtroFornecedor = ""; filtroAditivos = null; filtroMeses = ""; filtroGarantia = false; filtroCriticidadeBaixo = false;
       filtroStatusKpi = "";
       document.getElementById("ger-filtro-area").value = "";
       const buscaInput = document.getElementById("ger-busca");
