@@ -12515,7 +12515,7 @@ async function carregarFrotaEstudoPortal(portalSlug) {
     painel.innerHTML = `<p class="tela-intro">Não consegui carregar o estudo: ${escapeHTML(erro.message)}</p>`;
     return;
   }
-  if (E.vazio || E.versao !== 2) {
+  if (E.vazio || E.versao !== 3) {
     painel.innerHTML = `<p class="tela-intro">O estudo precisa de dados novos. Na aba PAINEL DE FROTA, clique em ATUALIZAR PLANILHA e envie a planilha de frota (aba Frota). Os números do estudo são gerados a partir dela.</p>`;
     return;
   }
@@ -12561,6 +12561,7 @@ function montarEstudoFrota(raiz, E) {
     precoA: { c: PRECOS.cronos || 115436, p: PRECOS.ranger || 212991, s: PRECOS.duster || 205054 },
     precoB: PRECOS.ranger || 212991,
     filtroSituacao: "",
+    ritmo: 0, metaAno: 2030, pct: 25,
   };
   const NOTA = { viaturas: 696, valor: 144242279.05 };
 
@@ -12601,7 +12602,7 @@ function montarEstudoFrota(raiz, E) {
     const okVeic = (r) => (!usa("prop") || passa(FD.prop, r[1])) && (!usa("grupo") || passa(FD.grupo, r[2])) && (!usa("safra") || passa(FD.safra, r[3]));
     const porUn = new Map();
     let total = 0, perde = 0, proprias = 0, cedidas = 0;
-    const porGrupoBase = [0, 0, 0, 0], safras = new Map(), porGrupoProp = [0, 1, 2, 3].map(() => [0, 0]);
+    const porGrupoBase = [0, 0, 0, 0], safras = new Map(), safrasBase = new Map(), porGrupoProp = [0, 1, 2, 3].map(() => [0, 0]);
     for (const r of E.desc) {
       if (!okUn(r)) continue;
       const [un, prop, grupo, ano, q] = r;
@@ -12611,6 +12612,7 @@ function montarEstudoFrota(raiz, E) {
       if (!okVeic(r)) continue;
       o.t += q; total += q;
       safras.set(ano, (safras.get(ano) || 0) + q);
+      if (prop === 0 || (prop === 1 && EST.cedidas)) safrasBase.set(ano, (safrasBase.get(ano) || 0) + q);
       if (ano <= EST.ano) {
         o.perde += q; perde += q;
         if (prop === 0) { o.perdeProp += q; proprias += q; porGrupoProp[grupo][0] += q; } else if (prop === 1) { o.perdeCed += q; cedidas += q; porGrupoProp[grupo][1] += q; }
@@ -12622,13 +12624,16 @@ function montarEstudoFrota(raiz, E) {
     const custoA = porGrupoBase[0] * EST.precoA.c + porGrupoBase[1] * EST.precoA.p + porGrupoBase[2] * EST.precoA.s + porGrupoBase[3] * EST.precoB;
     const custoB = baseTotal * EST.precoB;
     const perdemTodas = unidades.filter((o) => o.situacao === "PERDE TODAS" && o.base > 0).sort((a, b) => a.base - b.base);
-    const cenarios = [0.25, 0.5, 0.75, 1].map((p) => {
+    // reposição de p% da base, começando pelas unidades que perderiam todas as veladas, das menores para as maiores
+    const cenarioPara = (p) => {
       const n = Math.round(baseTotal * p);
-      let cum = 0, cobertas = 0;
-      for (const o of perdemTodas) { cum += o.base; if (cum <= n) cobertas++; else break; }
-      return { p, n, a: baseTotal ? (n * custoA) / baseTotal : 0, b: baseTotal ? (n * custoB) / baseTotal : 0, cobertas };
-    });
-    return { total, perde, proprias, cedidas, porGrupoBase, baseTotal, custoA, custoB, unidades, perdemTodas, cenarios, safras, porGrupoProp };
+      let cum = 0;
+      const lista = [];
+      for (const o of perdemTodas) { cum += o.base; if (cum <= n) lista.push(o); else break; }
+      return { p, n, a: baseTotal ? (n * custoA) / baseTotal : 0, b: baseTotal ? (n * custoB) / baseTotal : 0, cobertas: lista.length, lista };
+    };
+    const cenarios = [0.25, 0.5, 0.75, 1].map(cenarioPara);
+    return { total, perde, proprias, cedidas, porGrupoBase, baseTotal, custoA, custoB, unidades, perdemTodas, cenarios, cenarioPara, safras, safrasBase, porGrupoProp };
   }
 
   // ---------- investimento (entregues 2023 a 2026, com valor)
@@ -12762,6 +12767,191 @@ function montarEstudoFrota(raiz, E) {
     return `<svg class="es-poster" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg"><rect x="0" y="0" width="${W}" height="${H}" fill="var(--surface)"/>${s}</svg>`;
   }
 
+  // ---------- peças comuns dos quadros de reposição (mesmo desenho do infográfico do diagnóstico)
+  const sTxt = (x, y, t, tam, extra = "") => `<text x="${x}" y="${y}" font-family="monospace" font-size="${tam}" fill="var(--carvao)" ${extra}>${escapeHTML(t)}</text>`;
+  const sFraco = 'fill-opacity="0.62"';
+  const sRot = (x, y, t) => sTxt(x, y, t, 10, `letter-spacing="1.2" ${sFraco} font-weight="700"`);
+  const sCab = (titulo) => {
+    const f = textoFiltro("dia"), sub = f ? "Filtro: " + f : "Frota descaracterizada completa, sem filtro";
+    return `<rect x="30" y="0" width="64" height="4" fill="var(--mostarda)"/><text x="30" y="34" font-family="Spectral, Georgia, serif" font-size="22" font-weight="700" fill="var(--carvao)">${escapeHTML(titulo)}</text>`
+      + sTxt(30, 54, sub.length > 130 ? sub.slice(0, 129) + "…" : sub, 11, sFraco) + `<line x1="30" y1="66" x2="970" y2="66" stroke="var(--paper-line)"/>`;
+  };
+  const sQuebra = (t) => { const out = []; let atual = ""; t.split(" ").forEach((w) => { if ((atual + " " + w).trim().length > 148) { out.push(atual); atual = w; } else atual = (atual + " " + w).trim(); }); if (atual) out.push(atual); return out; };
+  const sRodLinhas = (linhas) => linhas.flatMap(sQuebra);
+  const sRod = (y, linhas) => `<line x1="30" y1="${y}" x2="970" y2="${y}" stroke="var(--paper-line)"/>` + sRodLinhas(linhas).map((t, i) => sTxt(30, y + 20 + i * 14, t, 10, sFraco)).join("");
+  const sAlturaRod = (fim, linhas) => fim + 18 + sRodLinhas(linhas).length * 14 + 12;
+  const sPoster = (H, corpo) => `<svg class="es-poster" viewBox="0 0 1000 ${H}" xmlns="http://www.w3.org/2000/svg"><rect x="0" y="0" width="1000" height="${H}" fill="var(--surface)"/>${corpo}</svg>`;
+  // cartão de número grande dentro do quadro
+  const sCartao = (x, y, w, rotulo, valor, nota, cor) => `<rect x="${x}" y="${y}" width="${w}" height="74" fill="none" stroke="var(--paper-line)"/><rect x="${x}" y="${y}" width="${w}" height="3" fill="${cor}"/>`
+    + sRot(x + 12, y + 22, rotulo) + `<text x="${x + 12}" y="${y + 48}" font-family="monospace" font-size="24" font-weight="700" fill="var(--carvao)">${escapeHTML(valor)}</text>`
+    + sTxt(x + 12, y + 65, nota.length > Math.floor((w - 20) / 5.9) ? nota.slice(0, Math.floor((w - 20) / 5.9) - 1) + "…" : nota, 10, sFraco);
+  const sLegenda = (x, y, itens) => itens.map(([c, t], i) => `<rect x="${x}" y="${y + i * 16 - 8}" width="9" height="9" fill="${c}"/>` + sTxt(x + 15, y + i * 16, t, 10)).join("");
+  const grupoDeTipo = (t) => (t === 1 || t === 2 || t === 3 ? 0 : t === 0 ? 1 : t === 4 ? 2 : 3);
+  // veladas entregues de 2023 a 2026 que passam pelos filtros que a planilha de entregas sabe responder (propriedade, tipo e COORPIN)
+  function entreguesVeladas(ignorarCoorpin = false) {
+    return E.entregas.filter((r) => r[4] !== 1 && (EST.combate || r[4] !== 2) && r[1] === 0 && passa(FD.prop, r[6]) && passa(FD.grupo, grupoDeTipo(r[5])) && (ignorarCoorpin || passa(FD.coorpin, E.coorpins[r[10]])));
+  }
+  const NOTA_ENTREGAS = "Entregas respeitam os filtros de propriedade, tipo de veículo e COORPIN. Departamento, região e fabricação valem só para a baixa.";
+
+  // ---------- 1. O ritmo de reposição cobre a baixa?
+  function ritmoSVG() {
+    const Cs = calcDia("safra"), T0 = EST.ano + 8, base = Cs.baseTotal;
+    const entradas = (Y) => Cs.safrasBase.get(Y - 8) || 0;
+    const ent = { 2023: 0, 2024: 0, 2025: 0, 2026: 0 };
+    entreguesVeladas().forEach((r) => { if (ent[r[0]] !== undefined) ent[r[0]] += r[8]; });
+    const anosEnt = [2023, 2024, 2025, 2026], totEnt = anosEnt.reduce((a, y) => a + ent[y], 0), media = totEnt / 4;
+    const melhorAno = anosEnt.reduce((m, y) => (ent[y] > ent[m] ? y : m), 2023), melhor = ent[melhorAno];
+    const serie = (r) => { const out = [{ y: T0, v: base }]; let s = base; for (let Y = T0 + 1; Y <= T0 + 8; Y++) { s = Math.max(0, s + entradas(Y) - r); out.push({ y: Y, v: s }); } return out; };
+    const linhas = [{ rot: `Ritmo médio (${N(media)} por ano)`, r: media, cor: "var(--terracota)" }, { rot: `Melhor ano, ${melhorAno} (${N(melhor)} por ano)`, r: melhor, cor: "var(--oliva)" }];
+    if (EST.ritmo > 0) linhas.push({ rot: `Ritmo informado (${N(EST.ritmo)} por ano)`, r: EST.ritmo, cor: "var(--dourado)" });
+    linhas.forEach((l) => { l.pts = serie(l.r); const z = l.pts.find((p) => p.v === 0); l.zera = z ? z.y : null; });
+    const meta = Math.max(EST.metaAno, T0 + 1);
+    let total = base; for (let Y = T0 + 1; Y <= meta; Y++) total += entradas(Y);
+    const necessario = Math.ceil(total / (meta - T0)), custoMed = base ? Cs.custoA / base : EST.precoB;
+
+    let s = sCab("O ritmo de reposição cobre a baixa?");
+    s += sRot(30, 90, "ANO A ANO: O QUE ENTRA E O QUE SAI") + sRot(530, 90, "ESTOQUE A REPOR SE O RITMO SE MANTIVER");
+    // colunas duplas
+    const anos = [2023, 2024, 2025, 2026, 2027, 2028, 2029], xe = 40, we = 440, yT = 118, yB = 340, gw = we / anos.length;
+    const maxV = Math.max(1, ...anos.map((y) => entradas(y) || 0), ...anosEnt.map((y) => ent[y]));
+    s += `<line x1="${xe}" y1="${yB}" x2="${xe + we}" y2="${yB}" stroke="var(--paper-line)"/>`;
+    anos.forEach((y, i) => {
+      const cx = xe + gw * i + gw / 2, vs = y <= 2026 ? ent[y] : null, vb = entradas(y);
+      const col = (v, x, cor, rot) => { if (!v) return ""; const hh = v / maxV * (yB - yT - 16); return `<rect x="${x}" y="${(yB - hh).toFixed(1)}" width="22" height="${hh.toFixed(1)}" fill="${cor}"><title>${y}: ${N(v)} ${rot}</title></rect>` + sTxt(x + 11, yB - hh - 5, N(v), 10, 'text-anchor="middle"'); };
+      s += col(vs, cx - 24, "var(--oliva)", "veladas entregues") + col(vb, cx + 2, "var(--terracota)", "viaturas completam 8 anos");
+      s += sTxt(cx, yB + 16, String(y), 10, 'text-anchor="middle"');
+    });
+    s += sLegenda(40, 376, [["var(--oliva)", "Veladas entregues no ano (a planilha só tem até 2026)"], ["var(--terracota)", "Viaturas cuja safra completa 8 anos naquele ano"]]);
+    // linhas do estoque
+    const xl = 560, wl = 400, ys = Math.max(1, ...linhas.flatMap((l) => l.pts.map((p) => p.v)));
+    const px = (i) => xl + wl * i / 8, py = (v) => yB - v / ys * (yB - yT - 10);
+    s += `<line x1="${xl}" y1="${yB}" x2="${xl + wl}" y2="${yB}" stroke="var(--paper-line)"/>`;
+    [0.5, 1].forEach((f) => { s += `<line x1="${xl}" y1="${py(ys * f).toFixed(1)}" x2="${xl + wl}" y2="${py(ys * f).toFixed(1)}" stroke="var(--paper-line)" stroke-dasharray="2 4"/>` + sTxt(xl - 6, py(ys * f) + 3, N(ys * f), 9, `text-anchor="end" ${sFraco}`); });
+    s += sTxt(xl - 6, yB + 3, "0", 9, `text-anchor="end" ${sFraco}`);
+    for (let i = 0; i <= 8; i++) s += sTxt(px(i), yB + 16, String(T0 + i), 9, 'text-anchor="middle"');
+    linhas.forEach((l) => {
+      s += `<polyline points="${l.pts.map((p, i) => px(i).toFixed(1) + "," + py(p.v).toFixed(1)).join(" ")}" fill="none" stroke="${l.cor}" stroke-width="2.5"><title>${escapeHTML(l.rot)}</title></polyline>`;
+      l.pts.forEach((p, i) => { s += `<circle cx="${px(i).toFixed(1)}" cy="${py(p.v).toFixed(1)}" r="3" fill="${l.cor}"><title>${p.y}: ${N(p.v)} viaturas a repor</title></circle>`; });
+    });
+    s += sTxt(px(0) + 6, py(base) - 8, N(base), 11, 'font-weight="700"');
+    linhas.forEach((l, i) => { s += `<rect x="${xl}" y="${376 + i * 16 - 8}" width="9" height="9" fill="${l.cor}"/>` + sTxt(xl + 15, 376 + i * 16, `${l.rot}, ${l.zera ? "zera em " + l.zera : "não zera até " + (T0 + 8)}`, 10); });
+    // cartões
+    const yC = 376 + Math.max(2, linhas.length) * 16 + 30;
+    s += sCartao(30, yC, 300, "ESTOQUE A REPOR", N(base), EST.cedidas ? "viaturas, próprias e cedidas" : "viaturas próprias do Estado", "var(--terracota)");
+    s += sCartao(350, yC, 300, `RITMO PARA ZERAR ATÉ ${meta}`, `${N(necessario)} por ano`, `${moeda(necessario * custoMed)} por ano${melhor ? `, ${(necessario / melhor).toFixed(1).replace(".", ",")}x o melhor ano` : ""}`, "var(--mostarda)");
+    s += sCartao(670, yC, 300, "RITMO MÉDIO, 2023 A 2026", `${N(media)} por ano`, `${N(totEnt)} veladas em 4 anos, melhor ano ${melhorAno}`, "var(--oliva)");
+    const [lm, lb] = linhas;
+    const leitura = `Leitura: no ritmo médio de ${N(media)} por ano o estoque ${lm.zera ? "zera em " + lm.zera : "não zera até " + (T0 + 8)}. Mantendo o melhor ano (${N(melhor)} por ano), ${lb.zera ? "zera em " + lb.zera : "não zera até " + (T0 + 8)}.`;
+    const rod = [leitura, `Estoque é a base de reposição na data da baixa (fabricação até ${EST.ano}). A cada ano seguinte entra a safra que completa 8 anos e sai o ritmo de entrega. Custo por viatura: média da hipótese A.`, NOTA_ENTREGAS];
+    s += sRod(yC + 96, rod);
+    return sPoster(sAlturaRod(yC + 96, rod), s);
+  }
+
+  // ---------- 2. Entrou x vai sair, por COORPIN
+  function entrouSaiSVG() {
+    const Cm = calcDia("coorpin"), baixa = new Map(), entPor = new Map();
+    let semB = 0;
+    for (const o of Cm.unidades) { const v = o.perdeProp + (EST.cedidas ? o.perdeCed : 0); if (!o.u.c) { semB += v; continue; } baixa.set(o.u.c, (baixa.get(o.u.c) || 0) + v); }
+    let semC = 0;
+    entreguesVeladas(true).forEach((r) => { const c = E.coorpins[r[10]]; if (c === "Sem COORPIN ligada") { semC += r[8]; return; } entPor.set(c, (entPor.get(c) || 0) + r[8]); });
+    const todas = [...new Set([...baixa.keys(), ...entPor.keys()])].map((c) => ({ c, b: baixa.get(c) || 0, e: entPor.get(c) || 0 })).filter((l) => l.b + l.e > 0);
+    const noRecorte = todas.filter((l) => passa(FD.coorpin, l.c));
+    const semFiltro = FD.coorpin.size === 0;
+    const totB = noRecorte.reduce((a, l) => a + l.b, 0) + (semFiltro ? semB : 0), totE = noRecorte.reduce((a, l) => a + l.e, 0) + (semFiltro ? semC : 0);
+    const corCob = (l) => (!l.b || l.e >= l.b ? "var(--oliva)" : l.e >= l.b / 2 ? "var(--mostarda)" : "var(--terracota)");
+    const faltam = noRecorte.filter((l) => l.e < l.b / 2).length;
+    let s = sCab("Entrou × vai sair, por COORPIN");
+    s += sCartao(30, 84, 300, "ENTREGUES, 2023 A 2026", N(totE), "veladas, por COORPIN de destino", "var(--oliva)");
+    s += sCartao(350, 84, 300, "A BAIXAR", N(totB), EST.cedidas ? "próprias e cedidas" : "só as próprias do Estado", "var(--terracota)");
+    s += sCartao(670, 84, 300, "COBERTURA", totB ? pct(totE, totB) : "0%", `${faltam} COORPIN(s) cobrem menos da metade`, "var(--mostarda)");
+    s += `<line x1="30" y1="174" x2="970" y2="174" stroke="var(--paper-line)"/>`;
+    s += sRot(30, 198, "ONDE A REPOSIÇÃO CHEGOU E ONDE FALTA") + sRot(500, 198, "A BAIXAR × ENTREGUES POR COORPIN");
+    const yC = 210;
+    let altMapa = 120, altBar = 120;
+    if (todas.length) {
+      let mapa = "";
+      try { mapa = mapaCoorpinSVG(todas.map((l) => ({ label: l.c, total: Math.max(l.b, l.e), dirpin: null, b: l.b, e: l.e, perc: l.b ? l.e / l.b : 1 })), { corFn: corCob, formatarTotal: (l) => `${l.e} entregue(s) e ${l.b} a baixar`, formatarRotulo: (l) => l.label }); } catch { mapa = ""; }
+      if (mapa) { const a = aninhar(mapa, 30, yC, 440, "coorpin"); s += a.svg; altMapa = a.altura; }
+    }
+    const yLeg = yC + altMapa + 16;
+    s += sLegenda(30, yLeg, [["var(--oliva)", "entregas cobrem a baixa ou não há baixa"], ["var(--mostarda)", "entregas cobrem metade ou mais"], ["var(--terracota)", "entregas cobrem menos da metade"]]);
+    s += sTxt(30, yLeg + 52, "Tamanho do ponto proporcional ao maior entre entregues e a baixar.", 10, sFraco);
+    if (semC || semB) s += sTxt(30, yLeg + 66, `${N(semC)} entregue(s) e ${N(semB)} a baixar sem COORPIN ligada ficam só nos totais.`, 10, sFraco);
+    altMapa += semC || semB ? 84 : 70;
+    // pares de barras, das que mais faltam para as que menos faltam
+    const ord = todas.slice().sort((a, b) => (b.b - b.e) - (a.b - a.e));
+    let top = ord.slice(0, 14);
+    FD.coorpin.forEach((c) => { if (!top.some((l) => l.c === c)) { const l = ord.find((x) => x.c === c); if (l) top.push(l); } });
+    const maxR = Math.max(1, ...top.map((l) => Math.max(l.b, l.e))), rh = 32, larg = 470, xb = 158, wb = 270;
+    const nome = (c) => (c.length > 24 ? c.slice(0, 23) + "…" : c);
+    let bs = "";
+    top.forEach((l, i) => {
+      const y = i * rh + 4;
+      bs += `<g data-cat="${escapeAttr(l.c)}" style="cursor:pointer"><rect class="area-hit" x="0" y="${y - 2}" width="${larg}" height="${rh}" fill="transparent"/>`
+        + `<text x="${xb - 8}" y="${y + 17}" text-anchor="end" font-family="monospace" font-size="10" fill="var(--carvao)">${escapeHTML(nome(l.c))}</text>`
+        + `<rect x="${xb}" y="${y + 2}" width="${Math.max(l.b / maxR * wb, l.b ? 2 : 0).toFixed(1)}" height="11" fill="var(--terracota)"><title>${escapeHTML(l.c)}: ${N(l.b)} a baixar</title></rect>`
+        + `<text x="${(xb + l.b / maxR * wb + 5).toFixed(1)}" y="${y + 11}" font-family="monospace" font-size="9" fill="var(--carvao)">${N(l.b)}</text>`
+        + `<rect x="${xb}" y="${y + 15}" width="${Math.max(l.e / maxR * wb, l.e ? 2 : 0).toFixed(1)}" height="11" fill="var(--oliva)"><title>${escapeHTML(l.c)}: ${N(l.e)} entregues</title></rect>`
+        + `<text x="${(xb + l.e / maxR * wb + 5).toFixed(1)}" y="${y + 24}" font-family="monospace" font-size="9" fill="var(--carvao)">${N(l.e)}</text></g>`;
+    });
+    const hb = top.length * rh + 30;
+    bs += `<rect x="${xb}" y="${hb - 16}" width="9" height="9" fill="var(--terracota)"/><text x="${xb + 14}" y="${hb - 8}" font-family="monospace" font-size="10" fill="var(--carvao)">A baixar</text><rect x="${xb + 100}" y="${hb - 16}" width="9" height="9" fill="var(--oliva)"/><text x="${xb + 114}" y="${hb - 8}" font-family="monospace" font-size="10" fill="var(--carvao)">Entregues</text>`;
+    if (top.length) { const a = aninhar(`<svg viewBox="0 0 ${larg} ${hb}" xmlns="http://www.w3.org/2000/svg">${bs}</svg>`, 500, yC, 470, "coorpin"); s += a.svg; altBar = a.altura; }
+    if (ord.length > top.length) { s += sTxt(500, yC + altBar + 14, `Mostrando as ${top.length} que mais faltam, de ${ord.length} COORPINs.`, 10, sFraco); altBar += 20; }
+    const fim = yC + Math.max(altMapa, altBar) + 10;
+    const pior = ord.find((l) => l.b > l.e);
+    const rod2 = [`Leitura: ${faltam} de ${noRecorte.length} COORPINs receberam menos da metade do que vão baixar${pior ? `. A que mais falta é ${pior.c}, com ${N(pior.b - pior.e)} a mais para baixar do que entregues` : ""}.`, "Entregues são as veladas incorporadas de 2023 a 2026, na COORPIN onde a viatura está lotada hoje. A baixar é a base de reposição da região (fabricação até " + EST.ano + ").", NOTA_ENTREGAS];
+    s += sRod(fim, rod2);
+    return sPoster(sAlturaRod(fim, rod2), s);
+  }
+
+  // ---------- 3. Quadro de cenários: quanto repor e quem sai do zero
+  function quadroCenarioSVG() {
+    const Cm = calcDia("coorpin"), p = EST.pct / 100, cen = Cm.cenarioPara(p), cobSet = new Set(cen.lista);
+    const por = new Map();
+    Cm.perdemTodas.forEach((o) => { const c = o.u.c || "Sem COORPIN ligada"; const x = por.get(c) || { t: 0, a: 0 }; x.t++; if (cobSet.has(o)) x.a++; por.set(c, x); });
+    const doRecorte = (c) => passa(FD.coorpin, c);
+    const todasU = [...por.entries()].map(([c, x]) => ({ c, t: x.t, a: x.a }));
+    const lista = todasU.filter((l) => l.c !== "Sem COORPIN ligada");
+    const noRec = todasU.filter((l) => (l.c === "Sem COORPIN ligada" ? FD.coorpin.size === 0 : doRecorte(l.c))), totT = noRec.reduce((a, l) => a + l.t, 0), totA = noRec.reduce((a, l) => a + l.a, 0);
+    let s = sCab(`Reposição de ${EST.pct}%: quem sai do zero de veladas`);
+    s += sCartao(30, 84, 300, "VIATURAS REPOSTAS", N(cen.n), `${EST.pct}% da base de ${N(Cm.baseTotal)} viaturas`, "var(--tinta)");
+    s += sCartao(350, 84, 300, "CUSTO, HIPÓTESE A", moeda(cen.a), `hipótese B, preço único: ${moeda(cen.b)}`, "var(--dourado)");
+    s += sCartao(670, 84, 300, "UNIDADES QUE SAEM DO ZERO", `${N(totA)} de ${N(totT)}`, "unidades que perderiam todas as veladas", "var(--oliva)");
+    s += `<line x1="30" y1="174" x2="970" y2="174" stroke="var(--paper-line)"/>`;
+    s += sRot(30, 198, "COBERTURA DA FILA POR COORPIN") + sRot(500, 198, "UNIDADES SEM VELADAS: ATENDIDAS E PENDENTES");
+    const yC = 210; let altMapa = 120, altBar = 120;
+    const cor = (l) => (l.a === l.t ? "var(--oliva)" : l.a > 0 ? "var(--mostarda)" : "var(--terracota)");
+    if (lista.length) {
+      let mapa = "";
+      try { mapa = mapaCoorpinSVG(lista.map((l) => ({ label: l.c, total: l.t, dirpin: null, a: l.a, t: l.t, perc: 0 })), { corFn: cor, formatarTotal: (l) => `${l.a} de ${l.total} unidade(s) sem veladas saem do zero`, formatarRotulo: (l) => l.label }); } catch { mapa = ""; }
+      if (mapa) { const a = aninhar(mapa, 30, yC, 440, "coorpin"); s += a.svg; altMapa = a.altura; }
+    } else s += sTxt(30, yC + 30, "Nenhuma unidade perde todas as veladas neste recorte.", 12, sFraco);
+    const yLeg = yC + altMapa + 16;
+    s += sLegenda(30, yLeg, [["var(--oliva)", "todas as unidades sem veladas da região atendidas"], ["var(--mostarda)", "parte atendida"], ["var(--terracota)", "nenhuma atendida"]]);
+    s += sTxt(30, yLeg + 52, "Tamanho do ponto proporcional às unidades que perdem todas as veladas.", 10, sFraco);
+    altMapa += 70;
+    const ord = lista.slice().sort((a, b) => (b.t - b.a) - (a.t - a.a));
+    const top = ord.slice(0, 12);
+    FD.coorpin.forEach((c) => { if (!top.some((l) => l.c === c)) { const l = ord.find((x) => x.c === c); if (l) top.push(l); } });
+    if (top.length) {
+      const bsv = barraHorizontalEmpilhadaSVG(top.map((l) => ({ label: l.c, valores: { "Saem do zero": l.a, "Seguem sem veladas": l.t - l.a } })), [{ label: "Saem do zero", cor: "var(--oliva)" }, { label: "Seguem sem veladas", cor: "var(--terracota)" }], { formatarValor: N });
+      const a = aninhar(bsv, 500, yC, 470, "coorpin"); s += a.svg; altBar = a.altura;
+    }
+    // primeiras unidades da fila, no recorte
+    const fila = cen.lista.filter((o) => doRecorte(o.u.c)).slice(0, 7);
+    let yf = yC + altBar + 22;
+    s += sRot(500, yf, "PRIMEIRAS UNIDADES DA FILA");
+    if (fila.length) fila.forEach((o, i) => { const t = `${i + 1}. ${o.u.n} · ${o.u.m} · ${N(o.base)} viatura(s)`; s += sTxt(500, yf + 18 + i * 15, t.length > 76 ? t.slice(0, 75) + "…" : t, 10); });
+    else s += sTxt(500, yf + 18, "Com este percentual nenhuma unidade do recorte é atendida.", 10, sFraco);
+    altBar = altBar + 22 + 18 + Math.max(1, fila.length) * 15;
+    const fim = yC + Math.max(altMapa, altBar) + 10;
+    const pend = noRec.filter((l) => l.a < l.t).sort((a, b) => (b.t - b.a) - (a.t - a.a));
+    const rod3 = [`Leitura: com ${EST.pct}% da reposição, ${N(totA)} de ${N(totT)} unidades deixam de ficar sem nenhuma velada${pend.length ? `. Ficam pendentes ${pend.slice(0, 3).map((l) => `${l.c} (${l.t - l.a})`).join(", ")}${pend.length > 3 ? " e outras" : ""}` : ""}.`, "A fila começa pelas unidades que perderiam todas as veladas, das menores para as maiores, e segue até acabar as viaturas do percentual escolhido. A hipótese A repõe cada viatura por um modelo equivalente e a B usa o preço único.", `Base de reposição: ${EST.cedidas ? "próprias e cedidas" : "só as próprias do Estado"}, fabricação até ${EST.ano}.`];
+    s += sRod(fim, rod3);
+    return sPoster(sAlturaRod(fim, rod3), s);
+  }
+
   raiz.innerHTML = `
     <header class="cab-v2"><div class="rot-v2">Frota · Estudo técnico</div><h1 class="tit-v2">Recomposição da frota de viaturas veladas</h1></header>
     <p class="dash-chart-hint">Base: ${h(E.base || "planilha de frota")}, gerada em ${new Date(E.atualizadoEm || E.geradoEm).toLocaleDateString("pt-BR")}. Velada é a viatura descaracterizada, sem motos e caminhões. Clique numa barra, coluna ou ponto do mapa para isolar uma categoria, e Ctrl, Shift ou Cmd mais clique para somar outras. Os seletores fazem o mesmo, com várias opções marcadas. A imagem baixada leva escrito o filtro ativo.</p>
@@ -12883,6 +13073,16 @@ function montarEstudoFrota(raiz, E) {
       ${caixa("investimento-por-doacao", "Doação sem permuta", barraDim("doacao", porDim("doacao")), "Marca os veículos que aparecem na aba Doação sem permuta da planilha de frota.", "inv", "doacao")}
     </div>
 
+    <h3 class="es-titulo">Reposição: o ritmo cobre a baixa, e onde ela chega?</h3>
+    <p class="dash-chart-hint" style="max-width:90ch">Os dois quadros abaixo usam os seletores do diagnóstico, lá em cima. Clique numa COORPIN do mapa ou das barras para isolar uma região, e Ctrl, Shift ou Cmd mais clique para somar outras. Cada quadro baixa como uma imagem, com o filtro escrito.</p>
+    ${chips("dia")}
+    <div class="dash-filtros" style="margin-bottom:12px">
+      <div class="dash-filtro"><label for="es-ritmo">RITMO INFORMADO (VIATURAS POR ANO)</label><input type="number" id="es-ritmo" min="0" step="5" value="${EST.ritmo || ""}" placeholder="opcional" style="width:130px"></div>
+      <div class="dash-filtro"><label for="es-meta">ZERAR O ESTOQUE ATÉ</label><select id="es-meta">${[2027, 2028, 2029, 2030, 2031, 2032, 2033, 2034].map((a) => `<option value="${a}"${EST.metaAno === a ? " selected" : ""}>${a}</option>`).join("")}</select></div>
+    </div>
+    <div class="dash-chart-box es-caixa es-info" data-nome="ritmo-de-reposicao" data-escopo="dia" data-dim=""><div class="es-grafico">${ritmoSVG()}</div></div>
+    <div class="dash-chart-box es-caixa es-info" data-nome="entrou-x-vai-sair-por-coorpin" data-escopo="dia" data-dim=""><div class="es-grafico">${entrouSaiSVG()}</div></div>
+
     <h3 class="es-titulo">Cenários de investimento</h3>
     <p class="dash-chart-hint" style="max-width:90ch">Base de reposição: ${N(C.baseTotal)} viaturas${EST.cedidas ? " (próprias e cedidas)" : " (só as próprias do Estado)"}${filtrosAtivos("dia").length ? `, no recorte do diagnóstico (${textoFiltro("dia")})` : ""}. A hipótese A repõe cada viatura por um modelo equivalente. A hipótese B repõe tudo pelo preço de uma Ranger. Os preços são os pagos em 2025 e 2026 e podem ser trocados pelo valor vigente informado pela DILOG. Base por grupo: ${N(nGrupo(0))} compactos, ${N(nGrupo(1))} pick-ups, ${N(nGrupo(2))} SUV${nGrupo(3) ? `, ${N(nGrupo(3))} outros` : ""}.</p>
     <div class="dash-filtros">
@@ -12891,6 +13091,9 @@ function montarEstudoFrota(raiz, E) {
       <div class="dash-filtro"><label for="es-pa-s">SUV (A), R$</label><input type="number" id="es-pa-s" value="${Math.round(EST.precoA.s)}" step="1000"></div>
       <div class="dash-filtro"><label for="es-pb">PREÇO ÚNICO (B), R$</label><input type="number" id="es-pb" value="${Math.round(EST.precoB)}" step="1000"></div>
     </div>
+    <div class="dash-filtros" style="margin:14px 0 10px"><div class="dash-filtro" style="min-width:280px"><label for="es-pct">PERCENTUAL DA REPOSIÇÃO: <span id="es-pct-val">${EST.pct}%</span></label><input type="range" id="es-pct" min="5" max="100" step="5" value="${EST.pct}" style="width:100%"></div></div>
+    ${chips("dia")}
+    <div class="dash-chart-box es-caixa es-info" data-nome="quadro-de-cenarios" data-escopo="dia" data-dim=""><div class="es-grafico">${quadroCenarioSVG()}</div></div>
     <div class="dash-charts" style="grid-template-columns:1fr 1fr">
       <div class="dash-chart-box"><h4>Cenários por percentual da reposição</h4>${botaoTabela("es-tab-cenarios", "estudo-frota-cenarios.png")}<div id="es-tab-cenarios"><table class="dash-tabela"><thead><tr><th>CENÁRIO</th><th>VIATURAS</th><th>HIPÓTESE A</th><th>HIPÓTESE B</th><th>UNIDADES SEM ZERO VELADA</th></tr></thead><tbody>${C.cenarios.map((c) => `<tr><td><b>${Math.round(c.p * 100)}%</b></td><td>${N(c.n)}</td><td>${moeda(c.a)}</td><td>${moeda(c.b)}</td><td>${c.cobertas} de ${C.perdemTodas.length}</td></tr>`).join("")}</tbody></table></div><p class="dash-chart-hint" style="margin-top:10px">A ordem de reposição começa pelas unidades que perderiam todas as veladas, das menores para as maiores. Repor uma viatura para cada uma das ${C.perdemTodas.length} unidades nessa situação (${C.perdemTodas.length} viaturas, de ${moeda(C.perdemTodas.length * EST.precoA.c)} a ${moeda(C.perdemTodas.length * EST.precoB)}) tira todas do zero.</p></div>
       ${caixa("cenarios-de-investimento", "Custo de cada cenário", C.baseTotal ? barraHorizontalComEixoSVG(cenCats, { cor: (c) => cenarioCores[c.k], rotuloExtra: (c) => `(${N(c.n)} viaturas)` }) : vazio, "Azul é a hipótese A, roxo é a hipótese B." + dicaFiltro("dia"), "dia", "")}
@@ -12976,6 +13179,9 @@ function montarEstudoFrota(raiz, E) {
     else if (id === "es-combate") EST.combate = el.value === "1";
     else if (id === "es-agrupar") EST.agrupar = el.value;
     else if (id === "es-inserv") EST.inservis = Math.max(0, +el.value || 0);
+    else if (id === "es-ritmo") EST.ritmo = Math.max(0, +el.value || 0);
+    else if (id === "es-meta") EST.metaAno = +el.value;
+    else if (id === "es-pct") EST.pct = +el.value;
     else if (id === "es-pa-c") EST.precoA.c = +el.value || 0;
     else if (id === "es-pa-p") EST.precoA.p = +el.value || 0;
     else if (id === "es-pa-s") EST.precoA.s = +el.value || 0;
@@ -12984,6 +13190,8 @@ function montarEstudoFrota(raiz, E) {
     else return;
     desenhar();
   });
+  // o número ao lado da barra de percentual acompanha o arraste; o quadro redesenha ao soltar
+  raiz.addEventListener("input", (ev) => { if (ev.target.id === "es-pct") { const v = raiz.querySelector("#es-pct-val"); if (v) v.textContent = ev.target.value + "%"; } });
   // guarda quais caixas de seleção estavam abertas (a tela é redesenhada a cada filtro)
   raiz.addEventListener("toggle", (ev) => {
     const d = ev.target;
