@@ -575,6 +575,12 @@ body{background:var(--paper);color:var(--carvao);font-family:'Archivo',sans-seri
 
 /* Estudo técnico (Frota): usa kpi-card, dash-chart-box e dash-tabela do sistema; só o que é próprio dele fica aqui */
 .es-titulo{font-family:'Spectral',sans-serif;font-size:var(--fs-subtitulo);margin:28px 0 12px;padding-top:14px;border-top:2px solid var(--paper-line)}
+.es-multi summary{cursor:pointer;background:var(--paper);color:var(--carvao);border:1.5px solid var(--paper-line);padding:8px 10px;font-family:'IBM Plex Mono',monospace;font-size:var(--fs-ui-sm);min-width:170px;list-style:none}
+.es-multi summary::-webkit-details-marker{display:none}
+.es-multi summary::after{content:" BE";opacity:.6}
+.es-multi[open] summary{border-color:var(--tinta)}
+.dash-filtro .es-multi-lista{max-height:220px;overflow:auto;margin-top:4px;padding:6px 8px;border:1.5px solid var(--paper-line);background:var(--surface);display:flex;flex-direction:column;gap:4px;font-family:'IBM Plex Mono',monospace;font-size:var(--fs-ui-sm)}
+.dash-filtro .es-multi-lista label{display:flex;gap:6px;align-items:center;letter-spacing:0;color:var(--carvao);text-transform:none;white-space:nowrap}
 .dash-filtro input[type=number]{background:var(--paper);color:var(--carvao);border:1.5px solid var(--paper-line);padding:8px 10px;font-family:'IBM Plex Mono',monospace;font-size:var(--fs-ui-sm);border-radius:var(--radius-md,0)}
 /* Atualizar planilhas de contratos (admin) */
 .modal-caixa.imp-caixa{max-width:900px;max-height:92vh;overflow:auto;border-top-color:var(--tinta)}
@@ -12487,11 +12493,14 @@ function criarMotorDimensoesPorValor(linhasTodas, dimensoes, campoRegiao) {
 //
 // Cross-filter (pedido direto: "dos velados adquiridos em 2023 ou 2025 quais
 // foram as fontes de investimento e vice-versa... e conforme eu filtro
-// cruzado, a pessoa pode baixar o gráfico desse modo também"): clicar numa
-// barra, coluna ou ponto do mapa filtra todo o resto; os seletores no topo de
-// cada bloco fazem o mesmo; cada gráfico mostra TODAS as suas categorias
-// (menos as que os OUTROS filtros escondem), com a escolhida em destaque; a
-// imagem baixada leva escrito qual filtro estava ativo.
+// cruzado, a pessoa pode baixar o gráfico desse modo também"; depois: "mostrar
+// as categorias e permitir agrupamento... se a pessoa quiser isolar essas
+// demais e ver só velada ela consegue, mas consegue juntar outras
+// combinações"): cada filtro aceita VÁRIOS valores. Clique simples isola um
+// valor; Ctrl, Shift ou Cmd + clique soma ou tira mais um. O gráfico principal
+// de investimento pode ser agrupado por categoria, tipo, fonte, doação ou
+// modelo, e clicar num trecho colorido filtra por aquela categoria. A imagem
+// baixada leva escrito qual filtro estava ativo.
 // =====================================================================
 async function carregarFrotaEstudoPortal(portalSlug) {
   const painel = document.getElementById("tab-frota-estudo");
@@ -12503,8 +12512,8 @@ async function carregarFrotaEstudoPortal(portalSlug) {
     painel.innerHTML = `<p class="tela-intro">Não consegui carregar o estudo: ${escapeHTML(erro.message)}</p>`;
     return;
   }
-  if (E.vazio) {
-    painel.innerHTML = `<p class="tela-intro">O estudo ainda não tem dados. Na aba PAINEL DE FROTA, clique em ATUALIZAR PLANILHA e envie a planilha de frota (aba Frota). Os números do estudo são gerados a partir dela.</p>`;
+  if (E.vazio || E.versao !== 2) {
+    painel.innerHTML = `<p class="tela-intro">O estudo precisa de dados novos. Na aba PAINEL DE FROTA, clique em ATUALIZAR PLANILHA e envie a planilha de frota (aba Frota). Os números do estudo são gerados a partir dela.</p>`;
     return;
   }
   montarEstudoFrota(painel, E);
@@ -12539,23 +12548,44 @@ function montarEstudoFrota(raiz, E) {
   const pct = (a, b) => (b ? Math.round((a / b) * 100) + "%" : "0%");
   const h = escapeHTML;
   const PRECOS = E.precos || {};
-  const NOMES = { tipo: ["Veladas", "Demais viaturas"], prop: ["Próprias", "Cedidas", "Alugadas"], grupo: ["Compactos", "Pick-ups", "SUV", "Outros"] };
+  const CAT = ["Velada (descaracterizada)", "Caracterizada padrão", "Caracterizada ADM"];
+  const TIPOS = ["Pick-up", "Sedan", "Hatchback", "Monovolume", "SUV", "Blindado/semi", "Moto", "Outros"];
+  const PROP = ["Própria", "Cedida", "Alugada", "Não informada"];
+  const GRUPOS = ["Compactos", "Pick-ups", "SUV", "Outros"];
+  const SIMNAO = ["Não", "Sim"];
   const EST = {
-    ano: 2018, cedidas: false, combate: true, inservis: 27,
+    ano: 2018, cedidas: false, combate: true, inservis: 27, agrupar: "categoria",
     precoA: { c: PRECOS.cronos || 115436, p: PRECOS.ranger || 212991, s: PRECOS.duster || 205054 },
     precoB: PRECOS.ranger || 212991,
     filtroSituacao: "",
   };
-  // filtros cruzados, um conjunto por bloco (investimento e diagnóstico têm
-  // chaves diferentes na planilha, então não se cruzam entre si)
-  const FI = { ano: null, fonte: null, tipo: null, modelo: null };
-  const FD = { dep: null, coorpin: null, safra: null, prop: null, grupo: null, regiao: null };
   const NOTA = { viaturas: 696, valor: 144242279.05 };
-  const ROT_FI = { ano: "Ano de entrega", fonte: "Fonte", tipo: "Tipo", modelo: "Modelo" };
-  const ROT_FD = { dep: "Departamento", coorpin: "COORPIN", safra: "Fabricação", prop: "Propriedade", grupo: "Tipo de veículo", regiao: "Região" };
-  const valorLegivel = (dim, v) => (dim === "tipo" ? NOMES.tipo[v] : dim === "prop" ? NOMES.prop[v] : dim === "grupo" ? NOMES.grupo[v] : String(v));
-  const filtrosAtivos = (escopo) => Object.entries(escopo === "inv" ? FI : FD).filter(([, v]) => v !== null);
-  const textoFiltro = (escopo) => filtrosAtivos(escopo).map(([d, v]) => `${(escopo === "inv" ? ROT_FI : ROT_FD)[d]} = ${valorLegivel(d, v)}`).join(" · ");
+
+  // dimensões do investimento (linha: [ano, categoria, fonte, modelo, esp, tipo, prop, doação, qtd, valor])
+  const DI = {
+    ano: { rot: "Ano de entrega", val: (r) => r[0], nome: (v) => String(v), tipo: Number },
+    categoria: { rot: "Categoria", val: (r) => r[1], nome: (v) => CAT[v], tipo: Number },
+    tipo: { rot: "Tipo de veículo", val: (r) => r[5], nome: (v) => TIPOS[v], tipo: Number },
+    prop: { rot: "Propriedade", val: (r) => r[6], nome: (v) => PROP[v], tipo: Number },
+    doacao: { rot: "Doação sem permuta", val: (r) => r[7], nome: (v) => SIMNAO[v], tipo: Number },
+    fonte: { rot: "Fonte do recurso", val: (r) => E.fontes[r[2]], nome: (v) => v, tipo: String },
+    modelo: { rot: "Modelo", val: (r) => E.modelos[r[3]], nome: (v) => v, tipo: String },
+  };
+  const DD = {
+    dep: { rot: "Departamento", nome: (v) => v, tipo: String },
+    coorpin: { rot: "COORPIN", nome: (v) => v, tipo: String },
+    regiao: { rot: "Região", nome: (v) => v, tipo: String },
+    prop: { rot: "Propriedade", nome: (v) => PROP[v], tipo: Number },
+    grupo: { rot: "Tipo de veículo", nome: (v) => GRUPOS[v], tipo: Number },
+    safra: { rot: "Fabricação", nome: (v) => String(v), tipo: Number },
+  };
+  const mkF = (dims) => Object.fromEntries(Object.keys(dims).map((k) => [k, new Set()]));
+  const FI = mkF(DI), FD = mkF(DD);
+  const DEF = { inv: DI, dia: DD }, FIL = { inv: FI, dia: FD };
+  const passa = (S, v) => S.size === 0 || S.has(v);
+  const filtrosAtivos = (escopo) => Object.entries(FIL[escopo]).filter(([, S]) => S.size > 0);
+  const textoFiltro = (escopo) => filtrosAtivos(escopo).map(([d, S]) => `${DEF[escopo][d].rot} = ${[...S].map((v) => DEF[escopo][d].nome(v)).join(" + ")}`).join(" · ");
+  const abertos = new Set();
 
   // ---------- diagnóstico (descaracterizadas)
   function calcDia(ignorar = null) {
@@ -12563,11 +12593,9 @@ function montarEstudoFrota(raiz, E) {
     // unidades entram; filtros de veículo (propriedade, tipo, fabricação)
     // escolhem quais viaturas contam. A situação da unidade (perde todas,
     // perde parte) sempre olha a frota descaracterizada COMPLETA dela.
-    const okUn = (r) => {
-      const u = E.unidades[r[0]];
-      return (ignorar === "dep" || FD.dep === null || u.d === FD.dep) && (ignorar === "coorpin" || FD.coorpin === null || u.c === FD.coorpin) && (ignorar === "regiao" || FD.regiao === null || u.r === FD.regiao);
-    };
-    const okVeic = (r) => (ignorar === "prop" || FD.prop === null || r[1] === FD.prop) && (ignorar === "grupo" || FD.grupo === null || r[2] === FD.grupo) && (ignorar === "safra" || FD.safra === null || r[3] === FD.safra);
+    const usa = (d) => ignorar !== d;
+    const okUn = (r) => { const u = E.unidades[r[0]]; return (!usa("dep") || passa(FD.dep, u.d)) && (!usa("coorpin") || passa(FD.coorpin, u.c)) && (!usa("regiao") || passa(FD.regiao, u.r)); };
+    const okVeic = (r) => (!usa("prop") || passa(FD.prop, r[1])) && (!usa("grupo") || passa(FD.grupo, r[2])) && (!usa("safra") || passa(FD.safra, r[3]));
     const porUn = new Map();
     let total = 0, perde = 0, proprias = 0, cedidas = 0;
     const porGrupoBase = [0, 0, 0, 0], safras = new Map(), porGrupoProp = [0, 1, 2, 3].map(() => [0, 0]);
@@ -12602,27 +12630,56 @@ function montarEstudoFrota(raiz, E) {
 
   // ---------- investimento (entregues 2023 a 2026, com valor)
   function calcInv(ignorar = null) {
-    const rows = E.entregas.filter((r) => r[4] !== 1 && (EST.combate || r[4] !== 2)
-      && (ignorar === "ano" || FI.ano === null || r[0] === FI.ano) && (ignorar === "tipo" || FI.tipo === null || r[1] === FI.tipo)
-      && (ignorar === "fonte" || FI.fonte === null || E.fontes[r[2]] === FI.fonte) && (ignorar === "modelo" || FI.modelo === null || E.modelos[r[3]] === FI.modelo));
+    const rows = E.entregas.filter((r) => r[4] !== 1 && (EST.combate || r[4] !== 2) && Object.keys(DI).every((d) => d === ignorar || passa(FI[d], DI[d].val(r))));
     const soma = (fn, campo) => rows.filter(fn).reduce((s, r) => s + r[campo], 0);
-    return { rows, n: soma(() => true, 5), v: soma(() => true, 6), nVel: soma((r) => r[1] === 0, 5), vVel: soma((r) => r[1] === 0, 6) };
+    return { rows, n: soma(() => true, 8), v: soma(() => true, 9), nVel: soma((r) => r[1] === 0, 8), vVel: soma((r) => r[1] === 0, 9) };
+  }
+  // soma por valor de uma dimensão; ordena pelo valor investido
+  function porDim(dim) {
+    const m = new Map();
+    for (const r of calcInv(dim).rows) { const k = DI[dim].val(r), o = m.get(k) || { n: 0, v: 0 }; o.n += r[8]; o.v += r[9]; m.set(k, o); }
+    return [...m.entries()].map(([k, o]) => ({ key: k, label: DI[dim].nome(k), valor: o.v, n: o.n })).sort((a, b) => b.valor - a.valor);
   }
 
   const cartao = (icone, rotulo, valor, cor, nota = "") => `<div class="kpi-card" style="--kpi-cor:${cor}"><div class="kpi-cabeca">${kpiIcone(icone)}<div class="kpi-label">${h(rotulo)}</div></div><div class="kpi-value">${valor}</div>${nota ? `<div class="kpi-valor-exato">${h(nota)}</div>` : ""}</div>`;
   // caixa de gráfico: data-escopo/data-dim dizem qual filtro o clique nas barras aciona
   const caixa = (nome, titulo, svg, dica = "", escopo = "", dim = "") => `<div class="dash-chart-box es-caixa" data-nome="${escapeAttr(nome)}" data-escopo="${escopo}" data-dim="${dim}"><h4>${h(titulo)}</h4><div class="es-grafico">${svg}</div>${dica ? `<p class="dash-chart-hint" style="margin-top:10px">${h(dica)}</p>` : ""}</div>`;
   const botaoTabela = (alvo, arquivo) => `<div style="display:flex;justify-content:flex-end;margin-bottom:8px"><button type="button" class="dash-toggle-btn" data-baixar-tabela="${alvo}" data-arquivo="${arquivo}">${iconeInline("download", 11, -1)} BAIXAR TABELA COMO IMAGEM</button></div>`;
-  const seletor = (id, rotulo, opcoes, atual) => `<div class="dash-filtro"><label for="${id}">${h(rotulo)}</label><select id="${id}"><option value="">Todos</option>${opcoes.map(([v, l]) => `<option value="${escapeAttr(String(v))}"${atual !== null && String(atual) === String(v) ? " selected" : ""}>${h(l)}</option>`).join("")}</select></div>`;
+  // seletor de vários valores (caixa que abre com marcadores)
+  const multi = (escopo, dim, opcoes) => {
+    const S = FIL[escopo][dim], id = `${escopo}:${dim}`, d = DEF[escopo][dim];
+    const resumo = S.size ? [...S].map((v) => d.nome(v)).join(", ") : "Todos";
+    return `<div class="dash-filtro"><label>${h(d.rot.toUpperCase())}</label><details class="es-multi" data-multi="${id}"${abertos.has(id) ? " open" : ""}><summary title="${escapeAttr(resumo)}">${h(resumo.length > 34 ? resumo.slice(0, 33) + "…" : resumo)}</summary><div class="es-multi-lista">${opcoes.map(([k, l]) => `<label><input type="checkbox" data-multi-item="${id}" value="${escapeAttr(String(k))}"${S.has(k) ? " checked" : ""}> ${h(l)}</label>`).join("")}</div></details></div>`;
+  };
   const chips = (escopo) => {
     const at = filtrosAtivos(escopo);
     if (!at.length) return "";
-    return `<div class="filter-chips" style="margin:0 0 12px">${at.map(([d, v]) => `<span class="filter-chip">${h((escopo === "inv" ? ROT_FI : ROT_FD)[d])}: ${h(valorLegivel(d, v))}<button type="button" data-limpar="${escopo}:${d}" aria-label="Tirar este filtro">${iconeInline("fechar", 9, -1)}</button></span>`).join("")}<button type="button" class="dash-toggle-btn" data-limpar="${escopo}:*">LIMPAR FILTROS</button></div>`;
+    return `<div class="filter-chips" style="margin:0 0 12px">${at.map(([d, S]) => `<span class="filter-chip">${h(DEF[escopo][d].rot)}: ${h([...S].map((v) => DEF[escopo][d].nome(v)).join(" + "))}<button type="button" data-limpar="${escopo}:${d}" aria-label="Tirar este filtro">${iconeInline("fechar", 9, -1)}</button></span>`).join("")}<button type="button" class="dash-toggle-btn" data-limpar="${escopo}:*">LIMPAR FILTROS</button></div>`;
   };
+
+  // colunas por ano empilhadas por uma dimensão qualquer, com legenda que quebra
+  // de linha (a do sistema só comporta 3 ou 4 itens) e trechos clicáveis
+  const CORES_SEG = ["var(--mostarda)", "var(--tinta)", "var(--oliva)", "var(--terracota)", "var(--dourado)", "var(--vinho)", "#7E8A8C"];
+  function colunasAgrupadasSVG(anos, segmentos) {
+    const w = 520, padL = 52, padR = 10, padT = 10, alturaPlot = 190, alturaRot = 22, colsLeg = 3, alturaLeg = Math.ceil(segmentos.length / colsLeg) * 14 + 6;
+    const hh = padT + alturaPlot + alturaRot + alturaLeg, baseY = padT + alturaPlot, bw = (w - padL - padR) / anos.length, barW = Math.min(bw * 0.6, 56);
+    const totais = anos.map((a) => segmentos.reduce((s, sg) => s + (a.valores[sg.label] || 0), 0)), maxT = Math.max(...totais, 1);
+    let grade = "", eixo = "";
+    [0, 0.25, 0.5, 0.75, 1].forEach((f) => { const y = baseY - alturaPlot * f; grade += `<line x1="${padL}" y1="${y.toFixed(1)}" x2="${w - padR}" y2="${y.toFixed(1)}" stroke="var(--paper-line)" stroke-width="1" stroke-dasharray="${f === 0 ? "0" : "2 4"}"/>`; eixo += `<text x="${padL - 6}" y="${(y + 3).toFixed(1)}" text-anchor="end" font-family="monospace" font-size="8" fill="var(--carvao)" fill-opacity="0.55">R$ ${formatarEixo(maxT * f)}</text>`; });
+    let cols = "", rot = "";
+    anos.forEach((a, i) => {
+      const cx = padL + bw * i + bw / 2; let y = baseY, c = `<rect class="area-hit" x="${(cx - bw / 2).toFixed(1)}" y="${padT}" width="${bw.toFixed(1)}" height="${alturaPlot}" fill="transparent"/>`;
+      segmentos.forEach((sg) => { const v = a.valores[sg.label] || 0; if (!v) return; const alt = alturaPlot * (v / maxT); const qt = a.quantidades[sg.label] || 0; c += `<rect data-seg="${escapeAttr(sg.label)}" x="${(cx - barW / 2).toFixed(1)}" y="${(y - alt).toFixed(1)}" width="${barW.toFixed(1)}" height="${alt.toFixed(1)}" fill="${sg.cor}" style="cursor:pointer"><title>${escapeHTML(a.label)} — ${escapeHTML(sg.label)}: ${moeda(v)} (${N(qt)} viaturas)</title></rect>`; y -= alt; });
+      cols += `<g data-cat="${escapeAttr(a.label)}" style="cursor:pointer">${c}</g>`;
+      rot += `<text x="${cx.toFixed(1)}" y="${baseY + 14}" text-anchor="middle" font-family="monospace" font-size="8.5" fill="var(--carvao)" fill-opacity="0.85">${escapeHTML(a.label)}</text>`;
+    });
+    const leg = segmentos.map((sg, k) => { const lx = padL + (k % colsLeg) * 150, ly = baseY + alturaRot + 12 + Math.floor(k / colsLeg) * 14; return `<rect x="${lx}" y="${ly - 7}" width="8" height="8" fill="${sg.cor}"/><text x="${lx + 12}" y="${ly}" font-family="monospace" font-size="8" fill="var(--carvao)">${escapeHTML(sg.label.length > 22 ? sg.label.slice(0, 21) + "…" : sg.label)}</text>`; }).join("");
+    return `<svg viewBox="0 0 ${w} ${hh}" xmlns="http://www.w3.org/2000/svg">${grade}${eixo}${cols}${rot}${leg}</svg>`;
+  }
 
   raiz.innerHTML = `
     <header class="cab-v2"><div class="rot-v2">Frota · Estudo técnico</div><h1 class="tit-v2">Recomposição da frota de viaturas veladas</h1></header>
-    <p class="dash-chart-hint">Base: ${h(E.base || "planilha de frota")}, gerada em ${new Date(E.atualizadoEm || E.geradoEm).toLocaleDateString("pt-BR")}. Velada é a viatura descaracterizada, sem motos e caminhões. Clique numa barra, coluna ou ponto do mapa para filtrar o resto da seção, ou use os seletores. A imagem baixada leva escrito o filtro ativo.</p>
+    <p class="dash-chart-hint">Base: ${h(E.base || "planilha de frota")}, gerada em ${new Date(E.atualizadoEm || E.geradoEm).toLocaleDateString("pt-BR")}. Velada é a viatura descaracterizada, sem motos e caminhões. Clique numa barra, coluna ou ponto do mapa para isolar uma categoria, e Ctrl, Shift ou Cmd mais clique para somar outras. Os seletores fazem o mesmo, com várias opções marcadas. A imagem baixada leva escrito o filtro ativo.</p>
     <div class="dash-filtros" style="margin-bottom:18px">
       <div class="dash-filtro" style="flex:1;min-width:230px"><label for="es-ano">BAIXA PARA ANO DE FABRICAÇÃO ATÉ</label>
         <select id="es-ano"><option value="2018">2018 (8 anos em 2026)</option><option value="2019">2019 (projeção 2027)</option><option value="2020">2020 (projeção 2028)</option><option value="2021">2021 (projeção 2029)</option></select></div>
@@ -12637,22 +12694,24 @@ function montarEstudoFrota(raiz, E) {
     const opDep = [...new Set(E.unidades.map((u) => u.d))].sort().map((d) => [d, d]);
     const opCoorpin = [...new Set(E.unidades.map((u) => u.c).filter(Boolean))].sort((a, b) => parseInt(a) - parseInt(b)).map((c) => [c, c]);
     const opSafra = [...new Set(E.desc.map((r) => r[3]))].sort((a, b) => a - b).map((a) => [a, String(a)]);
-    const opFonte = E.fontes.map((f) => [f, f]).sort((a, b) => a[0].localeCompare(b[0], "pt-BR"));
-    const opModelo = [...new Set(E.entregas.filter((r) => r[4] !== 1).map((r) => E.modelos[r[3]]))].sort().map((m) => [m, m]);
     const cenarioCores = { A: "var(--tinta)", B: "var(--dourado)" };
 
     // --- investimento: cada gráfico ignora o próprio filtro, KPIs usam todos
     const I = calcInv(null);
-    const agrup = (rows, chave) => { const m = new Map(); rows.forEach((r) => { const k = chave(r), o = m.get(k) || { n: 0, v: 0, nVel: 0, vVel: 0 }; o.n += r[5]; o.v += r[6]; if (r[1] === 0) { o.nVel += r[5]; o.vVel += r[6]; } m.set(k, o); }); return m; };
-    const mAno = agrup(calcInv("ano").rows, (r) => r[0]);
-    const gruposAno = [2023, 2024, 2025, 2026].map((a) => { const o = mAno.get(a) || { n: 0, v: 0, nVel: 0, vVel: 0 }; return { label: String(a), valores: { "Veladas": o.vVel, "Demais viaturas": o.v - o.vVel }, quantidades: { "Veladas": o.nVel, "Demais viaturas": o.n - o.nVel } }; });
-    const fonteLista = [...agrup(calcInv("fonte").rows, (r) => E.fontes[r[2]]).entries()].sort((a, b) => b[1].v - a[1].v);
-    const modeloLista = [...agrup(calcInv("modelo").rows, (r) => E.modelos[r[3]]).entries()].sort((a, b) => b[1].v - a[1].v);
-    const topo = modeloLista.slice(0, 10);
-    if (FI.modelo && !topo.some(([m]) => m === FI.modelo)) { const s = modeloLista.find(([m]) => m === FI.modelo); if (s) topo.push(s); }
-    const mTipo = agrup(calcInv("tipo").rows, (r) => r[1]);
-    const tipoCats = [0, 1].map((t) => ({ label: NOMES.tipo[t], valor: (mTipo.get(t) || { v: 0 }).v, n: (mTipo.get(t) || { n: 0 }).n }));
-    const velAnoFixo = (a) => E.entregas.filter((r) => r[4] !== 1 && (EST.combate || r[4] !== 2) && r[0] === a && r[1] === 0).reduce((s, r) => s + r[5], 0);
+    const opInv = (dim) => { const m = new Map(); E.entregas.filter((r) => r[4] !== 1).forEach((r) => m.set(DI[dim].val(r), DI[dim].nome(DI[dim].val(r)))); return [...m.entries()].sort((a, b) => (typeof a[0] === "number" ? a[0] - b[0] : String(a[1]).localeCompare(String(b[1]), "pt-BR"))); };
+    const props = opInv("prop");
+    // gráfico principal: por ano, agrupado pela dimensão escolhida
+    const dimAgr = EST.agrupar;
+    const rowsAno = calcInv("ano").rows;
+    const totSeg = new Map(); rowsAno.forEach((r) => { const k = DI[dimAgr].val(r); totSeg.set(k, (totSeg.get(k) || 0) + r[9]); });
+    const ordemSeg = [...totSeg.entries()].sort((a, b) => b[1] - a[1]).map(([k]) => k);
+    const MAXSEG = 6, topoSeg = ordemSeg.slice(0, MAXSEG), temOutros = ordemSeg.length > MAXSEG;
+    const corCategoria = ["var(--mostarda)", "var(--tinta)", "var(--oliva)"];
+    const segmentos = topoSeg.map((k, i) => ({ key: k, label: DI[dimAgr].nome(k), cor: dimAgr === "categoria" ? corCategoria[k] : CORES_SEG[i % CORES_SEG.length] })).concat(temOutros ? [{ key: null, label: "Outros", cor: "#7E8A8C" }] : []);
+    const anosGrupos = [2023, 2024, 2025, 2026].map((a) => { const valores = {}, quantidades = {}; segmentos.forEach((s) => { valores[s.label] = 0; quantidades[s.label] = 0; }); rowsAno.filter((r) => r[0] === a).forEach((r) => { const k = DI[dimAgr].val(r); const sg = segmentos.find((s) => s.key === k) || segmentos.find((s) => s.key === null); if (sg) { valores[sg.label] += r[9]; quantidades[sg.label] += r[8]; } }); return { label: String(a), valores, quantidades }; });
+    const topoModelos = porDim("modelo").slice(0, 10); FI.modelo.forEach((m) => { if (!topoModelos.some((x) => x.key === m)) { const s = porDim("modelo").find((x) => x.key === m); if (s) topoModelos.push(s); } });
+    const velAnoFixo = (a) => E.entregas.filter((r) => r[4] !== 1 && (EST.combate || r[4] !== 2) && r[0] === a && r[1] === 0).reduce((s, r) => s + r[8], 0);
+    const barraDim = (dim, lista) => (lista.length ? barraHorizontalComEixoSVG(lista, { cor: (c) => (dim === "categoria" ? corCategoria[c.key] : dim === "doacao" ? (c.key ? "var(--dourado)" : "var(--tinta)") : "var(--oliva)"), rotuloExtra: (c) => `(${N(c.n)} viaturas)` }) : `<p class="dash-chart-hint">Nada neste recorte.</p>`);
 
     // --- diagnóstico
     const cDep = calcDia("dep"), cSafra = calcDia("safra"), cMapa = calcDia("coorpin"), cGrupo = calcDia("grupo");
@@ -12669,7 +12728,7 @@ function montarEstudoFrota(raiz, E) {
     for (const o of cMapa.unidades) { if (!o.u.c) continue; const x = porCoorpin.get(o.u.c) || { t: 0, perde: 0, ced: 0, n: 0 }; x.t += o.t; x.perde += o.perde; x.ced += o.perdeCed; x.n += o.perde > 0 ? 1 : 0; porCoorpin.set(o.u.c, x); }
     const linhasMapa = [...porCoorpin.entries()].filter(([, x]) => x.perde > 0).map(([label, x]) => ({ label, total: x.perde, perc: x.perde / x.t, dirpin: null, rotuloTooltipExtra: `${x.n} unidade(s) afetada(s), ${N(x.ced)} cedida(s), ${pct(x.perde, x.t)} das descaracterizadas da região` }));
     const semCoorpin = cMapa.unidades.filter((o) => !o.u.c && o.perde > 0).length;
-    const grupoGrupos = [0, 1, 2, 3].map((g) => ({ label: NOMES.grupo[g], valores: { "Próprias": cGrupo.porGrupoProp[g][0], "Cedidas": cGrupo.porGrupoProp[g][1] } })).filter((g) => g.valores["Próprias"] + g.valores["Cedidas"] > 0);
+    const grupoGrupos = [0, 1, 2, 3].map((g) => ({ label: GRUPOS[g], valores: { "Próprias": cGrupo.porGrupoProp[g][0], "Cedidas": cGrupo.porGrupoProp[g][1] } })).filter((g) => g.valores["Próprias"] + g.valores["Cedidas"] > 0);
     let linhasUn = C.unidades.filter((o) => (EST.filtroSituacao ? o.situacao === EST.filtroSituacao : o.perde > 0));
     linhasUn = linhasUn.sort((a, b) => b.perde - a.perde || b.t - a.t);
     const nPerdemTodas = C.unidades.filter((o) => o.situacao === "PERDE TODAS").length, nPerdemParte = C.unidades.filter((o) => o.situacao === "PERDE PARTE").length;
@@ -12681,12 +12740,8 @@ function montarEstudoFrota(raiz, E) {
     q("#es-corpo").innerHTML = `
     <h3 class="es-titulo">Diagnóstico da frota descaracterizada</h3>
     <div class="dash-filtros" style="margin-bottom:10px">
-      ${seletor("es-sd-dep", "DEPARTAMENTO", opDep, FD.dep)}
-      ${seletor("es-sd-coorpin", "COORPIN", opCoorpin, FD.coorpin)}
-      ${seletor("es-sd-regiao", "REGIÃO", [["Capital", "Capital"], ["RMS", "RMS"], ["Interior", "Interior"]], FD.regiao)}
-      ${seletor("es-sd-prop", "PROPRIEDADE", [[0, "Próprias"], [1, "Cedidas"], [2, "Alugadas"]], FD.prop)}
-      ${seletor("es-sd-grupo", "TIPO DE VEÍCULO", NOMES.grupo.map((n, i) => [i, n]), FD.grupo)}
-      ${seletor("es-sd-safra", "ANO DE FABRICAÇÃO", opSafra, FD.safra)}
+      ${multi("dia", "dep", opDep)}${multi("dia", "coorpin", opCoorpin)}${multi("dia", "regiao", [["Capital", "Capital"], ["RMS", "RMS"], ["Interior", "Interior"]])}
+      ${multi("dia", "prop", [[0, "Próprias"], [1, "Cedidas"], [2, "Alugadas"]])}${multi("dia", "grupo", GRUPOS.map((n, i) => [i, n]))}${multi("dia", "safra", opSafra)}
     </div>
     ${chips("dia")}
     <div class="kpi-row">
@@ -12702,12 +12757,12 @@ function montarEstudoFrota(raiz, E) {
     </div>
     <div class="dash-filtros" style="margin:-4px 0 14px"><div class="dash-filtro"><label for="es-inserv">INSERVÍVEIS INFORMADOS</label><input type="number" id="es-inserv" min="0" value="${EST.inservis}" style="width:110px"></div></div>
     <div class="dash-charts" style="grid-template-columns:1fr 1fr">
-      ${caixa("safras-fabricacao", "Descaracterizadas por ano de fabricação", safraGrupos.length ? colunaEmpilhadaSVG(safraGrupos, [{ label: "A baixar", cor: "var(--terracota)" }, { label: "Ficam", cor: "var(--tinta)" }], { formatarValor: N, formatarEixoTick: (v) => N(v), substantivoQtd: "veículo", selecionado: FD.safra === null ? "" : String(FD.safra) }) : vazio, `Em vermelho, as safras que entram na baixa com a regra de fabricação até ${EST.ano}. Clique numa coluna para filtrar.`, "dia", "safra")}
+      ${caixa("safras-fabricacao", "Descaracterizadas por ano de fabricação", safraGrupos.length ? colunaEmpilhadaSVG(safraGrupos, [{ label: "A baixar", cor: "var(--terracota)" }, { label: "Ficam", cor: "var(--tinta)" }], { formatarValor: N, formatarEixoTick: (v) => N(v), substantivoQtd: "veículo" }) : vazio, `Em vermelho, as safras que entram na baixa com a regra de fabricação até ${EST.ano}. Clique numa coluna para filtrar.`, "dia", "safra")}
       <div class="dash-chart-box"><h4>Quando cada safra chega aos 8 anos</h4><table class="dash-tabela"><thead><tr><th>FABRICAÇÃO ATÉ</th><th>ENTRA NA BAIXA EM</th><th>ACUMULADO A BAIXAR</th></tr></thead><tbody>${projecao.map((p) => `<tr${p.lim === EST.ano ? ' style="background:color-mix(in srgb, var(--tinta) 14%, var(--surface))"' : ""}><td>${p.lim}</td><td>${p.ano}</td><td>${N(p.s)}</td></tr>`).join("")}</tbody></table></div>
     </div>
     <div class="dash-charts" style="grid-template-columns:1fr 1fr">
-      ${caixa("baixas-por-departamento", "Viaturas a baixar por departamento", depLista.length ? barraHorizontalEmpilhadaSVG(depLista.map(([d, x]) => ({ label: d, valores: { "Próprias": x.p, "Cedidas": x.c } })), [{ label: "Próprias", cor: "var(--terracota)" }, { label: "Cedidas", cor: "var(--mostarda)" }], { formatarValor: N, selecionado: FD.dep || "" }) : vazio, "Próprias entram na conta do Estado. Cedidas voltam ao órgão de origem. Clique numa barra para filtrar.", "dia", "dep")}
-      ${caixa("baixas-por-tipo-de-veiculo", "Viaturas a baixar por tipo de veículo", grupoGrupos.length ? barraHorizontalEmpilhadaSVG(grupoGrupos, [{ label: "Próprias", cor: "var(--terracota)" }, { label: "Cedidas", cor: "var(--mostarda)" }], { formatarValor: N, selecionado: FD.grupo === null ? "" : NOMES.grupo[FD.grupo] }) : vazio, "Compactos são hatch, sedan e monovolume. Clique numa barra para filtrar.", "dia", "grupo")}
+      ${caixa("baixas-por-departamento", "Viaturas a baixar por departamento", depLista.length ? barraHorizontalEmpilhadaSVG(depLista.map(([d, x]) => ({ label: d, valores: { "Próprias": x.p, "Cedidas": x.c } })), [{ label: "Próprias", cor: "var(--terracota)" }, { label: "Cedidas", cor: "var(--mostarda)" }], { formatarValor: N }) : vazio, "Próprias entram na conta do Estado. Cedidas voltam ao órgão de origem. Clique numa barra para filtrar.", "dia", "dep")}
+      ${caixa("baixas-por-tipo-de-veiculo", "Viaturas a baixar por tipo de veículo", grupoGrupos.length ? barraHorizontalEmpilhadaSVG(grupoGrupos, [{ label: "Próprias", cor: "var(--terracota)" }, { label: "Cedidas", cor: "var(--mostarda)" }], { formatarValor: N }) : vazio, "Compactos são hatch, sedan e monovolume. Clique numa barra para filtrar.", "dia", "grupo")}
     </div>
     <div class="dash-chart-box es-caixa" data-nome="mapa-unidades-afetadas" data-escopo="dia" data-dim="coorpin" style="margin-bottom:14px"><h4>Mapa das unidades afetadas</h4><div id="es-mapa" style="max-width:560px"></div><p class="dash-chart-hint" style="margin-top:10px">Cada ponto é uma COORPIN, com o tamanho proporcional às viaturas a baixar na região. Clique num ponto para filtrar. Capital e região metropolitana ficam no ponto da Sede. Vermelho indica 60% ou mais das descaracterizadas da região na baixa, amarelo de 40% a 59%, verde abaixo disso.${semCoorpin ? ` ${semCoorpin} unidade(s) não foram ligadas a uma COORPIN e ficam só na lista.` : ""}</p></div>
     <div class="dash-chart-box" style="margin-bottom:14px"><h4>Unidades, da que mais perde para a que menos perde</h4>
@@ -12718,10 +12773,8 @@ function montarEstudoFrota(raiz, E) {
 
     <h3 class="es-titulo">Investimento realizado, 2023 a 2026</h3>
     <div class="dash-filtros" style="margin-bottom:10px">
-      ${seletor("es-si-ano", "ANO DE ENTREGA", [2023, 2024, 2025, 2026].map((a) => [a, String(a)]), FI.ano)}
-      ${seletor("es-si-tipo", "TIPO", [[0, "Veladas"], [1, "Demais viaturas"]], FI.tipo)}
-      ${seletor("es-si-fonte", "FONTE DO RECURSO", opFonte, FI.fonte)}
-      ${seletor("es-si-modelo", "MODELO", opModelo, FI.modelo)}
+      ${multi("inv", "ano", [2023, 2024, 2025, 2026].map((a) => [a, String(a)]))}${multi("inv", "categoria", CAT.map((n, i) => [i, n]))}${multi("inv", "tipo", opInv("tipo"))}
+      ${props.length > 1 ? multi("inv", "prop", props) : ""}${multi("inv", "doacao", [[0, "Não"], [1, "Sim"]])}${multi("inv", "fonte", opInv("fonte"))}${multi("inv", "modelo", opInv("modelo"))}
     </div>
     ${chips("inv")}
     <div class="kpi-row">
@@ -12730,13 +12783,18 @@ function montarEstudoFrota(raiz, E) {
       ${cartao("mira", "Veladas no recorte", N(I.nVel), "var(--mostarda)", `${pct(I.nVel, I.n)} das viaturas, ${moeda(I.vVel)}`)}
       ${cartao("informacao", "Valor médio por viatura", I.n ? moeda(I.v / I.n) : "R$ 0", "var(--dourado)", filtrosAtivos("inv").length ? "do recorte filtrado" : `nota técnica: ${NOTA.viaturas} viaturas e ${moedaExata(NOTA.valor)}`)}
     </div>
+    <div class="dash-filtros" style="margin-bottom:10px"><div class="dash-filtro"><label for="es-agrupar">AGRUPAR O GRÁFICO POR ANO PELA</label><select id="es-agrupar">${[["categoria", "Categoria (velada, padrão, ADM)"], ["tipo", "Tipo de veículo"], ["fonte", "Fonte do recurso"], ["doacao", "Doação sem permuta"], ["modelo", "Modelo"]].map(([v, l]) => `<option value="${v}"${EST.agrupar === v ? " selected" : ""}>${l}</option>`).join("")}</select></div></div>
     <div class="dash-charts" style="grid-template-columns:1fr 1fr">
-      ${caixa("investimento-por-ano", "Valor investido por ano de entrega", colunaEmpilhadaSVG(gruposAno, [{ label: "Veladas", cor: "var(--mostarda)" }, { label: "Demais viaturas", cor: "var(--tinta)" }], { substantivoQtd: "viatura", selecionado: FI.ano === null ? "" : String(FI.ano) }), `Veladas entregues sem filtro: 2023 ${velAnoFixo(2023)}, 2025 ${velAnoFixo(2025)}, 2026 ${velAnoFixo(2026)} (a nota técnica traz 87 em 2025). Clique numa coluna para filtrar.`, "inv", "ano")}
-      ${caixa("investimento-por-fonte", "Por fonte do recurso", fonteLista.length ? barraHorizontalComEixoSVG(fonteLista.map(([f, x]) => ({ label: f, valor: x.v, n: x.n })), { cor: "var(--oliva)", rotuloExtra: (c) => `(${N(c.n)} viaturas)`, selecionado: FI.fonte || "" }) : vazio, "Clique numa barra para ver quais viaturas vieram dessa fonte.", "inv", "fonte")}
+      ${caixa("investimento-por-ano", `Valor investido por ano, por ${DI[dimAgr].rot.toLowerCase()}`, colunasAgrupadasSVG(anosGrupos, segmentos), `Veladas entregues sem filtro: 2023 ${velAnoFixo(2023)}, 2025 ${velAnoFixo(2025)}, 2026 ${velAnoFixo(2026)} (a nota técnica traz 87 em 2025). Clique numa coluna para isolar o ano, ou num trecho colorido para isolar a categoria.`, "inv", "ano")}
+      ${caixa("investimento-por-categoria", "Por categoria da viatura", barraDim("categoria", porDim("categoria")), "Velada é a descaracterizada. Caracterizada padrão e ADM são as demais. Ctrl, Shift ou Cmd mais clique soma categorias.", "inv", "categoria")}
     </div>
     <div class="dash-charts" style="grid-template-columns:1fr 1fr">
-      ${caixa("investimento-por-modelo", "Por modelo", topo.length ? barraHorizontalComEixoSVG(topo.map(([m, x]) => ({ label: m, valor: x.v, n: x.n })), { cor: "var(--tinta)", rotuloExtra: (c) => `(${N(c.n)} viaturas)`, selecionado: FI.modelo || "" }) : vazio, "Os dez modelos de maior valor no recorte.", "inv", "modelo")}
-      ${caixa("investimento-veladas-x-demais", "Veladas e demais viaturas", barraHorizontalComEixoSVG(tipoCats, { cor: (c) => (c.label === "Veladas" ? "var(--mostarda)" : "var(--tinta)"), rotuloExtra: (c) => `(${N(c.n)} viaturas)`, selecionado: FI.tipo === null ? "" : NOMES.tipo[FI.tipo] }), "Veladas são as descaracterizadas. Clique numa barra para filtrar.", "inv", "tipo")}
+      ${caixa("investimento-por-fonte", "Por fonte do recurso", barraDim("fonte", porDim("fonte")), "Clique numa barra para ver quais viaturas vieram dessa fonte.", "inv", "fonte")}
+      ${caixa("investimento-por-tipo", "Por tipo de veículo", barraDim("tipo", porDim("tipo")), "Tipos vêm da coluna Tipo de veículo da planilha.", "inv", "tipo")}
+    </div>
+    <div class="dash-charts" style="grid-template-columns:1fr 1fr">
+      ${caixa("investimento-por-modelo", "Por modelo", barraDim("modelo", topoModelos), "Os dez modelos de maior valor no recorte.", "inv", "modelo")}
+      ${caixa("investimento-por-doacao", "Doação sem permuta", barraDim("doacao", porDim("doacao")), "Marca os veículos que aparecem na aba Doação sem permuta da planilha de frota.", "inv", "doacao")}
     </div>
 
     <h3 class="es-titulo">Cenários de investimento</h3>
@@ -12757,9 +12815,20 @@ function montarEstudoFrota(raiz, E) {
 
     const alvoMapa = q("#es-mapa");
     try {
-      alvoMapa.innerHTML = linhasMapa.length ? mapaCoorpinSVG(linhasMapa, { selecionado: FD.coorpin || "", corFn: (l) => (l.perc >= 0.6 ? "var(--terracota)" : l.perc >= 0.4 ? "var(--mostarda)" : "var(--oliva)"), formatarTotal: (l) => `${l.total} viatura(s) a baixar`, formatarRotulo: (l) => l.label }) : vazio;
+      alvoMapa.innerHTML = linhasMapa.length ? mapaCoorpinSVG(linhasMapa, { corFn: (l) => (l.perc >= 0.6 ? "var(--terracota)" : l.perc >= 0.4 ? "var(--mostarda)" : "var(--oliva)"), formatarTotal: (l) => `${l.total} viatura(s) a baixar`, formatarRotulo: (l) => l.label }) : vazio;
     } catch { alvoMapa.innerHTML = `<p class="dash-chart-hint">Não foi possível desenhar o mapa.</p>`; }
     q("#es-f-sit").value = EST.filtroSituacao;
+
+    // destaque da seleção (vários valores): o que não está selecionado fica esmaecido
+    raiz.querySelectorAll(".es-caixa[data-dim]").forEach((cx) => {
+      const dim = cx.dataset.dim, escopo = cx.dataset.escopo;
+      if (!dim) return;
+      const S = FIL[escopo][dim]; if (!S.size) return;
+      const rev = chaveDoRotulo(escopo, dim);
+      cx.querySelectorAll("g[data-cat]").forEach((g) => { g.setAttribute("opacity", S.has(rev(g.dataset.cat)) ? "1" : "0.4"); });
+    });
+    // com o gráfico agrupado, o trecho colorido da categoria escolhida também
+    if (FI[dimAgr] && FI[dimAgr].size) raiz.querySelectorAll('[data-nome="investimento-por-ano"] rect[data-seg]').forEach((r) => { const k = chaveDoRotulo("inv", dimAgr)(r.dataset.seg); r.setAttribute("opacity", k !== undefined && FI[dimAgr].has(k) ? "1" : "0.35"); });
 
     // ampliar e baixar imagem do sistema, com nome próprio e o filtro escrito na imagem
     raiz.querySelectorAll(".es-grafico, #es-mapa").forEach(adicionarControlesGrafico);
@@ -12771,50 +12840,72 @@ function montarEstudoFrota(raiz, E) {
     });
   }
 
-  // clique no gráfico = filtro cruzado (clicar de novo no mesmo item tira o filtro)
-  const converte = { ano: Number, safra: Number, fonte: String, modelo: String, dep: String, coorpin: String, tipo: (k) => NOMES.tipo.indexOf(k), grupo: (k) => NOMES.grupo.indexOf(k) };
+  // rótulo mostrado no gráfico -> valor real do filtro
+  function chaveDoRotulo(escopo, dim) {
+    const d = DEF[escopo][dim], universo = escopo === "inv"
+      ? [...new Set(E.entregas.map((r) => DI[dim].val(r)))]
+      : dim === "dep" ? E.unidades.map((u) => u.d) : dim === "coorpin" ? E.unidades.map((u) => u.c) : dim === "regiao" ? E.unidades.map((u) => u.r) : dim === "prop" ? [0, 1, 2] : dim === "grupo" ? [0, 1, 2, 3] : E.desc.map((r) => r[3]);
+    const mapa = new Map(universo.filter((v) => v !== null && v !== undefined).map((v) => [d.nome(v), v]));
+    return (rotulo) => mapa.get(rotulo);
+  }
+
+  const alterna = (S, v, soma) => {
+    if (soma) { if (S.has(v)) S.delete(v); else S.add(v); }
+    else if (S.size === 1 && S.has(v)) S.clear();
+    else { S.clear(); S.add(v); }
+  };
   raiz.addEventListener("click", (ev) => {
     const lim = ev.target.closest("[data-limpar]");
     if (lim) {
-      const [escopo, dim] = lim.dataset.limpar.split(":"); const F = escopo === "inv" ? FI : FD;
-      if (dim === "*") Object.keys(F).forEach((k) => { F[k] = null; }); else F[dim] = null;
+      const [escopo, dim] = lim.dataset.limpar.split(":");
+      if (dim === "*") Object.values(FIL[escopo]).forEach((S) => S.clear()); else FIL[escopo][dim].clear();
       desenhar(); return;
     }
     const tb = ev.target.closest("[data-baixar-tabela]");
     if (tb) { baixarTabelaComoImagem(document.getElementById(tb.dataset.baixarTabela), tb.dataset.arquivo); return; }
-    const g = ev.target.closest("g[data-cat]"), cx = ev.target.closest(".es-caixa");
-    if (!g || !cx || !cx.dataset.dim) return;
-    const valor = converte[cx.dataset.dim](g.dataset.cat);
-    if (valor === undefined || Number.isNaN(valor) || valor === -1) return;
-    const F = cx.dataset.escopo === "inv" ? FI : FD, dim = cx.dataset.dim;
-    F[dim] = F[dim] === valor ? null : valor;
+    const cx = ev.target.closest(".es-caixa");
+    if (!cx || !cx.dataset.dim) return;
+    const soma = ev.ctrlKey || ev.metaKey || ev.shiftKey, escopo = cx.dataset.escopo;
+    // trecho colorido do gráfico agrupado por ano: filtra pela dimensão do agrupamento
+    const seg = ev.target.closest("rect[data-seg]");
+    if (seg && cx.dataset.nome === "investimento-por-ano") {
+      const k = chaveDoRotulo("inv", EST.agrupar)(seg.dataset.seg);
+      if (k === undefined) return;
+      alterna(FI[EST.agrupar], k, soma); desenhar(); return;
+    }
+    const g = ev.target.closest("g[data-cat]");
+    if (!g) return;
+    const k = chaveDoRotulo(escopo, cx.dataset.dim)(g.dataset.cat);
+    if (k === undefined) return;
+    alterna(FIL[escopo][cx.dataset.dim], k, soma);
     desenhar();
   });
   raiz.addEventListener("change", (ev) => {
-    const el = ev.target, id = el.id;
-    const vazioOu = (f) => (el.value === "" ? null : f(el.value));
+    const el = ev.target;
+    if (el.matches?.("[data-multi-item]")) {
+      const [escopo, dim] = el.dataset.multiItem.split(":"), S = FIL[escopo][dim], v = DEF[escopo][dim].tipo(el.value);
+      if (el.checked) S.add(v); else S.delete(v);
+      desenhar(); return;
+    }
+    const id = el.id;
     if (id === "es-ano") EST.ano = +el.value;
     else if (id === "es-cedidas") EST.cedidas = el.value === "1";
     else if (id === "es-combate") EST.combate = el.value === "1";
+    else if (id === "es-agrupar") EST.agrupar = el.value;
     else if (id === "es-inserv") EST.inservis = Math.max(0, +el.value || 0);
     else if (id === "es-pa-c") EST.precoA.c = +el.value || 0;
     else if (id === "es-pa-p") EST.precoA.p = +el.value || 0;
     else if (id === "es-pa-s") EST.precoA.s = +el.value || 0;
     else if (id === "es-pb") EST.precoB = +el.value || 0;
     else if (id === "es-f-sit") EST.filtroSituacao = el.value;
-    else if (id === "es-sd-dep") FD.dep = vazioOu(String);
-    else if (id === "es-sd-coorpin") FD.coorpin = vazioOu(String);
-    else if (id === "es-sd-regiao") FD.regiao = vazioOu(String);
-    else if (id === "es-sd-prop") FD.prop = vazioOu(Number);
-    else if (id === "es-sd-grupo") FD.grupo = vazioOu(Number);
-    else if (id === "es-sd-safra") FD.safra = vazioOu(Number);
-    else if (id === "es-si-ano") FI.ano = vazioOu(Number);
-    else if (id === "es-si-tipo") FI.tipo = vazioOu(Number);
-    else if (id === "es-si-fonte") FI.fonte = vazioOu(String);
-    else if (id === "es-si-modelo") FI.modelo = vazioOu(String);
     else return;
     desenhar();
   });
+  // guarda quais caixas de seleção estavam abertas (a tela é redesenhada a cada filtro)
+  raiz.addEventListener("toggle", (ev) => {
+    const d = ev.target;
+    if (d.matches?.("details.es-multi")) { if (d.open) abertos.add(d.dataset.multi); else abertos.delete(d.dataset.multi); }
+  }, true);
   desenhar();
 }
 
