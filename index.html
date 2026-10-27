@@ -1695,6 +1695,10 @@ const ICONS = {
   // atendimento e repressão na região metropolitana — silhueta de
   // skyline, cobertura urbana densa (o oposto do pino único do DEPIN).
   unidade_depom: "<svg viewBox=\"0 0 64 64\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"3\" stroke-linecap=\"square\" stroke-linejoin=\"miter\" xmlns=\"http://www.w3.org/2000/svg\">\n  <line x1=\"6\" y1=\"56\" x2=\"58\" y2=\"56\" />\n  <rect x=\"8\" y=\"32\" width=\"10\" height=\"24\" />\n  <rect x=\"20\" y=\"16\" width=\"10\" height=\"40\" />\n  <rect x=\"32\" y=\"24\" width=\"10\" height=\"32\" />\n  <rect x=\"44\" y=\"38\" width=\"10\" height=\"18\" />\n</svg>",
+  // GDG — Gabinete do Delegado Geral: o comando da instituição, uma estrela
+  // de cinco pontas dentro de um escudo (traço e cantos iguais aos das outras
+  // unidades).
+  unidade_gdg: "<svg viewBox=\"0 0 64 64\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"3\" stroke-linecap=\"square\" stroke-linejoin=\"miter\" xmlns=\"http://www.w3.org/2000/svg\">\n  <polygon points=\"32,5 56,13 56,32 32,60 8,32 8,13\" />\n  <polygon points=\"32,16 35.2,25.5 45.3,25.7 37.2,31.7 40.2,41.3 32,35.5 23.8,41.3 26.8,31.7 18.7,25.7 28.8,25.5\" />\n</svg>",
   // Pedido direto: "os ícones do site... no celular parece emojis, isso é
   // muito amador" — caracteres soltos (⬇ ⬆ ⤢ ✕ ⓘ ⚠ 🔗 ★) caem na fonte de
   // emoji colorida do sistema operacional em vez de renderizar como texto
@@ -16629,7 +16633,13 @@ async function carregarContratosPortal(portalSlug) {
   // forma provisória" — mesma troca aplicada no import (ver
   // seed-contratos-depin.js); aqui só lê o que a API já manda.
   function unidadeGestoraTopo(c) {
-    return c.areaGestora === "DEPIN/CONTRATOS" ? "DEPIN" : "DEPAF";
+    if (c.areaGestora === "DEPIN/CONTRATOS") return "DEPIN";
+    // Pedido direto: "cria uma aba para contratos GDG... pra ficar bem
+    // delimitado". Os contratos do Gabinete do Delegado Geral entram pela área
+    // gestora (qualquer área que comece com GDG) e saem do DEPAF sozinhos, sem
+    // precisar mexer aqui de novo quando a planilha chegar.
+    if (/^GDG/i.test(String(c.areaGestora || "").trim())) return "GDG";
+    return "DEPAF";
   }
   const UNIDADES_GESTORAS_DISPONIVEIS = [...new Set(lista.map(unidadeGestoraTopo))].sort();
 
@@ -16650,6 +16660,8 @@ async function carregarContratosPortal(portalSlug) {
     { chave: "DPSV", label: "DPSV · SAÚDE", icone: "saude", semDados: true },
     { chave: "ACADEPOL", label: "ACADEPOL", icone: "unidade_acadepol", semDados: true },
     { chave: "DEPOM", label: "DEPOM", icone: "unidade_depom", semDados: true },
+    // GDG acende sozinho quando houver contrato de área gestora GDG.
+    { chave: "GDG", label: "GDG · GABINETE", icone: "unidade_gdg", semDados: !lista.some((c) => unidadeGestoraTopo(c) === "GDG") },
   ];
 
   // Pedido direto (crítica externa que ela trouxe): "DIRPIN não devia ser
@@ -16876,7 +16888,7 @@ async function carregarContratosPortal(portalSlug) {
   if (seletorUnidadeGestora) {
     seletorUnidadeGestora.querySelectorAll(".unidade-gestora-btn").forEach((btn) => {
       btn.addEventListener("click", () => {
-        // Unidade "em preparação" (DPSV/ACADEPOL/DEPOM, por hora) — avisa
+        // Unidade "em preparação" (DPSV/ACADEPOL/DEPOM/GDG, por hora) — avisa
         // em vez de fingir que filtrou algo. Não mexe na aba ativa nem no
         // estado atual, só informa.
         if (btn.dataset.semDados) {
