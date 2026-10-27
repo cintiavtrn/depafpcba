@@ -12479,8 +12479,20 @@ async function carregarFrotaPortal(portalSlug) {
     painel.innerHTML = `<p class="tela-intro">Não consegui carregar o painel de frota: ${escapeHTML(erro.message)}</p>`;
     return;
   }
-  painel.innerHTML = `<div class="frota-v2"></div>`;
-  montarPainelFrota(painel.firstElementChild, dados);
+  painel.innerHTML = `${souAdmin() ? `<div style="display:flex;justify-content:flex-end;margin-bottom:10px"><button type="button" class="dash-toggle-btn" id="frota-atualizar-planilha">${iconeInline("upload", 12, -2)} ATUALIZAR PLANILHA</button></div>` : ""}<div class="frota-v2"></div>`;
+  montarPainelFrota(painel.querySelector(".frota-v2"), dados);
+  document.getElementById("frota-atualizar-planilha")?.addEventListener("click", () => {
+    abrirAtualizacaoPlanilhas({
+      base: `/api/portais/${encodeURIComponent(portalSlug)}/frota/importacao`,
+      titulo: "Atualizar a planilha de frota",
+      intro: "Envie a planilha de frota (aba Frota) e confira o que muda nos números do painel antes de gravar. A planilha não fica guardada no sistema, só os totais por departamento, caracterização, propriedade, região, tipo e modelo. Placa e município não entram.",
+      tipos: [{ chave: "painel", rotulo: "PLANILHA DE FROTA", dica: "FrotaPCBA, aba Frota" }],
+      chips: [["lidos", "Veículos na planilha"], ["totalAnterior", "Veículos hoje no painel"], ["novos", "Itens novos"], ["alterados", "Itens com alteração"], ["saiuDaPlanilha", "Departamentos zerados"]],
+      rotulos: { novos: "Itens novos no painel", alterados: "Itens com alteração", suspeitos: "Pontos de atenção", revisao: "Revisão", fora: "Departamentos que ficaram sem nenhum veículo", ignoradas: "Linhas ignoradas" },
+      mensagemOk: (res) => `Painel de frota atualizado com ${res.resumo.lidos} veículos.`,
+      aoConcluir: () => carregarFrotaPortal(portalSlug),
+    });
+  });
 }
 
 function montarPainelFrota(raiz, DB) {
@@ -15426,12 +15438,25 @@ function formatarValorImportacao(campo, v) {
 }
 
 function abrirAtualizacaoPlanilhasContratos(portalSlug, aoConcluir) {
-  const TIPOS = [
-    { chave: "geral", rotulo: "PLANILHA GERAL (DEPAF)", dica: "CONTRATOS - Informações Gerais" },
-    { chave: "depin", rotulo: "PLANILHA DA DEPIN", dica: "Contratos DEPIN, com as 6 abas" },
-  ];
-  const base = `/api/portais/${encodeURIComponent(portalSlug)}/contratos/importacao`;
-  let tipo = "geral";
+  abrirAtualizacaoPlanilhas({
+    base: `/api/portais/${encodeURIComponent(portalSlug)}/contratos/importacao`,
+    titulo: "Atualizar planilhas de contratos",
+    intro: "Escolha a planilha, envie o arquivo e confira o que vai mudar antes de gravar. Contrato que sumiu da planilha continua no sistema como histórico. Nada é apagado.",
+    tipos: [
+      { chave: "geral", rotulo: "PLANILHA GERAL (DEPAF)", dica: "CONTRATOS - Informações Gerais" },
+      { chave: "depin", rotulo: "PLANILHA DA DEPIN", dica: "Contratos DEPIN, com as 6 abas" },
+    ],
+    chips: [["lidos", "Contratos lidos"], ["novos", "Novos"], ["alterados", "Com alteração"], ["semAlteracao", "Sem alteração"], ["saiuDaPlanilha", "Fora da planilha"], ["revisaoManual", "Revisão manual"]],
+    rotulos: { novos: "Contratos novos", alterados: "Contratos com alteração", suspeitos: "Dados suspeitos", revisao: "Revisão manual: a planilha mudou, mas o banco tem ajuste feito à mão e não foi alterado", fora: "Fora da planilha, mantidos no sistema como histórico", ignoradas: "Linhas ignoradas" },
+    aoConcluir,
+  });
+}
+
+// Modal genérico de atualização de planilha (contratos e frota): CONFERIR
+// mostra o que mudaria sem gravar; GRAVAR só vale depois das travas.
+function abrirAtualizacaoPlanilhas(cfg) {
+  const { base, tipos: TIPOS, aoConcluir } = cfg;
+  let tipo = TIPOS[0].chave;
   let previa = null;
   let arquivo = null;
   let ocupado = false;
@@ -15440,9 +15465,9 @@ function abrirAtualizacaoPlanilhasContratos(portalSlug, aoConcluir) {
   const fundo = document.createElement("div");
   fundo.className = "modal-fundo";
   fundo.innerHTML = `
-    <div class="modal-caixa imp-caixa" role="dialog" aria-modal="true" aria-label="Atualizar planilhas de contratos">
-      <h3>Atualizar planilhas de contratos</h3>
-      <p>Escolha a planilha, envie o arquivo e confira o que vai mudar antes de gravar. Contrato que sumiu da planilha continua no sistema como histórico. Nada é apagado.</p>
+    <div class="modal-caixa imp-caixa" role="dialog" aria-modal="true" aria-label="${escapeAttr(cfg.titulo)}">
+      <h3>${escapeHTML(cfg.titulo)}</h3>
+      <p>${escapeHTML(cfg.intro)}</p>
       <div class="imp-abas" id="imp-abas"></div>
       <div class="imp-envio">
         <input type="file" id="imp-arquivo" accept=".xlsx" aria-label="Arquivo da planilha (.xlsx)">
@@ -15485,14 +15510,11 @@ function abrirAtualizacaoPlanilhasContratos(portalSlug, aoConcluir) {
   function desenharPrevia() {
     const p = previa;
     const r = p.resumo || {};
-    const chips = [
-      ["lidos", "Contratos lidos"], ["novos", "Novos"], ["alterados", "Com alteração"], ["semAlteracao", "Sem alteração"],
-      ["saiuDaPlanilha", "Fora da planilha"], ["revisaoManual", "Revisão manual"],
-    ].filter(([k]) => r[k] !== undefined).map(([k, rot]) => `<div class="imp-num"><b>${r[k]}</b><span>${rot}</span></div>`).join("");
+    const chips = cfg.chips.filter(([k]) => r[k] !== undefined).map(([k, rot]) => `<div class="imp-num"><b>${r[k]}</b><span>${rot}</span></div>`).join("");
     const novos = p.registros.filter((x) => x.novo);
     const alterados = p.registros.filter((x) => !x.novo && x.mudancas.length);
     const suspeitos = p.registros.filter((x) => x.avisos.length && !x.novo && !x.mudancas.length);
-    const itemContrato = (x) => `<div class="imp-item"><b>${escapeHTML(x.numero)}</b> · ${escapeHTML(x.empresa)}${x.aba ? ` · ${escapeHTML(x.aba)}` : ""}${
+    const itemContrato = (x) => `<div class="imp-item"><b>${escapeHTML(x.numero)}</b>${x.empresa ? ` · ${escapeHTML(x.empresa)}` : ""}${x.aba ? ` · ${escapeHTML(x.aba)}` : ""}${
       x.mudancas.map((m) => `<span class="imp-campo">${escapeHTML(m.campo)}: ${escapeHTML(formatarValorImportacao(m.campo, m.antes))} para ${escapeHTML(formatarValorImportacao(m.campo, m.depois))}</span>`).join("")}${
       x.avisos.map((a) => `<span class="imp-campo" style="color:var(--mostarda)">atenção, ${escapeHTML(a)}</span>`).join("")}</div>`;
     const t = p.travas;
@@ -15502,14 +15524,14 @@ function abrirAtualizacaoPlanilhasContratos(portalSlug, aoConcluir) {
       ${t.confirmaveis.length && !t.bloqueios.length ? `<label class="imp-confirmar"><input type="checkbox" id="imp-confirmar"> Conferi os pontos acima e quero gravar mesmo assim.</label>` : ""}
       ${lista("Avisos", t.avisos, "aviso")}
       ${t.bloqueios.length ? "" : `<div class="imp-resumo">${chips}</div>`}
-      ${t.bloqueios.length ? "" : detalhe("Contratos novos", novos.length, novos.map(itemContrato).join(""), true)}
-      ${t.bloqueios.length ? "" : detalhe("Contratos com alteração", alterados.length, alterados.map(itemContrato).join(""), true)}
-      ${t.bloqueios.length ? "" : detalhe("Dados suspeitos", suspeitos.length, suspeitos.map(itemContrato).join(""), true)}
-      ${t.bloqueios.length ? "" : detalhe("Revisão manual: a planilha mudou, mas o banco tem ajuste feito à mão e não foi alterado", (p.revisaoManual || []).length,
+      ${t.bloqueios.length ? "" : detalhe(cfg.rotulos.novos, novos.length, novos.map(itemContrato).join(""), true)}
+      ${t.bloqueios.length ? "" : detalhe(cfg.rotulos.alterados, alterados.length, alterados.map(itemContrato).join(""), true)}
+      ${t.bloqueios.length ? "" : detalhe(cfg.rotulos.suspeitos, suspeitos.length, suspeitos.map(itemContrato).join(""), true)}
+      ${t.bloqueios.length ? "" : detalhe(cfg.rotulos.revisao, (p.revisaoManual || []).length,
         (p.revisaoManual || []).map((x) => `<div class="imp-item"><b>${escapeHTML(x.numero)}</b> · ${escapeHTML(x.empresa)}<span class="imp-campo">${escapeHTML(x.campo)}: planilha ${escapeHTML(formatarValorImportacao(x.campo, x.planilhaAntes))} para ${escapeHTML(formatarValorImportacao(x.campo, x.planilhaAgora))}; no sistema ${escapeHTML(formatarValorImportacao(x.campo, x.banco))}</span></div>`).join(""), true)}
-      ${t.bloqueios.length ? "" : detalhe("Fora da planilha, mantidos no sistema como histórico", p.saiuDaPlanilha.length,
-        p.saiuDaPlanilha.map((x) => `<div class="imp-item"><b>${escapeHTML(x.numero)}</b> · ${escapeHTML(x.empresa)}${x.dataFim ? `<span class="imp-campo">vigência até ${escapeHTML(formatarValorImportacao("data", x.dataFim))}</span>` : ""}</div>`).join(""))}
-      ${t.bloqueios.length ? "" : detalhe("Linhas ignoradas", (p.ignoradas || []).length, (p.ignoradas || []).map((x) => `<div class="imp-item">${escapeHTML(x)}</div>`).join(""))}
+      ${t.bloqueios.length ? "" : detalhe(cfg.rotulos.fora, p.saiuDaPlanilha.length,
+        p.saiuDaPlanilha.map((x) => `<div class="imp-item"><b>${escapeHTML(x.numero)}</b>${x.empresa ? ` · ${escapeHTML(x.empresa)}` : ""}${x.dataFim ? `<span class="imp-campo">vigência até ${escapeHTML(formatarValorImportacao("data", x.dataFim))}</span>` : ""}</div>`).join(""))}
+      ${t.bloqueios.length ? "" : detalhe(cfg.rotulos.ignoradas, (p.ignoradas || []).length, (p.ignoradas || []).map((x) => `<div class="imp-item">${escapeHTML(x)}</div>`).join(""))}
       ${!t.bloqueios.length && !novos.length && !alterados.length && !(p.revisaoManual || []).length ? `<div class="imp-bloco aviso"><h4>Nada a atualizar</h4><ul><li>A planilha está igual ao que já está no sistema.</li></ul></div>` : ""}`;
     q("#imp-confirmar")?.addEventListener("change", atualizarBotaoGravar);
     atualizarBotaoGravar();
@@ -15545,7 +15567,7 @@ function abrirAtualizacaoPlanilhasContratos(portalSlug, aoConcluir) {
       fd.append("confirmar", q("#imp-confirmar")?.checked ? "true" : "false");
       fd.append("planilha", arquivo);
       const res = await apiFetch(`${base}/${tipo}/aplicar`, { method: "POST", body: fd });
-      toastOk(`Planilha atualizada: ${res.criados} contrato(s) novo(s), ${res.atualizados} alterado(s).`);
+      toastOk(cfg.mensagemOk ? cfg.mensagemOk(res) : `Planilha atualizada: ${res.criados} contrato(s) novo(s), ${res.atualizados} alterado(s).`);
       encerrar();
       if (aoConcluir) aoConcluir();
     } catch (erro) {
