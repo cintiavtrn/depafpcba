@@ -12479,8 +12479,11 @@ async function carregarFrotaPortal(portalSlug) {
     painel.innerHTML = `<p class="tela-intro">Não consegui carregar o painel de frota: ${escapeHTML(erro.message)}</p>`;
     return;
   }
-  painel.innerHTML = `${souAdmin() ? `<div style="display:flex;justify-content:flex-end;margin-bottom:10px"><button type="button" class="dash-toggle-btn" id="frota-atualizar-planilha">${iconeInline("upload", 12, -2)} ATUALIZAR PLANILHA</button></div>` : ""}<div class="frota-v2"></div>`;
+  painel.innerHTML = `${souAdmin() ? `<div style="display:flex;justify-content:flex-end;margin-bottom:10px"><button type="button" class="dash-toggle-btn" id="frota-atualizar-planilha">${iconeInline("upload", 12, -2)} ATUALIZAR PLANILHA</button><button type="button" class="dash-toggle-btn" id="frota-historico-planilha" style="margin-left:10px">HISTÓRICO DE ATUALIZAÇÕES</button></div>` : ""}<div class="frota-v2"></div>`;
   montarPainelFrota(painel.querySelector(".frota-v2"), dados);
+  document.getElementById("frota-historico-planilha")?.addEventListener("click", () => {
+    abrirHistoricoAtualizacoes({ base: `/api/portais/${encodeURIComponent(portalSlug)}/frota/importacao`, titulo: "Histórico de atualizações da planilha de frota", aoDesfazer: () => carregarFrotaPortal(portalSlug) });
+  });
   document.getElementById("frota-atualizar-planilha")?.addEventListener("click", () => {
     abrirAtualizacaoPlanilhas({
       base: `/api/portais/${encodeURIComponent(portalSlug)}/frota/importacao`,
@@ -15437,6 +15440,103 @@ function formatarValorImportacao(campo, v) {
   return t.length > 90 ? t.slice(0, 90) + "..." : t;
 }
 
+// Histórico das atualizações de planilha (contratos e frota), só admin: lista
+// quem atualizou e quando, mostra o que mudou (antes e depois), permite anotar
+// e desfazer a atualização mais recente. Pedido direto: "a gente vai
+// acompanhando e historicizando".
+const ROTULO_TIPO_ATUALIZACAO = { geral: "Planilha geral (DEPAF)", depin: "Planilha da DEPIN", frota: "Planilha de frota" };
+
+function htmlRegistroMudanca(x) {
+  return `<div class="imp-item"><b>${escapeHTML(x.numero)}</b>${x.empresa ? ` · ${escapeHTML(x.empresa)}` : ""}${x.aba ? ` · ${escapeHTML(x.aba)}` : ""}${x.novo ? ` · <span style="color:var(--oliva)">novo</span>` : ""}${
+    (x.mudancas || []).map((m) => `<span class="imp-campo">${escapeHTML(m.campo)}: ${escapeHTML(formatarValorImportacao(m.campo, m.antes))} para ${escapeHTML(formatarValorImportacao(m.campo, m.depois))}</span>`).join("")}${
+    (x.avisos || []).map((a) => `<span class="imp-campo" style="color:var(--mostarda)">atenção, ${escapeHTML(a)}</span>`).join("")}</div>`;
+}
+
+function abrirHistoricoAtualizacoes({ base, titulo, aoDesfazer }) {
+  const fundo = document.createElement("div");
+  fundo.className = "modal-fundo";
+  fundo.innerHTML = `
+    <div class="modal-caixa imp-caixa" role="dialog" aria-modal="true" aria-label="${escapeAttr(titulo)}">
+      <h3>${escapeHTML(titulo)}</h3>
+      <p>Cada atualização de planilha fica registrada aqui, com quem fez, quando e o que mudou. Só a mais recente que ainda está valendo pode ser desfeita.</p>
+      <div class="imp-envio"><input type="search" id="hist-busca" placeholder="Buscar contrato ou empresa" aria-label="Buscar contrato ou empresa nas atualizações" style="flex:1;min-width:200px"><button type="button" class="dash-toggle-btn" id="hist-buscar">BUSCAR</button></div>
+      <div id="hist-lista">${htmlCarregando("Carregando o histórico")}</div>
+      <div class="modal-botoes"><button class="btn-secundario" id="hist-fechar" type="button">FECHAR</button></div>
+    </div>`;
+  const q = (s) => fundo.querySelector(s);
+  const encerrar = () => { document.removeEventListener("keydown", aoTeclar); fundo.remove(); };
+  const aoTeclar = (ev) => { if (ev.key === "Escape") encerrar(); };
+  const dataHora = (d) => new Date(d).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
+  const textoResumo = (r) => {
+    const p = [];
+    if (r.lidos !== undefined) p.push(`${r.lidos} lido(s)`);
+    if (r.novos) p.push(`${r.novos} novo(s)`);
+    if (r.alterados) p.push(`${r.alterados} com alteração`);
+    return p.join(", ") || "sem alterações";
+  };
+
+  async function carregar() {
+    const busca = q("#hist-busca").value.trim();
+    q("#hist-lista").innerHTML = htmlCarregando("Carregando o histórico");
+    try {
+      const itens = await apiFetch(`${base}/historico${busca ? `?busca=${encodeURIComponent(busca)}` : ""}`);
+      if (!itens.length) { q("#hist-lista").innerHTML = `<div class="imp-bloco aviso"><h4>Nada encontrado</h4><ul><li>${busca ? "Nenhuma atualização mexeu em contrato com esse número ou empresa." : "Ainda não houve atualização por aqui."}</li></ul></div>`; return; }
+      q("#hist-lista").innerHTML = itens.map((it) => `
+        <details class="imp-detalhe" data-id="${escapeAttr(it.id)}" data-tipo="${escapeAttr(it.tipo)}"${busca ? " open" : ""}>
+          <summary>${dataHora(it.criadoEm)} · ${escapeHTML(ROTULO_TIPO_ATUALIZACAO[it.tipo] || it.tipo)} · ${escapeHTML(it.usuarioEmail || "sem identificação")} · ${escapeHTML(textoResumo(it.resumo || {}))}${it.desfeitaEm ? ` · <span style="color:var(--terracota)">DESFEITA em ${dataHora(it.desfeitaEm)}</span>` : ""}${it.observacao ? " · com anotação" : ""}</summary>
+          <div class="imp-lista" data-corpo>${it.encontrados ? `<div class="imp-bloco aviso"><h4>Onde apareceu a sua busca</h4></div>${it.encontrados.registros.map(htmlRegistroMudanca).join("")}${it.encontrados.saiuDaPlanilha.map((s) => `<div class="imp-item"><b>${escapeHTML(s.numero)}</b> · ${escapeHTML(s.empresa)}<span class="imp-campo">saiu da planilha nesta atualização, mantido no sistema</span></div>`).join("")}` : ""}<p class="dash-chart-hint" data-carregando>${busca ? "" : "Abra para ver o que mudou."}</p></div>
+        </details>`).join("");
+    } catch (erro) {
+      q("#hist-lista").innerHTML = `<div class="imp-bloco bloqueio"><h4>Não foi possível carregar</h4><ul><li>${escapeHTML(erro.message)}</li></ul></div>`;
+    }
+  }
+
+  async function abrirDetalhe(det) {
+    if (det.dataset.carregado) return;
+    det.dataset.carregado = "1";
+    const corpo = det.querySelector("[data-corpo]");
+    const id = det.dataset.id;
+    try {
+      const d = await apiFetch(`${base}/historico/${id}`);
+      const m = d.mudancas || {};
+      const regs = m.registros || [], saiu = m.saiuDaPlanilha || [], rev = m.revisaoManual || [], avisos = m.avisos || [];
+      const ja = corpo.innerHTML;
+      corpo.innerHTML = `${ja.replace(/<p class="dash-chart-hint"[^>]*>.*?<\/p>/, "")}
+        <p class="dash-chart-hint">Arquivo ${escapeHTML(d.nomeArquivo)}</p>
+        ${regs.length ? `<div class="imp-bloco aviso"><h4>O que mudou (${regs.length})</h4></div>${regs.map(htmlRegistroMudanca).join("")}` : `<div class="imp-bloco aviso"><h4>Nenhuma alteração nesta atualização</h4></div>`}
+        ${saiu.length ? `<div class="imp-bloco aviso"><h4>Saíram da planilha, mantidos no sistema (${saiu.length})</h4></div>${saiu.map((s) => `<div class="imp-item"><b>${escapeHTML(s.numero)}</b>${s.empresa ? ` · ${escapeHTML(s.empresa)}` : ""}</div>`).join("")}` : ""}
+        ${rev.length ? `<div class="imp-bloco aviso"><h4>Ficaram para revisão manual (${rev.length})</h4></div>${rev.map((x) => `<div class="imp-item"><b>${escapeHTML(x.numero)}</b> · ${escapeHTML(x.empresa)}<span class="imp-campo">${escapeHTML(x.campo)}: planilha ${escapeHTML(formatarValorImportacao(x.campo, x.planilhaAntes))} para ${escapeHTML(formatarValorImportacao(x.campo, x.planilhaAgora))}; no sistema ${escapeHTML(formatarValorImportacao(x.campo, x.banco))}</span></div>`).join("")}` : ""}
+        ${avisos.length ? `<div class="imp-bloco aviso"><h4>Avisos da época</h4><ul>${avisos.map((a) => `<li>${escapeHTML(a)}</li>`).join("")}</ul></div>` : ""}
+        <div style="margin-top:10px"><label class="dash-chart-hint" style="display:block;margin-bottom:4px">Anotação</label>
+          <textarea data-nota rows="2" maxlength="2000" style="width:100%;font-family:'IBM Plex Mono',monospace;font-size:var(--fs-ui-sm);background:var(--paper);color:var(--carvao);border:1.5px solid var(--paper-line);padding:6px 8px" placeholder="Ex.: planilha enviada pela DEPIN em reunião, valores conferidos">${escapeHTML(d.observacao || "")}</textarea>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:8px">
+            <button type="button" class="dash-toggle-btn" data-salvar-nota>SALVAR ANOTAÇÃO</button>
+            ${d.podeDesfazer ? `<button type="button" class="btn-perigo" data-desfazer style="border-color:var(--terracota)">DESFAZER ESTA ATUALIZAÇÃO</button>` : `<span class="dash-chart-hint" style="align-self:center">${d.desfeitaEm ? "Já foi desfeita." : "Só a atualização mais recente que ainda vale pode ser desfeita."}</span>`}
+          </div></div>`;
+      corpo.querySelector("[data-salvar-nota]").addEventListener("click", async () => {
+        try { await apiFetch(`${base}/historico/${id}/nota`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ observacao: corpo.querySelector("[data-nota]").value }) }); toastOk("Anotação salva."); } catch (erro) { toastErro(erro.message); }
+      });
+      corpo.querySelector("[data-desfazer]")?.addEventListener("click", async () => {
+        const ok = await confirmarAcao({ titulo: "Desfazer esta atualização?", alvo: `${dataHora(d.criadoEm)} · ${ROTULO_TIPO_ATUALIZACAO[d.tipo] || d.tipo}`, texto: d.tipo === "frota" ? "O painel volta a mostrar os números da versão anterior." : "Os contratos alterados voltam ao que eram antes e os contratos criados por ela são removidos. A próxima atualização passa a ser comparada com a versão anterior.", rotuloConfirmar: "DESFAZER" });
+        if (!ok) return;
+        try { await apiFetch(`${base}/historico/${id}/desfazer`, { method: "POST" }); toastOk("Atualização desfeita."); await carregar(); if (aoDesfazer) aoDesfazer(); } catch (erro) { toastErro(erro.message); }
+      });
+    } catch (erro) {
+      det.dataset.carregado = "";
+      corpo.insertAdjacentHTML("beforeend", `<div class="imp-bloco bloqueio"><h4>Não foi possível abrir</h4><ul><li>${escapeHTML(erro.message)}</li></ul></div>`);
+    }
+  }
+
+  fundo.addEventListener("click", (ev) => { if (ev.target === fundo) encerrar(); });
+  fundo.addEventListener("toggle", (ev) => { if (ev.target.matches?.("details.imp-detalhe") && ev.target.open) abrirDetalhe(ev.target); }, true);
+  q("#hist-fechar").addEventListener("click", encerrar);
+  q("#hist-buscar").addEventListener("click", carregar);
+  q("#hist-busca").addEventListener("keydown", (ev) => { if (ev.key === "Enter") carregar(); });
+  document.addEventListener("keydown", aoTeclar);
+  document.body.appendChild(fundo);
+  carregar().then(() => fundo.querySelectorAll("details.imp-detalhe[open]").forEach(abrirDetalhe));
+}
+
 function abrirAtualizacaoPlanilhasContratos(portalSlug, aoConcluir) {
   abrirAtualizacaoPlanilhas({
     base: `/api/portais/${encodeURIComponent(portalSlug)}/contratos/importacao`,
@@ -15722,7 +15822,7 @@ async function carregarContratosPortal(portalSlug) {
   // usar aquele painel e comparar com este.
   painel.innerHTML = `
     <header class="cab-v2"><div class="rot-v2">Orçamento e Finanças · Contratos</div><h1 class="tit-v2" id="contratos-manchete"></h1></header>
-    <div style="display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap;margin-bottom:10px">${souAdmin() ? `<button type="button" class="dash-toggle-btn" id="contratos-atualizar-planilhas">${iconeInline("upload", 12, -2)} ATUALIZAR PLANILHAS</button>` : ""}<button type="button" class="dash-toggle-btn" id="contratos-baixar-relatorio">${iconeInline("download", 12, -2)} BAIXAR RELATÓRIO (PDF)</button></div>
+    <div style="display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap;margin-bottom:10px">${souAdmin() ? `<button type="button" class="dash-toggle-btn" id="contratos-atualizar-planilhas">${iconeInline("upload", 12, -2)} ATUALIZAR PLANILHAS</button><button type="button" class="dash-toggle-btn" id="contratos-historico-planilhas">HISTÓRICO DE ATUALIZAÇÕES</button>` : ""}<button type="button" class="dash-toggle-btn" id="contratos-baixar-relatorio">${iconeInline("download", 12, -2)} BAIXAR RELATÓRIO (PDF)</button></div>
     ${UNIDADES_GESTORAS_DISPONIVEIS.length > 1 ? `
     <div class="dash-filtros" style="margin-bottom:12px">
       <div class="dash-filtro" style="flex:1;min-width:0">
@@ -15860,6 +15960,9 @@ async function carregarContratosPortal(portalSlug) {
   });
   document.getElementById("contratos-atualizar-planilhas")?.addEventListener("click", () => {
     abrirAtualizacaoPlanilhasContratos(portalSlug, () => carregarContratosPortal(portalSlug));
+  });
+  document.getElementById("contratos-historico-planilhas")?.addEventListener("click", () => {
+    abrirHistoricoAtualizacoes({ base: `/api/portais/${encodeURIComponent(portalSlug)}/contratos/importacao`, titulo: "Histórico de atualizações das planilhas de contratos", aoDesfazer: () => carregarContratosPortal(portalSlug) });
   });
 
   const seletorUnidadeGestora = document.getElementById("contratos-filtro-unidade-gestora");
