@@ -582,6 +582,9 @@ body{background:var(--paper);color:var(--carvao);font-family:'Archivo',sans-seri
 .dash-filtro .es-multi-lista{max-height:220px;overflow:auto;margin-top:4px;padding:6px 8px;border:1.5px solid var(--paper-line);background:var(--surface);display:flex;flex-direction:column;gap:4px;font-family:'IBM Plex Mono',monospace;font-size:var(--fs-ui-sm)}
 .dash-filtro .es-multi-lista label{display:flex;gap:6px;align-items:center;letter-spacing:0;color:var(--carvao);text-transform:none;white-space:nowrap}
 .dash-filtro input[type=number]{background:var(--paper);color:var(--carvao);border:1.5px solid var(--paper-line);padding:8px 10px;font-family:'IBM Plex Mono',monospace;font-size:var(--fs-ui-sm);border-radius:var(--radius-md,0)}
+.es-info .es-grafico{overflow-x:auto}
+.es-info svg.es-poster{display:block;width:100%;min-width:760px;height:auto}
+.es-subtitulo{font-family:'IBM Plex Mono',monospace;font-size:var(--fs-ui-sm);letter-spacing:.06em;text-transform:uppercase;color:var(--carvao);opacity:.7;margin:22px 0 10px}
 /* Atualizar planilhas de contratos (admin) */
 .modal-caixa.imp-caixa{max-width:900px;max-height:92vh;overflow:auto;border-top-color:var(--tinta)}
 .imp-abas{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}
@@ -12677,6 +12680,88 @@ function montarEstudoFrota(raiz, E) {
     return `<svg viewBox="0 0 ${w} ${hh}" xmlns="http://www.w3.org/2000/svg">${grade}${eixo}${cols}${rot}${leg}</svg>`;
   }
 
+  // Encaixa um gráfico pronto (SVG em texto) dentro do infográfico: vira um <svg>
+  // aninhado na posição e largura pedidas, com a altura que a proporção dele
+  // pede. data-zona diz qual filtro o clique naquela área aciona.
+  function aninhar(svg, x, y, largura, zona) {
+    const vb = svg.match(/viewBox="([^"]+)"/)[1].split(" ").map(Number);
+    const altura = largura * vb[3] / vb[2];
+    const aberto = `<svg x="${x}" y="${y}" width="${largura}" height="${altura.toFixed(1)}" viewBox="${vb.join(" ")}" preserveAspectRatio="xMidYMin meet" overflow="hidden" data-zona="${zona}" data-controles-adicionados="1" xmlns="http://www.w3.org/2000/svg">`;
+    return { svg: svg.replace(/<svg [^>]*>/, aberto), altura };
+  }
+
+  // Infográfico único: tamanho do problema (inservíveis x 8 anos ou mais), mapa
+  // das unidades afetadas e departamentos, no mesmo quadro e com os mesmos
+  // filtros. É um SVG só, então baixa como uma imagem só, com o filtro escrito.
+  function infograficoSVG({ C, linhasMapa, depLista, semCoorpin, safraGrupos, corMapa }) {
+    const W = 1000, M = 30, ink = "var(--carvao)", fraco = "fill-opacity=\"0.62\"";
+    const txt = (x, y, t, tam, extra = "") => `<text x="${x}" y="${y}" font-family="monospace" font-size="${tam}" fill="${ink}" ${extra}>${escapeHTML(t)}</text>`;
+    const rotulo = (x, y, t) => txt(x, y, t, 10, `letter-spacing="1.2" ${fraco} font-weight="700"`);
+    const filtro = textoFiltro("dia");
+    const sub = filtro ? "Filtro: " + filtro : "Frota descaracterizada completa, sem filtro";
+    const base = new Date(E.atualizadoEm || E.geradoEm).toLocaleDateString("pt-BR");
+    let s = `<rect x="${M}" y="0" width="64" height="4" fill="var(--mostarda)"/>`;
+    s += `<text x="${M}" y="34" font-family="Spectral, Georgia, serif" font-size="22" font-weight="700" fill="${ink}">Inservíveis, 8 anos ou mais e unidades afetadas</text>`;
+    s += txt(M, 54, sub.length > 130 ? sub.slice(0, 129) + "…" : sub, 11, fraco);
+    s += `<line x1="${M}" y1="66" x2="${W - M}" y2="66" stroke="var(--paper-line)"/>`;
+
+    // faixa 1: o tamanho do problema, as três barras na mesma escala
+    s += rotulo(M, 90, "O TAMANHO DO PROBLEMA");
+    const x0 = 262, larguraMax = 640, maxV = Math.max(C.total, C.perde, EST.inservis, 1);
+    const barras = [
+      { t: "Descaracterizadas", v: C.total, cor: "var(--tinta)", p: "" },
+      { t: `Fabricadas até ${EST.ano} (a baixar)`, v: C.perde, cor: "var(--terracota)", p: C.total ? ` · ${pct(C.perde, C.total)}` : "" },
+      { t: "Inservíveis informados", v: EST.inservis, cor: "var(--mostarda)", p: C.perde ? ` · ${pct(EST.inservis, C.perde)} do a baixar` : "" },
+    ];
+    barras.forEach((b, i) => {
+      const y = 102 + i * 36, w = Math.max(b.v / maxV * larguraMax, b.v > 0 ? 3 : 0);
+      s += txt(M, y + 16, b.t, 12);
+      s += `<rect x="${x0}" y="${y}" width="${w.toFixed(1)}" height="24" fill="${b.cor}"><title>${escapeHTML(b.t)}: ${N(b.v)}</title></rect>`;
+      s += `<text x="${(x0 + w + 8).toFixed(1)}" y="${y + 17}" font-family="monospace" font-size="14" font-weight="700" fill="${ink}">${N(b.v)}<tspan font-size="11" font-weight="400" fill-opacity="0.62">${escapeHTML(b.p)}</tspan></text>`;
+    });
+    s += txt(M, 226, "Os inservíveis são o total informado e não mudam com os filtros. Sem a lista de placas não dá para saber quantos", 10.5, fraco);
+    s += txt(M, 240, "deles estão entre as viaturas fabricadas até " + EST.ano + ", então as duas contagens não podem ser somadas.", 10.5, fraco);
+    s += `<line x1="${M}" y1="256" x2="${W - M}" y2="256" stroke="var(--paper-line)"/>`;
+
+    // faixa 2: mapa e departamentos
+    const yTopo = 280;
+    s += rotulo(M, yTopo, "UNIDADES AFETADAS POR COORPIN");
+    s += rotulo(500, yTopo, "VIATURAS A BAIXAR POR DEPARTAMENTO");
+    const yConteudo = yTopo + 12;
+    let altMapa = 120, altDep = 120;
+    if (linhasMapa.length) {
+      let mapa = "";
+      try { mapa = mapaCoorpinSVG(linhasMapa, { corFn: corMapa, formatarTotal: (l) => `${l.total} viatura(s) a baixar`, formatarRotulo: (l) => l.label }); } catch { mapa = ""; }
+      if (mapa) { const a = aninhar(mapa, M, yConteudo, 440, "coorpin"); s += a.svg; altMapa = a.altura; }
+    } else s += txt(M, yConteudo + 30, "Nenhuma COORPIN neste recorte.", 12, fraco);
+    const yLeg = yConteudo + altMapa + 16;
+    [["var(--terracota)", "60% ou mais das descaracterizadas da região"], ["var(--mostarda)", "de 40% a 59%"], ["var(--oliva)", "abaixo de 40%"]].forEach(([c, t], i) => {
+      s += `<rect x="${M}" y="${yLeg + i * 16 - 8}" width="9" height="9" fill="${c}"/>` + txt(M + 15, yLeg + i * 16, t, 10);
+    });
+    s += txt(M, yLeg + 52, "Tamanho do ponto proporcional às viaturas a baixar na região.", 10, fraco);
+    if (semCoorpin) s += txt(M, yLeg + 66, semCoorpin + " unidade(s) sem COORPIN ligada ficam só na tabela.", 10, fraco);
+    altMapa = altMapa + (semCoorpin ? 84 : 70);
+    if (depLista.length) {
+      const top = depLista.slice(0, 10);
+      FD.dep.forEach((d) => { if (!top.some((x) => x[0] === d)) { const x = depLista.find((y) => y[0] === d); if (x) top.push(x); } });
+      const dsv = barraHorizontalEmpilhadaSVG(top.map(([d, x]) => ({ label: d, valores: { "Próprias": x.p, "Cedidas": x.c } })), [{ label: "Próprias", cor: "var(--terracota)" }, { label: "Cedidas", cor: "var(--mostarda)" }], { formatarValor: N });
+      const a = aninhar(dsv, 500, yConteudo, 470, "dep"); s += a.svg; altDep = a.altura;
+      if (depLista.length > top.length) { s += txt(500, yConteudo + altDep + 14, `Mostrando os ${top.length} maiores de ${depLista.length} departamentos. A lista completa está logo abaixo.`, 10, fraco); altDep += 20; }
+    } else s += txt(500, yConteudo + 30, "Nenhum departamento neste recorte.", 12, fraco);
+    if (safraGrupos.length) {
+      const ySafra = yConteudo + altDep + 14;
+      s += rotulo(500, ySafra, `ANO DE FABRICAÇÃO: O QUE ENTRA NA BAIXA (ATÉ ${EST.ano})`);
+      const a = aninhar(colunaEmpilhadaSVG(safraGrupos, [{ label: "A baixar", cor: "var(--terracota)" }, { label: "Ficam", cor: "var(--tinta)" }], { formatarValor: N, formatarEixoTick: (v) => N(v), substantivoQtd: "veículo" }), 500, ySafra + 10, 470, "safra");
+      s += a.svg; altDep += 14 + 10 + a.altura;
+    }
+    const fim = yConteudo + Math.max(altMapa, altDep) + 10;
+    s += `<line x1="${M}" y1="${fim}" x2="${W - M}" y2="${fim}" stroke="var(--paper-line)"/>`;
+    s += txt(M, fim + 20, `Fonte: planilha de frota (${E.base || "aba Frota"}), base de ${base}. Velada é a viatura descaracterizada, sem motos e caminhões.`, 10, fraco);
+    s += txt(M, fim + 34, "Próprias entram na conta do Estado. Cedidas voltam ao órgão de origem. DEPAF · Polícia Civil da Bahia.", 10, fraco);
+    const H = fim + 46;
+    return `<svg class="es-poster" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg"><rect x="0" y="0" width="${W}" height="${H}" fill="var(--surface)"/>${s}</svg>`;
+  }
+
   raiz.innerHTML = `
     <header class="cab-v2"><div class="rot-v2">Frota · Estudo técnico</div><h1 class="tit-v2">Recomposição da frota de viaturas veladas</h1></header>
     <p class="dash-chart-hint">Base: ${h(E.base || "planilha de frota")}, gerada em ${new Date(E.atualizadoEm || E.geradoEm).toLocaleDateString("pt-BR")}. Velada é a viatura descaracterizada, sem motos e caminhões. Clique numa barra, coluna ou ponto do mapa para isolar uma categoria, e Ctrl, Shift ou Cmd mais clique para somar outras. Os seletores fazem o mesmo, com várias opções marcadas. A imagem baixada leva escrito o filtro ativo.</p>
@@ -12738,10 +12823,12 @@ function montarEstudoFrota(raiz, E) {
     const vazio = `<p class="dash-chart-hint">Nada neste recorte.</p>`;
 
     q("#es-corpo").innerHTML = `
-    <h3 class="es-titulo">Diagnóstico da frota descaracterizada</h3>
+    <h3 class="es-titulo">Diagnóstico: inservíveis, 8 anos ou mais e unidades afetadas</h3>
+    <p class="dash-chart-hint" style="max-width:90ch">Um quadro só para cruzar o que a nota técnica pede. Os seletores abaixo valem para o infográfico, os indicadores e os gráficos de detalhe. Clique numa COORPIN do mapa ou numa barra de departamento para isolar, e Ctrl, Shift ou Cmd mais clique para somar outras. A imagem baixada leva escrito o filtro ativo.</p>
     <div class="dash-filtros" style="margin-bottom:10px">
       ${multi("dia", "dep", opDep)}${multi("dia", "coorpin", opCoorpin)}${multi("dia", "regiao", [["Capital", "Capital"], ["RMS", "RMS"], ["Interior", "Interior"]])}
       ${multi("dia", "prop", [[0, "Próprias"], [1, "Cedidas"], [2, "Alugadas"]])}${multi("dia", "grupo", GRUPOS.map((n, i) => [i, n]))}${multi("dia", "safra", opSafra)}
+      <div class="dash-filtro"><label for="es-inserv">INSERVÍVEIS INFORMADOS</label><input type="number" id="es-inserv" min="0" value="${EST.inservis}" style="width:110px"></div>
     </div>
     ${chips("dia")}
     <div class="kpi-row">
@@ -12751,20 +12838,19 @@ function montarEstudoFrota(raiz, E) {
       ${cartao("link", "Cedidas", N(C.cedidas), "var(--mostarda)", "fora da conta do Estado")}
       ${cartao("predio", "Unidades perdem todas", N(nPerdemTodas), "var(--terracota)", `${nPerdemParte} perdem parte, de ${C.unidades.length}`)}
     </div>
+    <div class="dash-chart-box es-caixa es-info" data-nome="infografico-inserviveis-8-anos-unidades" data-escopo="dia" data-dim=""><div class="es-grafico">${infograficoSVG({ C, linhasMapa, depLista, semCoorpin, safraGrupos, corMapa: (l) => (l.perc >= 0.6 ? "var(--terracota)" : l.perc >= 0.4 ? "var(--mostarda)" : "var(--oliva)") })}</div></div>
+    <h4 class="es-subtitulo">Detalhamento</h4>
     <div class="dash-charts" style="grid-template-columns:1fr 1fr">
       ${caixa("funil-viaturas", "Do total da frota até a base do Estado", barraHorizontalComEixoSVG(funil, { cor: corFunil, formatarValor: N, formatarEixoTick: (v) => N(v) }), "Cada etapa mostra o que sobra depois de aplicar a regra seguinte." + dicaFiltro("dia"), "dia", "")}
-      ${caixa("inserviveis-x-8-anos", "Inservíveis contra 8 anos ou mais", barraHorizontalComEixoSVG([{ label: `Fabricação até ${EST.ano}`, valor: C.perde }, { label: "Inservíveis (informado)", valor: EST.inservis }], { cor: (c) => (c.label.startsWith("Inserv") ? "var(--mostarda)" : "var(--terracota)"), formatarValor: N, formatarEixoTick: (v) => N(v) }), "A lista de placas dos inservíveis ainda não foi entregue, então não dá para dizer quantos deles estão entre os a baixar.", "dia", "")}
-    </div>
-    <div class="dash-filtros" style="margin:-4px 0 14px"><div class="dash-filtro"><label for="es-inserv">INSERVÍVEIS INFORMADOS</label><input type="number" id="es-inserv" min="0" value="${EST.inservis}" style="width:110px"></div></div>
-    <div class="dash-charts" style="grid-template-columns:1fr 1fr">
-      ${caixa("safras-fabricacao", "Descaracterizadas por ano de fabricação", safraGrupos.length ? colunaEmpilhadaSVG(safraGrupos, [{ label: "A baixar", cor: "var(--terracota)" }, { label: "Ficam", cor: "var(--tinta)" }], { formatarValor: N, formatarEixoTick: (v) => N(v), substantivoQtd: "veículo" }) : vazio, `Em vermelho, as safras que entram na baixa com a regra de fabricação até ${EST.ano}. Clique numa coluna para filtrar.`, "dia", "safra")}
       <div class="dash-chart-box"><h4>Quando cada safra chega aos 8 anos</h4><table class="dash-tabela"><thead><tr><th>FABRICAÇÃO ATÉ</th><th>ENTRA NA BAIXA EM</th><th>ACUMULADO A BAIXAR</th></tr></thead><tbody>${projecao.map((p) => `<tr${p.lim === EST.ano ? ' style="background:color-mix(in srgb, var(--tinta) 14%, var(--surface))"' : ""}><td>${p.lim}</td><td>${p.ano}</td><td>${N(p.s)}</td></tr>`).join("")}</tbody></table></div>
     </div>
     <div class="dash-charts" style="grid-template-columns:1fr 1fr">
-      ${caixa("baixas-por-departamento", "Viaturas a baixar por departamento", depLista.length ? barraHorizontalEmpilhadaSVG(depLista.map(([d, x]) => ({ label: d, valores: { "Próprias": x.p, "Cedidas": x.c } })), [{ label: "Próprias", cor: "var(--terracota)" }, { label: "Cedidas", cor: "var(--mostarda)" }], { formatarValor: N }) : vazio, "Próprias entram na conta do Estado. Cedidas voltam ao órgão de origem. Clique numa barra para filtrar.", "dia", "dep")}
+      ${caixa("safras-fabricacao", "Descaracterizadas por ano de fabricação", safraGrupos.length ? colunaEmpilhadaSVG(safraGrupos, [{ label: "A baixar", cor: "var(--terracota)" }, { label: "Ficam", cor: "var(--tinta)" }], { formatarValor: N, formatarEixoTick: (v) => N(v), substantivoQtd: "veículo" }) : vazio, `Em vermelho, as safras que entram na baixa com a regra de fabricação até ${EST.ano}. Clique numa coluna para filtrar.`, "dia", "safra")}
       ${caixa("baixas-por-tipo-de-veiculo", "Viaturas a baixar por tipo de veículo", grupoGrupos.length ? barraHorizontalEmpilhadaSVG(grupoGrupos, [{ label: "Próprias", cor: "var(--terracota)" }, { label: "Cedidas", cor: "var(--mostarda)" }], { formatarValor: N }) : vazio, "Compactos são hatch, sedan e monovolume. Clique numa barra para filtrar.", "dia", "grupo")}
     </div>
-    <div class="dash-chart-box es-caixa" data-nome="mapa-unidades-afetadas" data-escopo="dia" data-dim="coorpin" style="margin-bottom:14px"><h4>Mapa das unidades afetadas</h4><div id="es-mapa" style="max-width:560px"></div><p class="dash-chart-hint" style="margin-top:10px">Cada ponto é uma COORPIN, com o tamanho proporcional às viaturas a baixar na região. Clique num ponto para filtrar. Capital e região metropolitana ficam no ponto da Sede. Vermelho indica 60% ou mais das descaracterizadas da região na baixa, amarelo de 40% a 59%, verde abaixo disso.${semCoorpin ? ` ${semCoorpin} unidade(s) não foram ligadas a uma COORPIN e ficam só na lista.` : ""}</p></div>
+    <div class="dash-charts" style="grid-template-columns:1fr">
+      ${caixa("baixas-por-departamento", "Viaturas a baixar por departamento (lista completa)", depLista.length ? barraHorizontalEmpilhadaSVG(depLista.map(([d, x]) => ({ label: d, valores: { "Próprias": x.p, "Cedidas": x.c } })), [{ label: "Próprias", cor: "var(--terracota)" }, { label: "Cedidas", cor: "var(--mostarda)" }], { formatarValor: N }) : vazio, "Próprias entram na conta do Estado. Cedidas voltam ao órgão de origem. Clique numa barra para filtrar.", "dia", "dep")}
+    </div>
     <div class="dash-chart-box" style="margin-bottom:14px"><h4>Unidades, da que mais perde para a que menos perde</h4>
       <div class="dash-filtros" style="margin-bottom:12px"><div class="dash-filtro"><label for="es-f-sit">SITUAÇÃO</label><select id="es-f-sit"><option value="">Só as que perdem</option><option value="PERDE TODAS">Perdem todas</option><option value="PERDE PARTE">Perdem parte</option><option value="NÃO PERDE">Não perdem</option></select></div></div>
       ${botaoTabela("es-tab-unidades", "estudo-frota-unidades.png")}
@@ -12813,15 +12899,11 @@ function montarEstudoFrota(raiz, E) {
     <h3 class="es-titulo">Impactos e priorização, com as respostas das unidades</h3>
     <div class="dash-chart-hint" style="max-width:90ch"><b>Aguardando as respostas das unidades.</b> O questionário e o modelo de resposta estão na planilha do plano de trabalho. Quando as respostas chegarem, os indicadores de cobertura investigativa, pressão sobre a frota, disponibilidade real e demanda reprimida entram aqui, junto com o risco de desassistência por unidade.</div>`;
 
-    const alvoMapa = q("#es-mapa");
-    try {
-      alvoMapa.innerHTML = linhasMapa.length ? mapaCoorpinSVG(linhasMapa, { corFn: (l) => (l.perc >= 0.6 ? "var(--terracota)" : l.perc >= 0.4 ? "var(--mostarda)" : "var(--oliva)"), formatarTotal: (l) => `${l.total} viatura(s) a baixar`, formatarRotulo: (l) => l.label }) : vazio;
-    } catch { alvoMapa.innerHTML = `<p class="dash-chart-hint">Não foi possível desenhar o mapa.</p>`; }
     q("#es-f-sit").value = EST.filtroSituacao;
 
     // destaque da seleção (vários valores): o que não está selecionado fica esmaecido
-    raiz.querySelectorAll(".es-caixa[data-dim]").forEach((cx) => {
-      const dim = cx.dataset.dim, escopo = cx.dataset.escopo;
+    raiz.querySelectorAll(".es-caixa[data-dim], .es-caixa [data-zona]").forEach((cx) => {
+      const dim = cx.dataset.zona || cx.dataset.dim, escopo = cx.dataset.escopo || "dia";
       if (!dim) return;
       const S = FIL[escopo][dim]; if (!S.size) return;
       const rev = chaveDoRotulo(escopo, dim);
@@ -12831,12 +12913,12 @@ function montarEstudoFrota(raiz, E) {
     if (FI[dimAgr] && FI[dimAgr].size) raiz.querySelectorAll('[data-nome="investimento-por-ano"] rect[data-seg]').forEach((r) => { const k = chaveDoRotulo("inv", dimAgr)(r.dataset.seg); r.setAttribute("opacity", k !== undefined && FI[dimAgr].has(k) ? "1" : "0.35"); });
 
     // ampliar e baixar imagem do sistema, com nome próprio e o filtro escrito na imagem
-    raiz.querySelectorAll(".es-grafico, #es-mapa").forEach(adicionarControlesGrafico);
+    raiz.querySelectorAll(".es-grafico").forEach(adicionarControlesGrafico);
     raiz.querySelectorAll(".es-caixa").forEach((cx) => {
       const svg = cx.querySelector("svg"), btn = cx.querySelector('button[title="Baixar como imagem"]');
       if (!svg || !btn) return;
       const novo = btn.cloneNode(true); btn.replaceWith(novo);
-      novo.addEventListener("click", () => baixarGraficoFiltrado(svg, `${cx.dataset.nome}.png`, cx.dataset.escopo ? textoFiltro(cx.dataset.escopo) : ""));
+      novo.addEventListener("click", () => baixarGraficoFiltrado(svg, `${cx.dataset.nome}.png`, cx.classList.contains("es-info") || !cx.dataset.escopo ? "" : textoFiltro(cx.dataset.escopo)));
     });
   }
 
@@ -12863,8 +12945,9 @@ function montarEstudoFrota(raiz, E) {
     }
     const tb = ev.target.closest("[data-baixar-tabela]");
     if (tb) { baixarTabelaComoImagem(document.getElementById(tb.dataset.baixarTabela), tb.dataset.arquivo); return; }
-    const cx = ev.target.closest(".es-caixa");
-    if (!cx || !cx.dataset.dim) return;
+    const cx = ev.target.closest(".es-caixa"), zona = ev.target.closest("[data-zona]");
+    const dimClicada = zona ? zona.dataset.zona : cx && cx.dataset.dim;
+    if (!cx || !dimClicada) return;
     const soma = ev.ctrlKey || ev.metaKey || ev.shiftKey, escopo = cx.dataset.escopo;
     // trecho colorido do gráfico agrupado por ano: filtra pela dimensão do agrupamento
     const seg = ev.target.closest("rect[data-seg]");
@@ -12875,9 +12958,9 @@ function montarEstudoFrota(raiz, E) {
     }
     const g = ev.target.closest("g[data-cat]");
     if (!g) return;
-    const k = chaveDoRotulo(escopo, cx.dataset.dim)(g.dataset.cat);
+    const k = chaveDoRotulo(escopo, dimClicada)(g.dataset.cat);
     if (k === undefined) return;
-    alterna(FIL[escopo][cx.dataset.dim], k, soma);
+    alterna(FIL[escopo][dimClicada], k, soma);
     desenhar();
   });
   raiz.addEventListener("change", (ev) => {
