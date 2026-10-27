@@ -12746,6 +12746,7 @@ function montarEstudoFrota(raiz, E) {
     const okVeic = (r) => (!usa("prop") || passa(FD.prop, r[1])) && (!usa("grupo") || passa(FD.grupo, r[2])) && (!usa("safra") || passa(FD.safra, r[3]));
     const porUn = new Map();
     let total = 0, perde = 0, proprias = 0, cedidas = 0;
+    const porProp = [0, 0, 0, 0];
     const porGrupoBase = [0, 0, 0, 0], safras = new Map(), safrasBase = new Map(), porGrupoProp = [0, 1, 2, 3].map(() => [0, 0]);
     for (const r of E.desc) {
       if (!okUn(r)) continue;
@@ -12754,7 +12755,7 @@ function montarEstudoFrota(raiz, E) {
       porUn.set(un, o);
       o.tFull += q; if (ano <= EST.ano) o.perdeFull += q;
       if (!okVeic(r)) continue;
-      o.t += q; total += q;
+      o.t += q; total += q; porProp[prop] = (porProp[prop] || 0) + q;
       safras.set(ano, (safras.get(ano) || 0) + q);
       if (prop === 0 || (prop === 1 && EST.cedidas)) safrasBase.set(ano, (safrasBase.get(ano) || 0) + q);
       if (ano <= EST.ano) {
@@ -12777,7 +12778,7 @@ function montarEstudoFrota(raiz, E) {
       return { p, n, a: baseTotal ? (n * custoA) / baseTotal : 0, b: baseTotal ? (n * custoB) / baseTotal : 0, cobertas: lista.length, lista };
     };
     const cenarios = [0.25, 0.5, 0.75, 1].map(cenarioPara);
-    return { total, perde, proprias, cedidas, porGrupoBase, baseTotal, custoA, custoB, unidades, perdemTodas, cenarios, cenarioPara, safras, safrasBase, porGrupoProp };
+    return { total, perde, proprias, cedidas, porProp, porGrupoBase, baseTotal, custoA, custoB, unidades, perdemTodas, cenarios, cenarioPara, safras, safrasBase, porGrupoProp };
   }
 
   // ---------- investimento (entregues 2023 a 2026, com valor)
@@ -12919,8 +12920,8 @@ function montarEstudoFrota(raiz, E) {
     const yK = Math.max(376 + Math.max(2, linhas.length) * 16 + 30, 398 + 3 * 16 + 20);
     s += `<line x1="30" y1="${yK - 14}" x2="970" y2="${yK - 14}" stroke="var(--paper-line)"/>` + sRot(30, yK + 6, "VELADAS E CARACTERIZADAS LADO A LADO: ENTREGUES CONTRA A BAIXAR");
     const carEnt = entregues([1, 2]).reduce((a, r) => a + r[8], 0), carBx = baixaCaracterizadas();
-    const maxK = Math.max(1, totEnt, base, carEnt, carBx), razao = (e, b) => (b ? (e / b).toFixed(1).replace(".", ",") + "x" : "sem baixa");
-    [["Veladas", totEnt, base, "descaracterizadas"], ["Caracterizadas (padrão e ADM)", carEnt, carBx, "ostensivas"]].forEach(([nomeK, e, b], i) => {
+    const maxK = Math.max(1, totEnt + carEnt, base + carBx), razao = (e, b) => (b ? (e / b).toFixed(1).replace(".", ",") + "x" : "sem baixa");
+    [["Veladas", totEnt, base, "descaracterizadas"], ["Caracterizadas (padrão e ADM)", carEnt, carBx, "ostensivas"], ["Frota toda (as duas)", totEnt + carEnt, base + carBx, "total"]].forEach(([nomeK, e, b], i) => {
       const y = yK + 22 + i * 54;
       s += sTxt(30, y + 20, nomeK, 12, 'font-weight="700"');
       s += `<rect x="262" y="${y}" width="${Math.max(e / maxK * 400, e ? 2 : 0).toFixed(1)}" height="18" fill="var(--oliva)"><title>${nomeK}: ${N(e)} entregues de 2023 a 2026</title></rect>` + sTxt(262 + e / maxK * 400 + 8, y + 14, N(e) + " entregues", 11);
@@ -12928,13 +12929,19 @@ function montarEstudoFrota(raiz, E) {
       s += `<text x="800" y="${y + 24}" font-family="monospace" font-size="22" font-weight="700" fill="var(--carvao)">${razao(e, b)}</text>` + sTxt(800, y + 40, "entregues por baixa", 10, sFraco);
     });
     // cartões
-    const yC = yK + 22 + 2 * 54 + 22;
+    const yC = yK + 22 + 3 * 54 + 22;
     s += sCartao(30, yC, 300, "ESTOQUE A REPOR", N(base), EST.cedidas ? "viaturas, próprias e cedidas" : "viaturas próprias do Estado", "var(--terracota)");
     s += sCartao(350, yC, 300, `RITMO PARA ZERAR ATÉ ${meta}`, `${N(necessario)} por ano`, `${moeda(necessario * custoMed)} por ano${melhor ? `, ${(necessario / melhor).toFixed(1).replace(".", ",")}x o melhor ano` : ""}`, "var(--mostarda)");
-    s += sCartao(670, yC, 300, "RITMO MÉDIO, 2023 A 2026", `${N(media)} por ano`, `${N(totEnt)} veladas em 4 anos, melhor ano ${melhorAno}`, "var(--oliva)");
+    s += sCartao(670, yC, 300, "RITMO MÉDIO, 2023 A 2026", `${N(media)} por ano`, `${N(totEnt)} veladas em 4 anos, 2026 incompleto`, "var(--oliva)");
     const [lm, lb] = linhas;
     const leitura = `Leitura: no ritmo médio de ${N(media)} por ano o estoque ${lm.zera ? "zera em " + lm.zera : "não zera até " + (T0 + 8)}. Mantendo o melhor ano (${N(melhor)} por ano), ${lb.zera ? "zera em " + lb.zera : "não zera até " + (T0 + 8)}. As caracterizadas receberam ${razao(carEnt, carBx)} o que baixam, e as veladas ${razao(totEnt, base)}.`;
-    const rod = [leitura, `Estoque é a base de reposição na data da baixa (fabricação até ${EST.ano}). A cada ano seguinte entra a safra que completa 8 anos e sai o ritmo de entrega. Custo por viatura: média da hipótese A.`, NOTA_ENTREGAS];
+    // o que mais pesa à frente e o que o custo está supondo
+    let maiorEntrada = { y: 0, n: 0 };
+    for (let Y = T0 + 1; Y <= T0 + 8; Y++) if (entradas(Y) > maiorEntrada.n) maiorEntrada = { y: Y, n: entradas(Y) };
+    const veladasEnt = entreguesVeladas(), qtdPaga = veladasEnt.reduce((a, r) => a + r[8], 0), precoPago = qtdPaga ? veladasEnt.reduce((a, r) => a + r[9], 0) / qtdPaga : 0;
+    const rod = [leitura, maiorEntrada.n ? `A maior entrada à frente é em ${maiorEntrada.y}: ${N(maiorEntrada.n)} viaturas da safra ${maiorEntrada.y - 8}. Se a reposição seguir em ondas, o problema volta a cada 8 anos.` : "Nenhuma safra nova entra na baixa nos próximos oito anos neste recorte.",
+      `Estoque é a base de reposição na data da baixa (fabricação até ${EST.ano}). A cada ano seguinte entra a safra que completa 8 anos e sai o ritmo de entrega. Elegível à baixa não é baixa feita, e 8 anos de idade não é estado de conservação.`,
+      `Custo por viatura: média da hipótese A (${moeda(custoMed)}), que repõe compactos por modelo de entrada.${precoPago ? ` As veladas entregues custaram em média ${moeda(precoPago)}, o que levaria a ${moeda(necessario * precoPago)} por ano.` : ""}`, NOTA_ENTREGAS];
     s += sRod(yC + 96, rod);
     return sPoster(sAlturaRod(yC + 96, rod), s);
   }
@@ -12972,6 +12979,7 @@ function montarEstudoFrota(raiz, E) {
     barras.forEach((b, i) => {
       const y = 102 + i * 36, w = Math.max(b.v / maxV * larguraMax, b.v > 0 ? 3 : 0);
       s += sTxt(30, y + 16, b.t, 12);
+      if (i === 0) s += sTxt(30, y + 31, `${N(C.porProp[0])} próprias, ${N(C.porProp[1])} cedidas, ${N(C.porProp[2])} locadas${C.porProp[3] ? `, ${N(C.porProp[3])} sem propriedade` : ""}`, 9.5, sFraco);
       s += `<rect x="${x0}" y="${y}" width="${w.toFixed(1)}" height="24" fill="${b.cor}"><title>${escapeHTML(b.t)}: ${N(b.v)}</title></rect>`;
       s += `<text x="${(x0 + w + 8).toFixed(1)}" y="${y + 17}" font-family="monospace" font-size="14" font-weight="700" fill="var(--carvao)">${N(b.v)}<tspan font-size="11" font-weight="400" fill-opacity="0.62">${escapeHTML(b.p)}</tspan></text>`;
     });
@@ -13003,9 +13011,9 @@ function montarEstudoFrota(raiz, E) {
     } else s += sTxt(500, yConteudo + 30, "Nenhum departamento neste recorte.", 12, sFraco);
     if (safraGrupos.length) {
       const ySafra = yConteudo + altDep + 14;
-      s += sRot(500, ySafra, `ANO DE FABRICAÇÃO: O QUE ENTRA NA BAIXA (ATÉ ${EST.ano})`);
-      const a = aninhar(colunaEmpilhadaSVG(safraGrupos, [{ label: "A baixar", cor: "var(--terracota)" }, { label: "Ficam", cor: "var(--tinta)" }], { formatarValor: N, formatarEixoTick: (v) => N(v), substantivoQtd: "veículo" }), 500, ySafra + 10, 470, "safra");
-      s += a.svg; altDep += 14 + 10 + a.altura;
+      s += sRot(500, ySafra, `ANO DE FABRICAÇÃO: O QUE ENTRA NA BAIXA (ATÉ ${EST.ano})`) + (C.porProp[2] ? sTxt(500, ySafra + 14, `Inclui ${N(C.porProp[2])} locadas, que não são compra do Estado.`, 10, sFraco) : "");
+      const a = aninhar(colunaEmpilhadaSVG(safraGrupos, [{ label: "A baixar", cor: "var(--terracota)" }, { label: "Ficam", cor: "var(--tinta)" }], { formatarValor: N, formatarEixoTick: (v) => N(v), substantivoQtd: "veículo" }), 500, ySafra + (C.porProp[2] ? 22 : 10), 470, "safra");
+      s += a.svg; altDep += 14 + (C.porProp[2] ? 22 : 10) + a.altura;
     }
     const fim = yConteudo + Math.max(altMapa, altDep) + 10;
     const rod = [`Fonte: planilha de frota (${E.base || "aba Frota"}), base de ${new Date(E.atualizadoEm || E.geradoEm).toLocaleDateString("pt-BR")}. Velada é a viatura descaracterizada, sem motos e caminhões.`, "Próprias entram na conta do Estado. Cedidas voltam ao órgão de origem. DEPAF · Polícia Civil da Bahia."];
