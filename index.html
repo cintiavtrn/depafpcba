@@ -12515,7 +12515,7 @@ async function carregarFrotaEstudoPortal(portalSlug) {
     painel.innerHTML = `<p class="tela-intro">Não consegui carregar o estudo: ${escapeHTML(erro.message)}</p>`;
     return;
   }
-  if (E.vazio || E.versao !== 3) {
+  if (E.vazio || E.versao !== 4) {
     painel.innerHTML = `<p class="tela-intro">O estudo precisa de dados novos. Na aba PAINEL DE FROTA, clique em ATUALIZAR PLANILHA e envie a planilha de frota (aba Frota). Os números do estudo são gerados a partir dela.</p>`;
     return;
   }
@@ -12788,10 +12788,15 @@ function montarEstudoFrota(raiz, E) {
   const sLegenda = (x, y, itens) => itens.map(([c, t], i) => `<rect x="${x}" y="${y + i * 16 - 8}" width="9" height="9" fill="${c}"/>` + sTxt(x + 15, y + i * 16, t, 10)).join("");
   const grupoDeTipo = (t) => (t === 1 || t === 2 || t === 3 ? 0 : t === 0 ? 1 : t === 4 ? 2 : 3);
   // veladas entregues de 2023 a 2026 que passam pelos filtros que a planilha de entregas sabe responder (propriedade, tipo e COORPIN)
-  function entreguesVeladas(ignorarCoorpin = false) {
-    return E.entregas.filter((r) => r[4] !== 1 && (EST.combate || r[4] !== 2) && r[1] === 0 && passa(FD.prop, r[6]) && passa(FD.grupo, grupoDeTipo(r[5])) && (ignorarCoorpin || passa(FD.coorpin, E.coorpins[r[10]])));
+  function entregues(categorias, ignorarCoorpin = false) {
+    return E.entregas.filter((r) => r[4] !== 1 && (EST.combate || r[4] !== 2) && categorias.includes(r[1]) && passa(FD.prop, r[6]) && passa(FD.grupo, grupoDeTipo(r[5])) && (ignorarCoorpin || passa(FD.coorpin, E.coorpins[r[10]])));
   }
-  const NOTA_ENTREGAS = "Entregas respeitam os filtros de propriedade, tipo de veículo e COORPIN. Departamento, região e fabricação valem só para a baixa.";
+  const entreguesVeladas = (ignorarCoorpin = false) => entregues([0], ignorarCoorpin);
+  // caracterizadas (padrão e ADM) com fabricação até o ano da baixa, pelos mesmos filtros das entregas
+  function baixaCaracterizadas() {
+    return E.baixaCarac.filter((r) => r[3] <= EST.ano && (r[1] === 0 || (r[1] === 1 && EST.cedidas)) && passa(FD.prop, r[1]) && passa(FD.grupo, r[2]) && passa(FD.coorpin, E.coorpins[r[0]])).reduce((a, r) => a + r[4], 0);
+  }
+  const NOTA_ENTREGAS = "Entregas e a baixa das caracterizadas respeitam os filtros de propriedade, tipo de veículo e COORPIN. Departamento, região e fabricação valem só para a baixa das veladas.";
 
   // ---------- 1. O ritmo de reposição cobre a baixa?
   function ritmoSVG() {
@@ -12835,13 +12840,25 @@ function montarEstudoFrota(raiz, E) {
     });
     s += sTxt(px(0) + 6, py(base) - 8, N(base), 11, 'font-weight="700"');
     linhas.forEach((l, i) => { s += `<rect x="${xl}" y="${376 + i * 16 - 8}" width="9" height="9" fill="${l.cor}"/>` + sTxt(xl + 15, 376 + i * 16, `${l.rot}, ${l.zera ? "zera em " + l.zera : "não zera até " + (T0 + 8)}`, 10); });
+    // veladas e caracterizadas lado a lado: o que entrou contra o que vai sair
+    const yK = 376 + Math.max(2, linhas.length) * 16 + 30;
+    s += `<line x1="30" y1="${yK - 14}" x2="970" y2="${yK - 14}" stroke="var(--paper-line)"/>` + sRot(30, yK + 6, "VELADAS E CARACTERIZADAS LADO A LADO: ENTREGUES CONTRA A BAIXAR");
+    const carEnt = entregues([1, 2]).reduce((a, r) => a + r[8], 0), carBx = baixaCaracterizadas();
+    const maxK = Math.max(1, totEnt, base, carEnt, carBx), razao = (e, b) => (b ? (e / b).toFixed(1).replace(".", ",") + "x" : "sem baixa");
+    [["Veladas", totEnt, base, "descaracterizadas"], ["Caracterizadas (padrão e ADM)", carEnt, carBx, "ostensivas"]].forEach(([nomeK, e, b], i) => {
+      const y = yK + 22 + i * 54;
+      s += sTxt(30, y + 20, nomeK, 12, 'font-weight="700"');
+      s += `<rect x="262" y="${y}" width="${Math.max(e / maxK * 400, e ? 2 : 0).toFixed(1)}" height="18" fill="var(--oliva)"><title>${nomeK}: ${N(e)} entregues de 2023 a 2026</title></rect>` + sTxt(262 + e / maxK * 400 + 8, y + 14, N(e) + " entregues", 11);
+      s += `<rect x="262" y="${y + 22}" width="${Math.max(b / maxK * 400, b ? 2 : 0).toFixed(1)}" height="18" fill="var(--terracota)"><title>${nomeK}: ${N(b)} com fabricação até ${EST.ano}</title></rect>` + sTxt(262 + b / maxK * 400 + 8, y + 36, N(b) + " a baixar", 11);
+      s += `<text x="800" y="${y + 24}" font-family="monospace" font-size="22" font-weight="700" fill="var(--carvao)">${razao(e, b)}</text>` + sTxt(800, y + 40, "entregues por baixa", 10, sFraco);
+    });
     // cartões
-    const yC = 376 + Math.max(2, linhas.length) * 16 + 30;
+    const yC = yK + 22 + 2 * 54 + 22;
     s += sCartao(30, yC, 300, "ESTOQUE A REPOR", N(base), EST.cedidas ? "viaturas, próprias e cedidas" : "viaturas próprias do Estado", "var(--terracota)");
     s += sCartao(350, yC, 300, `RITMO PARA ZERAR ATÉ ${meta}`, `${N(necessario)} por ano`, `${moeda(necessario * custoMed)} por ano${melhor ? `, ${(necessario / melhor).toFixed(1).replace(".", ",")}x o melhor ano` : ""}`, "var(--mostarda)");
     s += sCartao(670, yC, 300, "RITMO MÉDIO, 2023 A 2026", `${N(media)} por ano`, `${N(totEnt)} veladas em 4 anos, melhor ano ${melhorAno}`, "var(--oliva)");
     const [lm, lb] = linhas;
-    const leitura = `Leitura: no ritmo médio de ${N(media)} por ano o estoque ${lm.zera ? "zera em " + lm.zera : "não zera até " + (T0 + 8)}. Mantendo o melhor ano (${N(melhor)} por ano), ${lb.zera ? "zera em " + lb.zera : "não zera até " + (T0 + 8)}.`;
+    const leitura = `Leitura: no ritmo médio de ${N(media)} por ano o estoque ${lm.zera ? "zera em " + lm.zera : "não zera até " + (T0 + 8)}. Mantendo o melhor ano (${N(melhor)} por ano), ${lb.zera ? "zera em " + lb.zera : "não zera até " + (T0 + 8)}. As caracterizadas receberam ${razao(carEnt, carBx)} o que baixam, e as veladas ${razao(totEnt, base)}.`;
     const rod = [leitura, `Estoque é a base de reposição na data da baixa (fabricação até ${EST.ano}). A cada ano seguinte entra a safra que completa 8 anos e sai o ritmo de entrega. Custo por viatura: média da hipótese A.`, NOTA_ENTREGAS];
     s += sRod(yC + 96, rod);
     return sPoster(sAlturaRod(yC + 96, rod), s);
