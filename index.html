@@ -572,6 +572,30 @@ body{background:var(--paper);color:var(--carvao);font-family:'Archivo',sans-seri
 .modal-caixa .modal-alvo{color:var(--carvao);font-weight:700;word-break:break-word}
 .modal-caixa .modal-selo{width:34px;height:34px;opacity:.85}
 .modal-caixa .modal-selo svg{width:100%;height:100%}
+
+/* Estudo técnico (Frota): recomposição das veladas */
+.es-controles{display:flex;gap:14px;flex-wrap:wrap;align-items:center;margin:12px 0}
+.es-controles label{font-family:'IBM Plex Mono',monospace;font-size:var(--fs-ui-sm);color:var(--carvao);display:flex;gap:6px;align-items:center}
+.es-controles select,.es-controles input[type=number],.es-check input[type=number]{background:var(--paper);color:var(--carvao);border:1.5px solid var(--paper-line);padding:5px 8px;font-family:inherit;font-size:var(--fs-ui-sm)}
+.es-check{display:flex;gap:6px;align-items:center;font-family:'IBM Plex Mono',monospace;font-size:var(--fs-ui-sm);color:var(--carvao)}
+.es-sec{margin:26px 0;border-top:2px solid var(--paper-line);padding-top:12px}
+.es-sec h3{font-family:'Spectral',serif;font-size:var(--fs-subtitulo);margin:0 0 10px}
+.es-sec h4{font-family:'IBM Plex Mono',monospace;font-size:var(--fs-ui-sm);letter-spacing:.04em;text-transform:uppercase;margin:18px 0 8px;color:var(--carvao)}
+.es-kpis{display:flex;gap:10px;flex-wrap:wrap;margin:10px 0 14px}
+.es-kpi{border:1.5px solid var(--paper-line);padding:10px 14px;min-width:150px;flex:1}
+.es-kpi b{display:block;font-family:'Space Grotesk',sans-serif;font-size:24px}
+.es-kpi span{font-family:'IBM Plex Mono',monospace;font-size:var(--fs-ui-xs);color:var(--carvao);text-transform:uppercase;letter-spacing:.04em}
+.es-kpi small{display:block;color:#9AA3B2;font-size:11px;margin-top:3px}
+.es-fig{margin:8px 0 14px;max-width:760px}
+.es-fig-corpo{background:#fff;padding:8px;overflow-x:auto}
+.es-fig-rodape{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:6px;font-family:'IBM Plex Mono',monospace;font-size:var(--fs-ui-xs);color:#9AA3B2}
+.es-duas{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:20px}
+.es-tab{width:100%;border-collapse:collapse;font-family:'IBM Plex Mono',monospace;font-size:var(--fs-ui-sm)}
+.es-tab th,.es-tab td{border-bottom:1px solid var(--paper-line);padding:5px 8px;text-align:left}
+.es-tab tr.on td{background:var(--tinta-glow)}
+.es-tab td.ruim{color:var(--terracota);font-weight:700}
+.es-mapa{max-width:520px}
+.es-aguarda{border:1.5px dashed var(--paper-line);padding:14px;font-family:'IBM Plex Mono',monospace;font-size:var(--fs-ui-sm);line-height:1.55}
 /* Atualizar planilhas de contratos (admin) */
 .modal-caixa.imp-caixa{max-width:900px;max-height:92vh;overflow:auto;border-top-color:var(--tinta)}
 .imp-abas{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}
@@ -2641,14 +2665,17 @@ const SUBPORTAIS = {
   infraestrutura: [{ tab: "obras", rotulo: "PAINEL DE OBRAS", modulo: "obras" }],
   // O portal Frota agora é só o painel novo: as abas padrão (Visão Geral /
   // Painéis / Planilhas) e o texto de apresentação antigo não aparecem mais.
-  frota: [{ tab: "frota", rotulo: "PAINEL DE FROTA", modulo: "frota" }],
+  frota: [
+    { tab: "frota", rotulo: "PAINEL DE FROTA", modulo: "frota" },
+    { tab: "frota-estudo", rotulo: "ESTUDO: VIATURAS VELADAS", modulo: "frota", soAdmin: true },
+  ],
 };
 
 // Só as abas dos módulos que esta conta pode ver (cadastro de segurança:
 // quem é da CFCR não vê CPG - Contratos nem Obras). modulos=null = sem
 // restrição. É conveniência de tela — quem barra de verdade é o back-end.
 function subportaisDe(portalId) {
-  const todos = SUBPORTAIS[portalId] || [];
+  const todos = (SUBPORTAIS[portalId] || []).filter((sp) => !sp.soAdmin || souAdmin());
   const modulos = PORTAIS.find(x => x.id === portalId)?.modulos;
   return modulos ? todos.filter(sp => modulos.includes(sp.modulo)) : todos;
 }
@@ -12468,6 +12495,278 @@ function criarMotorDimensoesPorValor(linhasTodas, dimensoes, campoRegiao) {
 // Estrutura: manchete, filtros, Hoje (descaracterizados e alugados), barra de
 // propriedade e grupos de informação que abrem sob demanda.
 // =====================================================================
+// =====================================================================
+// ESTUDO: RECOMPOSIÇÃO DA FROTA DE VIATURAS VELADAS (portal Frota, só admin)
+// Pedido direto: "adicionar uma aba lá no sistema pra esse tipo de demanda...
+// você modela com base no que temos e nas respostas que estamos aguardando,
+// constrói o visual e deixa lá pra ser acessado". Os números vêm do endpoint
+// /frota/estudo (gerado quando a planilha de frota é enviada pelo botão
+// ATUALIZAR PLANILHA); aqui só se desenha. Gráficos em SVG com cores
+// literais pra poderem ser baixados como imagem e colados na nota técnica.
+// =====================================================================
+async function carregarFrotaEstudoPortal(portalSlug) {
+  const painel = document.getElementById("tab-frota-estudo");
+  painel.innerHTML = `<p class="tela-intro">Carregando o estudo...</p>`;
+  let E;
+  try {
+    E = await apiFetch(`/api/portais/${portalSlug}/frota/estudo`);
+  } catch (erro) {
+    painel.innerHTML = `<p class="tela-intro">Não consegui carregar o estudo: ${escapeHTML(erro.message)}</p>`;
+    return;
+  }
+  if (E.vazio) {
+    painel.innerHTML = `<p class="tela-intro">O estudo ainda não tem dados. Na aba PAINEL DE FROTA, clique em ATUALIZAR PLANILHA e envie a planilha de frota (aba Frota). Os números do estudo são gerados a partir dela.</p>`;
+    return;
+  }
+  montarEstudoFrota(painel, E);
+}
+
+function montarEstudoFrota(raiz, E) {
+  const N = (n) => Math.round(n).toLocaleString("pt-BR");
+  const moeda = (v) => v >= 1e6 ? `R$ ${(v / 1e6).toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} milhões` : `R$ ${N(v)}`;
+  const moedaExata = (v) => "R$ " + v.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const pct = (a, b) => (b ? Math.round((a / b) * 100) + "%" : "0%");
+  const h = escapeHTML;
+  const COR = { verde: "#1B5E20", verde2: "#2E7D32", verde3: "#66BB6A", verde4: "#A5D6A7", vermelho: "#C0392B", ambar: "#E0A800", cinza: "#8A8F9C", cinzaClaro: "#D5D8DD", texto: "#22262E" };
+  const PRECOS = E.precos || {};
+  const EST = {
+    ano: 2018, cedidas: false, combate: true, inservis: 27,
+    precoA: { c: PRECOS.cronos || 115436, p: PRECOS.ranger || 212991, s: PRECOS.duster || 205054 },
+    precoB: PRECOS.ranger || 212991,
+    filtroSituacao: "", filtroDep: "",
+  };
+  const NOTA = { viaturas: 696, valor: 144242279.05 };
+
+  // ---------- cálculos
+  function calcular() {
+    const porUn = new Map();
+    E.unidades.forEach((u, i) => porUn.set(i, { u, t: 0, perde: 0, perdeProp: 0, perdeCed: 0 }));
+    let total = 0, perde = 0, proprias = 0, cedidas = 0, alugadas = 0;
+    const porGrupoBase = [0, 0, 0, 0], safras = new Map();
+    for (const [un, prop, grupo, ano, q] of E.desc) {
+      const o = porUn.get(un); o.t += q; total += q;
+      safras.set(ano, (safras.get(ano) || 0) + q);
+      if (ano <= EST.ano) {
+        o.perde += q; perde += q;
+        if (prop === 0) { o.perdeProp += q; proprias += q; } else if (prop === 1) { o.perdeCed += q; cedidas += q; } else alugadas += q;
+        if (prop === 0 || (prop === 1 && EST.cedidas)) porGrupoBase[grupo] += q;
+      }
+    }
+    const unidades = [...porUn.values()].filter((o) => o.t > 0).map((o) => ({ ...o, situacao: o.perde === o.t ? "PERDE TODAS" : o.perde > 0 ? "PERDE PARTE" : "NÃO PERDE", base: o.perdeProp + (EST.cedidas ? o.perdeCed : 0) }));
+    const baseTotal = porGrupoBase.reduce((a, b) => a + b, 0);
+    const custoA = porGrupoBase[0] * EST.precoA.c + porGrupoBase[1] * EST.precoA.p + porGrupoBase[2] * EST.precoA.s + porGrupoBase[3] * EST.precoB;
+    const custoB = baseTotal * EST.precoB;
+    const perdemTodas = unidades.filter((o) => o.situacao === "PERDE TODAS" && o.base > 0).sort((a, b) => a.base - b.base);
+    const cenarios = [0.25, 0.5, 0.75, 1].map((p) => {
+      const n = Math.round(baseTotal * p);
+      let cum = 0, cobertas = 0;
+      for (const o of perdemTodas) { cum += o.base; if (cum <= n) cobertas++; else break; }
+      return { p, n, a: baseTotal ? (n * custoA) / baseTotal : 0, b: baseTotal ? (n * custoB) / baseTotal : 0, cobertas };
+    });
+    return { total, perde, proprias, cedidas, alugadas, porGrupoBase, baseTotal, custoA, custoB, unidades, perdemTodas, cenarios, safras };
+  }
+
+  // ---------- desenho
+  const FONTE = "font-family=\"Segoe UI, Arial, sans-serif\"";
+  const trunc = (t, n) => (String(t).length > n ? String(t).slice(0, n - 1) + "…" : String(t));
+  function svgBarrasH(itens, { largura = 640, rotuloW = 200, formatar = N, altLinha = 26, margemDir = 90 } = {}) {
+    const max = Math.max(...itens.map((i) => i.valor), 1), H = itens.length * altLinha + 12, area = largura - rotuloW - margemDir;
+    const linhas = itens.map((it, k) => {
+      const y = 6 + k * altLinha, w = Math.max(2, (it.valor / max) * area);
+      return `<text x="${rotuloW - 8}" y="${y + 15}" text-anchor="end" font-size="12" fill="${COR.texto}" ${FONTE}>${h(trunc(it.rotulo, 30))}</text><rect x="${rotuloW}" y="${y + 3}" width="${w.toFixed(1)}" height="${altLinha - 10}" fill="${it.cor || COR.verde2}" rx="2"/><text x="${rotuloW + w + 6}" y="${y + 15}" font-size="12" font-weight="700" fill="${COR.texto}" ${FONTE}>${h(formatar(it.valor))}${it.nota ? ` <tspan font-weight="400" fill="${COR.cinza}">${h(it.nota)}</tspan>` : ""}</text>`;
+    }).join("");
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${largura} ${H}" width="${largura}" height="${H}" style="max-width:100%;height:auto"><rect width="${largura}" height="${H}" fill="#FFFFFF"/>${linhas}</svg>`;
+  }
+  function svgEmpilhadas(itens, cores, legendas, { largura = 640, rotuloW = 90, altLinha = 24 } = {}) {
+    const max = Math.max(...itens.map((i) => i.partes.reduce((a, b) => a + b, 0)), 1), area = largura - rotuloW - 110, H = itens.length * altLinha + 34;
+    let corpo = legendas.map((l, k) => `<rect x="${rotuloW + k * 150}" y="6" width="10" height="10" fill="${cores[k]}"/><text x="${rotuloW + k * 150 + 15}" y="15" font-size="11" fill="${COR.texto}" ${FONTE}>${h(l)}</text>`).join("");
+    itens.forEach((it, k) => {
+      const y = 26 + k * altLinha; let x = rotuloW;
+      corpo += `<text x="${rotuloW - 8}" y="${y + 14}" text-anchor="end" font-size="12" fill="${COR.texto}" ${FONTE}>${h(trunc(it.rotulo, 14))}</text>`;
+      it.partes.forEach((v, j) => { if (!v) return; const w = (v / max) * area; corpo += `<rect x="${x.toFixed(1)}" y="${y + 2}" width="${w.toFixed(1)}" height="${altLinha - 8}" fill="${cores[j]}"/>`; x += w; });
+      corpo += `<text x="${x + 6}" y="${y + 14}" font-size="12" font-weight="700" fill="${COR.texto}" ${FONTE}>${N(it.partes.reduce((a, b) => a + b, 0))}${it.nota ? ` <tspan font-weight="400" fill="${COR.cinza}">${h(it.nota)}</tspan>` : ""}</text>`;
+    });
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${largura} ${H}" width="${largura}" height="${H}" style="max-width:100%;height:auto"><rect width="${largura}" height="${H}" fill="#FFFFFF"/>${corpo}</svg>`;
+  }
+  function svgColunas(itens, { largura = 640, altura = 240, linhaCorte = null } = {}) {
+    const max = Math.max(...itens.map((i) => i.valor), 1), base = altura - 34, topo = 22, larg = (largura - 40) / itens.length;
+    let corpo = "";
+    itens.forEach((it, k) => {
+      const hh = (it.valor / max) * (base - topo), x = 30 + k * larg;
+      corpo += `<rect x="${(x + larg * 0.12).toFixed(1)}" y="${(base - hh).toFixed(1)}" width="${(larg * 0.76).toFixed(1)}" height="${hh.toFixed(1)}" fill="${it.cor}"/><text x="${(x + larg / 2).toFixed(1)}" y="${(base - hh - 5).toFixed(1)}" text-anchor="middle" font-size="11" font-weight="700" fill="${COR.texto}" ${FONTE}>${N(it.valor)}</text><text x="${(x + larg / 2).toFixed(1)}" y="${base + 15}" text-anchor="middle" font-size="11" fill="${COR.texto}" ${FONTE}>${h(it.rotulo)}</text>`;
+    });
+    if (linhaCorte !== null) corpo += `<text x="${largura - 8}" y="14" text-anchor="end" font-size="11" fill="${COR.vermelho}" ${FONTE}>${h(linhaCorte)}</text>`;
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${largura} ${altura}" width="${largura}" height="${altura}" style="max-width:100%;height:auto"><rect width="${largura}" height="${altura}" fill="#FFFFFF"/>${corpo}</svg>`;
+  }
+  const figura = (nome, svg, comoLer = "") => `<figure class="es-fig" data-nome="${escapeAttr(nome)}"><div class="es-fig-corpo">${svg}</div><div class="es-fig-rodape"><button type="button" class="dash-toggle-btn" data-baixar-fig>${iconeInline("download", 11, -1)} BAIXAR IMAGEM</button>${comoLer ? `<span>${h(comoLer)}</span>` : ""}</div></figure>`;
+  const kpi = (valor, rotulo, cor = "var(--carvao)", sub = "") => `<div class="es-kpi" style="border-color:${cor}"><b style="color:${cor}">${valor}</b><span>${h(rotulo)}</span>${sub ? `<small>${h(sub)}</small>` : ""}</div>`;
+
+  function baixarFigura(fig) {
+    const svg = fig.querySelector("svg"); if (!svg) return;
+    const xml = new XMLSerializer().serializeToString(svg), w = +svg.getAttribute("width") * 2, hh = +svg.getAttribute("height") * 2;
+    const img = new Image();
+    img.onload = () => {
+      const c = document.createElement("canvas"); c.width = w; c.height = hh;
+      const ctx = c.getContext("2d"); ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, w, hh); ctx.drawImage(img, 0, 0, w, hh);
+      c.toBlob((b) => { const a = document.createElement("a"); a.href = URL.createObjectURL(b); a.download = `${fig.dataset.nome}.png`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 3000); });
+    };
+    img.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(xml);
+  }
+
+  raiz.innerHTML = `
+    <header class="cab-v2"><div class="rot-v2">Frota · Estudo técnico</div><h1 class="tit-v2">Recomposição da frota de viaturas veladas</h1></header>
+    <p class="dash-chart-hint" style="max-width:80ch">Base: ${h(E.base || "planilha de frota")}, gerada em ${new Date(E.atualizadoEm || E.geradoEm).toLocaleDateString("pt-BR")}. Velada é a viatura descaracterizada, sem motos e caminhões. Os números mudam sozinhos quando a planilha de frota é atualizada.</p>
+    <div class="es-controles">
+      <label>Baixa para ano de fabricação até
+        <select id="es-ano" aria-label="Ano de fabricação limite da baixa"><option value="2018">2018 (8 anos em 2026)</option><option value="2019">2019 (projeção 2027)</option><option value="2020">2020 (projeção 2028)</option><option value="2021">2021 (projeção 2029)</option></select></label>
+      <label class="es-check"><input type="checkbox" id="es-cedidas"> Incluir cedidas na conta de reposição</label>
+      <label class="es-check"><input type="checkbox" id="es-combate" checked> Incluir o veículo de combate no investimento</label>
+    </div>
+    <div id="es-corpo"></div>`;
+  const q = (s) => raiz.querySelector(s);
+
+  function desenhar() {
+    const C = calcular();
+    const { entregas, fontes, modelos } = E;
+    // ----- Eixo 1
+    const ent = entregas.filter((r) => r[4] !== 1 && (EST.combate || r[4] !== 2));
+    const anos = [2023, 2024, 2025, 2026];
+    const porAno = anos.map((a) => { const r = ent.filter((x) => x[0] === a); return { a, n: r.reduce((s, x) => s + x[5], 0), v: r.reduce((s, x) => s + x[6], 0), d: r.filter((x) => x[1] === 0).reduce((s, x) => s + x[5], 0) }; });
+    const totN = porAno.reduce((s, x) => s + x.n, 0), totV = porAno.reduce((s, x) => s + x.v, 0);
+    const porFonte = new Map(); ent.forEach((r) => { const f = fontes[r[2]]; const o = porFonte.get(f) || { n: 0, v: 0 }; o.n += r[5]; o.v += r[6]; porFonte.set(f, o); });
+    const fonteLista = [...porFonte.entries()].sort((a, b) => b[1].v - a[1].v);
+    const velAno = (a) => porAno.find((x) => x.a === a)?.d || 0;
+    // ----- Eixo 2
+    const cedAba = C.cedidas;
+    const funil = [
+      { rotulo: "Veículos na planilha", valor: E.totais.veiculos, cor: COR.cinza },
+      { rotulo: "Descaracterizados", valor: E.totais.descaracterizados, cor: COR.verde3 },
+      { rotulo: "Sem motos e caminhões", valor: C.total, cor: COR.verde2 },
+      { rotulo: `A baixar (fabricação até ${EST.ano})`, valor: C.perde, cor: COR.vermelho },
+      { rotulo: "Próprias do Estado", valor: C.proprias, cor: COR.verde },
+    ];
+    const deps = new Map();
+    for (const o of C.unidades) { const d = o.u.d; const x = deps.get(d) || { t: 0, p: 0, c: 0 }; x.t += o.t; x.p += o.perdeProp; x.c += o.perdeCed; deps.set(d, x); }
+    const depLista = [...deps.entries()].filter(([, x]) => x.p + x.c > 0).sort((a, b) => b[1].p + b[1].c - (a[1].p + a[1].c));
+    const safraItens = [...C.safras.entries()].sort((a, b) => a[0] - b[0]).map(([a, v]) => ({ rotulo: String(a), valor: v, cor: a <= EST.ano ? COR.vermelho : COR.verde3 }));
+    const projecao = [2018, 2019, 2020, 2021].map((lim) => { let s = 0; for (const [a, v] of C.safras) if (a <= lim) s += v; return { lim, ano: lim + 8, s }; });
+    // mapa por COORPIN
+    const porCoorpin = new Map();
+    for (const o of C.unidades) { if (!o.u.c) continue; const x = porCoorpin.get(o.u.c) || { t: 0, perde: 0, ced: 0, n: 0 }; x.t += o.t; x.perde += o.perde; x.ced += o.perdeCed; x.n += o.perde > 0 ? 1 : 0; porCoorpin.set(o.u.c, x); }
+    const linhasMapa = [...porCoorpin.entries()].filter(([, x]) => x.perde > 0).map(([label, x]) => ({ label, total: x.perde, perc: x.perde / x.t, dirpin: null, rotuloTooltipExtra: `${x.n} unidade(s) afetada(s), ${N(x.ced)} cedida(s), ${pct(x.perde, x.t)} das descaracterizadas da região` }));
+    const semCoorpin = C.unidades.filter((o) => !o.u.c && o.perde > 0).length;
+    // tabela de unidades
+    const deptList = [...new Set(C.unidades.map((o) => o.u.d))].sort();
+    let linhasUn = C.unidades.filter((o) => o.perde > 0 || EST.filtroSituacao === "NÃO PERDE");
+    if (EST.filtroSituacao) linhasUn = C.unidades.filter((o) => o.situacao === EST.filtroSituacao);
+    if (EST.filtroDep) linhasUn = linhasUn.filter((o) => o.u.d === EST.filtroDep);
+    linhasUn = linhasUn.sort((a, b) => b.perde - a.perde || b.t - a.t);
+    const nPerdemTodas = C.unidades.filter((o) => o.situacao === "PERDE TODAS").length, nPerdemParte = C.unidades.filter((o) => o.situacao === "PERDE PARTE").length;
+    const nGrupo = (g) => C.porGrupoBase[g];
+
+    q("#es-corpo").innerHTML = `
+    <section class="es-sec">
+      <h3>Diagnóstico da frota descaracterizada</h3>
+      <div class="es-kpis">
+        ${kpi(N(C.total), "Descaracterizadas", COR.verde2, "sem motos e caminhões")}
+        ${kpi(N(C.perde), "A baixar", COR.vermelho, `${pct(C.perde, C.total)} das descaracterizadas`)}
+        ${kpi(N(C.proprias), "Próprias do Estado", COR.verde, "base da reposição")}
+        ${kpi(N(cedAba), "Cedidas", COR.ambar, "fora da conta do Estado")}
+        ${kpi(`${nPerdemTodas}`, "Unidades perdem todas", COR.vermelho, `${nPerdemParte} perdem parte, de ${C.unidades.length}`)}
+      </div>
+      ${figura("funil-viaturas", svgBarrasH(funil, { rotuloW: 190 }), "Cada etapa mostra o que sobra depois de aplicar a regra seguinte.")}
+      <div class="es-duas">
+        <div>
+          <h4>Inservíveis contra 8 anos ou mais</h4>
+          <label class="es-check">Inservíveis informados <input type="number" id="es-inserv" min="0" value="${EST.inservis}" style="width:80px"></label>
+          ${figura("inserviveis-x-8-anos", svgBarrasH([{ rotulo: `Fabricação até ${EST.ano}`, valor: C.perde, cor: COR.vermelho }, { rotulo: "Inservíveis (informado)", valor: EST.inservis, cor: COR.ambar }], { largura: 440, rotuloW: 150, margemDir: 60 }), "")}
+          <p class="dash-chart-hint">A lista de placas dos inservíveis ainda não foi entregue, então não dá para dizer quantos deles estão entre os ${N(C.perde)} a baixar. Quando a lista chegar, este quadro mostra a interseção.</p>
+        </div>
+        <div>
+          <h4>Safras e o ano em que entram na baixa</h4>
+          <table class="es-tab"><thead><tr><th>Fabricação até</th><th>Entra na baixa em</th><th>Acumulado a baixar</th></tr></thead><tbody>${projecao.map((p) => `<tr${p.lim === EST.ano ? ' class="on"' : ""}><td>${p.lim}</td><td>${p.ano}</td><td>${N(p.s)}</td></tr>`).join("")}</tbody></table>
+        </div>
+      </div>
+      <h4>Descaracterizadas por ano de fabricação</h4>
+      ${figura("safras-fabricacao", svgColunas(safraItens, { linhaCorte: `vermelho: a baixar (até ${EST.ano})` }))}
+      <h4>Viaturas a baixar por departamento</h4>
+      ${figura("baixas-por-departamento", svgEmpilhadas(depLista.map(([d, x]) => ({ rotulo: d, partes: [x.p, x.c], nota: `${pct(x.p + x.c, x.t)} do dpto.` })), [COR.vermelho, COR.ambar], ["Próprias", "Cedidas"], { rotuloW: 90 }), "A porcentagem é a parte das descaracterizadas do departamento que entra na baixa.")}
+      <h4>Mapa das unidades afetadas</h4>
+      <div class="es-mapa" id="es-mapa"></div>
+      <p class="dash-chart-hint">Cada ponto é uma COORPIN, com o tamanho proporcional às viaturas a baixar na região. Capital e região metropolitana ficam no ponto da Sede. ${semCoorpin ? `${semCoorpin} unidade(s) não puderam ser ligadas a uma COORPIN e não aparecem no mapa.` : ""} Vermelho indica que 60% ou mais das descaracterizadas da região entram na baixa. Para a nota, use a captura de tela do mapa.</p>
+      <h4>Unidades, da que mais perde para a que menos perde</h4>
+      <div class="es-controles">
+        <label>Situação <select id="es-f-sit"><option value="">Só as que perdem</option><option value="PERDE TODAS">Perdem todas</option><option value="PERDE PARTE">Perdem parte</option><option value="NÃO PERDE">Não perdem</option></select></label>
+        <label>Departamento <select id="es-f-dep"><option value="">Todos</option>${deptList.map((d) => `<option value="${escapeAttr(d)}">${h(d)}</option>`).join("")}</select></label>
+      </div>
+      <div class="tabela-rolavel" style="max-height:380px"><table class="es-tab"><thead><tr><th>Unidade</th><th>Dpto</th><th>Município</th><th>Descarac.</th><th>A baixar</th><th>Próprias</th><th>Cedidas</th><th>Situação</th></tr></thead><tbody>${linhasUn.map((o) => `<tr><td>${h(o.u.n)}</td><td>${h(o.u.d)}</td><td>${h(o.u.m)}</td><td>${N(o.t)}</td><td><b>${N(o.perde)}</b></td><td>${N(o.perdeProp)}</td><td>${N(o.perdeCed)}</td><td class="${o.situacao === "PERDE TODAS" ? "ruim" : ""}">${o.situacao}</td></tr>`).join("") || `<tr><td colspan="8">Nenhuma unidade nesse recorte.</td></tr>`}</tbody></table></div>
+    </section>
+
+    <section class="es-sec">
+      <h3>Investimento realizado, 2023 a 2026</h3>
+      <div class="es-kpis">
+        ${kpi(N(totN), "Viaturas incorporadas", COR.verde2, "com valor, sem reboques e VUC")}
+        ${kpi(moeda(totV), "Investido", COR.verde, moedaExata(totV))}
+        ${kpi(N(velAno(2025)), "Veladas entregues em 2025", COR.ambar, `a nota técnica traz 87; também há ${velAno(2023)} em 2023 e ${velAno(2026)} em 2026`)}
+        ${kpi(`${N(totN - NOTA.viaturas)}`, "Diferença para a nota", "var(--carvao)", `nota: ${NOTA.viaturas} viaturas e ${moedaExata(NOTA.valor)}`)}
+      </div>
+      ${figura("investimento-por-ano", svgBarrasH(porAno.map((x) => ({ rotulo: String(x.a), valor: x.v, cor: COR.verde2, nota: `${N(x.n)} viaturas, ${N(x.d)} veladas` })), { formatar: (v) => moeda(v), largura: 760, rotuloW: 60, margemDir: 290 }), "Valor investido por ano de entrega.")}
+      <h4>Por fonte do recurso</h4>
+      ${figura("investimento-por-fonte", svgBarrasH(fonteLista.map(([f, x]) => ({ rotulo: f, valor: x.v, cor: COR.verde3, nota: `${N(x.n)} viaturas` })), { formatar: (v) => moeda(v), largura: 760, rotuloW: 190, margemDir: 230 }))}
+    </section>
+
+    <section class="es-sec">
+      <h3>Cenários de investimento</h3>
+      <p class="dash-chart-hint" style="max-width:80ch">Base de reposição: ${N(C.baseTotal)} viaturas${EST.cedidas ? " (próprias e cedidas)" : " (só as próprias do Estado)"}. A hipótese A repõe cada viatura por um modelo equivalente. A hipótese B repõe tudo pelo preço de uma Ranger. Os preços são os pagos em 2025 e 2026 e podem ser trocados pelo valor vigente informado pela DILOG.</p>
+      <div class="es-controles">
+        <label>Compactos (A) <input type="number" id="es-pa-c" value="${Math.round(EST.precoA.c)}" step="1000"></label>
+        <label>Pick-ups (A) <input type="number" id="es-pa-p" value="${Math.round(EST.precoA.p)}" step="1000"></label>
+        <label>SUV (A) <input type="number" id="es-pa-s" value="${Math.round(EST.precoA.s)}" step="1000"></label>
+        <label>Preço único (B) <input type="number" id="es-pb" value="${Math.round(EST.precoB)}" step="1000"></label>
+      </div>
+      <p class="dash-chart-hint">Base por grupo: ${N(nGrupo(0))} compactos, ${N(nGrupo(1))} pick-ups, ${N(nGrupo(2))} SUV${nGrupo(3) ? `, ${N(nGrupo(3))} outros` : ""}.</p>
+      <div class="tabela-rolavel"><table class="es-tab"><thead><tr><th>Cenário</th><th>Viaturas</th><th>Custo hipótese A</th><th>Custo hipótese B</th><th>Unidades que deixam de ficar sem nenhuma velada</th></tr></thead><tbody>${C.cenarios.map((c) => `<tr><td><b>${Math.round(c.p * 100)}%</b></td><td>${N(c.n)}</td><td>${moeda(c.a)}</td><td>${moeda(c.b)}</td><td>${c.cobertas} de ${C.perdemTodas.length}</td></tr>`).join("")}</tbody></table></div>
+      ${figura("cenarios-de-investimento", svgBarrasH(C.cenarios.flatMap((c) => [{ rotulo: `${Math.round(c.p * 100)}% hipótese A`, valor: c.a, cor: COR.verde2, nota: `${N(c.n)} viaturas` }, { rotulo: `${Math.round(c.p * 100)}% hipótese B`, valor: c.b, cor: COR.verde4 }]), { formatar: (v) => moeda(v), largura: 760, rotuloW: 150, margemDir: 240 }), "A ordem de reposição começa pelas unidades que perderiam todas as veladas, das menores para as maiores.")}
+      <p class="dash-chart-hint">Repor uma viatura para cada uma das ${C.perdemTodas.length} unidades que perderiam todas as veladas (${C.perdemTodas.length} viaturas, de ${moeda(C.perdemTodas.length * EST.precoA.c)} a ${moeda(C.perdemTodas.length * EST.precoB)}) tira todas da situação de zero velada.</p>
+    </section>
+
+    <section class="es-sec">
+      <h3>Impactos e priorização, com as respostas das unidades</h3>
+      <div class="es-aguarda"><b>Aguardando as respostas das unidades.</b> O questionário e o modelo de resposta estão na planilha do plano de trabalho. Quando as respostas chegarem, os indicadores de cobertura investigativa, pressão sobre a frota, disponibilidade real e demanda reprimida entram aqui, junto com o risco de desassistência por unidade.</div>
+    </section>`;
+
+    // mapa
+    const alvoMapa = q("#es-mapa");
+    if (alvoMapa) {
+      try {
+        alvoMapa.innerHTML = linhasMapa.length ? mapaCoorpinSVG(linhasMapa, { corFn: (l) => (l.perc >= 0.6 ? "#C0392B" : l.perc >= 0.4 ? "#E0A800" : "#2E7D32"), formatarTotal: (l) => `${l.total} viatura(s) a baixar`, formatarRotulo: (l) => l.label }) : `<p class="dash-chart-hint">Nenhuma COORPIN com viatura a baixar nesse recorte.</p>`;
+      } catch { alvoMapa.innerHTML = `<p class="dash-chart-hint">Não foi possível desenhar o mapa.</p>`; }
+    }
+    q("#es-f-sit").value = EST.filtroSituacao; q("#es-f-dep").value = EST.filtroDep;
+  }
+
+  raiz.addEventListener("change", (ev) => {
+    const el = ev.target;
+    if (el.id === "es-ano") EST.ano = +el.value;
+    else if (el.id === "es-cedidas") EST.cedidas = el.checked;
+    else if (el.id === "es-combate") EST.combate = el.checked;
+    else if (el.id === "es-inserv") EST.inservis = Math.max(0, +el.value || 0);
+    else if (el.id === "es-pa-c") EST.precoA.c = +el.value || 0;
+    else if (el.id === "es-pa-p") EST.precoA.p = +el.value || 0;
+    else if (el.id === "es-pa-s") EST.precoA.s = +el.value || 0;
+    else if (el.id === "es-pb") EST.precoB = +el.value || 0;
+    else if (el.id === "es-f-sit") EST.filtroSituacao = el.value;
+    else if (el.id === "es-f-dep") EST.filtroDep = el.value;
+    else return;
+    desenhar();
+  });
+  raiz.addEventListener("click", (ev) => {
+    const b = ev.target.closest("[data-baixar-fig]");
+    if (b) baixarFigura(b.closest("figure"));
+  });
+  desenhar();
+}
+
 async function carregarFrotaPortal(portalSlug) {
   const painel = document.getElementById("tab-frota");
   painel.innerHTML = `<p class="tela-intro">Carregando o painel de frota...</p>`;
@@ -16247,6 +16546,7 @@ async function abrirTela(id) {
     if (nome === "contratos") carregarContratosPortal(p.id);
     if (nome === "obras") carregarObrasPortal(p.id);
     if (nome === "frota") carregarFrotaPortal(p.id);
+    if (nome === "frota-estudo") carregarFrotaEstudoPortal(p.id);
     if (nome === "cfcr") carregarCfcrPortal(p.id);
     if (nome === "cfcr-acordos") carregarCfcrAcordosPortal(p.id);
     // recarrega os destaques ao voltar pra Visão Geral: marcar um painel na
