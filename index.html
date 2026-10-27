@@ -12586,7 +12586,7 @@ async function carregarFrotaEstudoPortal(portalSlug) {
     painel.innerHTML = `<p class="tela-intro">Não consegui carregar o estudo: ${escapeHTML(erro.message)}</p>`;
     return;
   }
-  if (E.vazio || E.versao !== 5) {
+  if (E.vazio || E.versao !== 6) {
     painel.innerHTML = `<p class="tela-intro">O estudo precisa de dados novos. Na aba PAINEL DE FROTA, clique em ATUALIZAR PLANILHA e envie a planilha de frota (aba Frota). Os números do estudo são gerados a partir dela.</p>`;
     return;
   }
@@ -12860,23 +12860,39 @@ function montarEstudoFrota(raiz, E) {
     + sTxt(x + 12, y + 65, nota.length > Math.floor((w - 20) / 5.9) ? nota.slice(0, Math.floor((w - 20) / 5.9) - 1) + "…" : nota, 10, sFraco);
   const sLegenda = (x, y, itens) => itens.map(([c, t], i) => `<rect x="${x}" y="${y + i * 16 - 8}" width="9" height="9" fill="${c}"/>` + sTxt(x + 15, y + i * 16, t, 10)).join("");
   const grupoDeTipo = (t) => (t === 1 || t === 2 || t === 3 ? 0 : t === 0 ? 1 : t === 4 ? 2 : 3);
-  // entregues de 2023 a 2026 pelos filtros que a planilha de entregas sabe responder: propriedade, tipo, município e departamento
-  function entregues(categorias, ignorar = null) {
-    return E.entregas.filter((r) => r[4] !== 1 && (EST.combate || r[4] !== 2) && categorias.includes(r[1]) && passa(FD.prop, r[6]) && passa(FD.grupo, grupoDeTipo(r[5])) && (ignorar === "mun" || passa(FD.mun, E.munNome[r[11]])) && (ignorar === "dep" || passa(FD.dep, E.deps[r[12]])));
+  // Entregas e baixa das caracterizadas passam pelos MESMOS seis filtros da baixa das veladas (departamento,
+  // município, região, propriedade, tipo e ano de fabricação), para as duas pontas de uma razão sempre
+  // medirem o mesmo recorte. `ignorar` tira um filtro dos dois lados ao mesmo tempo (ex.: "safra" no quadro
+  // do ritmo, que já separa por safra, e "mun" ou "dep" nos quadros que listam esses próprios itens).
+  function entregues(categorias, ignorar = []) {
+    const ig = [].concat(ignorar);
+    return E.entregas.filter((r) => r[4] !== 1 && (EST.combate || r[4] !== 2) && categorias.includes(r[1]) && passa(FD.prop, r[6]) && passa(FD.grupo, grupoDeTipo(r[5]))
+      && (ig.includes("mun") || passa(FD.mun, E.munNome[r[11]])) && (ig.includes("dep") || passa(FD.dep, E.deps[r[12]]))
+      && (ig.includes("regiao") || passa(FD.regiao, E.regioes[r[14]])) && (ig.includes("safra") || passa(FD.safra, r[13])));
   }
-  const entreguesVeladas = (ignorar = null) => entregues([0], ignorar);
-  // caracterizadas (padrão e ADM) com fabricação até o ano da baixa, pelos filtros de propriedade, tipo e município
-  function baixaCaracterizadas() {
-    return E.baixaCarac.filter((r) => r[3] <= EST.ano && (r[1] === 0 || (r[1] === 1 && EST.cedidas)) && passa(FD.prop, r[1]) && passa(FD.grupo, r[2]) && passa(FD.mun, E.munNome[r[0]])).reduce((a, r) => a + r[4], 0);
+  const entreguesVeladas = (ignorar = []) => entregues([0], ignorar);
+  // caracterizadas (padrão e ADM) com a mesma regra de idade das veladas: fabricação até o ano da baixa
+  function baixaCaracterizadas(ignorar = []) {
+    const ig = [].concat(ignorar);
+    return E.baixaCarac.filter((r) => r[3] <= EST.ano && (r[1] === 0 || (r[1] === 1 && EST.cedidas)) && passa(FD.prop, r[1]) && passa(FD.grupo, r[2])
+      && (ig.includes("mun") || passa(FD.mun, E.munNome[r[0]])) && (ig.includes("dep") || passa(FD.dep, E.deps[r[5]]))
+      && (ig.includes("regiao") || passa(FD.regiao, E.regioes[r[6]])) && (ig.includes("safra") || passa(FD.safra, r[3]))).reduce((a, r) => a + r[4], 0);
   }
-  const NOTA_ENTREGAS = "Entregas respeitam os filtros de propriedade, tipo, município e departamento. A baixa das caracterizadas, só propriedade, tipo e município. Região e fabricação valem só para a baixa das veladas.";
+  // nota do rodapé: só o que de fato diferencia os dois lados, nunca uma explicação de filtro que já vale igual
+  const notaEntregas = (ignoraSafra = false) => {
+    const sv = E.totais.semValor || { veladas: 0, caracterizadas: 0 };
+    const fora = [sv.veladas ? `${N(sv.veladas)} velada(s)` : "", sv.caracterizadas ? `${N(sv.caracterizadas)} caracterizada(s)` : ""].filter(Boolean).join(" e ");
+    const partes = fora ? [`Entregas contam só viaturas com valor informado: ${fora} entregue(s) sem valor ficam fora.`] : [];
+    if (ignoraSafra && FD.safra.size) partes.push("O filtro de fabricação não vale neste quadro, que já separa por safra.");
+    return partes.join(" ");
+  };
 
   // ---------- 1. O ritmo de reposição cobre a baixa?
   function ritmoSVG() {
     const Cs = calcDia("safra"), T0 = EST.ano + 8, base = Cs.baseTotal;
     const entradas = (Y) => Cs.safrasBase.get(Y - 8) || 0;
     const ent = { 2023: 0, 2024: 0, 2025: 0, 2026: 0 };
-    entreguesVeladas().forEach((r) => { if (ent[r[0]] !== undefined) ent[r[0]] += r[8]; });
+    entreguesVeladas("safra").forEach((r) => { if (ent[r[0]] !== undefined) ent[r[0]] += r[8]; });
     const anosEnt = [2023, 2024, 2025, 2026], totEnt = anosEnt.reduce((a, y) => a + ent[y], 0), media = totEnt / 4;
     const melhorAno = anosEnt.reduce((m, y) => (ent[y] > ent[m] ? y : m), 2023), melhor = ent[melhorAno];
     const serie = (r) => { const out = [{ y: T0, v: base }]; let s = base; for (let Y = T0 + 1; Y <= T0 + 8; Y++) { s = Math.max(0, s + entradas(Y) - r); out.push({ y: Y, v: s }); } return out; };
@@ -12918,18 +12934,18 @@ function montarEstudoFrota(raiz, E) {
     linhas.forEach((l, i) => { s += `<rect x="${xl}" y="${376 + i * 16 - 8}" width="9" height="9" fill="${l.cor}"/>` + sTxt(xl + 15, 376 + i * 16, `${l.rot}, ${l.zera ? "zera em " + l.zera : "não zera até " + (T0 + 8)}`, 10); });
     // veladas e caracterizadas lado a lado: o que entrou contra o que vai sair
     const yK = Math.max(376 + Math.max(2, linhas.length) * 16 + 30, 398 + 3 * 16 + 20);
-    s += `<line x1="30" y1="${yK - 14}" x2="970" y2="${yK - 14}" stroke="var(--paper-line)"/>` + sRot(30, yK + 6, "VELADAS E CARACTERIZADAS LADO A LADO: ENTREGUES CONTRA A BAIXAR");
-    const carEnt = entregues([1, 2]).reduce((a, r) => a + r[8], 0), carBx = baixaCaracterizadas();
+    s += `<line x1="30" y1="${yK - 14}" x2="970" y2="${yK - 14}" stroke="var(--paper-line)"/>` + sRot(30, yK + 6, "VELADAS E CARACTERIZADAS LADO A LADO: ENTREGUES CONTRA A BAIXAR") + sTxt(30, yK + 20, `Baixa nas duas: fabricação até ${EST.ano}, ${EST.cedidas ? "próprias e cedidas" : "só próprias"}, sem motos e caminhões. Mesmos filtros nos dois lados.`, 10, sFraco);
+    const carEnt = entregues([1, 2], "safra").reduce((a, r) => a + r[8], 0), carBx = baixaCaracterizadas("safra");
     const maxK = Math.max(1, totEnt + carEnt, base + carBx), razao = (e, b) => (b ? (e / b).toFixed(1).replace(".", ",") + "x" : "sem baixa");
     [["Veladas", totEnt, base, "descaracterizadas"], ["Caracterizadas (padrão e ADM)", carEnt, carBx, "ostensivas"], ["Frota toda (as duas)", totEnt + carEnt, base + carBx, "total"]].forEach(([nomeK, e, b], i) => {
-      const y = yK + 22 + i * 54;
+      const y = yK + 32 + i * 54;
       s += sTxt(30, y + 20, nomeK, 12, 'font-weight="700"');
       s += `<rect x="262" y="${y}" width="${Math.max(e / maxK * 400, e ? 2 : 0).toFixed(1)}" height="18" fill="var(--oliva)"><title>${nomeK}: ${N(e)} entregues de 2023 a 2026</title></rect>` + sTxt(262 + e / maxK * 400 + 8, y + 14, N(e) + " entregues", 11);
       s += `<rect x="262" y="${y + 22}" width="${Math.max(b / maxK * 400, b ? 2 : 0).toFixed(1)}" height="18" fill="var(--terracota)"><title>${nomeK}: ${N(b)} com fabricação até ${EST.ano}</title></rect>` + sTxt(262 + b / maxK * 400 + 8, y + 36, N(b) + " a baixar", 11);
       s += `<text x="800" y="${y + 24}" font-family="monospace" font-size="22" font-weight="700" fill="var(--carvao)">${razao(e, b)}</text>` + sTxt(800, y + 40, "entregues por baixa", 10, sFraco);
     });
     // cartões
-    const yC = yK + 22 + 3 * 54 + 22;
+    const yC = yK + 32 + 3 * 54 + 22;
     s += sCartao(30, yC, 300, "ESTOQUE A REPOR", N(base), EST.cedidas ? "viaturas, próprias e cedidas" : "viaturas próprias do Estado", "var(--terracota)");
     s += sCartao(350, yC, 300, `RITMO PARA ZERAR ATÉ ${meta}`, `${N(necessario)} por ano`, `${moeda(necessario * custoMed)} por ano${melhor ? `, ${(necessario / melhor).toFixed(1).replace(".", ",")}x o melhor ano` : ""}`, "var(--mostarda)");
     s += sCartao(670, yC, 300, "RITMO MÉDIO, 2023 A 2026", `${N(media)} por ano`, `${N(totEnt)} veladas em 4 anos, 2026 incompleto`, "var(--oliva)");
@@ -12938,10 +12954,10 @@ function montarEstudoFrota(raiz, E) {
     // o que mais pesa à frente e o que o custo está supondo
     let maiorEntrada = { y: 0, n: 0 };
     for (let Y = T0 + 1; Y <= T0 + 8; Y++) if (entradas(Y) > maiorEntrada.n) maiorEntrada = { y: Y, n: entradas(Y) };
-    const veladasEnt = entreguesVeladas(), qtdPaga = veladasEnt.reduce((a, r) => a + r[8], 0), precoPago = qtdPaga ? veladasEnt.reduce((a, r) => a + r[9], 0) / qtdPaga : 0;
+    const veladasEnt = entreguesVeladas("safra"), qtdPaga = veladasEnt.reduce((a, r) => a + r[8], 0), precoPago = qtdPaga ? veladasEnt.reduce((a, r) => a + r[9], 0) / qtdPaga : 0;
     const rod = [leitura, maiorEntrada.n ? `A maior entrada à frente é em ${maiorEntrada.y}: ${N(maiorEntrada.n)} viaturas da safra ${maiorEntrada.y - 8}. Se a reposição seguir em ondas, o problema volta a cada 8 anos.` : "Nenhuma safra nova entra na baixa nos próximos oito anos neste recorte.",
       `Estoque é a base de reposição na data da baixa (fabricação até ${EST.ano}). A cada ano seguinte entra a safra que completa 8 anos e sai o ritmo de entrega. Elegível à baixa não é baixa feita, e 8 anos de idade não é estado de conservação.`,
-      `Custo por viatura: média da hipótese A (${moeda(custoMed)}), que repõe compactos por modelo de entrada.${precoPago ? ` As veladas entregues custaram em média ${moeda(precoPago)}, o que levaria a ${moeda(necessario * precoPago)} por ano.` : ""}`, NOTA_ENTREGAS];
+      `Custo por viatura: média da hipótese A (${moeda(custoMed)}), que repõe compactos por modelo de entrada.${precoPago ? ` As veladas entregues custaram em média ${moeda(precoPago)}, o que levaria a ${moeda(necessario * precoPago)} por ano.` : ""}`, notaEntregas(true)];
     s += sRod(yC + 96, rod);
     return sPoster(sAlturaRod(yC + 96, rod), s);
   }
@@ -12974,7 +12990,7 @@ function montarEstudoFrota(raiz, E) {
     const barras = [
       { t: "Descaracterizadas", v: C.total, cor: "var(--tinta)", p: "" },
       { t: `Fabricadas até ${EST.ano} (a baixar)`, v: C.perde, cor: "var(--terracota)", p: C.total ? ` · ${pct(C.perde, C.total)}` : "" },
-      { t: "Inservíveis informados", v: EST.inservis, cor: "var(--mostarda)", p: C.perde ? ` · ${pct(EST.inservis, C.perde)} do a baixar` : "" },
+      { t: "Inservíveis informados", v: EST.inservis, cor: "var(--mostarda)", p: filtrosAtivos("dia").length ? " · total informado, sem filtro" : C.perde ? ` · ${pct(EST.inservis, C.perde)} do a baixar` : "" },
     ];
     barras.forEach((b, i) => {
       const y = 102 + i * 36, w = Math.max(b.v / maxV * larguraMax, b.v > 0 ? 3 : 0);
@@ -13066,7 +13082,7 @@ function montarEstudoFrota(raiz, E) {
     if (topI.length) { const a = aninhar(barrasParesSVG(topI), 500, yI + 12, 470, "mun"); s += a.svg; altDir += 14 + 12 + a.altura; if (ordI.length > topI.length) { s += sTxt(500, yI + 12 + a.altura + 14, `Mostrando os ${topI.length} que mais faltam, de ${ordI.length} municípios.`, 10, sFraco); altDir += 20; } }
     const fim = yC + Math.max(altMapa, altDir) + 10;
     const pior = ordI.find((l) => l.b > l.e);
-    const rod2 = [`Leitura: Salvador concentra ${N(salM.b)} das ${N(totB)} a baixar e recebeu ${N(salM.e)} das ${N(totE)} entregues. ${faltam} de ${noRec.length} municípios receberam menos da metade do que vão baixar${pior ? `. Fora de Salvador, o que mais falta é ${pior.c}, com ${N(pior.b - pior.e)} a mais para baixar do que entregues` : ""}.`, "Entregues são as veladas incorporadas de 2023 a 2026, no município onde a viatura está lotada hoje. A baixar é a base de reposição (fabricação até " + EST.ano + ").", NOTA_ENTREGAS];
+    const rod2 = [`Leitura: Salvador concentra ${N(salM.b)} das ${N(totB)} a baixar e recebeu ${N(salM.e)} das ${N(totE)} entregues. ${faltam} de ${noRec.length} municípios receberam menos da metade do que vão baixar${pior ? `. Fora de Salvador, o que mais falta é ${pior.c}, com ${N(pior.b - pior.e)} a mais para baixar do que entregues` : ""}.`, "Entregues são as veladas incorporadas de 2023 a 2026, no município onde a viatura está lotada hoje. A baixar é a base de reposição (fabricação até " + EST.ano + ").", notaEntregas()];
     s += sRod(fim, rod2);
     return sPoster(sAlturaRod(fim, rod2), s);
   }
