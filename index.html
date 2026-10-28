@@ -582,6 +582,11 @@ body{background:var(--paper);color:var(--carvao);font-family:'Archivo',sans-seri
 .dash-filtro .es-multi-lista{max-height:220px;overflow:auto;margin-top:4px;padding:6px 8px;border:1.5px solid var(--paper-line);background:var(--surface);display:flex;flex-direction:column;gap:4px;font-family:'IBM Plex Mono',monospace;font-size:var(--fs-ui-sm)}
 .dash-filtro .es-multi-lista label{display:flex;gap:6px;align-items:center;letter-spacing:0;color:var(--carvao);text-transform:none;white-space:nowrap}
 .dash-filtro input[type=number]{background:var(--paper);color:var(--carvao);border:1.5px solid var(--paper-line);padding:8px 10px;font-family:'IBM Plex Mono',monospace;font-size:var(--fs-ui-sm);border-radius:var(--radius-md,0)}
+.es-rel-opcao{display:flex;gap:10px;align-items:flex-start;font-family:'IBM Plex Mono',monospace;font-size:var(--fs-ui-sm);color:var(--carvao);margin:8px 0;line-height:1.45;cursor:pointer}
+.es-rel-opcao input[type=checkbox],.es-rel-opcao input[type=radio]{margin-top:3px;flex:none}
+.es-rel-opcao span{color:#B8C0CE}
+.es-rel-opcao b{color:var(--carvao)}
+.es-rel-botoes{display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap;margin-top:18px}
 .es-info .es-grafico{overflow-x:auto}
 .es-info svg.es-poster{display:block;width:100%;min-width:760px;height:auto}
 .es-subtitulo{font-family:'IBM Plex Mono',monospace;font-size:var(--fs-ui-sm);letter-spacing:.06em;text-transform:uppercase;color:var(--carvao);opacity:.7;margin:22px 0 10px}
@@ -2115,10 +2120,11 @@ function barraHorizontalComEixoSVG(categorias, opcoes = {}) {
   // cor: string (cor única pra todas as barras, como sempre foi) OU função
   // (c) => cor (uma cor por categoria — CFCR precisa disso pro "Motivo da
   // Pendência", onde cada barra usa a MESMA cor do status equivalente).
-  const { formatarValor = (v) => "R$ " + formatarMoedaCompacta(v), formatarEixoTick = (v) => "R$ " + formatarEixo(v), cor = "var(--tinta)", selecionado = "", rotularDiagonal = false, rotuloExtra = null, formatarRotulo = (c) => c.label } = opcoes;
+  const { formatarValor = (v) => "R$ " + formatarMoedaCompacta(v), formatarEixoTick = (v) => "R$ " + formatarEixo(v), cor = "var(--tinta)", selecionado = "", rotularDiagonal = false, rotuloExtra = null, formatarRotulo = (c) => c.label, valoresVisiveis = false } = opcoes;
   const corDe = typeof cor === "function" ? cor : () => cor;
   const MAX_ROTULO = 22;
-  const padL = 150, padR = 14, padT = 4, alturaEixoX = rotularDiagonal ? 34 : 24;
+  // valoresVisiveis (opcional): escreve o valor ao lado de cada barra, para a imagem baixada não depender do mouse
+  const padL = 150, padR = valoresVisiveis ? (rotuloExtra ? 190 : 76) : 14, padT = 4, alturaEixoX = rotularDiagonal ? 34 : 24;
   const larguraPlot = 280;
   // Achado dela (rótulos tipo "Serviço de manutenção do mobiliário da DT"
   // quebrando em 2-3 linhas e invadindo a linha vizinha): rowH fixa de 26
@@ -2158,6 +2164,7 @@ function barraHorizontalComEixoSVG(categorias, opcoes = {}) {
       <rect class="area-hit" x="0" y="${y.toFixed(1)}" width="${w}" height="${rowH}" fill="transparent" />
       ${rotulo}
       <rect x="${padL}" y="${(y + 4).toFixed(1)}" width="${Math.max(largura, 1.5).toFixed(1)}" height="${(rowH - 8).toFixed(1)}" fill="${corDe(c)}"><title>${escapeHTML(rotuloTexto)}: ${formatarValor(c.valor)}${rotuloExtra ? ` ${escapeHTML(rotuloExtra(c))}` : ""}</title></rect>
+      ${valoresVisiveis ? `<text x="${(padL + Math.max(largura, 1.5) + 5).toFixed(1)}" y="${(y + rowH / 2 + 3).toFixed(1)}" font-family="monospace" font-size="8.5" fill="var(--carvao)">${escapeHTML(formatarValor(c.valor))}${rotuloExtra ? " " + escapeHTML(rotuloExtra(c)) : ""}</text>` : ""}
     </g>`;
   });
   return `<svg viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg">${grade}${barras}${eixoX}</svg>`;
@@ -2171,9 +2178,9 @@ function barraHorizontalComEixoSVG(categorias, opcoes = {}) {
 // rótulo tipo "15ª Serrinha"), onde colunaEmpilhadaSVG amassaria tudo numa
 // faixa de 460px.
 function barraHorizontalEmpilhadaSVG(grupos, segmentos, opcoes = {}) {
-  const { formatarValor = (v) => v.toLocaleString("pt-BR"), formatarEixoTick = (v) => Math.round(v).toLocaleString("pt-BR"), selecionado = "", formatarRotulo = (g) => g.label } = opcoes;
+  const { formatarValor = (v) => v.toLocaleString("pt-BR"), formatarEixoTick = (v) => Math.round(v).toLocaleString("pt-BR"), selecionado = "", formatarRotulo = (g) => g.label, valoresVisiveis = false } = opcoes;
   const MAX_ROTULO = 22;
-  const padL = 150, padR = 14, padT = 4;
+  const padL = 150, padR = valoresVisiveis ? 84 : 14, padT = 4;
   const larguraPlot = 280;
   // Mesmo ajuste de barraHorizontalComEixoSVG — necessário agora que os
   // rótulos de COORPIN ficaram mais longos ("1ª COORPIN — Feira de
@@ -2208,6 +2215,11 @@ function barraHorizontalEmpilhadaSVG(grupos, segmentos, opcoes = {}) {
       segmentosSVG += `<rect x="${x.toFixed(1)}" y="${(y + 4).toFixed(1)}" width="${Math.max(largura, 1).toFixed(1)}" height="${(rowH - 8).toFixed(1)}" fill="${s.cor}"><title>${escapeHTML(rotuloTexto)} — ${escapeHTML(s.label)}: ${formatarValor(v)}</title></rect>`;
       x += largura;
     });
+    // total (e a divisão, quando há mais de um segmento) ao lado da barra, para a imagem baixada
+    if (valoresVisiveis) {
+      const partes = segmentos.map((s) => g.valores[s.label] || 0).filter((v) => v);
+      segmentosSVG += `<text x="${(x + 5).toFixed(1)}" y="${(y + rowH / 2 + 3).toFixed(1)}" font-family="monospace" font-size="8.5" fill="var(--carvao)">${escapeHTML(formatarValor(partes.reduce((a, v) => a + v, 0)))}${partes.length > 1 ? ` (${partes.map((v) => formatarValor(v)).join(" + ")})` : ""}</text>`;
+    }
     barras += `<g data-cat="${escapeAttr(g.label)}" style="cursor:pointer" opacity="${dim ? 0.4 : 1}">
       <rect class="area-hit" x="0" y="${y.toFixed(1)}" width="${w}" height="${rowH}" fill="transparent" />
       ${rotulo}
@@ -2243,7 +2255,7 @@ function colunaEmpilhadaSVG(grupos, segmentos, opcoes = {}) {
   // paralelo a `valores` (mesma chave de segmento), só usado no tooltip —
   // não mexe na conta de altura/empilhamento, que continua só em cima de
   // `valores`.
-  const { formatarValor = (v) => "R$ " + formatarMoedaCompacta(v), formatarEixoTick = (v) => "R$ " + formatarEixo(v), selecionado = "", substantivoQtd = "registro" } = opcoes;
+  const { formatarValor = (v) => "R$ " + formatarMoedaCompacta(v), formatarEixoTick = (v) => "R$ " + formatarEixo(v), selecionado = "", substantivoQtd = "registro", valoresVisiveis = false } = opcoes;
   const w = 460, padL = 46, padR = 10, padT = 10;
   const alturaPlot = 190, alturaRotulos = 22;
   const alturaLegenda = 18;
@@ -2277,6 +2289,8 @@ function colunaEmpilhadaSVG(grupos, segmentos, opcoes = {}) {
       coluna += `<rect x="${(cx - barW / 2).toFixed(1)}" y="${(y - alt).toFixed(1)}" width="${barW.toFixed(1)}" height="${alt.toFixed(1)}" fill="${s.cor}"><title>${escapeHTML(g.label)} — ${escapeHTML(s.label)}: ${formatarValor(v)}${qtdTexto}</title></rect>`;
       y -= alt;
     });
+    // total no topo de cada coluna, para a imagem baixada
+    if (valoresVisiveis && totais[i]) coluna += `<text x="${cx.toFixed(1)}" y="${(y - 3).toFixed(1)}" text-anchor="middle" font-family="monospace" font-size="8" fill="var(--carvao)">${escapeHTML(formatarValor(totais[i]))}</text>`;
     colunas += `<g data-cat="${escapeAttr(g.label)}" style="cursor:pointer" opacity="${dim ? 0.4 : 1}">${coluna}</g>`;
     rotulos += `<text x="${cx.toFixed(1)}" y="${(baseY + 14).toFixed(1)}" text-anchor="middle" font-family="monospace" font-size="8.5" fill="var(--carvao)" fill-opacity="${dim ? 0.5 : 0.85}" font-weight="${selecionado === g.label ? 700 : 400}">${escapeHTML(g.label)}</text>`;
   });
@@ -12572,7 +12586,7 @@ function criarMotorDimensoesPorValor(linhasTodas, dimensoes, campoRegiao) {
 // demais e ver só velada ela consegue, mas consegue juntar outras
 // combinações"): cada filtro aceita VÁRIOS valores. Clique simples isola um
 // valor; Ctrl, Shift ou Cmd + clique soma ou tira mais um. O gráfico principal
-// de investimento pode ser agrupado por categoria, tipo, fonte, doação ou
+// de investimento pode ser agrupado por categoria, tipo, fonte ou
 // modelo, e clicar num trecho colorido filtra por aquela categoria. A imagem
 // baixada leva escrito qual filtro estava ativo.
 // =====================================================================
@@ -12586,7 +12600,7 @@ async function carregarFrotaEstudoPortal(portalSlug) {
     painel.innerHTML = `<p class="tela-intro">Não consegui carregar o estudo: ${escapeHTML(erro.message)}</p>`;
     return;
   }
-  if (E.vazio || E.versao !== 8) {
+  if (E.vazio || E.versao !== 9) {
     painel.innerHTML = `<p class="tela-intro">O estudo precisa de dados novos. Na aba PAINEL DE FROTA, clique em ATUALIZAR PLANILHA e envie a planilha de frota (aba Frota). Os números do estudo são gerados a partir dela.</p>`;
     return;
   }
@@ -12656,8 +12670,9 @@ function munCanon(bruto) {
 
 // dados: Map nome do município -> { cor, op, titulo }. Município sem dado fica em cinza claro.
 // marca: texto do destaque de Salvador (o polígono é pequeno demais para ler), com chamada e caixa.
-function mapaMunicipiosEstudoSVG(dados, { selecionados = new Set(), marca = null } = {}) {
+function mapaMunicipiosEstudoSVG(dados, { selecionados = new Set(), marca = null, escrever = 8 } = {}) {
   let formas = "", sal = null;
+  const rotulados = [];
   const vistos = new Set();
   for (const [k, d] of poligonosMunicipios()) {
     const n = normMun(k);
@@ -12665,9 +12680,27 @@ function mapaMunicipiosEstudoSVG(dados, { selecionados = new Set(), marca = null
     vistos.add(n);
     const nome = munNomeDe(k), dado = dados.get(nome), sel = selecionados.has(nome);
     if (nome === "SALVADOR") sal = d;
+    if (dado && dado.rot && nome !== "SALVADOR") {
+      const nums = d.match(/-?[0-9]+\.?[0-9]*/g).map(Number);
+      let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9;
+      for (let i = 0; i + 1 < nums.length; i += 2) { x0 = Math.min(x0, nums[i]); x1 = Math.max(x1, nums[i]); y0 = Math.min(y0, nums[i + 1]); y1 = Math.max(y1, nums[i + 1]); }
+      rotulados.push({ nome, cx: (x0 + x1) / 2, cy: (y0 + y1) / 2, peso: dado.peso || 0, rot: dado.rot });
+    }
     const op = dado ? (selecionados.size && !sel ? 0.3 : (dado.op ?? 0.9)) : 0.5;
     formas += `<path${dado ? ` data-cat="${escapeAttr(nome)}" style="cursor:pointer"` : ""} d="${d}" fill="${dado ? dado.cor : "var(--paper-line)"}" fill-opacity="${op}" stroke="${sel ? "var(--carvao)" : "var(--paper)"}" stroke-width="${sel ? 1.4 : 0.3}" fill-rule="evenodd"><title>${escapeHTML(nome)}${dado ? ": " + escapeHTML(dado.titulo) : ""}</title></path>`;
   }
+  // os maiores municípios com o nome e o número escritos, para a imagem baixada
+  let escritos = "";
+  const ocupados = [];
+  rotulados.sort((a, b) => b.peso - a.peso).slice(0, escrever * 2).forEach((r) => {
+    if (ocupados.length >= escrever) return;
+    const nome = r.nome.length > 13 ? r.nome.slice(0, 12) + "." : r.nome;
+    const x = Math.min(Math.max(r.cx, 34), 500);
+    const larg = (nome.length + 1 + r.rot.length) * 5.9, caixa = { x0: x - larg / 2 - 2, x1: x + larg / 2 + 2, y0: r.cy - 10, y1: r.cy + 3 };
+    if (ocupados.some((o) => caixa.x0 < o.x1 && caixa.x1 > o.x0 && caixa.y0 < o.y1 && caixa.y1 > o.y0)) return;
+    ocupados.push(caixa);
+    escritos += `<text x="${x.toFixed(1)}" y="${r.cy.toFixed(1)}" text-anchor="middle" font-family="monospace" font-size="9.5" font-weight="700" fill="var(--carvao)" stroke="var(--surface)" stroke-width="2.6" paint-order="stroke" style="pointer-events:none">${escapeHTML(nome)} ${escapeHTML(r.rot)}</text>`;
+  });
   let destaque = "";
   const linhasMarca = marca ? [].concat(marca) : [];
   if (linhasMarca.length && sal) {
@@ -12681,7 +12714,7 @@ function mapaMunicipiosEstudoSVG(dados, { selecionados = new Set(), marca = null
       + `<text x="474" y="315" font-family="monospace" font-size="12" font-weight="700" fill="var(--carvao)">SALVADOR</text>`
       + linhasMarca.map((t, i) => `<text x="474" y="${331 + i * 15}" font-family="monospace" font-size="10.5" fill="var(--carvao)">${escapeHTML(t)}</text>`).join("") + `</g>`;
   }
-  return `<svg viewBox="${MAPA_MUNICIPIOS_CFCR.viewBox}" xmlns="http://www.w3.org/2000/svg">${formas}${destaque}</svg>`;
+  return `<svg viewBox="${MAPA_MUNICIPIOS_CFCR.viewBox}" xmlns="http://www.w3.org/2000/svg">${formas}${escritos}${destaque}</svg>`;
 }
 
 function montarEstudoFrota(raiz, E) {
@@ -12715,7 +12748,6 @@ function montarEstudoFrota(raiz, E) {
     categoria: { rot: "Categoria", val: (r) => r[1], nome: (v) => CAT[v], tipo: Number },
     tipo: { rot: "Tipo de veículo", val: (r) => r[5], nome: (v) => TIPOS[v], tipo: Number },
     prop: { rot: "Propriedade", val: (r) => r[6], nome: (v) => PROP[v], tipo: Number },
-    doacao: { rot: "Doação sem permuta", val: (r) => r[7], nome: (v) => SIMNAO[v], tipo: Number },
     fonte: { rot: "Fonte do recurso", val: (r) => E.fontes[r[2]], nome: (v) => v, tipo: String },
     modelo: { rot: "Modelo", val: (r) => E.modelos[r[3]], nome: (v) => v, tipo: String },
   };
@@ -12783,7 +12815,8 @@ function montarEstudoFrota(raiz, E) {
 
   // ---------- investimento (entregues 2023 a 2026, com valor)
   function calcInv(ignorar = null) {
-    const rows = E.entregas.filter((r) => r[4] !== 1 && (EST.combate || r[4] !== 2) && Object.keys(DI).every((d) => d === ignorar || passa(FI[d], DI[d].val(r))));
+    // investimento inclui reboque e VUC (decisão dela); só a reposição os deixa de fora, porque a baixa não conta caminhões
+    const rows = E.entregas.filter((r) => (EST.combate || r[4] !== 2) && Object.keys(DI).every((d) => d === ignorar || passa(FI[d], DI[d].val(r))));
     const soma = (fn, campo) => rows.filter(fn).reduce((s, r) => s + r[campo], 0);
     return { rows, n: soma(() => true, 8), v: soma(() => true, 9), sv: soma(() => true, 15), nVel: soma((r) => r[1] === 0, 8), vVel: soma((r) => r[1] === 0, 9) };
   }
@@ -12814,7 +12847,7 @@ function montarEstudoFrota(raiz, E) {
   // de linha (a do sistema só comporta 3 ou 4 itens) e trechos clicáveis
   const CORES_SEG = ["var(--mostarda)", "var(--tinta)", "var(--oliva)", "var(--terracota)", "var(--dourado)", "var(--vinho)", "#7E8A8C"];
   function colunasAgrupadasSVG(anos, segmentos) {
-    const w = 520, padL = 52, padR = 10, padT = 10, alturaPlot = 190, alturaRot = 22, colsLeg = 3, alturaLeg = Math.ceil(segmentos.length / colsLeg) * 14 + 6;
+    const w = 520, padL = 52, padR = 10, padT = 24, alturaPlot = 190, alturaRot = 22, colsLeg = 2, alturaLeg = Math.ceil(segmentos.length / colsLeg) * 14 + 6;
     const hh = padT + alturaPlot + alturaRot + alturaLeg, baseY = padT + alturaPlot, bw = (w - padL - padR) / anos.length, barW = Math.min(bw * 0.6, 56);
     const totais = anos.map((a) => segmentos.reduce((s, sg) => s + (a.valores[sg.label] || 0), 0)), maxT = Math.max(...totais, 1);
     let grade = "", eixo = "";
@@ -12823,25 +12856,27 @@ function montarEstudoFrota(raiz, E) {
     anos.forEach((a, i) => {
       const cx = padL + bw * i + bw / 2; let y = baseY, c = `<rect class="area-hit" x="${(cx - bw / 2).toFixed(1)}" y="${padT}" width="${bw.toFixed(1)}" height="${alturaPlot}" fill="transparent"/>`;
       segmentos.forEach((sg) => { const v = a.valores[sg.label] || 0; if (!v) return; const alt = alturaPlot * (v / maxT); const qt = a.quantidades[sg.label] || 0; c += `<rect data-seg="${escapeAttr(sg.label)}" x="${(cx - barW / 2).toFixed(1)}" y="${(y - alt).toFixed(1)}" width="${barW.toFixed(1)}" height="${alt.toFixed(1)}" fill="${sg.cor}" style="cursor:pointer"><title>${escapeHTML(a.label)} — ${escapeHTML(sg.label)}: ${moeda(v)} (${N(qt)} viaturas)</title></rect>`; y -= alt; });
+      if (totais[i] > 0) c += `<text x="${cx.toFixed(1)}" y="${(y - 4).toFixed(1)}" text-anchor="middle" font-family="monospace" font-size="8" fill="var(--carvao)">${moeda(totais[i])}</text>`;
       cols += `<g data-cat="${escapeAttr(a.label)}" style="cursor:pointer">${c}</g>`;
       rot += `<text x="${cx.toFixed(1)}" y="${baseY + 14}" text-anchor="middle" font-family="monospace" font-size="8.5" fill="var(--carvao)" fill-opacity="0.85">${escapeHTML(a.label)}</text>`;
     });
-    const leg = segmentos.map((sg, k) => { const lx = padL + (k % colsLeg) * 150, ly = baseY + alturaRot + 12 + Math.floor(k / colsLeg) * 14; return `<rect x="${lx}" y="${ly - 7}" width="8" height="8" fill="${sg.cor}"/><text x="${lx + 12}" y="${ly}" font-family="monospace" font-size="8" fill="var(--carvao)">${escapeHTML(sg.label.length > 22 ? sg.label.slice(0, 21) + "…" : sg.label)}</text>`; }).join("");
+    const leg = segmentos.map((sg, k) => { const lx = padL + (k % colsLeg) * 230, ly = baseY + alturaRot + 12 + Math.floor(k / colsLeg) * 14; return `<rect x="${lx}" y="${ly - 7}" width="8" height="8" fill="${sg.cor}"/><text x="${lx + 12}" y="${ly}" font-family="monospace" font-size="8" fill="var(--carvao)">${escapeHTML((sg.label.length > 22 ? sg.label.slice(0, 21) + "…" : sg.label) + " " + moeda(anos.reduce((acc, a) => acc + (a.valores[sg.label] || 0), 0)))}</text>`; }).join("");
     return `<svg viewBox="0 0 ${w} ${hh}" xmlns="http://www.w3.org/2000/svg">${grade}${eixo}${cols}${rot}${leg}</svg>`;
   }
 
   // Encaixa um gráfico pronto (SVG em texto) dentro do infográfico: vira um <svg>
   // aninhado na posição e largura pedidas, com a altura que a proporção dele
   // pede. data-zona diz qual filtro o clique naquela área aciona.
-  function aninhar(svg, x, y, largura, zona) {
+  function aninhar(svg, x, y, largura, zona, fator = 1) {
     const vb = svg.match(/viewBox="([^"]+)"/)[1].split(" ").map(Number);
     const altura = largura * vb[3] / vb[2];
     const aberto = `<svg x="${x}" y="${y}" width="${largura}" height="${altura.toFixed(1)}" viewBox="${vb.join(" ")}" preserveAspectRatio="xMidYMin meet" overflow="hidden" data-zona="${zona}" data-controles-adicionados="1" xmlns="http://www.w3.org/2000/svg">`;
-    return { svg: svg.replace(/<svg [^>]*>/, aberto), altura };
+    const corpo = fator === 1 ? svg : svg.replace(/font-size="([0-9.]+)"/g, (m, v) => `font-size="${(Number(v) * fator).toFixed(1)}"`);
+    return { svg: corpo.replace(/<svg [^>]*>/, aberto), altura };
   }
 
   // ---------- peças comuns dos quadros de reposição (mesmo desenho do infográfico do diagnóstico)
-  const sTxt = (x, y, t, tam, extra = "") => `<text x="${x}" y="${y}" font-family="monospace" font-size="${tam}" fill="var(--carvao)" ${extra}>${escapeHTML(t)}</text>`;
+  const sTxt = (x, y, t, tam, extra = "") => `<text x="${x}" y="${y}" font-family="monospace" font-size="${tam < 14 ? +(tam * 1.18).toFixed(1) : tam}" fill="var(--carvao)" ${extra}>${escapeHTML(t)}</text>`;
   const sFraco = 'fill-opacity="0.62"';
   const sRot = (x, y, t) => sTxt(x, y, t, 10, `letter-spacing="1.2" ${sFraco} font-weight="700"`);
   const sCab = (titulo) => {
@@ -12849,15 +12884,15 @@ function montarEstudoFrota(raiz, E) {
     return `<rect x="30" y="0" width="64" height="4" fill="var(--mostarda)"/><text x="30" y="34" font-family="Spectral, Georgia, serif" font-size="22" font-weight="700" fill="var(--carvao)">${escapeHTML(titulo)}</text>`
       + sTxt(30, 54, sub.length > 130 ? sub.slice(0, 129) + "…" : sub, 11, sFraco) + `<line x1="30" y1="66" x2="970" y2="66" stroke="var(--paper-line)"/>`;
   };
-  const sQuebra = (t) => { const out = []; let atual = ""; t.split(" ").forEach((w) => { if ((atual + " " + w).trim().length > 148) { out.push(atual); atual = w; } else atual = (atual + " " + w).trim(); }); if (atual) out.push(atual); return out; };
-  const sRodLinhas = (linhas) => linhas.flatMap(sQuebra);
+  const sQuebra = (t, max = 124) => { const out = []; let atual = ""; t.split(" ").forEach((w) => { if ((atual + " " + w).trim().length > max) { out.push(atual); atual = w; } else atual = (atual + " " + w).trim(); }); if (atual) out.push(atual); return out; };
+  const sRodLinhas = (linhas) => linhas.flatMap((t) => sQuebra(t));
   const sRod = (y, linhas) => `<line x1="30" y1="${y}" x2="970" y2="${y}" stroke="var(--paper-line)"/>` + sRodLinhas(linhas).map((t, i) => sTxt(30, y + 20 + i * 14, t, 10, sFraco)).join("");
   const sAlturaRod = (fim, linhas) => fim + 18 + sRodLinhas(linhas).length * 14 + 12;
   const sPoster = (H, corpo) => `<svg class="es-poster" viewBox="0 0 1000 ${H}" xmlns="http://www.w3.org/2000/svg"><rect x="0" y="0" width="1000" height="${H}" fill="var(--surface)"/>${corpo}</svg>`;
   // cartão de número grande dentro do quadro
   const sCartao = (x, y, w, rotulo, valor, nota, cor) => `<rect x="${x}" y="${y}" width="${w}" height="74" fill="none" stroke="var(--paper-line)"/><rect x="${x}" y="${y}" width="${w}" height="3" fill="${cor}"/>`
     + sRot(x + 12, y + 22, rotulo) + `<text x="${x + 12}" y="${y + 48}" font-family="monospace" font-size="24" font-weight="700" fill="var(--carvao)">${escapeHTML(valor)}</text>`
-    + sTxt(x + 12, y + 65, nota.length > Math.floor((w - 20) / 5.9) ? nota.slice(0, Math.floor((w - 20) / 5.9) - 1) + "…" : nota, 10, sFraco);
+    + sTxt(x + 12, y + 65, nota.length > Math.floor((w - 20) / 7) ? nota.slice(0, Math.floor((w - 20) / 7) - 1) + "…" : nota, 10, sFraco);
   const sLegenda = (x, y, itens) => itens.map(([c, t], i) => `<rect x="${x}" y="${y + i * 16 - 8}" width="9" height="9" fill="${c}"/>` + sTxt(x + 15, y + i * 16, t, 10)).join("");
   const grupoDeTipo = (t) => (t === 1 || t === 2 || t === 3 ? 0 : t === 0 ? 1 : t === 4 ? 2 : 3);
   // Entregas e baixa das caracterizadas passam pelos MESMOS seis filtros da baixa das veladas (departamento,
@@ -12947,7 +12982,7 @@ function montarEstudoFrota(raiz, E) {
     // cartões
     const yC = yK + 32 + 3 * 54 + 22;
     s += sCartao(30, yC, 300, "ESTOQUE A REPOR", N(base), EST.cedidas ? "viaturas, próprias e cedidas" : "viaturas próprias do Estado", "var(--terracota)");
-    s += sCartao(350, yC, 300, `RITMO PARA ZERAR ATÉ ${meta}`, `${N(necessario)} por ano`, `${moeda(necessario * custoMed)} por ano${melhor ? `, ${(necessario / melhor).toFixed(1).replace(".", ",")}x o melhor ano` : ""}`, "var(--mostarda)");
+    s += sCartao(350, yC, 300, `RITMO PARA ZERAR ATÉ ${meta}`, `${N(necessario)} por ano`, `${moeda(necessario * custoMed)}/ano${melhor ? `, ${(necessario / melhor).toFixed(1).replace(".", ",")}x o melhor ano` : ""}`, "var(--mostarda)");
     s += sCartao(670, yC, 300, "RITMO MÉDIO, 2023 A 2026", `${N(media)} por ano`, `${N(totEnt)} veladas em 4 anos, 2026 incompleto`, "var(--oliva)");
     const [lm, lb] = linhas;
     const leitura = `Leitura: no ritmo médio de ${N(media)} por ano o estoque ${lm.zera ? "zera em " + lm.zera : "não zera até " + (T0 + 8)}. Mantendo o melhor ano (${N(melhor)} por ano), ${lb.zera ? "zera em " + lb.zera : "não zera até " + (T0 + 8)}. As caracterizadas receberam ${razao(carEnt, carBx)} o que baixam, e as veladas ${razao(totEnt, base)}.`;
@@ -12970,14 +13005,14 @@ function montarEstudoFrota(raiz, E) {
     linhas.forEach((l, i) => {
       const y = i * rh + 4;
       bs += `<g data-cat="${escapeAttr(l.c)}" style="cursor:pointer"><rect class="area-hit" x="0" y="${y - 2}" width="${larg}" height="${rh}" fill="transparent"/>`
-        + `<text x="${xb - 8}" y="${y + 17}" text-anchor="end" font-family="monospace" font-size="10" fill="var(--carvao)">${escapeHTML(nome(l.c))}</text>`
+        + `<text x="${xb - 8}" y="${y + 17}" text-anchor="end" font-family="monospace" font-size="11" fill="var(--carvao)">${escapeHTML(nome(l.c))}</text>`
         + `<rect x="${xb}" y="${y + 2}" width="${Math.max(l.b / maxR * wb, l.b ? 2 : 0).toFixed(1)}" height="11" fill="var(--terracota)"><title>${escapeHTML(l.c)}: ${N(l.b)} a baixar</title></rect>`
-        + `<text x="${(xb + l.b / maxR * wb + 5).toFixed(1)}" y="${y + 11}" font-family="monospace" font-size="9" fill="var(--carvao)">${N(l.b)}</text>`
+        + `<text x="${(xb + l.b / maxR * wb + 5).toFixed(1)}" y="${y + 12}" font-family="monospace" font-size="10.5" fill="var(--carvao)">${N(l.b)}</text>`
         + `<rect x="${xb}" y="${y + 15}" width="${Math.max(l.e / maxR * wb, l.e ? 2 : 0).toFixed(1)}" height="11" fill="var(--oliva)"><title>${escapeHTML(l.c)}: ${N(l.e)} entregues</title></rect>`
-        + `<text x="${(xb + l.e / maxR * wb + 5).toFixed(1)}" y="${y + 24}" font-family="monospace" font-size="9" fill="var(--carvao)">${N(l.e)}</text></g>`;
+        + `<text x="${(xb + l.e / maxR * wb + 5).toFixed(1)}" y="${y + 25}" font-family="monospace" font-size="10.5" fill="var(--carvao)">${N(l.e)}</text></g>`;
     });
     const hb = linhas.length * rh + 30;
-    bs += `<rect x="${xb}" y="${hb - 16}" width="9" height="9" fill="var(--terracota)"/><text x="${xb + 14}" y="${hb - 8}" font-family="monospace" font-size="10" fill="var(--carvao)">A baixar</text><rect x="${xb + 100}" y="${hb - 16}" width="9" height="9" fill="var(--oliva)"/><text x="${xb + 114}" y="${hb - 8}" font-family="monospace" font-size="10" fill="var(--carvao)">Entregues</text>`;
+    bs += `<rect x="${xb}" y="${hb - 16}" width="9" height="9" fill="var(--terracota)"/><text x="${xb + 14}" y="${hb - 8}" font-family="monospace" font-size="11" fill="var(--carvao)">A baixar</text><rect x="${xb + 100}" y="${hb - 16}" width="9" height="9" fill="var(--oliva)"/><text x="${xb + 114}" y="${hb - 8}" font-family="monospace" font-size="11" fill="var(--carvao)">Entregues</text>`;
     return `<svg viewBox="0 0 ${larg} ${hb}" xmlns="http://www.w3.org/2000/svg">${bs}</svg>`;
   }
   const maisUm = (lista, sel, chave) => { const top = lista.slice(); sel.forEach((v) => { if (!top.some((l) => l[chave] === v)) { const x = lista.find((l) => l[chave] === v); if (x) top.push(x); } }); return top; };
@@ -12986,7 +13021,7 @@ function montarEstudoFrota(raiz, E) {
   function infograficoSVG({ C, porMun, depSplit, semMapa, safraGrupos }) {
     let s = sCab("Inservíveis, 8 anos ou mais e unidades afetadas");
     s += sRot(30, 90, "O TAMANHO DO PROBLEMA");
-    const x0 = 262, larguraMax = 640, maxV = Math.max(C.total, C.perde, EST.inservis, 1);
+    const x0 = 300, larguraMax = 600, maxV = Math.max(C.total, C.perde, EST.inservis, 1);
     const barras = [
       { t: "Descaracterizadas", v: C.total, cor: "var(--tinta)", p: "" },
       { t: `Fabricadas até ${EST.ano} (a baixar)`, v: C.perde, cor: "var(--terracota)", p: C.total ? ` · ${pct(C.perde, C.total)}` : "" },
@@ -13008,7 +13043,7 @@ function montarEstudoFrota(raiz, E) {
     const yConteudo = yTopo + 12;
     let altMapa = 120, altDep = 120;
     const dados = new Map();
-    porMun.forEach((x, nome) => { if (x.perde > 0) dados.set(nome, { cor: "var(--terracota)", op: x.perde >= 10 ? 1 : x.perde >= 4 ? 0.78 : x.perde >= 2 ? 0.55 : 0.35, titulo: `${N(x.perde)} a baixar de ${N(x.t)} descaracterizadas (${pct(x.perde, x.t)})` }); });
+    porMun.forEach((x, nome) => { if (x.perde > 0) dados.set(nome, { cor: "var(--terracota)", rot: N(x.perde), peso: x.perde, op: x.perde >= 10 ? 1 : x.perde >= 4 ? 0.78 : x.perde >= 2 ? 0.55 : 0.35, titulo: `${N(x.perde)} a baixar de ${N(x.t)} descaracterizadas (${pct(x.perde, x.t)})` }); });
     const sal = porMun.get("SALVADOR");
     if (dados.size) { const a = aninhar(mapaMunicipiosEstudoSVG(dados, { selecionados: FD.mun, marca: sal && sal.perde ? `${N(sal.perde)} a baixar` : "sem baixa" }), 30, yConteudo, 440, "mun"); s += a.svg; altMapa = a.altura; }
     else s += sTxt(30, yConteudo + 30, "Nenhum município neste recorte.", 12, sFraco);
@@ -13016,19 +13051,19 @@ function montarEstudoFrota(raiz, E) {
     [[0.35, "1 viatura a baixar"], [0.55, "2 a 3"], [0.78, "4 a 9"], [1, "10 ou mais"]].forEach(([op, t], i) => {
       s += `<rect x="${30 + (i % 2) * 190}" y="${yLeg + Math.floor(i / 2) * 16 - 8}" width="9" height="9" fill="var(--terracota)" fill-opacity="${op}"/>` + sTxt(45 + (i % 2) * 190, yLeg + Math.floor(i / 2) * 16, t, 10);
     });
-    s += sTxt(30, yLeg + 46, "Quanto mais forte a cor, mais viaturas a baixar no município. Salvador aparece em destaque.", 10, sFraco);
-    if (semMapa) s += sTxt(30, yLeg + 60, `${N(semMapa)} viatura(s) a baixar em locais sem município no mapa ficam só nos totais.`, 10, sFraco);
-    altMapa += semMapa ? 78 : 64;
+    sQuebra("Quanto mais forte a cor, mais viaturas a baixar no município. Salvador aparece em destaque.", 56).forEach((t, i) => { s += sTxt(30, yLeg + 46 + i * 15, t, 10, sFraco); });
+    if (semMapa) s += sTxt(30, yLeg + 76, `${N(semMapa)} viatura(s) em locais sem município no mapa ficam só nos totais.`.slice(0, 64), 10, sFraco);
+    altMapa += semMapa ? 92 : 78;
     if (depSplit.length) {
       const top = maisUm(depSplit.slice(0, 10).map(([d, x]) => ({ d, ...x })), FD.dep, "d");
-      const dsv = barraHorizontalEmpilhadaSVG(top.map((x) => ({ label: x.d, valores: { "Salvador": x.sal, "Demais municípios": x.dem } })), [{ label: "Salvador", cor: "var(--tinta)" }, { label: "Demais municípios", cor: "var(--terracota)" }], { formatarValor: N });
-      const a = aninhar(dsv, 500, yConteudo, 470, "dep"); s += a.svg; altDep = a.altura;
-      if (depSplit.length > top.length) { s += sTxt(500, yConteudo + altDep + 14, `Mostrando os ${top.length} maiores de ${depSplit.length} departamentos. A lista completa está logo abaixo.`, 10, sFraco); altDep += 20; }
+      const dsv = barraHorizontalEmpilhadaSVG(top.map((x) => ({ label: x.d, valores: { "Salvador": x.sal, "Demais municípios": x.dem } })), [{ label: "Salvador", cor: "var(--tinta)" }, { label: "Demais municípios", cor: "var(--terracota)" }], { formatarValor: N, valoresVisiveis: true });
+      const a = aninhar(dsv, 500, yConteudo, 470, "dep", 1.3); s += a.svg; altDep = a.altura;
+      if (depSplit.length > top.length) { s += sTxt(500, yConteudo + altDep + 14, `Os ${top.length} maiores de ${depSplit.length} departamentos. Lista completa abaixo.`, 10, sFraco); altDep += 20; }
     } else s += sTxt(500, yConteudo + 30, "Nenhum departamento neste recorte.", 12, sFraco);
     if (safraGrupos.length) {
       const ySafra = yConteudo + altDep + 14;
       s += sRot(500, ySafra, `ANO DE FABRICAÇÃO: O QUE ENTRA NA BAIXA (ATÉ ${EST.ano})`) + (C.porProp[2] ? sTxt(500, ySafra + 14, `Inclui ${N(C.porProp[2])} locadas, que não são compra do Estado.`, 10, sFraco) : "");
-      const a = aninhar(colunaEmpilhadaSVG(safraGrupos, [{ label: "A baixar", cor: "var(--terracota)" }, { label: "Ficam", cor: "var(--tinta)" }], { formatarValor: N, formatarEixoTick: (v) => N(v), substantivoQtd: "veículo" }), 500, ySafra + (C.porProp[2] ? 22 : 10), 470, "safra");
+      const a = aninhar(colunaEmpilhadaSVG(safraGrupos, [{ label: "A baixar", cor: "var(--terracota)" }, { label: "Ficam", cor: "var(--tinta)" }], { formatarValor: N, formatarEixoTick: (v) => N(v), substantivoQtd: "veículo", valoresVisiveis: true }), 500, ySafra + (C.porProp[2] ? 22 : 10), 470, "safra", 1.1);
       s += a.svg; altDep += 14 + (C.porProp[2] ? 22 : 10) + a.altura;
     }
     const fim = yConteudo + Math.max(altMapa, altDep) + 10;
@@ -13059,11 +13094,11 @@ function montarEstudoFrota(raiz, E) {
     const yC = 210;
     let altMapa = 120, altDir = 0;
     const dados = new Map();
-    todas.forEach((l) => dados.set(l.c, { cor: corCob(l), op: 0.9, titulo: `${N(l.e)} entregue(s) e ${N(l.b)} a baixar` }));
+    todas.forEach((l) => dados.set(l.c, { cor: corCob(l), rot: `${N(l.e)}/${N(l.b)}`, peso: l.b, op: 0.9, titulo: `${N(l.e)} entregue(s) e ${N(l.b)} a baixar` }));
     if (dados.size) { const a = aninhar(mapaMunicipiosEstudoSVG(dados, { selecionados: FD.mun, marca: [`${N(salM.b)} a baixar`, `${N(salM.e)} entregues`] }), 30, yC, 440, "mun"); s += a.svg; altMapa = a.altura; }
     const yLeg = yC + altMapa + 16;
     s += sLegenda(30, yLeg, [["var(--oliva)", "entregas cobrem a baixa ou não há baixa"], ["var(--mostarda)", "entregas cobrem metade ou mais"], ["var(--terracota)", "entregas cobrem menos da metade"]]);
-    s += sTxt(30, yLeg + 52, "Salvador aparece em destaque, com o total a baixar e entregue.", 10, sFraco);
+    s += sTxt(30, yLeg + 52, "Salvador em destaque, com total a baixar e entregue.", 10, sFraco);
     if (semMapa) s += sTxt(30, yLeg + 66, `${N(semMapa)} viatura(s) em locais sem município no mapa ficam só nos totais.`, 10, sFraco);
     altMapa += semMapa ? 84 : 70;
     // Salvador por departamento
@@ -13107,23 +13142,23 @@ function montarEstudoFrota(raiz, E) {
     const yC = 210; let altMapa = 120, altDir = 0;
     const cor = (l) => (l.a === l.t ? "var(--oliva)" : l.a > 0 ? "var(--mostarda)" : "var(--terracota)");
     const dados = new Map();
-    lista.forEach((l) => dados.set(l.c, { cor: cor(l), op: 0.9, titulo: `${l.a} de ${l.t} unidade(s) sem veladas saem do zero` }));
+    lista.forEach((l) => dados.set(l.c, { cor: cor(l), rot: `${l.a}/${l.t}`, peso: l.t, op: 0.9, titulo: `${l.a} de ${l.t} unidade(s) sem veladas saem do zero` }));
     if (dados.size) { const a = aninhar(mapaMunicipiosEstudoSVG(dados, { selecionados: FD.mun, marca: [`${salM.a} de ${salM.t}`, "unidades"] }), 30, yC, 440, "mun"); s += a.svg; altMapa = a.altura; }
     else s += sTxt(30, yC + 30, "Nenhuma unidade perde todas as veladas neste recorte.", 12, sFraco);
     const yLeg = yC + altMapa + 16;
     s += sLegenda(30, yLeg, [["var(--oliva)", "todas as unidades sem veladas do município atendidas"], ["var(--mostarda)", "parte atendida"], ["var(--terracota)", "nenhuma atendida"]]);
-    s += sTxt(30, yLeg + 52, "Só aparecem municípios com unidade que perderia todas as veladas.", 10, sFraco);
+    s += sTxt(30, yLeg + 52, "Só municípios com unidade que perderia todas as veladas.", 10, sFraco);
     altMapa += 70;
     const depL = [...porD.entries()].map(([c, x]) => ({ c, t: x.t, a: x.a })).sort((a, b) => (b.t - b.a) - (a.t - a.a));
-    const empilhado = (itens) => barraHorizontalEmpilhadaSVG(itens.map((l) => ({ label: l.c, valores: { "Saem do zero": l.a, "Seguem sem veladas": l.t - l.a } })), [{ label: "Saem do zero", cor: "var(--oliva)" }, { label: "Seguem sem veladas", cor: "var(--terracota)" }], { formatarValor: N });
+    const empilhado = (itens) => barraHorizontalEmpilhadaSVG(itens.map((l) => ({ label: l.c, valores: { "Saem do zero": l.a, "Seguem sem veladas": l.t - l.a } })), [{ label: "Saem do zero", cor: "var(--oliva)" }, { label: "Seguem sem veladas", cor: "var(--terracota)" }], { formatarValor: N, valoresVisiveis: true });
     const depTop = maisUm(depL.slice(0, 9), FD.dep, "c");
-    if (depTop.length) { const a = aninhar(empilhado(depTop), 500, yC, 470, "dep"); s += a.svg; altDir = a.altura; }
+    if (depTop.length) { const a = aninhar(empilhado(depTop), 500, yC, 470, "dep", 1.3); s += a.svg; altDir = a.altura; }
     else { s += sTxt(500, yC + 20, "Nenhuma unidade de Salvador sem veladas neste recorte.", 11, sFraco); altDir = 30; }
     const yI = yC + altDir + 14;
     s += sRot(500, yI, "DEMAIS MUNICÍPIOS: UNIDADES PENDENTES");
     const ordI = lista.filter((l) => l.c !== "SALVADOR").sort((a, b) => (b.t - b.a) - (a.t - a.a));
     const topI = maisUm(ordI.slice(0, 8), FD.mun, "c");
-    if (topI.length) { const a = aninhar(empilhado(topI), 500, yI + 12, 470, "mun"); s += a.svg; altDir += 14 + 12 + a.altura; }
+    if (topI.length) { const a = aninhar(empilhado(topI), 500, yI + 12, 470, "mun", 1.3); s += a.svg; altDir += 14 + 12 + a.altura; }
     // primeiras unidades da fila, no recorte
     const fila = cen.lista.filter((o) => passa(FD.mun, o.u.mn)).slice(0, 7);
     const yf = yC + altDir + 22;
@@ -13138,9 +13173,161 @@ function montarEstudoFrota(raiz, E) {
     return sPoster(sAlturaRod(fim, rod3), s);
   }
 
+  // =====================================================================
+  // Relatório em PDF do estudo. Mesmo padrão dos outros portais (abre uma página
+  // pronta para imprimir ou salvar como PDF, sempre com o dado do momento), mas
+  // com escolha do que entra e dos filtros, e com os critérios explicados antes
+  // dos quadros. Os quadros vão como desenho vetorial, com os números escritos.
+  // =====================================================================
+  const CSS_RELATORIO_ESTUDO = `
+    :root{--surface:#FFFFFF;--paper:#FFFFFF;--paper-line:#D8D6CC;--carvao:#22262E;--tinta:#1F6FB2;--terracota:#C0432F;--mostarda:#C98A12;--oliva:#1E8A52;--dourado:#7C5CBF;--vinho:#7A2E4D}
+    .rel-poster{page-break-before:always;margin:0}
+    .rel-poster svg{width:100%;height:auto;max-height:228mm;display:block}
+    .rel-legenda-quadro{font-size:11px;color:#5B6478;margin:0 0 6px}
+    .rel-criterios{margin:6px 0 0;padding-left:20px}
+    .rel-criterios li{font-size:11.5px;line-height:1.55;margin:5px 0;text-align:left}
+    .rel-criterios b{color:#22262E}
+    .rel-grade{display:grid;grid-template-columns:1fr;gap:12px}
+    .rel-grade .rel-caixa{break-inside:avoid}
+    .rel-grade h3{font-size:12px;margin:0 0 6px;color:#22262E}
+    .rel-tabela-un td, .rel-tabela-un th{font-size:9.5px}
+    .rel-secao-nova{page-break-before:always}`;
+
+  const guardarFiltros = () => ({ dia: Object.fromEntries(Object.entries(FD).map(([k, S]) => [k, [...S]])), inv: Object.fromEntries(Object.entries(FI).map(([k, S]) => [k, [...S]])) });
+  const restaurarFiltros = (g) => {
+    for (const [k, v] of Object.entries(g.dia)) { FD[k].clear(); v.forEach((x) => FD[k].add(x)); }
+    for (const [k, v] of Object.entries(g.inv)) { FI[k].clear(); v.forEach((x) => FI[k].add(x)); }
+  };
+  // roda fn com os filtros da tela ou sem nenhum, e devolve tudo como estava
+  function comFiltros(usar, fn) {
+    const g = guardarFiltros();
+    if (!usar) { Object.values(FD).forEach((S) => S.clear()); Object.values(FI).forEach((S) => S.clear()); }
+    try { return fn(); } finally { restaurarFiltros(g); }
+  }
+
+  // gráficos da seção de investimento, os mesmos da tela
+  function graficosInvestimento() {
+    const dimAgr = EST.agrupar;
+    const rowsAno = calcInv("ano").rows;
+    const totSeg = new Map(); rowsAno.forEach((r) => { const k = DI[dimAgr].val(r); totSeg.set(k, (totSeg.get(k) || 0) + r[9]); });
+    const ordemSeg = [...totSeg.entries()].sort((a, b) => b[1] - a[1]).map(([k]) => k);
+    const corCategoria = ["var(--mostarda)", "var(--tinta)", "var(--oliva)"];
+    const segmentos = ordemSeg.slice(0, 6).map((k, i) => ({ key: k, label: DI[dimAgr].nome(k), cor: dimAgr === "categoria" ? corCategoria[k] : CORES_SEG[i % CORES_SEG.length] })).concat(ordemSeg.length > 6 ? [{ key: null, label: "Outros", cor: "#7E8A8C" }] : []);
+    const anosGrupos = [2023, 2024, 2025, 2026].map((a) => { const valores = {}, quantidades = {}; segmentos.forEach((s) => { valores[s.label] = 0; quantidades[s.label] = 0; }); rowsAno.filter((r) => r[0] === a).forEach((r) => { const k = DI[dimAgr].val(r); const sg = segmentos.find((s) => s.key === k) || segmentos.find((s) => s.key === null); if (sg) { valores[sg.label] += r[9]; quantidades[sg.label] += r[8]; } }); return { label: String(a), valores, quantidades }; });
+    const topoModelos = porDim("modelo").slice(0, 10);
+    const barra = (dim, lista) => (lista.length ? barraHorizontalComEixoSVG(lista, { cor: (c) => (dim === "categoria" ? corCategoria[c.key] : "var(--oliva)"), rotuloExtra: (c) => `(${N(c.n)} ${c.n === 1 ? "viatura" : "viaturas"})`, valoresVisiveis: true }) : "<p>Nada neste recorte.</p>");
+    return [
+      [`Valor investido por ano, por ${DI[dimAgr].rot.toLowerCase()}`, colunasAgrupadasSVG(anosGrupos, segmentos)],
+      ["Por categoria da viatura", barra("categoria", porDim("categoria"))],
+      ["Por fonte do recurso", barra("fonte", porDim("fonte"))],
+      ["Por tipo de veículo", barra("tipo", porDim("tipo"))],
+      ["Por modelo (os dez de maior valor)", barra("modelo", topoModelos)],
+    ];
+  }
+
+  // o que o infográfico recebe (os mesmos cálculos da tela), para o relatório montar igual
+  function entradasInfografico() {
+    const porMun = new Map();
+    for (const o of calcDia("mun").unidades) { const x = porMun.get(o.u.mn) || { t: 0, perde: 0 }; x.t += o.t; x.perde += o.perde; porMun.set(o.u.mn, x); }
+    const depMap = new Map();
+    for (const o of calcDia("dep").unidades) { const x = depMap.get(o.u.d) || { sal: 0, dem: 0 }; if (o.u.mn === "SALVADOR") x.sal += o.perde; else x.dem += o.perde; depMap.set(o.u.d, x); }
+    const depSplit = [...depMap.entries()].filter(([, x]) => x.sal + x.dem > 0).sort((a, b) => b[1].sal + b[1].dem - (a[1].sal + a[1].dem));
+    const semMapa = calcDia("mun").unidades.filter((o) => o.perde > 0 && !munCanon(o.u.m).noMapa).reduce((a, o) => a + o.perde, 0);
+    const safraGrupos = [...calcDia("safra").safras.entries()].sort((a, b) => a[0] - b[0]).map(([a, v]) => ({ label: String(a), valores: { "Ficam": a <= EST.ano ? 0 : v, "A baixar": a <= EST.ano ? v : 0 } }));
+    return { porMun, depSplit, semMapa, safraGrupos };
+  }
+
+  function relatorioEstudoHTML(op) {
+    const data = new Date().toLocaleDateString("pt-BR");
+    const base = E.base || "planilha de frota", dataBase = new Date(E.atualizadoEm || E.geradoEm).toLocaleDateString("pt-BR");
+    const todos = comFiltros(false, () => ({ C: calcDia(null), I: calcInv(null) }));
+    const pctVal = op.pct;
+    const pEnt = (E.totais.semValorFora || { veladas: 0, caracterizadas: 0 });
+    const filtroTxt = op.usarFiltros ? [textoFiltro("dia"), textoFiltro("inv")].filter(Boolean).join(" · ") : "";
+    const guardaPct = EST.pct;
+    EST.pct = pctVal;
+    try {
+      return comFiltros(op.usarFiltros, () => {
+        const C = calcDia(null), I = calcInv(null);
+        const nPerdemTodas = C.unidades.filter((o) => o.situacao === "PERDE TODAS").length;
+        let h = `<h1>Estudo técnico: recomposição da frota de viaturas veladas</h1>
+          <p class="rel-topo">Gerado em ${data}. Base: ${escapeHTML(base)}, gerada em ${dataBase}. ${filtroTxt ? `Filtros aplicados: ${escapeHTML(filtroTxt)}.` : "Sem filtro: frota toda."}</p>
+          <div class="rel-kpis">${relKpiHTML(N(C.total), "Descaracterizadas", "#1F6FB2")}${relKpiHTML(N(C.perde), `A baixar (até ${EST.ano})`, "#C0432F")}${relKpiHTML(N(C.proprias), "Próprias do Estado", "#1E8A52")}${relKpiHTML(N(C.cedidas), "Cedidas", "#C98A12")}${relKpiHTML(N(nPerdemTodas), "Unidades perdem todas", "#C0432F")}</div>
+          <h2>Critérios e como ler este relatório</h2>
+          <ol class="rel-criterios">
+            <li><b>Base de dados.</b> Planilha de frota (${escapeHTML(base)}), com ${N(E.totais.veiculos)} veículos, gerada em ${dataBase}. O relatório usa sempre o dado do momento em que é gerado.</li>
+            <li><b>Viatura velada.</b> É a descaracterizada (coluna PADRONIZADO igual a NÃO): ${N(E.totais.descaracterizados)}, menos ${N(E.totais.motos)} motocicletas e ${N(E.totais.caminhoes)} caminhões, restam ${N(todos.C.total)} (${N(todos.C.porProp[0])} próprias, ${N(todos.C.porProp[1])} cedidas e ${N(todos.C.porProp[2])} locadas).</li>
+            <li><b>Baixa.</b> Entra na baixa a viatura fabricada até ${EST.ano} (8 anos ou mais em ${EST.ano + 8}): ${N(todos.C.perde)} veladas. A base de reposição conta ${EST.cedidas ? "as próprias e as cedidas" : "só as próprias do Estado"}: ${N(todos.C.baseTotal)}. As cedidas voltam ao órgão de origem e as locadas são contrato de locação, por isso não entram na conta do Estado. Elegível à baixa não é baixa feita, e 8 anos de idade não é estado de conservação.</li>
+            <li><b>Inservíveis.</b> A nota técnica informa ${N(EST.inservis)}. A lista de placas ainda não foi entregue, então não dá para dizer quantos estão entre as ${N(todos.C.perde)} a baixar, e os dois números não devem ser somados.</li>
+            <li><b>Investimento.</b> Próprias entregues de 2023 a 2026 com valor informado, incluindo o reboque e o VUC: ${N(todos.I.n)} viaturas e ${moedaExata(todos.I.v)}. A nota técnica traz ${NOTA.viaturas} viaturas e ${moedaExata(NOTA.valor)}: a quantidade ${todos.I.n === NOTA.viaturas ? "bate" : "difere"} e o valor difere em ${moedaExata(Math.abs(NOTA.valor - todos.I.v))}, diferença que não foi reproduzida com a planilha de hoje. Ficam fora ${N(pEnt.veladas + pEnt.caracterizadas)} doações que vieram sem valor, porque não são dinheiro do Estado.</li>
+            <li><b>Ritmo e reposição por município.</b> Comparam as veladas entregues (sem motos e caminhões, como a baixa) com as veladas a baixar, e as entregas passam pelos mesmos filtros da baixa. A coluna de quem completa 8 anos mostra elegibilidade. O ano de 2026 está incompleto, porque a base é de ${dataBase}.</li>
+            <li><b>Cenários.</b> A hipótese A repõe cada viatura por um modelo equivalente (compactos pelo Cronos a ${moeda(EST.precoA.c)}, pick-ups pela Ranger a ${moeda(EST.precoA.p)} e SUV pelo Duster a ${moeda(EST.precoA.s)}). A hipótese B usa um preço único de ${moeda(EST.precoB)}. São os preços pagos em 2025 e 2026, a confirmar com o valor vigente da DILOG. A fila começa pelas unidades que perderiam todas as veladas, das menores para as maiores.</li>
+            <li><b>Filtros.</b> ${filtroTxt ? `Este relatório foi gerado com: ${escapeHTML(filtroTxt)}. Entregas, baixa das veladas e baixa das caracterizadas passam pelos mesmos filtros, para as razões sempre compararem o mesmo recorte. Os inservíveis são o total informado e não mudam com os filtros.` : "Nenhum filtro aplicado: os números são da frota toda."}</li>
+          </ol>`;
+        if (op.secoes.has("info")) h += `<div class="rel-poster">${relLeituraHTML("Mostra o tamanho do problema e onde ele está. As três barras comparam o total de descaracterizadas, as que passam de 8 anos e os inservíveis informados. O mapa pinta cada município pela quantidade de viaturas a baixar, com Salvador em destaque, e os departamentos aparecem separados entre Salvador e os demais municípios.")}${infograficoSVG({ C, ...entradasInfografico() })}</div>`;
+        if (op.secoes.has("ritmo")) h += `<div class="rel-poster">${relLeituraHTML("Responde se o ritmo de entrega cobre o que passa dos 8 anos. À esquerda, o que foi entregue em cada ano contra as safras que completam 8 anos, com o acumulado já elegível embaixo de cada ano. À direita, quanto do estoque ainda precisaria ser reposto se o ritmo se mantiver. Embaixo, veladas e caracterizadas lado a lado, para mostrar se a renovação foi para o mesmo tipo de viatura que sai.")}${ritmoSVG()}</div>`;
+        if (op.secoes.has("sai")) h += `<div class="rel-poster">${relLeituraHTML("Mostra onde a reposição recente chegou e onde ainda falta, comparando entregues e a baixar. Salvador aparece por departamento, porque concentra boa parte da frota, e o interior aparece por município.")}${entrouSaiSVG()}</div>`;
+        if (op.secoes.has("cen")) h += `<div class="rel-poster">${relLeituraHTML("Mostra o que acontece se for reposto o percentual escolhido da base: quantas viaturas, quanto custa nas duas hipóteses e quais unidades deixam de ficar sem nenhuma velada.")}${quadroCenarioSVG()}</div>`;
+        if (op.secoes.has("inv")) {
+          h += `<div class="rel-secao-nova"><h2>Investimento realizado, 2023 a 2026</h2>
+            <div class="rel-kpis">${relKpiHTML(N(I.n), "Viaturas incorporadas", "#1F6FB2")}${relKpiHTML(moeda(I.v), "Investido", "#1E8A52")}${relKpiHTML(N(I.nVel), "Veladas no recorte", "#C98A12")}${relKpiHTML(I.n - I.sv > 0 ? moeda(I.v / (I.n - I.sv)) : "R$ 0", "Valor médio por viatura", "#7C5CBF")}</div>
+            ${relLeituraHTML(`Mostra quanto o Estado pôs em viaturas e em quê. ${N(I.n)} viaturas somam ${moedaExata(I.v)}. Os gráficos dividem esse valor por ano, categoria, fonte do recurso, tipo e modelo, com o valor e a quantidade escritos em cada barra.`)}
+            <div class="rel-grade">${graficosInvestimento().map(([t, svg]) => `<div class="rel-caixa"><h3>${escapeHTML(t)}</h3>${svg}</div>`).join("")}</div></div>`;
+        }
+        if (op.secoes.has("uni")) {
+          const linhas = C.unidades.filter((o) => o.perde > 0).sort((a, b) => b.perde - a.perde || b.t - a.t);
+          h += `<div class="rel-secao-nova"><h2>Unidades afetadas</h2>${relLeituraHTML(`Lista as ${N(linhas.length)} unidades com viaturas a baixar, da que mais perde para a que menos perde. Perde todas indica unidade que ficaria sem nenhuma velada.`)}
+            <table class="rel-tabela-un"><thead><tr><th>UNIDADE</th><th>DPTO</th><th>MUNICÍPIO</th><th>DESCARAC.</th><th>A BAIXAR</th><th>PRÓPRIAS</th><th>CEDIDAS</th><th>SITUAÇÃO</th></tr></thead><tbody>${linhas.map((o) => `<tr><td>${h_(o.u.n)}</td><td>${h_(o.u.d)}</td><td>${h_(o.u.m)}</td><td>${N(o.t)}</td><td><b>${N(o.perde)}</b></td><td>${N(o.perdeProp)}</td><td>${N(o.perdeCed)}</td><td>${o.situacao}</td></tr>`).join("") || "<tr><td colspan='8'>Nenhuma unidade nesse recorte.</td></tr>"}</tbody></table></div>`;
+        }
+        return h;
+      });
+    } finally { EST.pct = guardaPct; }
+  }
+  const h_ = (t) => escapeHTML(String(t ?? ""));
+
+  function abrirDialogoRelatorioEstudo() {
+    const filtroTela = [textoFiltro("dia"), textoFiltro("inv")].filter(Boolean).join(" · ");
+    const fundo = document.createElement("div");
+    fundo.className = "modal-fundo";
+    const opcao = (id, rot, desc, marcado = true, desligado = false) => `<label class="es-rel-opcao"><input type="checkbox" id="${id}"${marcado ? " checked" : ""}${desligado ? " disabled" : ""}><span><b>${rot}</b><br>${desc}</span></label>`;
+    fundo.innerHTML = `<div class="modal-caixa imp-caixa" role="dialog" aria-modal="true" aria-label="Relatório do estudo em PDF">
+      <h3>Baixar relatório do estudo (PDF)</h3>
+      <p>O relatório abre numa página pronta para imprimir ou salvar como PDF. Vai com os critérios explicados, o que cada quadro mostra e os números escritos nos gráficos, então não depende de passar o mouse.</p>
+      <h4 class="es-subtitulo">Filtros</h4>
+      <label class="es-rel-opcao"><input type="radio" name="es-rel-filtro" value="tela"${filtroTela ? " checked" : ""}><span><b>Usar os filtros que estão na tela</b><br>${filtroTela ? h_(filtroTela) : "Nenhum filtro ativo agora, então sai a frota toda."}</span></label>
+      <label class="es-rel-opcao"><input type="radio" name="es-rel-filtro" value="todos"${filtroTela ? "" : " checked"}><span><b>Frota toda, sem filtro</b><br>Ignora os filtros da tela e usa todos os dados.</span></label>
+      <h4 class="es-subtitulo">O que incluir</h4>
+      ${opcao("es-rel-crit", "Critérios e como ler", "Sempre incluído: base, regras de velada, baixa, investimento e cenários.", true, true)}
+      ${opcao("es-rel-info", "Infográfico: inservíveis, 8 anos ou mais e unidades afetadas", "O tamanho do problema, o mapa por município e os departamentos.")}
+      ${opcao("es-rel-ritmo", "O ritmo de reposição cobre a baixa?", "Entregas contra safras que completam 8 anos, veladas e caracterizadas lado a lado.")}
+      ${opcao("es-rel-sai", "Entrou × vai sair, por município", "Onde a reposição chegou e onde falta, com Salvador por departamento.")}
+      ${opcao("es-rel-cen", "Quadro de cenários", `Reposição de <input type="number" id="es-rel-pct" min="5" max="100" step="5" value="${EST.pct}" style="width:64px"> % da base: custo e unidades que saem do zero.`)}
+      ${opcao("es-rel-inv", "Investimento realizado, 2023 a 2026", "Indicadores e gráficos por ano, categoria, fonte, tipo e modelo.")}
+      ${opcao("es-rel-uni", "Lista de unidades afetadas", "Tabela com todas as unidades que têm viaturas a baixar.", false)}
+      <div class="es-rel-botoes"><button type="button" class="dash-toggle-btn" id="es-rel-cancelar">CANCELAR</button><button type="button" class="dash-toggle-btn" id="es-rel-gerar">${iconeInline("download", 12, -2)} GERAR RELATÓRIO</button></div>
+    </div>`;
+    const fechar = () => { document.removeEventListener("keydown", aoTeclar); fundo.remove(); };
+    const aoTeclar = (ev) => { if (ev.key === "Escape") fechar(); };
+    document.addEventListener("keydown", aoTeclar);
+    fundo.addEventListener("click", (ev) => { if (ev.target === fundo) fechar(); });
+    document.body.appendChild(fundo);
+    fundo.querySelector("#es-rel-cancelar").addEventListener("click", fechar);
+    fundo.querySelector("#es-rel-gerar").addEventListener("click", () => {
+      const marcado = (id) => fundo.querySelector(id).checked;
+      const secoes = new Set([["#es-rel-info", "info"], ["#es-rel-ritmo", "ritmo"], ["#es-rel-sai", "sai"], ["#es-rel-cen", "cen"], ["#es-rel-inv", "inv"], ["#es-rel-uni", "uni"]].filter(([id]) => marcado(id)).map(([, k]) => k));
+      const usarFiltros = fundo.querySelector('input[name="es-rel-filtro"]:checked').value === "tela";
+      const pct = Math.min(100, Math.max(5, Math.round(+fundo.querySelector("#es-rel-pct").value / 5) * 5 || EST.pct));
+      let corpo;
+      try { corpo = relatorioEstudoHTML({ secoes, usarFiltros, pct }); } catch (erro) { toastErro("Não consegui montar o relatório: " + erro.message); return; }
+      fechar();
+      abrirRelatorioImprimivel("Estudo técnico de frota", corpo, { css: CSS_RELATORIO_ESTUDO });
+    });
+  }
+
   raiz.innerHTML = `
     <header class="cab-v2"><div class="rot-v2">Frota · Estudo técnico</div><h1 class="tit-v2">Recomposição da frota de viaturas veladas</h1></header>
     <p class="dash-chart-hint">Base: ${h(E.base || "planilha de frota")}, gerada em ${new Date(E.atualizadoEm || E.geradoEm).toLocaleDateString("pt-BR")}. Velada é a viatura descaracterizada, sem motos e caminhões. Clique numa barra, coluna ou ponto do mapa para isolar uma categoria, e Ctrl, Shift ou Cmd mais clique para somar outras. Os seletores fazem o mesmo, com várias opções marcadas. A imagem baixada leva escrito o filtro ativo.</p>
+    <div style="display:flex;justify-content:flex-end;margin:0 0 10px"><button type="button" class="dash-toggle-btn" id="es-relatorio">${iconeInline("download", 12, -2)} BAIXAR RELATÓRIO (PDF)</button></div>
     <div class="dash-filtros" style="margin-bottom:18px">
       <div class="dash-filtro" style="flex:1;min-width:230px"><label for="es-ano">BAIXA PARA ANO DE FABRICAÇÃO ATÉ</label>
         <select id="es-ano"><option value="2018">2018 (8 anos em 2026)</option><option value="2019">2019 (projeção 2027)</option><option value="2020">2020 (projeção 2028)</option><option value="2021">2021 (projeção 2029)</option></select></div>
@@ -13149,6 +13336,7 @@ function montarEstudoFrota(raiz, E) {
     </div>
     <div id="es-corpo"></div>`;
   const q = (s) => raiz.querySelector(s);
+  q("#es-relatorio").addEventListener("click", abrirDialogoRelatorioEstudo);
 
   function desenhar() {
     const C = calcDia(null);
@@ -13159,7 +13347,7 @@ function montarEstudoFrota(raiz, E) {
 
     // --- investimento: cada gráfico ignora o próprio filtro, KPIs usam todos
     const I = calcInv(null);
-    const opInv = (dim) => { const m = new Map(); E.entregas.filter((r) => r[4] !== 1).forEach((r) => m.set(DI[dim].val(r), DI[dim].nome(DI[dim].val(r)))); return [...m.entries()].sort((a, b) => (typeof a[0] === "number" ? a[0] - b[0] : String(a[1]).localeCompare(String(b[1]), "pt-BR"))); };
+    const opInv = (dim) => { const m = new Map(); E.entregas.forEach((r) => m.set(DI[dim].val(r), DI[dim].nome(DI[dim].val(r)))); return [...m.entries()].sort((a, b) => (typeof a[0] === "number" ? a[0] - b[0] : String(a[1]).localeCompare(String(b[1]), "pt-BR"))); };
     const props = opInv("prop");
     // gráfico principal: por ano, agrupado pela dimensão escolhida
     const dimAgr = EST.agrupar;
@@ -13171,8 +13359,8 @@ function montarEstudoFrota(raiz, E) {
     const segmentos = topoSeg.map((k, i) => ({ key: k, label: DI[dimAgr].nome(k), cor: dimAgr === "categoria" ? corCategoria[k] : CORES_SEG[i % CORES_SEG.length] })).concat(temOutros ? [{ key: null, label: "Outros", cor: "#7E8A8C" }] : []);
     const anosGrupos = [2023, 2024, 2025, 2026].map((a) => { const valores = {}, quantidades = {}; segmentos.forEach((s) => { valores[s.label] = 0; quantidades[s.label] = 0; }); rowsAno.filter((r) => r[0] === a).forEach((r) => { const k = DI[dimAgr].val(r); const sg = segmentos.find((s) => s.key === k) || segmentos.find((s) => s.key === null); if (sg) { valores[sg.label] += r[9]; quantidades[sg.label] += r[8]; } }); return { label: String(a), valores, quantidades }; });
     const topoModelos = porDim("modelo").slice(0, 10); FI.modelo.forEach((m) => { if (!topoModelos.some((x) => x.key === m)) { const s = porDim("modelo").find((x) => x.key === m); if (s) topoModelos.push(s); } });
-    const velAnoFixo = (a) => E.entregas.filter((r) => r[4] !== 1 && (EST.combate || r[4] !== 2) && r[0] === a && r[1] === 0).reduce((s, r) => s + r[8], 0);
-    const barraDim = (dim, lista) => (lista.length ? barraHorizontalComEixoSVG(lista, { cor: (c) => (dim === "categoria" ? corCategoria[c.key] : dim === "doacao" ? (c.key ? "var(--dourado)" : "var(--tinta)") : "var(--oliva)"), rotuloExtra: (c) => `(${N(c.n)} viaturas)` }) : `<p class="dash-chart-hint">Nada neste recorte.</p>`);
+    const velAnoFixo = (a) => E.entregas.filter((r) => (EST.combate || r[4] !== 2) && r[0] === a && r[1] === 0).reduce((s, r) => s + r[8], 0);
+    const barraDim = (dim, lista) => (lista.length ? barraHorizontalComEixoSVG(lista, { cor: (c) => (dim === "categoria" ? corCategoria[c.key] : "var(--oliva)"), rotuloExtra: (c) => `(${N(c.n)} ${c.n === 1 ? "viatura" : "viaturas"})`, valoresVisiveis: true }) : `<p class="dash-chart-hint">Nada neste recorte.</p>`);
 
     // --- diagnóstico
     const cDep = calcDia("dep"), cSafra = calcDia("safra"), cMapa = calcDia("mun"), cGrupo = calcDia("grupo");
@@ -13219,15 +13407,15 @@ function montarEstudoFrota(raiz, E) {
     <div class="dash-chart-box es-caixa es-info" data-nome="infografico-inserviveis-8-anos-unidades" data-escopo="dia" data-dim=""><div class="es-grafico">${infograficoSVG({ C, porMun, depSplit, semMapa, safraGrupos })}</div></div>
     <h4 class="es-subtitulo">Detalhamento</h4>
     <div class="dash-charts" style="grid-template-columns:1fr 1fr">
-      ${caixa("funil-viaturas", "Do total da frota até a base do Estado", barraHorizontalComEixoSVG(funil, { cor: corFunil, formatarValor: N, formatarEixoTick: (v) => N(v) }), "Cada etapa mostra o que sobra depois de aplicar a regra seguinte." + dicaFiltro("dia"), "dia", "")}
+      ${caixa("funil-viaturas", "Do total da frota até a base do Estado", barraHorizontalComEixoSVG(funil, { cor: corFunil, formatarValor: N, formatarEixoTick: (v) => N(v), valoresVisiveis: true }), "Cada etapa mostra o que sobra depois de aplicar a regra seguinte." + dicaFiltro("dia"), "dia", "")}
       <div class="dash-chart-box"><h4>Quando cada safra chega aos 8 anos</h4><table class="dash-tabela"><thead><tr><th>FABRICAÇÃO ATÉ</th><th>ENTRA NA BAIXA EM</th><th>ACUMULADO A BAIXAR</th></tr></thead><tbody>${projecao.map((p) => `<tr${p.lim === EST.ano ? ' style="background:color-mix(in srgb, var(--tinta) 14%, var(--surface))"' : ""}><td>${p.lim}</td><td>${p.ano}</td><td>${N(p.s)}</td></tr>`).join("")}</tbody></table></div>
     </div>
     <div class="dash-charts" style="grid-template-columns:1fr 1fr">
-      ${caixa("safras-fabricacao", "Descaracterizadas por ano de fabricação", safraGrupos.length ? colunaEmpilhadaSVG(safraGrupos, [{ label: "A baixar", cor: "var(--terracota)" }, { label: "Ficam", cor: "var(--tinta)" }], { formatarValor: N, formatarEixoTick: (v) => N(v), substantivoQtd: "veículo" }) : vazio, `Em vermelho, as safras que entram na baixa com a regra de fabricação até ${EST.ano}. Clique numa coluna para filtrar.`, "dia", "safra")}
-      ${caixa("baixas-por-tipo-de-veiculo", "Viaturas a baixar por tipo de veículo", grupoGrupos.length ? barraHorizontalEmpilhadaSVG(grupoGrupos, [{ label: "Próprias", cor: "var(--terracota)" }, { label: "Cedidas", cor: "var(--mostarda)" }], { formatarValor: N }) : vazio, "Compactos são hatch, sedan e monovolume. Clique numa barra para filtrar.", "dia", "grupo")}
+      ${caixa("safras-fabricacao", "Descaracterizadas por ano de fabricação", safraGrupos.length ? colunaEmpilhadaSVG(safraGrupos, [{ label: "A baixar", cor: "var(--terracota)" }, { label: "Ficam", cor: "var(--tinta)" }], { formatarValor: N, formatarEixoTick: (v) => N(v), substantivoQtd: "veículo", valoresVisiveis: true }) : vazio, `Em vermelho, as safras que entram na baixa com a regra de fabricação até ${EST.ano}. Clique numa coluna para filtrar.`, "dia", "safra")}
+      ${caixa("baixas-por-tipo-de-veiculo", "Viaturas a baixar por tipo de veículo", grupoGrupos.length ? barraHorizontalEmpilhadaSVG(grupoGrupos, [{ label: "Próprias", cor: "var(--terracota)" }, { label: "Cedidas", cor: "var(--mostarda)" }], { formatarValor: N, valoresVisiveis: true }) : vazio, "Compactos são hatch, sedan e monovolume. Clique numa barra para filtrar.", "dia", "grupo")}
     </div>
     <div class="dash-charts" style="grid-template-columns:1fr">
-      ${caixa("baixas-por-departamento", "Viaturas a baixar por departamento (lista completa)", depLista.length ? barraHorizontalEmpilhadaSVG(depLista.map(([d, x]) => ({ label: d, valores: { "Próprias": x.p, "Cedidas": x.c } })), [{ label: "Próprias", cor: "var(--terracota)" }, { label: "Cedidas", cor: "var(--mostarda)" }], { formatarValor: N }) : vazio, "Próprias entram na conta do Estado. Cedidas voltam ao órgão de origem. Clique numa barra para filtrar.", "dia", "dep")}
+      ${caixa("baixas-por-departamento", "Viaturas a baixar por departamento (lista completa)", depLista.length ? barraHorizontalEmpilhadaSVG(depLista.map(([d, x]) => ({ label: d, valores: { "Próprias": x.p, "Cedidas": x.c } })), [{ label: "Próprias", cor: "var(--terracota)" }, { label: "Cedidas", cor: "var(--mostarda)" }], { formatarValor: N, valoresVisiveis: true }) : vazio, "Próprias entram na conta do Estado. Cedidas voltam ao órgão de origem. Clique numa barra para filtrar.", "dia", "dep")}
     </div>
     <div class="dash-chart-box" style="margin-bottom:14px"><h4>Unidades, da que mais perde para a que menos perde</h4>
       <div class="dash-filtros" style="margin-bottom:12px"><div class="dash-filtro"><label for="es-f-sit">SITUAÇÃO</label><select id="es-f-sit"><option value="">Só as que perdem</option><option value="PERDE TODAS">Perdem todas</option><option value="PERDE PARTE">Perdem parte</option><option value="NÃO PERDE">Não perdem</option></select></div></div>
@@ -13238,17 +13426,17 @@ function montarEstudoFrota(raiz, E) {
     <h3 class="es-titulo">Investimento realizado, 2023 a 2026</h3>
     <div class="dash-filtros" style="margin-bottom:10px">
       ${multi("inv", "ano", [2023, 2024, 2025, 2026].map((a) => [a, String(a)]))}${multi("inv", "categoria", CAT.map((n, i) => [i, n]))}${multi("inv", "tipo", opInv("tipo"))}
-      ${props.length > 1 ? multi("inv", "prop", props) : ""}${multi("inv", "doacao", [[0, "Não"], [1, "Sim"]])}${multi("inv", "fonte", opInv("fonte"))}${multi("inv", "modelo", opInv("modelo"))}
+      ${props.length > 1 ? multi("inv", "prop", props) : ""}${multi("inv", "fonte", opInv("fonte"))}${multi("inv", "modelo", opInv("modelo"))}
     </div>
     ${chips("inv")}
     <div class="kpi-row">
-      ${cartao("viatura", "Viaturas incorporadas", N(I.n), "var(--tinta)", "próprias, sem motos e caminhões e sem doações")}
+      ${cartao("viatura", "Viaturas incorporadas", N(I.n), "var(--tinta)", "próprias com valor, com reboque e VUC")}
       ${cartao("moeda", "Investido", moeda(I.v), "var(--oliva)", moedaExata(I.v))}
       ${cartao("mira", "Veladas no recorte", N(I.nVel), "var(--mostarda)", `${pct(I.nVel, I.n)} das viaturas, ${moeda(I.vVel)}`)}
       ${cartao("informacao", "Valor médio por viatura", I.n - I.sv > 0 ? moeda(I.v / (I.n - I.sv)) : "R$ 0", "var(--dourado)", filtrosAtivos("inv").length ? "do recorte filtrado, entre as com valor" : "entre as que têm valor")}
     </div>
-    ${filtrosAtivos("inv").length || !EST.combate ? "" : `<p class="dash-chart-hint" style="max-width:100ch">Conferência com a nota técnica: ${N(I.n)} viaturas aqui contra ${NOTA.viaturas} na nota. ${(() => { const f = E.totais.semValorFora || { veladas: 0, caracterizadas: 0 }, t = f.veladas + f.caracterizadas; return I.n + t === NOTA.viaturas ? `A diferença são ${N(t)} doações que vieram sem valor (R$ 0), que a nota conta e o estudo exclui por não serem dinheiro do Estado.` : ""; })()} Valor: ${moedaExata(I.v)} aqui contra ${moedaExata(NOTA.valor)} na nota, uma diferença de ${moedaExata(Math.abs(NOTA.valor - I.v))} que não consigo reproduzir só com os dados da planilha de hoje. A regra é a da nota: próprias entregues de 2023 a 2026, sem motos e caminhões (reboque e VUC são caminhões na planilha).</p>`}
-    <div class="dash-filtros" style="margin-bottom:10px"><div class="dash-filtro"><label for="es-agrupar">AGRUPAR O GRÁFICO POR ANO PELA</label><select id="es-agrupar">${[["categoria", "Categoria (velada, padrão, ADM)"], ["tipo", "Tipo de veículo"], ["fonte", "Fonte do recurso"], ["doacao", "Doação sem permuta"], ["modelo", "Modelo"]].map(([v, l]) => `<option value="${v}"${EST.agrupar === v ? " selected" : ""}>${l}</option>`).join("")}</select></div></div>
+    ${filtrosAtivos("inv").length || !EST.combate ? "" : `<p class="dash-chart-hint" style="max-width:100ch">Conferência com a nota técnica: ${N(I.n)} viaturas${I.n === NOTA.viaturas ? ", a mesma quantidade da nota" : `, contra ${NOTA.viaturas} na nota`}. Valor: ${moedaExata(I.v)} aqui contra ${moedaExata(NOTA.valor)} na nota, uma diferença de ${moedaExata(Math.abs(NOTA.valor - I.v))} (${I.v > NOTA.valor ? "a planilha de hoje é maior" : "a nota é maior"}) que não consigo reproduzir só com os dados da planilha de hoje. A regra: próprias entregues de 2023 a 2026 com valor informado, incluindo o reboque e o VUC. Ficam fora ${N(((E.totais.semValorFora || {}).veladas || 0) + ((E.totais.semValorFora || {}).caracterizadas || 0))} doações que vieram sem valor, que não são dinheiro do Estado. A reposição, ao contrário, não conta caminhões, porque a baixa também não conta.</p>`}
+    <div class="dash-filtros" style="margin-bottom:10px"><div class="dash-filtro"><label for="es-agrupar">AGRUPAR O GRÁFICO POR ANO PELA</label><select id="es-agrupar">${[["categoria", "Categoria (velada, padrão, ADM)"], ["tipo", "Tipo de veículo"], ["fonte", "Fonte do recurso"], ["modelo", "Modelo"]].map(([v, l]) => `<option value="${v}"${EST.agrupar === v ? " selected" : ""}>${l}</option>`).join("")}</select></div></div>
     <div class="dash-charts" style="grid-template-columns:1fr 1fr">
       ${caixa("investimento-por-ano", `Valor investido por ano, por ${DI[dimAgr].rot.toLowerCase()}`, colunasAgrupadasSVG(anosGrupos, segmentos), `Veladas entregues sem filtro: 2023 ${velAnoFixo(2023)}, 2025 ${velAnoFixo(2025)}, 2026 ${velAnoFixo(2026)} (a nota técnica traz 87 em 2025, o número das fabricadas em 2025). Clique numa coluna para isolar o ano, ou num trecho colorido para isolar a categoria.`, "inv", "ano")}
       ${caixa("investimento-por-categoria", "Por categoria da viatura", barraDim("categoria", porDim("categoria")), "Velada é a descaracterizada. Caracterizada padrão e ADM são as demais. Ctrl, Shift ou Cmd mais clique soma categorias.", "inv", "categoria")}
@@ -13257,9 +13445,8 @@ function montarEstudoFrota(raiz, E) {
       ${caixa("investimento-por-fonte", "Por fonte do recurso", barraDim("fonte", porDim("fonte")), "Clique numa barra para ver quais viaturas vieram dessa fonte.", "inv", "fonte")}
       ${caixa("investimento-por-tipo", "Por tipo de veículo", barraDim("tipo", porDim("tipo")), "Tipos vêm da coluna Tipo de veículo da planilha.", "inv", "tipo")}
     </div>
-    <div class="dash-charts" style="grid-template-columns:1fr 1fr">
+    <div class="dash-charts" style="grid-template-columns:1fr">
       ${caixa("investimento-por-modelo", "Por modelo", barraDim("modelo", topoModelos), "Os dez modelos de maior valor no recorte.", "inv", "modelo")}
-      ${caixa("investimento-por-doacao", "Doação sem permuta", barraDim("doacao", porDim("doacao")), "Marca os veículos que aparecem na aba Doação sem permuta da planilha de frota.", "inv", "doacao")}
     </div>
 
     <h3 class="es-titulo">Reposição: o ritmo cobre a baixa, e onde ela chega?</h3>
@@ -13285,7 +13472,7 @@ function montarEstudoFrota(raiz, E) {
     <div class="dash-chart-box es-caixa es-info" data-nome="quadro-de-cenarios" data-escopo="dia" data-dim=""><div class="es-grafico">${quadroCenarioSVG()}</div></div>
     <div class="dash-charts" style="grid-template-columns:1fr 1fr">
       <div class="dash-chart-box"><h4>Cenários por percentual da reposição</h4>${botaoTabela("es-tab-cenarios", "estudo-frota-cenarios.png")}<div id="es-tab-cenarios"><table class="dash-tabela"><thead><tr><th>CENÁRIO</th><th>VIATURAS</th><th>HIPÓTESE A</th><th>HIPÓTESE B</th><th>UNIDADES SEM ZERO VELADA</th></tr></thead><tbody>${C.cenarios.map((c) => `<tr><td><b>${Math.round(c.p * 100)}%</b></td><td>${N(c.n)}</td><td>${moeda(c.a)}</td><td>${moeda(c.b)}</td><td>${c.cobertas} de ${C.perdemTodas.length}</td></tr>`).join("")}</tbody></table></div><p class="dash-chart-hint" style="margin-top:10px">A ordem de reposição começa pelas unidades que perderiam todas as veladas, das menores para as maiores. Repor uma viatura para cada uma das ${C.perdemTodas.length} unidades nessa situação (${C.perdemTodas.length} viaturas, de ${moeda(C.perdemTodas.length * EST.precoA.c)} a ${moeda(C.perdemTodas.length * EST.precoB)}) tira todas do zero.</p></div>
-      ${caixa("cenarios-de-investimento", "Custo de cada cenário", C.baseTotal ? barraHorizontalComEixoSVG(cenCats, { cor: (c) => cenarioCores[c.k], rotuloExtra: (c) => `(${N(c.n)} viaturas)` }) : vazio, "Azul é a hipótese A, roxo é a hipótese B." + dicaFiltro("dia"), "dia", "")}
+      ${caixa("cenarios-de-investimento", "Custo de cada cenário", C.baseTotal ? barraHorizontalComEixoSVG(cenCats, { cor: (c) => cenarioCores[c.k], rotuloExtra: (c) => `(${N(c.n)} ${c.n === 1 ? "viatura" : "viaturas"})`, valoresVisiveis: true }) : vazio, "Azul é a hipótese A, roxo é a hipótese B." + dicaFiltro("dia"), "dia", "")}
     </div>
 
     <h3 class="es-titulo">Impactos e priorização, com as respostas das unidades</h3>
@@ -14886,7 +15073,7 @@ function montarPainelEntenderGeografiaContratos(listaCompleta) {
 // do momento (nunca precisa eu regenerar nada manualmente). `corpoHTML` é
 // quem monta o conteúdo — este helper só cuida da casca (estilo de
 // impressão, botão de imprimir, abrir a aba).
-function abrirRelatorioImprimivel(titulo, corpoHTML) {
+function abrirRelatorioImprimivel(titulo, corpoHTML, opcoes = {}) {
   const win = window.open("", "_blank");
   if (!win) {
     toastErro("O navegador bloqueou a nova aba — permita pop-ups pra este site e tente de novo.");
@@ -14895,7 +15082,7 @@ function abrirRelatorioImprimivel(titulo, corpoHTML) {
   const html = `<!DOCTYPE html>
 <html lang="pt-BR"><head><meta charset="UTF-8"><title>${escapeHTML(titulo)}</title>
 <style>
-  @page { size: A4; margin: 16mm 14mm; }
+  @page { size: ${opcoes.paisagem ? "A4 landscape" : "A4"}; margin: 12mm 12mm; }
   /* donutCfcrSVG/vennTresConjuntosSVG (reaproveitados aqui) usam
      var(--carvao)/var(--paper) direto no fill do SVG — sem essas variáveis
      definidas aqui, o texto das fatias fica preto sem contraste ou some. */
@@ -14953,6 +15140,7 @@ function abrirRelatorioImprimivel(titulo, corpoHTML) {
   .rel-leitura p { margin: 0; }
   .no-print { }
   @media print { .no-print { display: none; } }
+  ${opcoes.css || ""}
 </style></head>
 <body>
   <button class="no-print" onclick="window.print()" style="margin-bottom:18px;padding:9px 18px;font-size:13px;background:#22262E;color:#fff;border:none;border-radius:6px;cursor:pointer">Imprimir / Salvar como PDF</button>
