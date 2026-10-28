@@ -5901,7 +5901,7 @@ function formaAba(tab, tam = 12) {
 // cursor converte as formas que cobre e a legenda, que também é botão, isola
 // um estado (sem mouse, funciona igual).
 // itens: [{k, rot, n (real), qtd (formas), cor, estado, attrs}]
-function mosaicoGeo({ itens, tipo = "losango", cols = 17, cel = 26, peso = 1, unidade = "itens", selecionado = null, aria = "", soLegenda = false }) {
+function mosaicoGeo({ itens, tipo = "losango", cols = 17, cel = 26, peso = 1, unidade = "itens", selecionado = null, aria = "", soLegenda = true }) {
   const lista = [];
   itens.forEach((it) => { for (let i = 0; i < it.qtd; i++) lista.push(it); });
   const linhas = Math.max(1, Math.ceil(lista.length / cols));
@@ -9316,7 +9316,7 @@ function renderSituacaoContratos(lista, resumo) {
   ].filter((x) => x.n > 0);
   alvo.innerHTML = `<section class="nota-v2"><div class="k">Situação</div><div class="v"><h3>Situação dos ${resumo.qtdContratos.toLocaleString("pt-BR")} contratos</h3>${mosaicoGeo({
     itens: segs.map((x) => ({ k: x.k, rot: x.l, n: x.n, qtd: x.n, cor: { NaoVencidoVigente: "#A9B6B8", "A Vencer": "var(--mostarda)", Vencido: "var(--terracota)", AContratar: "#8E9B9D" }[x.k], estado: { NaoVencidoVigente: "cheio", "A Vencer": "anel", Vencido: "riscado", AContratar: "vazio" }[x.k], attrs: ` data-v2-acao="situacao-contratos" data-k="${escapeAttr(x.k)}"` })),
-    tipo: "losango", cols: 17, cel: 26, unidade: "contratos", soLegenda: true, aria: `Mosaico de ${resumo.qtdContratos} losangos, um por contrato, agrupados por situação`
+    tipo: "losango", cols: 17, cel: 26, unidade: "contratos", aria: `Mosaico de ${resumo.qtdContratos} losangos, um por contrato, agrupados por situação`
   })}</div></section>`;
 }
 document.addEventListener("click", (e) => {
