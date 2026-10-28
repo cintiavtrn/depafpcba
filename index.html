@@ -12586,7 +12586,7 @@ async function carregarFrotaEstudoPortal(portalSlug) {
     painel.innerHTML = `<p class="tela-intro">Não consegui carregar o estudo: ${escapeHTML(erro.message)}</p>`;
     return;
   }
-  if (E.vazio || E.versao !== 7) {
+  if (E.vazio || E.versao !== 8) {
     painel.innerHTML = `<p class="tela-intro">O estudo precisa de dados novos. Na aba PAINEL DE FROTA, clique em ATUALIZAR PLANILHA e envie a planilha de frota (aba Frota). Os números do estudo são gerados a partir dela.</p>`;
     return;
   }
@@ -12879,15 +12879,10 @@ function montarEstudoFrota(raiz, E) {
       && (ig.includes("regiao") || passa(FD.regiao, E.regioes[r[6]])) && (ig.includes("safra") || passa(FD.safra, r[3]))).reduce((a, r) => a + r[4], 0);
   }
   // nota do rodapé: só o que de fato diferencia os dois lados, nunca uma explicação de filtro que já vale igual
-  // fontes das entregas sem valor: se todas são doação, o R$ 0 é correto e não falta dado
-  const fontesSemValor = (rows) => [...new Set(rows.filter((r) => r[15] > 0).map((r) => E.fontes[r[2]]))];
-  const rotuloSemValor = (rows) => { const f = fontesSemValor(rows); return f.length && f.every((x) => /^DOA/i.test(x)) ? "doação" : "sem valor informado"; };
+  // doações que vieram sem valor ficam fora das entregas: o estudo mede só o dinheiro do Estado
   const notaEntregas = (ignoraSafra = false) => {
-    const ig = ignoraSafra ? ["safra"] : [];
-    const sv = (cats) => entregues(cats, ig).reduce((a, r) => a + r[15], 0);
-    const sVel = sv([0]), sCar = sv([1, 2]), tipoSv = rotuloSemValor(entregues([0, 1, 2], ig));
-    const fora = [sVel ? `${N(sVel)} velada(s)` : "", sCar ? `${N(sCar)} caracterizada(s)` : ""].filter(Boolean).join(" e ");
-    const partes = fora ? [`Entregas sem valor entram na contagem e somam R$ 0 (${tipoSv}): ${fora}.`] : [];
+    const sv = E.totais.semValorFora || { veladas: 0, caracterizadas: 0 }, total = sv.veladas + sv.caracterizadas;
+    const partes = total ? [`Ficam fora das entregas ${N(total)} doação(ões) sem valor, que não são investimento do Estado.`] : [];
     if (ignoraSafra && FD.safra.size) partes.push("O filtro de fabricação não vale neste quadro, que já separa por safra.");
     return partes.join(" ");
   };
@@ -13247,12 +13242,12 @@ function montarEstudoFrota(raiz, E) {
     </div>
     ${chips("inv")}
     <div class="kpi-row">
-      ${cartao("viatura", "Viaturas incorporadas", N(I.n), "var(--tinta)", `próprias, sem motos e caminhões${I.sv ? `, ${N(I.sv)} sem valor (${rotuloSemValor(I.rows)})` : ""}`)}
+      ${cartao("viatura", "Viaturas incorporadas", N(I.n), "var(--tinta)", "próprias, sem motos e caminhões e sem doações")}
       ${cartao("moeda", "Investido", moeda(I.v), "var(--oliva)", moedaExata(I.v))}
       ${cartao("mira", "Veladas no recorte", N(I.nVel), "var(--mostarda)", `${pct(I.nVel, I.n)} das viaturas, ${moeda(I.vVel)}`)}
       ${cartao("informacao", "Valor médio por viatura", I.n - I.sv > 0 ? moeda(I.v / (I.n - I.sv)) : "R$ 0", "var(--dourado)", filtrosAtivos("inv").length ? "do recorte filtrado, entre as com valor" : "entre as que têm valor")}
     </div>
-    ${filtrosAtivos("inv").length || !EST.combate ? "" : `<p class="dash-chart-hint" style="max-width:100ch">Conferência com a nota técnica: ${N(I.n)} viaturas${I.n === NOTA.viaturas ? ", a mesma quantidade da nota" : `, contra ${NOTA.viaturas} na nota`}, ${I.sv ? `${N(I.sv)} delas sem valor na planilha, ${rotuloSemValor(I.rows) === "doação" ? "que são doações (fonte " + fontesSemValor(I.rows).join(" e ") + "), por isso o R$ 0 está correto" : "sem valor informado"} (entram na contagem e somam R$ 0)` : "todas com valor informado"}. Valor: ${moedaExata(I.v)} aqui contra ${moedaExata(NOTA.valor)} na nota, uma diferença de ${moedaExata(Math.abs(NOTA.valor - I.v))} que não consigo reproduzir só com os dados da planilha de hoje. A regra é a da nota: próprias entregues de 2023 a 2026, sem motos e caminhões (reboque e VUC são caminhões na planilha).</p>`}
+    ${filtrosAtivos("inv").length || !EST.combate ? "" : `<p class="dash-chart-hint" style="max-width:100ch">Conferência com a nota técnica: ${N(I.n)} viaturas aqui contra ${NOTA.viaturas} na nota. ${(() => { const f = E.totais.semValorFora || { veladas: 0, caracterizadas: 0 }, t = f.veladas + f.caracterizadas; return I.n + t === NOTA.viaturas ? `A diferença são ${N(t)} doações que vieram sem valor (R$ 0), que a nota conta e o estudo exclui por não serem dinheiro do Estado.` : ""; })()} Valor: ${moedaExata(I.v)} aqui contra ${moedaExata(NOTA.valor)} na nota, uma diferença de ${moedaExata(Math.abs(NOTA.valor - I.v))} que não consigo reproduzir só com os dados da planilha de hoje. A regra é a da nota: próprias entregues de 2023 a 2026, sem motos e caminhões (reboque e VUC são caminhões na planilha).</p>`}
     <div class="dash-filtros" style="margin-bottom:10px"><div class="dash-filtro"><label for="es-agrupar">AGRUPAR O GRÁFICO POR ANO PELA</label><select id="es-agrupar">${[["categoria", "Categoria (velada, padrão, ADM)"], ["tipo", "Tipo de veículo"], ["fonte", "Fonte do recurso"], ["doacao", "Doação sem permuta"], ["modelo", "Modelo"]].map(([v, l]) => `<option value="${v}"${EST.agrupar === v ? " selected" : ""}>${l}</option>`).join("")}</select></div></div>
     <div class="dash-charts" style="grid-template-columns:1fr 1fr">
       ${caixa("investimento-por-ano", `Valor investido por ano, por ${DI[dimAgr].rot.toLowerCase()}`, colunasAgrupadasSVG(anosGrupos, segmentos), `Veladas entregues sem filtro: 2023 ${velAnoFixo(2023)}, 2025 ${velAnoFixo(2025)}, 2026 ${velAnoFixo(2026)} (a nota técnica traz 87 em 2025, o número das fabricadas em 2025). Clique numa coluna para isolar o ano, ou num trecho colorido para isolar a categoria.`, "inv", "ano")}
