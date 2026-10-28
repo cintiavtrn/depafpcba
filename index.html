@@ -13132,7 +13132,12 @@ function montarEstudoFrota(raiz, E) {
       const top = maisUm(depSplit.slice(0, 10).map(([d, x]) => ({ d, ...x })), FD.dep, "d");
       const dsv = barraHorizontalEmpilhadaSVG(top.map((x) => ({ label: x.d, valores: { "Salvador": x.sal, "Demais municípios": x.dem } })), [{ label: "Salvador", cor: "var(--tinta)" }, { label: "Demais municípios", cor: "var(--terracota)" }], { formatarValor: N, valoresVisiveis: true });
       const a = aninhar(dsv, 500, yConteudo, 470, "dep", 1.3); s += a.svg; altDep = a.altura;
-      if (depSplit.length > top.length) { s += sTxt(500, yConteudo + altDep + 14, `Os ${top.length} maiores de ${depSplit.length} departamentos. Lista completa abaixo.`, 10, sFraco); altDep += 20; }
+      if (depSplit.length > top.length) {
+        const sT = top.reduce((a, x) => a + x.sal + x.dem, 0), sA = depSplit.reduce((a, [, x]) => a + x.sal + x.dem, 0);
+        const linhasNota = sQuebra(`Os ${top.length} maiores de ${depSplit.length} departamentos somam ${N(sT)} de ${N(sA)} viaturas a baixar. Os outros ${depSplit.length - top.length} somam ${N(sA - sT)}. Lista completa abaixo.`, 60);
+        linhasNota.forEach((t, i) => { s += sTxt(500, yConteudo + altDep + 14 + i * 15, t, 10, sFraco); });
+        altDep += 8 + linhasNota.length * 15;
+      }
     } else s += sTxt(500, yConteudo + 30, "Nenhum departamento neste recorte.", 12, sFraco);
     if (safraGrupos.length) {
       const ySafra = yConteudo + altDep + 14;
@@ -13172,7 +13177,7 @@ function montarEstudoFrota(raiz, E) {
     if (dados.size) { const a = aninhar(mapaMunicipiosEstudoSVG(dados, { selecionados: FD.mun, marca: [`${N(salM.b)} a baixar`, `${N(salM.e)} entregues`] }), 30, yC, 440, "mun"); s += a.svg; altMapa = a.altura; }
     const yLeg = yC + altMapa + 16;
     s += sLegenda(30, yLeg, [["var(--oliva)", "entregas cobrem a baixa ou não há baixa"], ["var(--mostarda)", "entregas cobrem metade ou mais"], ["var(--terracota)", "entregas cobrem menos da metade"]]);
-    s += sTxt(30, yLeg + 52, "Salvador em destaque, com total a baixar e entregue.", 10, sFraco);
+    s += sTxt(30, yLeg + 52, "Salvador em destaque: próprias a baixar e veladas entregues.", 10, sFraco);
     if (semMapa) s += sTxt(30, yLeg + 66, `${N(semMapa)} viatura(s) em locais sem município no mapa ficam só nos totais.`, 10, sFraco);
     altMapa += semMapa ? 84 : 70;
     // Salvador por departamento
@@ -13180,15 +13185,25 @@ function montarEstudoFrota(raiz, E) {
     for (const o of Cd.unidades) if (o.u.mn === "SALVADOR") bDep.set(o.u.d, (bDep.get(o.u.d) || 0) + baixaDe(o));
     entreguesVeladas("dep").forEach((r) => { if (E.munNome[r[11]] === "SALVADOR") { const d = E.deps[r[12]]; eDep.set(d, (eDep.get(d) || 0) + r[8]); } });
     const depSal = [...new Set([...bDep.keys(), ...eDep.keys()])].map((d) => ({ c: d, b: bDep.get(d) || 0, e: eDep.get(d) || 0 })).filter((l) => l.b + l.e > 0).sort((a, b) => (b.b - b.e) - (a.b - a.e));
-    const depTop = maisUm(depSal.slice(0, 9), FD.dep, "c");
-    if (depTop.length) { const a = aninhar(barrasParesSVG(depTop), 500, yC, 470, "dep"); s += a.svg; altDir = a.altura; }
+    // Salvador mostra todos os departamentos, para a soma das barras fechar com o total do mapa
+    const depTop = depSal;
+    if (depTop.length) {
+      const a = aninhar(barrasParesSVG(depTop), 500, yC, 470, "dep"); s += a.svg; altDir = a.altura;
+      const sB = depTop.reduce((x, l) => x + l.b, 0), sE = depTop.reduce((x, l) => x + l.e, 0);
+      s += sTxt(500, yC + altDir + 12, `Soma dos ${depTop.length} departamentos de Salvador: ${N(sB)} a baixar e ${N(sE)} entregues.`, 10, sFraco); altDir += 20;
+    }
     else { s += sTxt(500, yC + 20, "Nenhuma viatura de Salvador neste recorte.", 11, sFraco); altDir = 30; }
     // interior e região metropolitana
     const yI = yC + altDir + 14;
     s += sRot(500, yI, "DEMAIS MUNICÍPIOS: OS QUE MAIS FALTAM");
     const ordI = todas.filter((l) => l.c !== "SALVADOR").sort((a, b) => (b.b - b.e) - (a.b - a.e));
     const topI = maisUm(ordI.slice(0, 8), FD.mun, "c");
-    if (topI.length) { const a = aninhar(barrasParesSVG(topI), 500, yI + 12, 470, "mun"); s += a.svg; altDir += 14 + 12 + a.altura; if (ordI.length > topI.length) { s += sTxt(500, yI + 12 + a.altura + 14, `Mostrando os ${topI.length} que mais faltam, de ${ordI.length} municípios.`, 10, sFraco); altDir += 20; } }
+    if (topI.length) { const a = aninhar(barrasParesSVG(topI), 500, yI + 12, 470, "mun"); s += a.svg; altDir += 14 + 12 + a.altura; if (ordI.length > topI.length) {
+      const sB = topI.reduce((x, l) => x + l.b, 0), sE = topI.reduce((x, l) => x + l.e, 0), tB = ordI.reduce((x, l) => x + l.b, 0), tE = ordI.reduce((x, l) => x + l.e, 0);
+      const linhasNota = sQuebra(`Os ${topI.length} que mais faltam somam ${N(sB)} a baixar e ${N(sE)} entregues. Nos ${ordI.length} municípios fora de Salvador são ${N(tB)} e ${N(tE)}.`, 60);
+      linhasNota.forEach((t, i) => { s += sTxt(500, yI + 12 + a.altura + 14 + i * 15, t, 10, sFraco); });
+      altDir += 8 + linhasNota.length * 15;
+    } }
     const fim = yC + Math.max(altMapa, altDir) + 10;
     const pior = ordI.find((l) => l.b > l.e);
     const rod2 = [`Leitura: Salvador concentra ${N(salM.b)} das ${N(totB)} a baixar e recebeu ${N(salM.e)} das ${N(totE)} entregues. ${faltam} de ${noRec.length} municípios receberam menos da metade do que vão baixar${pior ? `. Fora de Salvador, o que mais falta é ${pior.c}, com ${N(pior.b - pior.e)} a mais para baixar do que entregues` : ""}.`, "Entregues são as veladas incorporadas de 2023 a 2026, no município onde a viatura está lotada hoje. A baixar é a base de reposição (fabricação até " + EST.ano + ").", notaEntregas()];
@@ -13225,14 +13240,26 @@ function montarEstudoFrota(raiz, E) {
     altMapa += 70;
     const depL = [...porD.entries()].map(([c, x]) => ({ c, t: x.t, a: x.a })).sort((a, b) => (b.t - b.a) - (a.t - a.a));
     const empilhado = (itens) => barraHorizontalEmpilhadaSVG(itens.map((l) => ({ label: l.c, valores: { "Saem do zero": l.a, "Seguem sem veladas": l.t - l.a } })), [{ label: "Saem do zero", cor: "var(--oliva)" }, { label: "Seguem sem veladas", cor: "var(--terracota)" }], { formatarValor: N, valoresVisiveis: true });
-    const depTop = maisUm(depL.slice(0, 9), FD.dep, "c");
-    if (depTop.length) { const a = aninhar(empilhado(depTop), 500, yC, 470, "dep", 1.3); s += a.svg; altDir = a.altura; }
+    const depTop = depL;
+    if (depTop.length) {
+      const a = aninhar(empilhado(depTop), 500, yC, 470, "dep", 1.3); s += a.svg; altDir = a.altura;
+      const sA = depTop.reduce((x, l) => x + l.a, 0), sT = depTop.reduce((x, l) => x + l.t, 0);
+      s += sTxt(500, yC + altDir + 12, `Soma de Salvador: ${sA} de ${sT} unidades sem veladas saem do zero.`, 10, sFraco); altDir += 20;
+    }
     else { s += sTxt(500, yC + 20, "Nenhuma unidade de Salvador sem veladas neste recorte.", 11, sFraco); altDir = 30; }
     const yI = yC + altDir + 14;
     s += sRot(500, yI, "DEMAIS MUNICÍPIOS: UNIDADES PENDENTES");
     const ordI = lista.filter((l) => l.c !== "SALVADOR").sort((a, b) => (b.t - b.a) - (a.t - a.a));
     const topI = maisUm(ordI.slice(0, 8), FD.mun, "c");
-    if (topI.length) { const a = aninhar(empilhado(topI), 500, yI + 12, 470, "mun", 1.3); s += a.svg; altDir += 14 + 12 + a.altura; }
+    if (topI.length) {
+      const a = aninhar(empilhado(topI), 500, yI + 12, 470, "mun", 1.3); s += a.svg; altDir += 14 + 12 + a.altura;
+      if (ordI.length > topI.length) {
+        const sA = topI.reduce((x, l) => x + l.a, 0), sT = topI.reduce((x, l) => x + l.t, 0), tA = ordI.reduce((x, l) => x + l.a, 0), tT = ordI.reduce((x, l) => x + l.t, 0);
+        const linhasNota = sQuebra(`Os ${topI.length} com mais unidades pendentes somam ${sA} de ${sT} atendidas. Nos ${ordI.length} municípios fora de Salvador são ${tA} de ${tT}.`, 60);
+        linhasNota.forEach((t, i) => { s += sTxt(500, yI + 12 + a.altura + 14 + i * 15, t, 10, sFraco); });
+        altDir += 8 + linhasNota.length * 15;
+      }
+    }
     // primeiras unidades da fila, no recorte
     const fila = cen.lista.filter((o) => passa(FD.mun, o.u.mn)).slice(0, 7);
     const yf = yC + altDir + 22;
