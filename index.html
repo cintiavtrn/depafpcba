@@ -587,6 +587,19 @@ body{background:var(--paper);color:var(--carvao);font-family:'Archivo',sans-seri
 .es-rel-opcao span{color:#B8C0CE}
 .es-rel-opcao b{color:var(--carvao)}
 .es-rel-botoes{display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap;margin-top:18px}
+#tela-conteudo:has(#tab-frota-estudo:not([hidden])){max-width:2100px}
+.menu-estudo .nota-v2{grid-template-columns:1fr;gap:6px 0}
+.menu-estudo .nota-v2>.k{text-align:left;padding-top:0}
+.es-duo{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,460px),1fr));gap:14px;margin-bottom:14px}
+.es-duo .dash-chart-box,.es-seq .dash-chart-box{margin-bottom:0}
+.es-seq{display:grid;gap:14px;margin-bottom:14px}
+.es-cards-safra{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.es-card-safra{border:1.5px solid var(--paper-line);padding:12px 14px;display:flex;flex-direction:column;gap:4px}
+.es-card-safra span{font-family:'IBM Plex Mono',monospace;font-size:var(--fs-ui-xs);text-transform:uppercase;letter-spacing:.04em;color:#9AA3B2}
+.es-card-safra b{font-family:'Space Grotesk',sans-serif;font-size:30px;line-height:1.1}
+.es-card-safra small{font-family:'IBM Plex Mono',monospace;font-size:var(--fs-ui-xs);color:#9AA3B2}
+.es-card-safra.on{border-color:var(--tinta);background:var(--tinta-glow)}
+.es-info svg.es-poster{max-width:1500px;margin-left:auto;margin-right:auto}
 .es-info .es-grafico{overflow-x:auto}
 .es-info svg.es-poster{display:block;width:100%;min-width:760px;height:auto}
 .es-subtitulo{font-family:'IBM Plex Mono',monospace;font-size:var(--fs-ui-sm);letter-spacing:.06em;text-transform:uppercase;color:var(--carvao);opacity:.7;margin:22px 0 10px}
@@ -2120,12 +2133,12 @@ function barraHorizontalComEixoSVG(categorias, opcoes = {}) {
   // cor: string (cor única pra todas as barras, como sempre foi) OU função
   // (c) => cor (uma cor por categoria — CFCR precisa disso pro "Motivo da
   // Pendência", onde cada barra usa a MESMA cor do status equivalente).
-  const { formatarValor = (v) => "R$ " + formatarMoedaCompacta(v), formatarEixoTick = (v) => "R$ " + formatarEixo(v), cor = "var(--tinta)", selecionado = "", rotularDiagonal = false, rotuloExtra = null, formatarRotulo = (c) => c.label, valoresVisiveis = false } = opcoes;
+  const { formatarValor = (v) => "R$ " + formatarMoedaCompacta(v), formatarEixoTick = (v) => "R$ " + formatarEixo(v), cor = "var(--tinta)", selecionado = "", rotularDiagonal = false, rotuloExtra = null, formatarRotulo = (c) => c.label, valoresVisiveis = false, larguraPlot: larguraPlotOpc = 280, padEsq = 150, maxRotulo = 22 } = opcoes;
   const corDe = typeof cor === "function" ? cor : () => cor;
-  const MAX_ROTULO = 22;
+  const MAX_ROTULO = maxRotulo;
   // valoresVisiveis (opcional): escreve o valor ao lado de cada barra, para a imagem baixada não depender do mouse
-  const padL = 150, padR = valoresVisiveis ? (rotuloExtra ? 190 : 76) : 14, padT = 4, alturaEixoX = rotularDiagonal ? 34 : 24;
-  const larguraPlot = 280;
+  const padL = padEsq, padR = valoresVisiveis ? (rotuloExtra ? 190 : 76) : 14, padT = 4, alturaEixoX = rotularDiagonal ? 34 : 24;
+  const larguraPlot = larguraPlotOpc;
   // Achado dela (rótulos tipo "Serviço de manutenção do mobiliário da DT"
   // quebrando em 2-3 linhas e invadindo a linha vizinha): rowH fixa de 26
   // só cabe rótulo de 1 linha — mesmo ajuste já usado em outro gráfico
@@ -2178,10 +2191,10 @@ function barraHorizontalComEixoSVG(categorias, opcoes = {}) {
 // rótulo tipo "15ª Serrinha"), onde colunaEmpilhadaSVG amassaria tudo numa
 // faixa de 460px.
 function barraHorizontalEmpilhadaSVG(grupos, segmentos, opcoes = {}) {
-  const { formatarValor = (v) => v.toLocaleString("pt-BR"), formatarEixoTick = (v) => Math.round(v).toLocaleString("pt-BR"), selecionado = "", formatarRotulo = (g) => g.label, valoresVisiveis = false } = opcoes;
-  const MAX_ROTULO = 22;
-  const padL = 150, padR = valoresVisiveis ? 84 : 14, padT = 4;
-  const larguraPlot = 280;
+  const { formatarValor = (v) => v.toLocaleString("pt-BR"), formatarEixoTick = (v) => Math.round(v).toLocaleString("pt-BR"), selecionado = "", formatarRotulo = (g) => g.label, valoresVisiveis = false, larguraPlot: larguraPlotOpc = 280, padEsq = 150, maxRotulo = 22 } = opcoes;
+  const MAX_ROTULO = maxRotulo;
+  const padL = padEsq, padR = valoresVisiveis ? 84 : 14, padT = 4;
+  const larguraPlot = larguraPlotOpc;
   // Mesmo ajuste de barraHorizontalComEixoSVG — necessário agora que os
   // rótulos de COORPIN ficaram mais longos ("1ª COORPIN — Feira de
   // Santana" passa de 22 caracteres e quebra linha).
@@ -2255,9 +2268,9 @@ function colunaEmpilhadaSVG(grupos, segmentos, opcoes = {}) {
   // paralelo a `valores` (mesma chave de segmento), só usado no tooltip —
   // não mexe na conta de altura/empilhamento, que continua só em cima de
   // `valores`.
-  const { formatarValor = (v) => "R$ " + formatarMoedaCompacta(v), formatarEixoTick = (v) => "R$ " + formatarEixo(v), selecionado = "", substantivoQtd = "registro", valoresVisiveis = false } = opcoes;
-  const w = 460, padL = 46, padR = 10, padT = 10;
-  const alturaPlot = 190, alturaRotulos = 22;
+  const { formatarValor = (v) => "R$ " + formatarMoedaCompacta(v), formatarEixoTick = (v) => "R$ " + formatarEixo(v), selecionado = "", substantivoQtd = "registro", valoresVisiveis = false, larguraSvg = 460, alturaGraf = 190 } = opcoes;
+  const w = larguraSvg, padL = 46, padR = 10, padT = 10;
+  const alturaPlot = alturaGraf, alturaRotulos = 22;
   const alturaLegenda = 18;
   const h = padT + alturaPlot + alturaRotulos + alturaLegenda;
   const baseY = padT + alturaPlot;
@@ -9369,7 +9382,7 @@ function v2Matriz(rows, cols, modo, { neutra = -1, cores = null, acao = "", sel 
 // HTML pronto no render() e o depois() liga o que precisa ser ligado.
 function menuEstudoPorTipo(alvo, { titulo, subtitulo, secoes }) {
   const raiz = document.createElement("div");
-  raiz.className = "menu-tipos";
+  raiz.className = "menu-tipos menu-estudo";
   raiz.innerHTML = `<div class="cab-outros-v2"><h2>${escapeHTML(titulo)}</h2><p>${escapeHTML(subtitulo)}</p></div>`;
   const itens = [];
   secoes.forEach((sec) => {
@@ -12890,8 +12903,8 @@ function montarEstudoFrota(raiz, E) {
   // colunas por ano empilhadas por uma dimensão qualquer, com legenda que quebra
   // de linha (a do sistema só comporta 3 ou 4 itens) e trechos clicáveis
   const CORES_SEG = ["var(--mostarda)", "var(--tinta)", "var(--oliva)", "var(--terracota)", "var(--dourado)", "var(--vinho)", "#7E8A8C"];
-  function colunasAgrupadasSVG(anos, segmentos) {
-    const w = 520, padL = 52, padR = 10, padT = 24, alturaPlot = 190, alturaRot = 22, colsLeg = 2, alturaLeg = Math.ceil(segmentos.length / colsLeg) * 14 + 6;
+  function colunasAgrupadasSVG(anos, segmentos, w = 900) {
+    const padL = 56, padR = 10, padT = 24, alturaPlot = 240, alturaRot = 22, colsLeg = 2, alturaLeg = Math.ceil(segmentos.length / colsLeg) * 14 + 6;
     const hh = padT + alturaPlot + alturaRot + alturaLeg, baseY = padT + alturaPlot, bw = (w - padL - padR) / anos.length, barW = Math.min(bw * 0.6, 56);
     const totais = anos.map((a) => segmentos.reduce((s, sg) => s + (a.valores[sg.label] || 0), 0)), maxT = Math.max(...totais, 1);
     let grade = "", eixo = "";
@@ -12899,12 +12912,12 @@ function montarEstudoFrota(raiz, E) {
     let cols = "", rot = "";
     anos.forEach((a, i) => {
       const cx = padL + bw * i + bw / 2; let y = baseY, c = `<rect class="area-hit" x="${(cx - bw / 2).toFixed(1)}" y="${padT}" width="${bw.toFixed(1)}" height="${alturaPlot}" fill="transparent"/>`;
-      segmentos.forEach((sg) => { const v = a.valores[sg.label] || 0; if (!v) return; const alt = alturaPlot * (v / maxT); const qt = a.quantidades[sg.label] || 0; c += `<rect data-seg="${escapeAttr(sg.label)}" x="${(cx - barW / 2).toFixed(1)}" y="${(y - alt).toFixed(1)}" width="${barW.toFixed(1)}" height="${alt.toFixed(1)}" fill="${sg.cor}" style="cursor:pointer"><title>${escapeHTML(a.label)} — ${escapeHTML(sg.label)}: ${moeda(v)} (${N(qt)} viaturas)</title></rect>`; y -= alt; });
+      segmentos.forEach((sg) => { const v = a.valores[sg.label] || 0; if (!v) return; const alt = alturaPlot * (v / maxT); const qt = a.quantidades[sg.label] || 0; c += `<rect data-seg="${escapeAttr(sg.label)}" x="${(cx - barW / 2).toFixed(1)}" y="${(y - alt).toFixed(1)}" width="${barW.toFixed(1)}" height="${alt.toFixed(1)}" fill="${sg.cor}" style="cursor:pointer"><title>${escapeHTML(a.label)} — ${escapeHTML(sg.label)}: ${moeda(v)} (${N(qt)} viaturas)</title></rect>`; if (alt >= 17) c += `<text x="${cx.toFixed(1)}" y="${(y - alt / 2 + 3).toFixed(1)}" text-anchor="middle" font-family="monospace" font-size="9.5" font-weight="700" fill="var(--surface)" style="pointer-events:none">R$ ${formatarEixo(v)}</text>`; y -= alt; });
       if (totais[i] > 0) c += `<text x="${cx.toFixed(1)}" y="${(y - 4).toFixed(1)}" text-anchor="middle" font-family="monospace" font-size="8" fill="var(--carvao)">${moeda(totais[i])}</text>`;
       cols += `<g data-cat="${escapeAttr(a.label)}" style="cursor:pointer">${c}</g>`;
       rot += `<text x="${cx.toFixed(1)}" y="${baseY + 14}" text-anchor="middle" font-family="monospace" font-size="8.5" fill="var(--carvao)" fill-opacity="0.85">${escapeHTML(a.label)}</text>`;
     });
-    const leg = segmentos.map((sg, k) => { const lx = padL + (k % colsLeg) * 230, ly = baseY + alturaRot + 12 + Math.floor(k / colsLeg) * 14; return `<rect x="${lx}" y="${ly - 7}" width="8" height="8" fill="${sg.cor}"/><text x="${lx + 12}" y="${ly}" font-family="monospace" font-size="8" fill="var(--carvao)">${escapeHTML((sg.label.length > 22 ? sg.label.slice(0, 21) + "…" : sg.label) + " " + moeda(anos.reduce((acc, a) => acc + (a.valores[sg.label] || 0), 0)))}</text>`; }).join("");
+    const leg = segmentos.map((sg, k) => { const lx = padL + (k % colsLeg) * 330, ly = baseY + alturaRot + 12 + Math.floor(k / colsLeg) * 14; return `<rect x="${lx}" y="${ly - 7}" width="8" height="8" fill="${sg.cor}"/><text x="${lx + 12}" y="${ly}" font-family="monospace" font-size="8" fill="var(--carvao)">${escapeHTML((sg.label.length > 30 ? sg.label.slice(0, 29) + "…" : sg.label) + " " + moeda(anos.reduce((acc, a) => acc + (a.valores[sg.label] || 0), 0)))}</text>`; }).join("");
     return `<svg viewBox="0 0 ${w} ${hh}" xmlns="http://www.w3.org/2000/svg">${grade}${eixo}${cols}${rot}${leg}</svg>`;
   }
 
@@ -13041,6 +13054,23 @@ function montarEstudoFrota(raiz, E) {
     return sPoster(sAlturaRod(yC + 96, rod), s);
   }
 
+  // opções que deixam os gráficos de barras largos o bastante para a área inteira da seção
+  const GRANDE = { larguraPlot: 600, padEsq: 230, maxRotulo: 34 };
+  // funil de verdade: cada etapa é uma barra centralizada, ligada à seguinte, com o número e a parte que sobra
+  function funilSVG(etapas) {
+    const W = 1100, cx = 560, maxW = 500, rh = 46, gap = 12, padT = 6;
+    const max = Math.max(...etapas.map((e) => e.valor), 1);
+    let corpo = "";
+    etapas.forEach((e, i) => {
+      const w = Math.max(e.valor / max * maxW, 6), y = padT + i * (rh + gap), prox = etapas[i + 1];
+      if (prox) { const w2 = Math.max(prox.valor / max * maxW, 6), y2 = y + rh; corpo += `<polygon points="${(cx - w / 2).toFixed(1)},${y2} ${(cx + w / 2).toFixed(1)},${y2} ${(cx + w2 / 2).toFixed(1)},${y2 + gap} ${(cx - w2 / 2).toFixed(1)},${y2 + gap}" fill="${e.cor}" fill-opacity="0.28"/>`; }
+      corpo += `<rect x="${(cx - w / 2).toFixed(1)}" y="${y}" width="${w.toFixed(1)}" height="${rh}" fill="${e.cor}"><title>${escapeHTML(e.label)}: ${N(e.valor)}</title></rect>`;
+      corpo += `<text x="${cx - maxW / 2 - 18}" y="${y + rh / 2 + 5}" text-anchor="end" font-family="monospace" font-size="15" fill="var(--carvao)">${escapeHTML(e.label)}</text>`;
+      corpo += `<text x="${cx + maxW / 2 + 18}" y="${y + rh / 2 + 6}" font-family="monospace" font-size="20" font-weight="700" fill="var(--carvao)">${N(e.valor)}<tspan font-size="13" font-weight="400" fill-opacity="0.62">${i ? " · " + pct(e.valor, etapas[i - 1].valor) + " da etapa anterior" : ""}</tspan></text>`;
+    });
+    const h = padT + etapas.length * (rh + gap);
+    return `<svg viewBox="0 0 ${W} ${h}" xmlns="http://www.w3.org/2000/svg">${corpo}</svg>`;
+  }
   // pares de barras (a baixar x entregues), uma linha por departamento ou município
   function barrasParesSVG(linhas, larg = 470) {
     const rh = 32, xb = 158, wb = 270, maxR = Math.max(1, ...linhas.map((l) => Math.max(l.b, l.e)));
@@ -13406,7 +13436,7 @@ function montarEstudoFrota(raiz, E) {
     const anosGrupos = [2023, 2024, 2025, 2026].map((a) => { const valores = {}, quantidades = {}; segmentos.forEach((s) => { valores[s.label] = 0; quantidades[s.label] = 0; }); rowsAno.filter((r) => r[0] === a).forEach((r) => { const k = DI[dimAgr].val(r); const sg = segmentos.find((s) => s.key === k) || segmentos.find((s) => s.key === null); if (sg) { valores[sg.label] += r[9]; quantidades[sg.label] += r[8]; } }); return { label: String(a), valores, quantidades }; });
     const topoModelos = porDim("modelo").slice(0, 10); FI.modelo.forEach((m) => { if (!topoModelos.some((x) => x.key === m)) { const s = porDim("modelo").find((x) => x.key === m); if (s) topoModelos.push(s); } });
     const velAnoFixo = (a) => E.entregas.filter((r) => (EST.combate || r[4] !== 2) && r[0] === a && r[1] === 0).reduce((s, r) => s + r[8], 0);
-    const barraDim = (dim, lista) => (lista.length ? barraHorizontalComEixoSVG(lista, { cor: (c) => (dim === "categoria" ? corCategoria[c.key] : "var(--oliva)"), rotuloExtra: (c) => `(${N(c.n)} ${c.n === 1 ? "viatura" : "viaturas"})`, valoresVisiveis: true }) : `<p class="dash-chart-hint">Nada neste recorte.</p>`);
+    const barraDim = (dim, lista, grande = false) => (lista.length ? barraHorizontalComEixoSVG(lista, { cor: (c) => (dim === "categoria" ? corCategoria[c.key] : "var(--oliva)"), rotuloExtra: (c) => `(${N(c.n)} ${c.n === 1 ? "viatura" : "viaturas"})`, valoresVisiveis: true, ...(grande ? GRANDE : {}) }) : `<p class="dash-chart-hint">Nada neste recorte.</p>`);
 
     // --- diagnóstico
     const cDep = calcDia("dep"), cSafra = calcDia("safra"), cMapa = calcDia("mun"), cGrupo = calcDia("grupo");
@@ -13455,16 +13485,14 @@ function montarEstudoFrota(raiz, E) {
     <div class="dash-chart-box es-caixa es-info" data-nome="infografico-inserviveis-8-anos-unidades" data-escopo="dia" data-dim=""><div class="es-grafico">${infograficoSVG({ C, porMun, depSplit, semMapa, safraGrupos })}</div></div>
 `,
       det: `
-    <div class="dash-charts" style="grid-template-columns:1fr 1fr">
-      ${caixa("funil-viaturas", "Do total da frota até a base do Estado", barraHorizontalComEixoSVG(funil, { cor: corFunil, formatarValor: N, formatarEixoTick: (v) => N(v), valoresVisiveis: true }), "Cada etapa mostra o que sobra depois de aplicar a regra seguinte." + dicaFiltro("dia"), "dia", "")}
-      <div class="dash-chart-box"><h4>Quando cada safra chega aos 8 anos</h4><table class="dash-tabela"><thead><tr><th>FABRICAÇÃO ATÉ</th><th>ENTRA NA BAIXA EM</th><th>ACUMULADO A BAIXAR</th></tr></thead><tbody>${projecao.map((p) => `<tr${p.lim === EST.ano ? ' style="background:color-mix(in srgb, var(--tinta) 14%, var(--surface))"' : ""}><td>${p.lim}</td><td>${p.ano}</td><td>${N(p.s)}</td></tr>`).join("")}</tbody></table></div>
-    </div>
-    <div class="dash-charts" style="grid-template-columns:1fr 1fr">
-      ${caixa("safras-fabricacao", "Descaracterizadas por ano de fabricação", safraGrupos.length ? colunaEmpilhadaSVG(safraGrupos, [{ label: "A baixar", cor: "var(--terracota)" }, { label: "Ficam", cor: "var(--tinta)" }], { formatarValor: N, formatarEixoTick: (v) => N(v), substantivoQtd: "veículo", valoresVisiveis: true }) : vazio, `Em vermelho, as safras que entram na baixa com a regra de fabricação até ${EST.ano}. Clique numa coluna para filtrar.`, "dia", "safra")}
-      ${caixa("baixas-por-tipo-de-veiculo", "Viaturas a baixar por tipo de veículo", grupoGrupos.length ? barraHorizontalEmpilhadaSVG(grupoGrupos, [{ label: "Próprias", cor: "var(--terracota)" }, { label: "Cedidas", cor: "var(--mostarda)" }], { formatarValor: N, valoresVisiveis: true }) : vazio, "Compactos são hatch, sedan e monovolume. Clique numa barra para filtrar.", "dia", "grupo")}
-    </div>
-    <div class="dash-charts" style="grid-template-columns:1fr">
-      ${caixa("baixas-por-departamento", "Viaturas a baixar por departamento (lista completa)", depLista.length ? barraHorizontalEmpilhadaSVG(depLista.map(([d, x]) => ({ label: d, valores: { "Próprias": x.p, "Cedidas": x.c } })), [{ label: "Próprias", cor: "var(--terracota)" }, { label: "Cedidas", cor: "var(--mostarda)" }], { formatarValor: N, valoresVisiveis: true }) : vazio, "Próprias entram na conta do Estado. Cedidas voltam ao órgão de origem. Clique numa barra para filtrar.", "dia", "dep")}
+    <div class="es-seq">
+      ${caixa("funil-viaturas", "Do total da frota até a base do Estado", funilSVG(funil.map((e) => ({ ...e, cor: corFunil(e) }))), "Cada etapa mostra o que sobra depois de aplicar a regra seguinte." + dicaFiltro("dia"), "dia", "")}
+      <div class="es-duo">
+        <div class="dash-chart-box"><h4>Quando cada safra chega aos 8 anos</h4><div class="es-cards-safra">${projecao.map((q) => `<div class="es-card-safra${q.lim === EST.ano ? " on" : ""}"><span>Fabricação até ${q.lim}</span><b>${N(q.s)}</b><small>a baixar desde ${q.ano}</small></div>`).join("")}</div><p class="dash-chart-hint" style="margin-top:10px">Viaturas a baixar, somadas, conforme cada safra passa dos 8 anos de fabricação.</p></div>
+        ${caixa("baixas-por-tipo-de-veiculo", "Viaturas a baixar por tipo de veículo", grupoGrupos.length ? barraHorizontalEmpilhadaSVG(grupoGrupos, [{ label: "Próprias", cor: "var(--terracota)" }, { label: "Cedidas", cor: "var(--mostarda)" }], { formatarValor: N, valoresVisiveis: true }) : vazio, "Compactos são hatch, sedan e monovolume. Clique numa barra para filtrar.", "dia", "grupo")}
+      </div>
+      ${caixa("safras-fabricacao", "Descaracterizadas por ano de fabricação", safraGrupos.length ? colunaEmpilhadaSVG(safraGrupos, [{ label: "A baixar", cor: "var(--terracota)" }, { label: "Ficam", cor: "var(--tinta)" }], { formatarValor: N, formatarEixoTick: (v) => N(v), substantivoQtd: "veículo", valoresVisiveis: true, larguraSvg: 960, alturaGraf: 240 }) : vazio, `Em vermelho, as safras que entram na baixa com a regra de fabricação até ${EST.ano}. Clique numa coluna para filtrar.`, "dia", "safra")}
+      ${caixa("baixas-por-departamento", "Viaturas a baixar por departamento (lista completa)", depLista.length ? barraHorizontalEmpilhadaSVG(depLista.map(([d, x]) => ({ label: d, valores: { "Próprias": x.p, "Cedidas": x.c } })), [{ label: "Próprias", cor: "var(--terracota)" }, { label: "Cedidas", cor: "var(--mostarda)" }], { formatarValor: N, valoresVisiveis: true, ...GRANDE }) : vazio, "Próprias entram na conta do Estado. Cedidas voltam ao órgão de origem. Clique numa barra para filtrar.", "dia", "dep")}
     </div>
 `,
       uni: `
@@ -13489,16 +13517,14 @@ function montarEstudoFrota(raiz, E) {
     </div>
     ${filtrosAtivos("inv").length || !EST.combate ? "" : `<p class="dash-chart-hint" style="max-width:100ch">Conferência com a nota técnica: ${N(I.n)} viaturas${I.n === NOTA.viaturas ? ", a mesma quantidade da nota" : `, contra ${NOTA.viaturas} na nota`}. Valor: ${moedaExata(I.v)} aqui contra ${moedaExata(NOTA.valor)} na nota, uma diferença de ${moedaExata(Math.abs(NOTA.valor - I.v))} (${I.v > NOTA.valor ? "a planilha de hoje é maior" : "a nota é maior"}) que não consigo reproduzir só com os dados da planilha de hoje. A regra: próprias entregues de 2023 a 2026 com valor informado, incluindo o reboque e o VUC. Ficam fora ${N(((E.totais.semValorFora || {}).veladas || 0) + ((E.totais.semValorFora || {}).caracterizadas || 0))} doações que vieram sem valor, que não são dinheiro do Estado. A reposição, ao contrário, não conta caminhões, porque a baixa também não conta.</p>`}
     <div class="dash-filtros" style="margin-bottom:10px"><div class="dash-filtro"><label for="es-agrupar">AGRUPAR O GRÁFICO POR ANO PELA</label><select id="es-agrupar">${[["categoria", "Categoria (velada, padrão, ADM)"], ["tipo", "Tipo de veículo"], ["fonte", "Fonte do recurso"], ["modelo", "Modelo"]].map(([v, l]) => `<option value="${v}"${EST.agrupar === v ? " selected" : ""}>${l}</option>`).join("")}</select></div></div>
-    <div class="dash-charts" style="grid-template-columns:1fr 1fr">
+    <div class="es-seq">
       ${caixa("investimento-por-ano", `Valor investido por ano, por ${DI[dimAgr].rot.toLowerCase()}`, colunasAgrupadasSVG(anosGrupos, segmentos), `Veladas entregues sem filtro: 2023 ${velAnoFixo(2023)}, 2025 ${velAnoFixo(2025)}, 2026 ${velAnoFixo(2026)} (a nota técnica traz 87 em 2025, o número das fabricadas em 2025). Clique numa coluna para isolar o ano, ou num trecho colorido para isolar a categoria.`, "inv", "ano")}
-      ${caixa("investimento-por-categoria", "Por categoria da viatura", barraDim("categoria", porDim("categoria")), "Velada é a descaracterizada. Caracterizada padrão e ADM são as demais. Ctrl, Shift ou Cmd mais clique soma categorias.", "inv", "categoria")}
-    </div>
-    <div class="dash-charts" style="grid-template-columns:1fr 1fr">
-      ${caixa("investimento-por-fonte", "Por fonte do recurso", barraDim("fonte", porDim("fonte")), "Clique numa barra para ver quais viaturas vieram dessa fonte.", "inv", "fonte")}
-      ${caixa("investimento-por-tipo", "Por tipo de veículo", barraDim("tipo", porDim("tipo")), "Tipos vêm da coluna Tipo de veículo da planilha.", "inv", "tipo")}
-    </div>
-    <div class="dash-charts" style="grid-template-columns:1fr">
-      ${caixa("investimento-por-modelo", "Por modelo", barraDim("modelo", topoModelos), "Os dez modelos de maior valor no recorte.", "inv", "modelo")}
+      <div class="es-duo">
+        ${caixa("investimento-por-categoria", "Por categoria da viatura", barraDim("categoria", porDim("categoria")), "Velada é a descaracterizada. Caracterizada padrão e ADM são as demais. Ctrl, Shift ou Cmd mais clique soma categorias.", "inv", "categoria")}
+        ${caixa("investimento-por-tipo", "Por tipo de veículo", barraDim("tipo", porDim("tipo")), "Tipos vêm da coluna Tipo de veículo da planilha.", "inv", "tipo")}
+      </div>
+      ${caixa("investimento-por-fonte", "Por fonte do recurso", barraDim("fonte", porDim("fonte"), true), "Clique numa barra para ver quais viaturas vieram dessa fonte.", "inv", "fonte")}
+      ${caixa("investimento-por-modelo", "Por modelo", barraDim("modelo", topoModelos, true), "Os dez modelos de maior valor no recorte.", "inv", "modelo")}
     </div>
 
 `,
@@ -13524,9 +13550,9 @@ function montarEstudoFrota(raiz, E) {
     </div>
     <div class="dash-filtros" style="margin:14px 0 10px"><div class="dash-filtro" style="min-width:280px"><label for="es-pct">PERCENTUAL DA REPOSIÇÃO: <span id="es-pct-val">${EST.pct}%</span></label><input type="range" id="es-pct" min="5" max="100" step="5" value="${EST.pct}" style="width:100%"></div></div>
     <div class="dash-chart-box es-caixa es-info" data-nome="quadro-de-cenarios" data-escopo="dia" data-dim=""><div class="es-grafico">${quadroCenarioSVG()}</div></div>
-    <div class="dash-charts" style="grid-template-columns:1fr 1fr">
+    <div class="es-seq">
       <div class="dash-chart-box"><h4>Cenários por percentual da reposição</h4>${botaoTabela("es-tab-cenarios", "estudo-frota-cenarios.png")}<div id="es-tab-cenarios"><table class="dash-tabela"><thead><tr><th>CENÁRIO</th><th>VIATURAS</th><th>HIPÓTESE A</th><th>HIPÓTESE B</th><th>UNIDADES SEM ZERO VELADA</th></tr></thead><tbody>${C.cenarios.map((c) => `<tr><td><b>${Math.round(c.p * 100)}%</b></td><td>${N(c.n)}</td><td>${moeda(c.a)}</td><td>${moeda(c.b)}</td><td>${c.cobertas} de ${C.perdemTodas.length}</td></tr>`).join("")}</tbody></table></div><p class="dash-chart-hint" style="margin-top:10px">A ordem de reposição começa pelas unidades que perderiam todas as veladas, das menores para as maiores. Repor uma viatura para cada uma das ${C.perdemTodas.length} unidades nessa situação (${C.perdemTodas.length} viaturas, de ${moeda(C.perdemTodas.length * EST.precoA.c)} a ${moeda(C.perdemTodas.length * EST.precoB)}) tira todas do zero.</p></div>
-      ${caixa("cenarios-de-investimento", "Custo de cada cenário", C.baseTotal ? barraHorizontalComEixoSVG(cenCats, { cor: (c) => cenarioCores[c.k], rotuloExtra: (c) => `(${N(c.n)} ${c.n === 1 ? "viatura" : "viaturas"})`, valoresVisiveis: true }) : vazio, "Azul é a hipótese A, roxo é a hipótese B." + dicaFiltro("dia"), "dia", "")}
+      ${caixa("cenarios-de-investimento", "Custo de cada cenário", C.baseTotal ? barraHorizontalComEixoSVG(cenCats, { cor: (c) => cenarioCores[c.k], rotuloExtra: (c) => `(${N(c.n)} ${c.n === 1 ? "viatura" : "viaturas"})`, valoresVisiveis: true, ...GRANDE }) : vazio, "Azul é a hipótese A, roxo é a hipótese B." + dicaFiltro("dia"), "dia", "")}
     </div>
 
 `,
