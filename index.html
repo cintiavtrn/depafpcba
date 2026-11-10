@@ -13523,6 +13523,41 @@ function montarEstudoFrota(raiz, E) {
       ${caixa("baixas-por-departamento", "Viaturas a baixar por departamento (lista completa)", depLista.length ? barraHorizontalEmpilhadaSVG(depLista.map(([d, x]) => ({ label: d, valores: { "Próprias": x.p, "Cedidas": x.c } })), [{ label: "Próprias", cor: "var(--terracota)" }, { label: "Cedidas", cor: "var(--mostarda)" }], { formatarValor: N, valoresVisiveis: true, ...GRANDE }) : vazio, "Próprias entram na conta do Estado. Cedidas voltam ao órgão de origem. Clique numa barra para filtrar.", "dia", "dep")}
     </div>
 `,
+      prev: (() => {
+    const P = E.previstas;
+    if (!P || !P.lotes || !P.lotes.length) return `<p class="dash-chart-hint">As entregas previstas vêm da nota técnica e ainda não foram carregadas neste ambiente.</p>`;
+    const L = P.lotes, totQ = L.reduce((a, l) => a + l.q, 0), totV = L.reduce((a, l) => a + (l.valor || 0), 0), semValor = L.filter((l) => l.valor == null).reduce((a, l) => a + l.q, 0);
+    const CORES = { apta: "var(--oliva)", regularizacao: "var(--dourado)", fornecedor: "var(--mostarda)", aquisicao: "var(--terracota)" };
+    const porSit = P.situacoes.map((s) => { const ls = L.filter((l) => l.situacao === s.id); return { ...s, q: ls.reduce((a, l) => a + l.q, 0), v: ls.reduce((a, l) => a + (l.valor || 0), 0) }; });
+    const fontes = [...new Set(L.map((l) => l.fonte))].map((f) => { const ls = L.filter((l) => l.fonte === f); return { f, q: ls.reduce((a, l) => a + l.q, 0), v: ls.reduce((a, l) => a + (l.valor || 0), 0), sv: ls.filter((l) => l.valor == null).reduce((a, l) => a + l.q, 0) }; }).sort((a, b) => b.q - a.q);
+    const emenda = fontes.filter((x) => /EMENDA/i.test(x.f)).reduce((o, x) => ({ q: o.q + x.q, v: o.v + x.v }), { q: 0, v: 0 });
+    const apta = porSit.find((s) => s.id === "apta") || { q: 0 };
+    const baseSem = comFiltros(false, () => calcDia(null)).baseTotal;
+    const conferePrev = P.declarado && (P.declarado.viaturas !== totQ || Math.abs(P.declarado.valor - totV) >= 1);
+    return `
+    <p class="dash-chart-hint" style="max-width:100ch">Estas entregas não saem da planilha: vêm da ${h(P.fonte)}, que lista o que está previsto para 2026. A nota não diz quais viaturas serão veladas (só o caminhão VUC aparece como descaracterizado), então o quadro mostra o que está a caminho e em que ponto está cada lote, sem entrar na conta da baixa.</p>
+    <div class="kpi-row">
+      ${cartao("viatura", "Viaturas previstas", N(totQ), "var(--tinta)", `${L.length} lotes, previstos até dezembro de 2026`)}
+      ${cartao("moeda", "Valor previsto", moeda(totV), "var(--oliva)", `${moedaExata(totV)}${semValor ? `; ${N(semValor)} sem valor na nota` : ""}`)}
+      ${cartao("mira", "Aptas para entrega", N(apta.q), "var(--mostarda)", "prontas para ir às unidades, em outubro")}
+      ${cartao("informacao", "Dependem de emenda", N(emenda.q), "var(--dourado)", `${moeda(emenda.v)}; a nota avisa que podem ficar para 2027`)}
+    </div>
+    <div class="dash-chart-box" style="margin-bottom:14px"><h4>Em que ponto está cada viatura</h4>
+      ${porSit.map((s) => `<div style="display:grid;grid-template-columns:minmax(150px,220px) 1fr auto;gap:12px;align-items:center;margin:9px 0"><div style="font-weight:600">${h(s.rotulo)}</div><div style="background:var(--paper-line);height:14px"><div style="width:${totQ ? Math.max(2, Math.round((s.q / totQ) * 100)) : 0}%;height:14px;background:${CORES[s.id] || "var(--tinta)"}"></div></div><div style="font-variant-numeric:tabular-nums;white-space:nowrap"><b>${N(s.q)}</b> · ${pct(s.q, totQ)}${s.v ? ` · ${moeda(s.v)}` : ""}</div></div>`).join("")}
+      <p class="dash-chart-hint" style="margin-top:10px">Só as aptas podem ser entregues agora. As em regularização já saíram da concessionária e esperam documento. As demais dependem do fornecedor ou ainda estão sendo compradas.</p>
+    </div>
+    <div class="dash-chart-box" style="margin-bottom:14px"><h4>Os lotes previstos</h4>
+      ${botaoTabela("es-tab-previstas", "estudo-frota-entregas-previstas.png")}
+      <div class="tabela-rolavel" id="es-tab-previstas"><table class="dash-tabela"><thead><tr><th>LOTE</th><th>QTD.</th><th>VALOR</th><th>ORIGEM</th><th>PREVISÃO</th><th>SITUAÇÃO</th></tr></thead><tbody>${L.map((l) => `<tr><td>${h(l.descricao)}</td><td><b>${N(l.q)}</b></td><td style="white-space:nowrap">${l.valor == null ? "sem valor" : moedaExata(l.valor)}</td><td>${h(l.fonte)}</td><td>${h(l.previsao)}</td><td><span style="color:${CORES[l.situacao] || "inherit"};font-weight:700">${h((porSit.find((s) => s.id === l.situacao) || {}).rotulo || "")}</span>${l.detalhe ? `<div style="font-size:var(--fs-ui-sm);opacity:.75;margin-top:2px">${h(l.detalhe)}</div>` : ""}</td></tr>`).join("")}<tr><td><b>Total</b></td><td><b>${N(totQ)}</b></td><td style="white-space:nowrap"><b>${moedaExata(totV)}</b></td><td colspan="3"></td></tr></tbody></table></div>
+      ${conferePrev ? `<p class="dash-chart-hint" style="margin-top:10px">Atenção: a nota declara ${N(P.declarado.viaturas)} viaturas e ${moedaExata(P.declarado.valor)}, e a soma dos lotes dá ${N(totQ)} e ${moedaExata(totV)}.</p>` : `<p class="dash-chart-hint" style="margin-top:10px">A soma dos lotes confere com o total da nota: ${N(P.declarado.viaturas)} viaturas e ${moedaExata(P.declarado.valor)}.</p>`}
+    </div>
+    <div class="dash-chart-box"><h4>De onde vem o recurso</h4>
+      <div class="tabela-rolavel"><table class="dash-tabela"><thead><tr><th>ORIGEM</th><th>VIATURAS</th><th>VALOR</th></tr></thead><tbody>${fontes.map((x) => `<tr><td>${h(x.f)}</td><td><b>${N(x.q)}</b></td><td style="white-space:nowrap">${x.v ? moedaExata(x.v) : "sem valor"}${x.sv && x.v ? ` (mais ${N(x.sv)} sem valor)` : ""}</td></tr>`).join("")}</tbody></table></div>
+      <p class="dash-chart-hint" style="margin-top:10px">Para dar escala: a base de reposição (veladas fabricadas até ${EST.ano}, ${EST.cedidas ? "próprias e cedidas" : "só as próprias"}) é de ${N(baseSem)}. As ${N(totQ)} previstas equivalem a ${pct(totQ, baseSem)} disso se todas fossem veladas, o que a nota não informa; serve de ordem de grandeza, não de cobertura.</p>
+    </div>
+`;
+  })(),
+
       uni: `
     <div class="dash-chart-box" style="margin-bottom:14px"><h4>Unidades, da que mais perde para a que menos perde</h4>
       <div class="dash-filtros" style="margin-bottom:12px"><div class="dash-filtro"><label for="es-f-sit">SITUAÇÃO</label><select id="es-f-sit"><option value="">Só as que perdem</option><option value="PERDE TODAS">Perdem todas</option><option value="PERDE PARTE">Perdem parte</option><option value="NÃO PERDE">Não perdem</option></select></div></div>
@@ -13600,6 +13635,9 @@ function montarEstudoFrota(raiz, E) {
           ] },
           { tipo: "Evolução dos investimentos", itens: [
             { id: "inv", titulo: "Investimento realizado, 2023 a 2026", etiqueta: "Eixo 1", sub: "Quanto o Estado investiu e o que foi incorporado, com a conferência da nota técnica.", render: () => PARTES.inv, depois: posRender },
+          ] },
+          { tipo: "Entregas previstas", itens: [
+            { id: "prev", titulo: "O que está a caminho em 2026", etiqueta: "Nota técnica", sub: "Lotes previstos, em que ponto está cada um e de onde vem o recurso.", render: () => PARTES.prev, depois: posRender },
           ] },
           { tipo: "Reposição", itens: [
             { id: "ritmo", titulo: "O ritmo de reposição cobre a baixa?", etiqueta: "Eixos 1 e 2", sub: "Entregas contra safras que completam 8 anos, veladas e caracterizadas lado a lado.", render: () => PARTES.ritmo, depois: posRender },
