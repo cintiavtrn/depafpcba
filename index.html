@@ -13339,6 +13339,21 @@ function montarEstudoFrota(raiz, E) {
     return { porMun, depSplit, semMapa, safraGrupos };
   }
 
+  // entregas previstas (nota técnica): mesmos números na tela e no relatório
+  function dadosPrevistas() {
+    const P = E.previstas;
+    if (!P || !P.lotes || !P.lotes.length) return null;
+    const L = P.lotes, totQ = L.reduce((a, l) => a + l.q, 0), totV = L.reduce((a, l) => a + (l.valor || 0), 0), semValor = L.filter((l) => l.valor == null).reduce((a, l) => a + l.q, 0);
+    const CORES = { apta: "var(--oliva)", regularizacao: "var(--dourado)", fornecedor: "var(--mostarda)", aquisicao: "var(--terracota)" };
+    const porSit = P.situacoes.map((s) => { const ls = L.filter((l) => l.situacao === s.id); return { ...s, q: ls.reduce((a, l) => a + l.q, 0), v: ls.reduce((a, l) => a + (l.valor || 0), 0) }; });
+    const fontes = [...new Set(L.map((l) => l.fonte))].map((f) => { const ls = L.filter((l) => l.fonte === f); return { f, q: ls.reduce((a, l) => a + l.q, 0), v: ls.reduce((a, l) => a + (l.valor || 0), 0), sv: ls.filter((l) => l.valor == null).reduce((a, l) => a + l.q, 0) }; }).sort((a, b) => b.q - a.q);
+    const emenda = fontes.filter((x) => /EMENDA/i.test(x.f)).reduce((o, x) => ({ q: o.q + x.q, v: o.v + x.v }), { q: 0, v: 0 });
+    const apta = porSit.find((s) => s.id === "apta") || { q: 0 };
+    const baseSem = comFiltros(false, () => calcDia(null)).baseTotal;
+    const conferePrev = P.declarado && (P.declarado.viaturas !== totQ || Math.abs(P.declarado.valor - totV) >= 1);
+    return { P, L, totQ, totV, semValor, CORES, porSit, fontes, emenda, apta, baseSem, conferePrev };
+  }
+
   function relatorioEstudoHTML(op) {
     const data = new Date().toLocaleDateString("pt-BR");
     const base = E.base || "planilha de frota", dataBase = new Date(E.atualizadoEm || E.geradoEm).toLocaleDateString("pt-BR");
@@ -13376,6 +13391,21 @@ function montarEstudoFrota(raiz, E) {
             ${relLeituraHTML(`Mostra quanto o Estado pôs em viaturas e em quê. ${N(I.n)} viaturas somam ${moedaExata(I.v)}. Os gráficos dividem esse valor por ano, categoria, fonte do recurso, tipo e modelo, com o valor e a quantidade escritos em cada barra.`)}
             <div class="rel-grade">${graficosInvestimento().map(([t, svg]) => `<div class="rel-caixa"><h3>${escapeHTML(t)}</h3>${svg}</div>`).join("")}</div></div>`;
         }
+        if (op.secoes.has("prev")) {
+          const D = dadosPrevistas();
+          if (D) {
+            const cor = { apta: "#1E8A52", regularizacao: "#7C5CBF", fornecedor: "#C98A12", aquisicao: "#C0432F" };
+            h += `<div class="rel-secao-nova"><h2>Entregas previstas para 2026</h2>
+              <div class="rel-kpis">${relKpiHTML(N(D.totQ), "Viaturas previstas", "#1F6FB2")}${relKpiHTML(moeda(D.totV), "Valor previsto", "#1E8A52")}${relKpiHTML(N(D.apta.q), "Aptas para entrega", "#C98A12")}${relKpiHTML(N(D.emenda.q), "Dependem de emenda", "#7C5CBF")}</div>
+              ${relLeituraHTML(`Mostra o que está a caminho, vindo da ${D.P.fonte}, e não da planilha. São ${N(D.totQ)} viaturas em ${D.L.length} lotes, ${moedaExata(D.totV)}${D.semValor ? ` (mais ${N(D.semValor)} sem valor na nota)` : ""}. A nota não diz quais serão veladas, então estas viaturas não entram na conta da baixa. As viaturas de emenda parlamentar podem ficar para 2027, segundo a própria nota.`)}
+              <table class="rel-tabela-un"><thead><tr><th>SITUAÇÃO</th><th>VIATURAS</th><th>%</th><th>VALOR</th></tr></thead><tbody>${D.porSit.map((x) => `<tr><td style="color:${cor[x.id] || "inherit"};font-weight:700">${h_(x.rotulo)}</td><td><b>${N(x.q)}</b></td><td>${pct(x.q, D.totQ)}</td><td>${x.v ? moedaExata(x.v) : "sem valor"}</td></tr>`).join("")}</tbody></table>
+              <h3 style="margin:14px 0 6px;font-size:12px">Os lotes previstos</h3>
+              <table class="rel-tabela-un"><thead><tr><th>LOTE</th><th>QTD.</th><th>VALOR</th><th>ORIGEM</th><th>PREVISÃO</th><th>SITUAÇÃO</th></tr></thead><tbody>${D.L.map((l) => `<tr><td>${h_(l.descricao)}</td><td><b>${N(l.q)}</b></td><td>${l.valor == null ? "sem valor" : moedaExata(l.valor)}</td><td>${h_(l.fonte)}</td><td>${h_(l.previsao)}</td><td>${h_((D.porSit.find((x) => x.id === l.situacao) || {}).rotulo || "")}${l.detalhe ? `<br>${h_(l.detalhe)}` : ""}</td></tr>`).join("")}<tr><td><b>Total</b></td><td><b>${N(D.totQ)}</b></td><td><b>${moedaExata(D.totV)}</b></td><td colspan="3"></td></tr></tbody></table>
+              <h3 style="margin:14px 0 6px;font-size:12px">De onde vem o recurso</h3>
+              <table class="rel-tabela-un"><thead><tr><th>ORIGEM</th><th>VIATURAS</th><th>VALOR</th></tr></thead><tbody>${D.fontes.map((x) => `<tr><td>${h_(x.f)}</td><td><b>${N(x.q)}</b></td><td>${x.v ? moedaExata(x.v) : "sem valor"}${x.sv && x.v ? ` (mais ${N(x.sv)} sem valor)` : ""}</td></tr>`).join("")}</tbody></table>
+              <p class="rel-legenda-quadro" style="margin-top:10px">Escala: a base de reposição (veladas fabricadas até ${EST.ano}, ${EST.cedidas ? "próprias e cedidas" : "só as próprias"}) é de ${N(D.baseSem)}. As ${N(D.totQ)} previstas equivalem a ${pct(D.totQ, D.baseSem)} disso se todas fossem veladas, o que a nota não informa.</p></div>`;
+          }
+        }
         if (op.secoes.has("uni")) {
           const linhas = C.unidades.filter((o) => o.perde > 0).sort((a, b) => b.perde - a.perde || b.t - a.t);
           h += `<div class="rel-secao-nova"><h2>Unidades afetadas</h2>${relLeituraHTML(`Lista as ${N(linhas.length)} unidades com viaturas a baixar, da que mais perde para a que menos perde. Perde todas indica unidade que ficaria sem nenhuma velada.`)}
@@ -13405,6 +13435,7 @@ function montarEstudoFrota(raiz, E) {
       ${opcao("es-rel-sai", "Entrou × vai sair, por município", "Onde a reposição chegou e onde falta, com Salvador por departamento.")}
       ${opcao("es-rel-cen", "Quadro de cenários", `Reposição de <input type="number" id="es-rel-pct" min="5" max="100" step="5" value="${EST.pct}" style="width:64px"> % da base: custo e unidades que saem do zero.`)}
       ${opcao("es-rel-inv", "Investimento realizado, 2023 a 2026", "Indicadores e gráficos por ano, categoria, fonte, tipo e modelo.")}
+      ${E.previstas && E.previstas.lotes ? opcao("es-rel-prev", "Entregas previstas para 2026", "Lotes da nota técnica, em que ponto está cada um e de onde vem o recurso.") : ""}
       ${opcao("es-rel-uni", "Lista de unidades afetadas", "Tabela com todas as unidades que têm viaturas a baixar.", false)}
       <div class="es-rel-botoes"><button type="button" class="dash-toggle-btn" id="es-rel-cancelar">CANCELAR</button><button type="button" class="dash-toggle-btn" id="es-rel-gerar">${iconeInline("download", 12, -2)} GERAR RELATÓRIO</button></div>
     </div>`;
@@ -13415,8 +13446,8 @@ function montarEstudoFrota(raiz, E) {
     document.body.appendChild(fundo);
     fundo.querySelector("#es-rel-cancelar").addEventListener("click", fechar);
     fundo.querySelector("#es-rel-gerar").addEventListener("click", () => {
-      const marcado = (id) => fundo.querySelector(id).checked;
-      const secoes = new Set([["#es-rel-info", "info"], ["#es-rel-ritmo", "ritmo"], ["#es-rel-sai", "sai"], ["#es-rel-cen", "cen"], ["#es-rel-inv", "inv"], ["#es-rel-uni", "uni"]].filter(([id]) => marcado(id)).map(([, k]) => k));
+      const marcado = (id) => Boolean(fundo.querySelector(id)?.checked);
+      const secoes = new Set([["#es-rel-info", "info"], ["#es-rel-ritmo", "ritmo"], ["#es-rel-sai", "sai"], ["#es-rel-cen", "cen"], ["#es-rel-inv", "inv"], ["#es-rel-prev", "prev"], ["#es-rel-uni", "uni"]].filter(([id]) => marcado(id)).map(([, k]) => k));
       const usarFiltros = fundo.querySelector('input[name="es-rel-filtro"]:checked').value === "tela";
       const pct = Math.min(100, Math.max(5, Math.round(+fundo.querySelector("#es-rel-pct").value / 5) * 5 || EST.pct));
       let corpo;
@@ -13524,16 +13555,9 @@ function montarEstudoFrota(raiz, E) {
     </div>
 `,
       prev: (() => {
-    const P = E.previstas;
-    if (!P || !P.lotes || !P.lotes.length) return `<p class="dash-chart-hint">As entregas previstas vêm da nota técnica e ainda não foram carregadas neste ambiente.</p>`;
-    const L = P.lotes, totQ = L.reduce((a, l) => a + l.q, 0), totV = L.reduce((a, l) => a + (l.valor || 0), 0), semValor = L.filter((l) => l.valor == null).reduce((a, l) => a + l.q, 0);
-    const CORES = { apta: "var(--oliva)", regularizacao: "var(--dourado)", fornecedor: "var(--mostarda)", aquisicao: "var(--terracota)" };
-    const porSit = P.situacoes.map((s) => { const ls = L.filter((l) => l.situacao === s.id); return { ...s, q: ls.reduce((a, l) => a + l.q, 0), v: ls.reduce((a, l) => a + (l.valor || 0), 0) }; });
-    const fontes = [...new Set(L.map((l) => l.fonte))].map((f) => { const ls = L.filter((l) => l.fonte === f); return { f, q: ls.reduce((a, l) => a + l.q, 0), v: ls.reduce((a, l) => a + (l.valor || 0), 0), sv: ls.filter((l) => l.valor == null).reduce((a, l) => a + l.q, 0) }; }).sort((a, b) => b.q - a.q);
-    const emenda = fontes.filter((x) => /EMENDA/i.test(x.f)).reduce((o, x) => ({ q: o.q + x.q, v: o.v + x.v }), { q: 0, v: 0 });
-    const apta = porSit.find((s) => s.id === "apta") || { q: 0 };
-    const baseSem = comFiltros(false, () => calcDia(null)).baseTotal;
-    const conferePrev = P.declarado && (P.declarado.viaturas !== totQ || Math.abs(P.declarado.valor - totV) >= 1);
+    const D = dadosPrevistas();
+    if (!D) return `<p class="dash-chart-hint">As entregas previstas vêm da nota técnica e ainda não foram carregadas neste ambiente.</p>`;
+    const { P, L, totQ, totV, semValor, CORES, porSit, fontes, emenda, apta, baseSem, conferePrev } = D;
     return `
     <p class="dash-chart-hint" style="max-width:100ch">Estas entregas não saem da planilha: vêm da ${h(P.fonte)}, que lista o que está previsto para 2026. A nota não diz quais viaturas serão veladas (só o caminhão VUC aparece como descaracterizado), então o quadro mostra o que está a caminho e em que ponto está cada lote, sem entrar na conta da baixa.</p>
     <div class="kpi-row">
