@@ -12948,9 +12948,9 @@ function montarEstudoFrota(raiz, E) {
   const sAlturaRod = (fim, linhas) => fim + 18 + sRodLinhas(linhas).length * 14 + 12;
   const sPoster = (H, corpo, cortes) => `<svg class="es-poster" viewBox="0 0 1000 ${H}"${cortes ? ` data-cortes="${cortes.map((c) => c.map((v) => Math.round(v)).join(",")).join("|")}"` : ""} xmlns="http://www.w3.org/2000/svg"><rect x="0" y="0" width="1000" height="${H}" fill="var(--surface)"/>${corpo}</svg>`;
   // cartão de número grande dentro do quadro
-  const sCartao = (x, y, w, rotulo, valor, nota, cor) => `<rect x="${x}" y="${y}" width="${w}" height="74" fill="none" stroke="var(--paper-line)"/><rect x="${x}" y="${y}" width="${w}" height="3" fill="${cor}"/>`
-    + sRot(x + 12, y + 22, rotulo) + `<text x="${x + 12}" y="${y + 48}" font-family="monospace" font-size="24" font-weight="700" fill="var(--carvao)">${escapeHTML(valor)}</text>`
-    + sTxt(x + 12, y + 65, nota.length > Math.floor((w - 20) / 7) ? nota.slice(0, Math.floor((w - 20) / 7) - 1) + "…" : nota, 10, sFraco);
+  const sCartao = (x, y, w, rotulo, valor, nota, cor) => `<rect x="${x}" y="${y}" width="${w}" height="2.5" fill="${cor}"/>`
+    + sRot(x, y + 22, rotulo) + `<text x="${x}" y="${y + 48}" font-family="monospace" font-size="24" font-weight="700" fill="var(--carvao)">${escapeHTML(valor)}</text>`
+    + sTxt(x, y + 65, nota.length > Math.floor((w - 20) / 7) ? nota.slice(0, Math.floor((w - 20) / 7) - 1) + "…" : nota, 10, sFraco);
   const sLegenda = (x, y, itens) => itens.map(([c, t], i) => `<rect x="${x}" y="${y + i * 16 - 8}" width="9" height="9" fill="${c}"/>` + sTxt(x + 15, y + i * 16, t, 10)).join("");
   const grupoDeTipo = (t) => (t === 1 || t === 2 || t === 3 ? 0 : t === 0 ? 1 : t === 4 ? 2 : 3);
   // Entregas e baixa das caracterizadas passam pelos MESMOS seis filtros da baixa das veladas (departamento,
@@ -13148,7 +13148,7 @@ function montarEstudoFrota(raiz, E) {
       s += a.svg; altDep += 14 + (C.porProp[2] ? 22 : 10) + a.altura;
     }
     const fim = yConteudo + Math.max(altMapa, altDep) + 10;
-    const rod = [`Fonte: planilha de frota (${E.base || "aba Frota"}), base de ${new Date(E.atualizadoEm || E.geradoEm).toLocaleDateString("pt-BR")}. Velada é a viatura descaracterizada, sem motos e caminhões.`, "Próprias entram na conta do Estado. Cedidas voltam ao órgão de origem. DEPAF · Polícia Civil da Bahia."];
+    const rod = [`Fonte: planilha de frota, base de ${new Date(E.atualizadoEm || E.geradoEm).toLocaleDateString("pt-BR")}. Velada é a viatura descaracterizada, sem motos e caminhões.`, "Próprias entram na conta do Estado. Cedidas voltam ao órgão de origem. DEPAF · Polícia Civil da Bahia."];
     s += sRod(fim, rod);
     const Hf = sAlturaRod(fim, rod);
     return sPoster(Hf, s, [[0, 0, 1000, yTopo - 14], [0, yTopo - 14, 498, altMapa + 32, 200], [498, yTopo - 14, 502, fim - yTopo + 10], [0, fim - 2, 1000, Hf - fim + 2]]);
@@ -13303,7 +13303,18 @@ function montarEstudoFrota(raiz, E) {
     @media print{body{max-width:none;padding:0}}
     .rel-poster .rel-painel svg{max-height:none}
     .rel-painel{break-inside:avoid;margin:0 0 3mm}
-    .rel-painel svg{height:auto;display:block}`;
+    .rel-painel svg{height:auto;display:block}
+    /* sem caixas: hierarquia por tipografia, espaço e fios (nada de cartão com fundo, borda arredondada e faixa lateral) */
+    .rel-kpis{gap:22px;margin:14px 0 20px}
+    .rel-kpi{border:none;border-top:2px solid;border-radius:0;padding:9px 0 0;text-align:left;min-width:110px}
+    .rel-kpi .valor{font-size:25px;line-height:1.1}
+    .rel-kpi .rotulo{margin-top:3px;font-size:8px}
+    .rel-leitura{background:none;border:none;border-top:1px solid #B9B7AC;border-radius:0;padding:7px 0 0;margin:12px 0 14px}
+    .rel-leitura-tag{color:#5B6478;margin-bottom:2px}
+    .rel-caixa{border:none;border-top:1px solid #B9B7AC;border-radius:0;padding:8px 0 0;margin:14px 0}
+    th{background:none;color:#22262E;border-bottom:1.5px solid #22262E;padding:4px 6px 4px 0;font-size:8.5px;letter-spacing:.05em;text-transform:uppercase}
+    td{padding:4px 6px 4px 0}
+    tr:nth-child(even) td{background:none}`;
 
   const guardarFiltros = () => ({ dia: Object.fromEntries(Object.entries(FD).map(([k, S]) => [k, [...S]])), inv: Object.fromEntries(Object.entries(FI).map(([k, S]) => [k, [...S]])) });
   const restaurarFiltros = (g) => {
@@ -13366,7 +13377,7 @@ function montarEstudoFrota(raiz, E) {
 
   function relatorioEstudoHTML(op) {
     const data = new Date().toLocaleDateString("pt-BR");
-    const base = E.base || "planilha de frota", dataBase = new Date(E.atualizadoEm || E.geradoEm).toLocaleDateString("pt-BR");
+    const dataBase = new Date(E.atualizadoEm || E.geradoEm).toLocaleDateString("pt-BR");
     const todos = comFiltros(false, () => ({ C: calcDia(null), I: calcInv(null) }));
     const pctVal = op.pct;
     const pEnt = (E.totais.semValorFora || { veladas: 0, caracterizadas: 0 });
@@ -13378,11 +13389,11 @@ function montarEstudoFrota(raiz, E) {
         const C = calcDia(null), I = calcInv(null);
         const nPerdemTodas = C.unidades.filter((o) => o.situacao === "PERDE TODAS").length;
         let h = `<h1>Estudo técnico: recomposição da frota de viaturas veladas</h1>
-          <p class="rel-topo">Gerado em ${data}. Base: ${escapeHTML(base)}, gerada em ${dataBase}. ${filtroTxt ? `Filtros aplicados: ${escapeHTML(filtroTxt)}.` : "Sem filtro: frota toda."}</p>
+          <p class="rel-topo">Gerado em ${data}. Base: planilha de frota, gerada em ${dataBase}. ${filtroTxt ? `Filtros aplicados: ${escapeHTML(filtroTxt)}.` : "Sem filtro: frota toda."}</p>
           <div class="rel-kpis">${relKpiHTML(N(C.total), "Descaracterizadas", "#1F6FB2")}${relKpiHTML(N(C.perde), `A baixar (até ${EST.ano})`, "#C0432F")}${relKpiHTML(N(C.proprias), "Próprias do Estado", "#1E8A52")}${relKpiHTML(N(C.cedidas), "Cedidas", "#C98A12")}${relKpiHTML(N(nPerdemTodas), "Unidades perdem todas", "#C0432F")}</div>
           <h2>Critérios e como ler este relatório</h2>
           <ol class="rel-criterios">
-            <li><b>Base de dados.</b> Planilha de frota (${escapeHTML(base)}), com ${N(E.totais.veiculos)} veículos, gerada em ${dataBase}. O relatório usa sempre o dado do momento em que é gerado.</li>
+            <li><b>Base de dados.</b> Planilha de frota, com ${N(E.totais.veiculos)} veículos, gerada em ${dataBase}. O relatório usa sempre o dado do momento em que é gerado.</li>
             <li><b>Viatura velada.</b> É a descaracterizada (coluna de caracterização, antes PADRONIZADO, igual a NÃO): ${N(E.totais.descaracterizados)}, menos ${N(E.totais.motos)} motocicletas e ${N(E.totais.caminhoes)} caminhões, restam ${N(todos.C.total)} (${N(todos.C.porProp[0])} próprias, ${N(todos.C.porProp[1])} cedidas e ${N(todos.C.porProp[2])} locadas).</li>
             <li><b>Baixa.</b> Entra na baixa a viatura fabricada até ${EST.ano} (8 anos ou mais em ${EST.ano + 8}): ${N(todos.C.perde)} veladas. A base de reposição conta ${EST.cedidas ? "as próprias e as cedidas" : "só as próprias do Estado"}: ${N(todos.C.baseTotal)}. As cedidas voltam ao órgão de origem e as locadas são contrato de locação, por isso não entram na conta do Estado. Elegível à baixa não é baixa feita, e 8 anos de idade não é estado de conservação.</li>
             <li><b>Inservíveis.</b> A nota técnica informa ${N(EST.inservis)}. A lista de placas ainda não foi entregue, então não dá para dizer quantos estão entre as ${N(todos.C.perde)} a baixar, e os dois números não devem ser somados.</li>
@@ -13469,7 +13480,7 @@ function montarEstudoFrota(raiz, E) {
 
   raiz.innerHTML = `
     <header class="cab-v2"><div class="rot-v2">Frota · Estudo técnico</div><h1 class="tit-v2">Recomposição da frota de viaturas veladas</h1></header>
-    <p class="dash-chart-hint">Base: ${h(E.base || "planilha de frota")}, gerada em ${new Date(E.atualizadoEm || E.geradoEm).toLocaleDateString("pt-BR")}. Velada é a viatura descaracterizada, sem motos e caminhões. Clique numa barra, coluna ou ponto do mapa para isolar uma categoria, e Ctrl, Shift ou Cmd mais clique para somar outras. Os seletores fazem o mesmo, com várias opções marcadas. A imagem baixada leva escrito o filtro ativo.</p>
+    <p class="dash-chart-hint">Base: planilha de frota, gerada em ${new Date(E.atualizadoEm || E.geradoEm).toLocaleDateString("pt-BR")}. Velada é a viatura descaracterizada, sem motos e caminhões. Clique numa barra, coluna ou ponto do mapa para isolar uma categoria, e Ctrl, Shift ou Cmd mais clique para somar outras. Os seletores fazem o mesmo, com várias opções marcadas. A imagem baixada leva escrito o filtro ativo.</p>
     <div style="display:flex;justify-content:flex-end;margin:0 0 10px"><button type="button" class="dash-toggle-btn" id="es-relatorio">${iconeInline("download", 12, -2)} BAIXAR RELATÓRIO (PDF)</button></div>
     <div class="dash-filtros" style="margin-bottom:18px">
       <div class="dash-filtro" style="flex:1;min-width:230px"><label for="es-ano">BAIXA PARA ANO DE FABRICAÇÃO ATÉ</label>
