@@ -12946,7 +12946,7 @@ function montarEstudoFrota(raiz, E) {
   const sRodLinhas = (linhas) => linhas.flatMap((t) => sQuebra(t));
   const sRod = (y, linhas) => `<line x1="30" y1="${y}" x2="970" y2="${y}" stroke="var(--paper-line)"/>` + sRodLinhas(linhas).map((t, i) => sTxt(30, y + 20 + i * 14, t, 10, sFraco)).join("");
   const sAlturaRod = (fim, linhas) => fim + 18 + sRodLinhas(linhas).length * 14 + 12;
-  const sPoster = (H, corpo) => `<svg class="es-poster" viewBox="0 0 1000 ${H}" xmlns="http://www.w3.org/2000/svg"><rect x="0" y="0" width="1000" height="${H}" fill="var(--surface)"/>${corpo}</svg>`;
+  const sPoster = (H, corpo, cortes) => `<svg class="es-poster" viewBox="0 0 1000 ${H}"${cortes ? ` data-cortes="${cortes.map((c) => c.map((v) => Math.round(v)).join(",")).join("|")}"` : ""} xmlns="http://www.w3.org/2000/svg"><rect x="0" y="0" width="1000" height="${H}" fill="var(--surface)"/>${corpo}</svg>`;
   // cartão de número grande dentro do quadro
   const sCartao = (x, y, w, rotulo, valor, nota, cor) => `<rect x="${x}" y="${y}" width="${w}" height="74" fill="none" stroke="var(--paper-line)"/><rect x="${x}" y="${y}" width="${w}" height="3" fill="${cor}"/>`
     + sRot(x + 12, y + 22, rotulo) + `<text x="${x + 12}" y="${y + 48}" font-family="monospace" font-size="24" font-weight="700" fill="var(--carvao)">${escapeHTML(valor)}</text>`
@@ -13052,7 +13052,8 @@ function montarEstudoFrota(raiz, E) {
       `Estoque é a base de reposição na data da baixa (fabricação até ${EST.ano}). A cada ano seguinte entra a safra que completa 8 anos e sai o ritmo de entrega. Elegível à baixa não é baixa feita, e 8 anos de idade não é estado de conservação.`,
       `Custo por viatura: média da hipótese A (${moeda(custoMed)}), que repõe compactos por modelo de entrada.${precoPago ? ` As veladas entregues custaram em média ${moeda(precoPago)}, o que levaria a ${moeda(necessario * precoPago)} por ano.` : ""}`, notaEntregas(true)];
     s += sRod(yC + 96, rod);
-    return sPoster(sAlturaRod(yC + 96, rod), s);
+    const Hf = sAlturaRod(yC + 96, rod);
+    return sPoster(Hf, s, [[0, 0, 1000, 76], [0, 76, 515, yK - 14 - 76, 112], [515, 76, 485, yK - 14 - 76, 112], [0, yK - 14, 1000, Hf - yK + 14]]);
   }
 
   // opções que deixam os gráficos de barras largos o bastante para a área inteira da seção
@@ -13149,7 +13150,8 @@ function montarEstudoFrota(raiz, E) {
     const fim = yConteudo + Math.max(altMapa, altDep) + 10;
     const rod = [`Fonte: planilha de frota (${E.base || "aba Frota"}), base de ${new Date(E.atualizadoEm || E.geradoEm).toLocaleDateString("pt-BR")}. Velada é a viatura descaracterizada, sem motos e caminhões.`, "Próprias entram na conta do Estado. Cedidas voltam ao órgão de origem. DEPAF · Polícia Civil da Bahia."];
     s += sRod(fim, rod);
-    return sPoster(sAlturaRod(fim, rod), s);
+    const Hf = sAlturaRod(fim, rod);
+    return sPoster(Hf, s, [[0, 0, 1000, yTopo - 14], [0, yTopo - 14, 498, altMapa + 32, 200], [498, yTopo - 14, 502, fim - yTopo + 10], [0, fim - 2, 1000, Hf - fim + 2]]);
   }
 
   // ---------- 2. Entrou x vai sair, por município (Salvador por departamento, interior por município)
@@ -13209,7 +13211,8 @@ function montarEstudoFrota(raiz, E) {
     const pior = ordI.find((l) => l.b > l.e);
     const rod2 = [`Leitura: Salvador concentra ${N(salM.b)} das ${N(totB)} a baixar e recebeu ${N(salM.e)} das ${N(totE)} entregues. ${faltam} de ${noRec.length} municípios receberam menos da metade do que vão baixar${pior ? `. Fora de Salvador, o que mais falta é ${pior.c}, com ${N(pior.b - pior.e)} a mais para baixar do que entregues` : ""}.`, "Entregues são as veladas incorporadas de 2023 a 2026, no município onde a viatura está lotada hoje. A baixar é a base de reposição (fabricação até " + EST.ano + ").", notaEntregas()];
     s += sRod(fim, rod2);
-    return sPoster(sAlturaRod(fim, rod2), s);
+    const Hf = sAlturaRod(fim, rod2);
+    return sPoster(Hf, s, [[0, 0, 1000, yC - 24], [0, yC - 24, 498, altMapa + 30, 200], [498, yC - 24, 502, yI - yC + 8], [498, yI - 14, 502, fim - yI + 14], [0, fim - 2, 1000, Hf - fim + 2]]);
   }
 
   // ---------- 3. Quadro de cenários: quanto repor e quem sai do zero
@@ -13272,7 +13275,8 @@ function montarEstudoFrota(raiz, E) {
     const pend = noRec.filter((l) => l.a < l.t).sort((a, b) => (b.t - b.a) - (a.t - a.a));
     const rod3 = [`Leitura: com ${EST.pct}% da reposição, ${N(totA)} de ${N(totT)} unidades deixam de ficar sem nenhuma velada${pend.length ? `. Ficam pendentes ${pend.slice(0, 3).map((l) => `${l.c} (${l.t - l.a})`).join(", ")}${pend.length > 3 ? " e outros" : ""}` : ""}.`, "A fila começa pelas unidades que perderiam todas as veladas, das menores para as maiores, e segue até acabar as viaturas do percentual escolhido. A hipótese A repõe cada viatura por um modelo equivalente e a B usa o preço único.", `Base de reposição: ${EST.cedidas ? "próprias e cedidas" : "só as próprias do Estado"}, fabricação até ${EST.ano}.`];
     s += sRod(fim, rod3);
-    return sPoster(sAlturaRod(fim, rod3), s);
+    const Hf = sAlturaRod(fim, rod3);
+    return sPoster(Hf, s, [[0, 0, 1000, yC - 24], [0, yC - 24, 498, altMapa + 30, 200], [498, yC - 24, 502, yI - yC + 8], [498, yI - 14, 502, fim - yI + 14], [0, fim - 2, 1000, Hf - fim + 2]]);
   }
 
   // =====================================================================
@@ -13293,7 +13297,13 @@ function montarEstudoFrota(raiz, E) {
     .rel-grade .rel-caixa{break-inside:avoid}
     .rel-grade h3{font-size:12px;margin:0 0 6px;color:#22262E}
     .rel-tabela-un td, .rel-tabela-un th{font-size:9.5px}
-    .rel-secao-nova{page-break-before:always}`;
+    .rel-secao-nova{page-break-before:always}
+    /* mais área útil: margem menor e sem a coluna estreita do corpo, para os quadros ocuparem a largura da página */
+    @page{margin:8mm}
+    @media print{body{max-width:none;padding:0}}
+    .rel-poster .rel-painel svg{max-height:none}
+    .rel-painel{break-inside:avoid;margin:0 0 3mm}
+    .rel-painel svg{height:auto;display:block}`;
 
   const guardarFiltros = () => ({ dia: Object.fromEntries(Object.entries(FD).map(([k, S]) => [k, [...S]])), inv: Object.fromEntries(Object.entries(FI).map(([k, S]) => [k, [...S]])) });
   const restaurarFiltros = (g) => {
@@ -13376,15 +13386,15 @@ function montarEstudoFrota(raiz, E) {
             <li><b>Viatura velada.</b> É a descaracterizada (coluna de caracterização, antes PADRONIZADO, igual a NÃO): ${N(E.totais.descaracterizados)}, menos ${N(E.totais.motos)} motocicletas e ${N(E.totais.caminhoes)} caminhões, restam ${N(todos.C.total)} (${N(todos.C.porProp[0])} próprias, ${N(todos.C.porProp[1])} cedidas e ${N(todos.C.porProp[2])} locadas).</li>
             <li><b>Baixa.</b> Entra na baixa a viatura fabricada até ${EST.ano} (8 anos ou mais em ${EST.ano + 8}): ${N(todos.C.perde)} veladas. A base de reposição conta ${EST.cedidas ? "as próprias e as cedidas" : "só as próprias do Estado"}: ${N(todos.C.baseTotal)}. As cedidas voltam ao órgão de origem e as locadas são contrato de locação, por isso não entram na conta do Estado. Elegível à baixa não é baixa feita, e 8 anos de idade não é estado de conservação.</li>
             <li><b>Inservíveis.</b> A nota técnica informa ${N(EST.inservis)}. A lista de placas ainda não foi entregue, então não dá para dizer quantos estão entre as ${N(todos.C.perde)} a baixar, e os dois números não devem ser somados.</li>
-            <li><b>Investimento.</b> Próprias entregues de 2023 a 2026 com valor informado, incluindo o reboque e o VUC: ${N(todos.I.n)} viaturas e ${moedaExata(todos.I.v)}. A nota técnica traz ${NOTA.viaturas} viaturas e ${moedaExata(NOTA.valor)}: a quantidade ${todos.I.n === NOTA.viaturas ? "bate" : "difere"} e o valor difere em ${moedaExata(Math.abs(NOTA.valor - todos.I.v))}, diferença que não foi reproduzida com a planilha de hoje. Ficam fora ${N(pEnt.veladas + pEnt.caracterizadas)} doações que vieram sem valor, porque não são dinheiro do Estado.</li>
+            <li><b>Investimento.</b> Próprias entregues de 2023 a 2026 com valor informado, incluindo o reboque e o VUC: ${N(todos.I.n)} viaturas e ${moedaExata(todos.I.v)}. A nota técnica traz ${NOTA.viaturas} viaturas e ${moedaExata(NOTA.valor)}: a quantidade ${todos.I.n === NOTA.viaturas ? "bate" : "difere"} e o valor ${Math.abs(NOTA.valor - todos.I.v) < 1 ? `difere em ${moedaExata(Math.abs(NOTA.valor - todos.I.v))}, só arredondamento` : `difere em ${moedaExata(Math.abs(NOTA.valor - todos.I.v))}, diferença que não foi reproduzida com a planilha de hoje`}. Ficam fora ${N(pEnt.veladas + pEnt.caracterizadas)} doações que vieram sem valor, porque não são dinheiro do Estado.</li>
             <li><b>Ritmo e reposição por município.</b> Comparam as veladas entregues (sem motos e caminhões, como a baixa) com as veladas a baixar, e as entregas passam pelos mesmos filtros da baixa. A coluna de quem completa 8 anos mostra elegibilidade. O ano de 2026 está incompleto, porque a base é de ${dataBase}.</li>
             <li><b>Cenários.</b> A hipótese A repõe cada viatura por um modelo equivalente (compactos pelo Cronos a ${moeda(EST.precoA.c)}, pick-ups pela Ranger a ${moeda(EST.precoA.p)} e SUV pelo Duster a ${moeda(EST.precoA.s)}). A hipótese B usa um preço único de ${moeda(EST.precoB)}. São os preços pagos em 2025 e 2026, a confirmar com o valor vigente da DILOG. A fila começa pelas unidades que perderiam todas as veladas, das menores para as maiores.</li>
             <li><b>Filtros.</b> ${filtroTxt ? `Este relatório foi gerado com: ${escapeHTML(filtroTxt)}. Entregas, baixa das veladas e baixa das caracterizadas passam pelos mesmos filtros, para as razões sempre compararem o mesmo recorte. Os inservíveis são o total informado e não mudam com os filtros.` : "Nenhum filtro aplicado: os números são da frota toda."}</li>
           </ol>`;
-        if (op.secoes.has("info")) h += `<div class="rel-poster">${relLeituraHTML("Mostra o tamanho do problema e onde ele está. As três barras comparam o total de descaracterizadas, as que passam de 8 anos e os inservíveis informados. O mapa pinta cada município pela quantidade de viaturas a baixar, com Salvador em destaque, e os departamentos aparecem separados entre Salvador e os demais municípios.")}${infograficoSVG({ C, ...entradasInfografico() })}</div>`;
-        if (op.secoes.has("ritmo")) h += `<div class="rel-poster">${relLeituraHTML("Responde se o ritmo de entrega cobre o que passa dos 8 anos. À esquerda, o que foi entregue em cada ano contra as safras que completam 8 anos, com o acumulado já elegível embaixo de cada ano. À direita, quanto do estoque ainda precisaria ser reposto se o ritmo se mantiver. Embaixo, veladas e caracterizadas lado a lado, para mostrar se a renovação foi para o mesmo tipo de viatura que sai.")}${ritmoSVG()}</div>`;
-        if (op.secoes.has("sai")) h += `<div class="rel-poster">${relLeituraHTML("Mostra onde a reposição recente chegou e onde ainda falta, comparando entregues e a baixar. Salvador aparece por departamento, porque concentra boa parte da frota, e o interior aparece por município.")}${entrouSaiSVG()}</div>`;
-        if (op.secoes.has("cen")) h += `<div class="rel-poster">${relLeituraHTML("Mostra o que acontece se for reposto o percentual escolhido da base: quantas viaturas, quanto custa nas duas hipóteses e quais unidades deixam de ficar sem nenhuma velada.")}${quadroCenarioSVG()}</div>`;
+        if (op.secoes.has("info")) h += `<div class="rel-poster">${relLeituraHTML("Mostra o tamanho do problema e onde ele está. As três barras comparam o total de descaracterizadas, as que passam de 8 anos e os inservíveis informados. O mapa pinta cada município pela quantidade de viaturas a baixar, com Salvador em destaque, e os departamentos aparecem separados entre Salvador e os demais municípios.")}${relPaineisHTML(infograficoSVG({ C, ...entradasInfografico() }))}</div>`;
+        if (op.secoes.has("ritmo")) h += `<div class="rel-poster">${relLeituraHTML("Responde se o ritmo de entrega cobre o que passa dos 8 anos. À esquerda, o que foi entregue em cada ano contra as safras que completam 8 anos, com o acumulado já elegível embaixo de cada ano. À direita, quanto do estoque ainda precisaria ser reposto se o ritmo se mantiver. Embaixo, veladas e caracterizadas lado a lado, para mostrar se a renovação foi para o mesmo tipo de viatura que sai.")}${relPaineisHTML(ritmoSVG())}</div>`;
+        if (op.secoes.has("sai")) h += `<div class="rel-poster">${relLeituraHTML("Mostra onde a reposição recente chegou e onde ainda falta, comparando entregues e a baixar. Salvador aparece por departamento, porque concentra boa parte da frota, e o interior aparece por município.")}${relPaineisHTML(entrouSaiSVG())}</div>`;
+        if (op.secoes.has("cen")) h += `<div class="rel-poster">${relLeituraHTML("Mostra o que acontece se for reposto o percentual escolhido da base: quantas viaturas, quanto custa nas duas hipóteses e quais unidades deixam de ficar sem nenhuma velada.")}${relPaineisHTML(quadroCenarioSVG())}</div>`;
         if (op.secoes.has("inv")) {
           h += `<div class="rel-secao-nova"><h2>Investimento realizado, 2023 a 2026</h2>
             <div class="rel-kpis">${relKpiHTML(N(I.n), "Viaturas incorporadas", "#1F6FB2")}${relKpiHTML(moeda(I.v), "Investido", "#1E8A52")}${relKpiHTML(N(I.nVel), "Veladas no recorte", "#C98A12")}${relKpiHTML(I.n - I.sv > 0 ? moeda(I.v / (I.n - I.sv)) : "R$ 0", "Valor médio por viatura", "#7C5CBF")}</div>
@@ -15358,6 +15368,19 @@ function abrirRelatorioImprimivel(titulo, corpoHTML, opcoes = {}) {
 function relBarraHTML(rotulo, valor, max, cor) {
   const pct = max ? Math.max(2, (valor / max) * 100) : 0;
   return `<div class="rel-bar-linha"><div class="rel-bar-rotulo">${escapeHTML(rotulo)}</div><div class="rel-bar-trilha"><div class="rel-bar-preenchido" style="width:${pct}%;background:${cor}"></div></div><div class="rel-bar-valor">${valor.toLocaleString("pt-BR")}</div></div>`;
+}
+
+// Os quadros grandes viram vários painéis de largura inteira (viewBox recortado do mesmo SVG), para o texto
+// ficar legível no PDF em vez de encolher o quadro todo para caber numa página.
+function relPaineisHTML(svg) {
+  const m = svg.match(/data-cortes="([^"]+)"/);
+  if (!m) return svg;
+  return m[1].split("|").map((c) => {
+    const [x, y, w, h, max] = c.split(",").map(Number);
+    const recorte = svg.replace(/viewBox="[^"]*"/, `viewBox="${x} ${y} ${w} ${h}"`);
+    // limita a ALTURA pela largura (e não por max-height), senão o SVG mostra o que está fora do recorte nas laterais
+    return `<div class="rel-painel">${recorte.replace("<svg ", `<svg style="width:min(100%, ${((max || 262) * w / h).toFixed(1)}mm);margin:0 auto" `)}</div>`;
+  }).join("");
 }
 
 function relKpiHTML(valor, rotulo, cor) {
