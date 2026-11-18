@@ -959,6 +959,10 @@ details.painel-detalhes{border:1px solid var(--paper-line)!important}
 .hoje-v2{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:0}
 .hoje-v2 button{text-align:left;padding:2px 22px 8px 0;margin-right:22px;border:0;border-right:1px solid var(--paper-line);background:transparent;color:var(--carvao);cursor:pointer;font-family:inherit}
 .hoje-v2 button:last-child{border-right:0}
+.impacto-v2>div{padding:2px 22px 8px 0;margin-right:22px;border-right:1px solid var(--paper-line);color:var(--carvao)}
+.impacto-v2>div:last-child{border-right:0}
+.impacto-v2 .n{font-size:2.4rem}
+.impacto-rotulo{color:var(--carvao);margin:8px 0 2px}
 .hoje-v2 button:hover{background:var(--paper-line)}
 .hoje-v2 .n{font-family:'Spectral',serif;font-weight:700;font-size:3rem;line-height:1;font-variant-numeric:lining-nums tabular-nums}
 .hoje-v2 .l{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.12em;text-transform:uppercase;margin-top:4px}
@@ -9497,6 +9501,42 @@ function menuPorTipo(painel, { titulo, subtitulo, secoes }) {
 
 // Itens novos do menu de Contratos. O estado de filtro é compartilhado entre
 // eles e zera quando a base muda (outra unidade gestora ou DIRPIN).
+// Impacto mensal ESTIMADO dos contratos: mesma regra das medidas DAX do
+// .pbip de Contratos. Taxa de cada contrato = valor global atual dividido
+// pela vigência em meses (dias / 30,4375). É estimativa linear, não gasto
+// realizado. Entram só contratos com valor, as duas datas, vigência de pelo
+// menos 30 dias e status diferente de "Vencido" ("A Contratar" não tem
+// valor, então cai fora). Por mês do calendário: soma das taxas dos
+// contratos cuja vigência cobre aquele mês.
+const DIAS_POR_MES = 30.4375;
+const ROTULO_IMPACTO_MENSAL = "Estimativa linear: valor global atual dividido pela vigência de cada contrato. Não é gasto realizado.";
+function impactoMensalContratos(lista, { meses = 12, hoje = new Date() } = {}) {
+  const entram = [], fora = { vencido: 0, aContratar: 0, semValor: 0, semDatas: 0, curta: 0 };
+  for (const c of lista) {
+    if (c.statusVigencia === "Vencido") { fora.vencido++; continue; }
+    const valor = Number(c.valorGlobalAtual);
+    if (c.valorGlobalAtual == null || !Number.isFinite(valor) || valor <= 0) { if (c.statusVigencia === "A Contratar") fora.aContratar++; else fora.semValor++; continue; }
+    const ini = c.dataInicio ? new Date(c.dataInicio).getTime() : NaN, fim = c.dataFim ? new Date(c.dataFim).getTime() : NaN;
+    if (!Number.isFinite(ini) || !Number.isFinite(fim)) { fora.semDatas++; continue; }
+    const dias = (fim - ini) / 86400000;
+    if (dias < 30) { fora.curta++; continue; }
+    entram.push({ c, ini, fim, taxa: valor / (dias / DIAS_POR_MES) });
+  }
+  const mensal = entram.reduce((a, e) => a + e.taxa, 0);
+  const cats = new Map();
+  for (const e of entram) { const k = e.c.tipoObjeto || "(sem categoria)"; const x = cats.get(k) || { k, n: 0, v: 0 }; x.n++; x.v += e.taxa; cats.set(k, x); }
+  const porMes = [];
+  let y = hoje.getFullYear(), m = hoje.getMonth();
+  for (let i = 0; i < meses; i++) {
+    const inicioMes = new Date(y, m, 1).getTime(), fimMes = new Date(y, m + 1, 1).getTime() - 1;
+    const cobre = entram.filter((e) => e.ini <= fimMes && e.fim >= inicioMes);
+    porMes.push({ ym: `${y}-${String(m + 1).padStart(2, "0")}`, v: cobre.reduce((a, e) => a + e.taxa, 0), n: cobre.length });
+    m++; if (m > 11) { m = 0; y++; }
+  }
+  const qtdFora = Object.values(fora).reduce((a, n) => a + n, 0);
+  return { mensal, anual: mensal * 12, entram, fora, qtdFora, porCategoria: [...cats.values()].sort((a, b) => b.v - a.v), porMes };
+}
+
 function montarMenuContratos(painel, getContext) {
   const N = (n) => Math.round(n).toLocaleString("pt-BR");
   const soma = (a) => a.reduce((x, y) => x + y, 0);
@@ -9573,6 +9613,39 @@ function montarMenuContratos(painel, getContext) {
     return `${pilulas()}<div class="v2c-ctl">${grp("valorModo", [["valor", "Por valor"], ["qtd", "Por quantidade"]], ST.valorModo)}</div>${itens.length ? v2Barras(itens, { sel, acao: "cat" }) : `<p class="item-sub-v2">Nenhum contrato com esses filtros.</p>`}
       <div data-v2c-lista>${ST.cat !== null ? tabela([...filtrada()].sort((a, b) => (b.valorGlobalAtual || 0) - (a.valorGlobalAtual || 0)), `Contratos de ${ST.cat}, do maior valor para o menor`) : ""}</div>`;
   }
+  // ---- Valores: impacto mensal estimado (estimativa linear)
+  function itemImpacto() {
+    const r = impactoMensalContratos(filtrada({ mes: true }));
+    const exato = (v) => formatarMoedaBR(v);
+    const motivos = [
+      [r.fora.vencido, "vencido", "vencidos"], [r.fora.aContratar, "a contratar, sem valor", "a contratar, sem valor"],
+      [r.fora.semValor, "sem valor lançado", "sem valor lançado"], [r.fora.semDatas, "sem data de início ou fim", "sem data de início ou fim"],
+      [r.fora.curta, "com vigência menor que 30 dias", "com vigência menor que 30 dias"],
+    ].filter(([n]) => n).map(([n, um, varios]) => `${N(n)} ${n === 1 ? um : varios}`);
+    const LIM = 7, cats = r.porCategoria, mostrar = ST.valorTodas ? cats : cats.slice(0, LIM);
+    const itens = mostrar.map((d) => ({ k: d.k, l: `${d.k} (${N(d.n)})`, v: d.v, txt: moedaC(d.v) + "/mês" }));
+    const resto = cats.slice(LIM);
+    if (resto.length && !ST.valorTodas) { const vr = soma(resto.map((d) => d.v)); itens.push({ k: "mais", l: `Outras ${resto.length} categorias (ver todas)`, v: vr, txt: moedaC(vr) + "/mês", cor: "#56625F", acao: "maisCat" }); }
+    else if (resto.length && ST.valorTodas) itens.push({ k: "menos", l: `Mostrar só as ${LIM} maiores`, v: 0, txt: "", cor: "#56625F", acao: "maisCat" });
+    const mx = Math.max(...r.porMes.map((x) => x.v), 1);
+    const leit = (x) => `${mesRot(x.ym)}: ${moedaC(x.v)} no mês, ${N(x.n)} ${x.n === 1 ? "contrato" : "contratos"} em vigência`;
+    const contratosCat = ST.cat === null ? [] : r.entram.filter((e) => categoria(e.c) === ST.cat).sort((a, b) => b.taxa - a.taxa).map((e) => e.c);
+    return `${pilulas()}<div class="hoje-v2 impacto-v2">
+        <div><div class="n">${moedaC(r.mensal)}</div><div class="l">Por mês, estimado</div><div class="s">${exato(r.mensal)}</div></div>
+        <div><div class="n">${moedaC(r.anual)}</div><div class="l">Por ano (12 × o mensal)</div><div class="s">${exato(r.anual)}</div></div>
+        <div><div class="n">${N(r.entram.length)}</div><div class="l">Contratos na conta</div><div class="s">${N(r.qtdFora)} de fora</div></div>
+      </div>
+      <p class="item-sub-v2 impacto-rotulo" data-impacto-rotulo>${escapeHTML(ROTULO_IMPACTO_MENSAL)}</p>
+      ${motivos.length ? `<p class="item-sub-v2">Ficam de fora: ${escapeHTML(motivos.join("; "))}.</p>` : ""}
+      <h4 class="v2c-lista-tit">Por categoria de objeto, em R$ por mês</h4>
+      ${itens.length ? v2Barras(itens, { sel: ST.cat, acao: "cat" }) : `<p class="item-sub-v2">Nenhum contrato entra na conta com esses filtros.</p>`}
+      <h4 class="v2c-lista-tit">Próximos ${r.porMes.length} meses</h4>
+      <div class="v2c-leit" data-v2c-leit>${escapeHTML(leit(r.porMes[0]))}</div>
+      <div class="v2c-cols">${r.porMes.map((x) => `<button type="button" data-leit="${escapeAttr(leit(x))}" aria-label="${escapeAttr(leit(x))}"><em>${x.v ? escapeHTML(formatarMoedaCompacta(x.v)) : ""}</em><div class="pilha-col" style="height:${x.v / mx * 100}%"><i style="display:block;height:100%;background:${V2C_COR.vigente}"></i></div></button>`).join("")}</div>
+      <div class="v2c-rot">${r.porMes.map((x, i) => `<span>${i === 0 || x.ym.slice(5, 7) === "01" ? mesRot(x.ym) : MESES_ROT[+x.ym.slice(5, 7) - 1]}</span>`).join("")}</div>
+      <p class="item-sub-v2">Cada mês soma as taxas dos contratos cuja vigência cobre aquele mês. A curva cai conforme os contratos vencem: renovações e contratações novas ainda não entram.</p>
+      <div data-v2c-lista>${ST.cat !== null ? tabela(contratosCat, `Contratos de ${ST.cat} na conta, da maior taxa mensal para a menor`) : ""}</div>`;
+  }
   // ---- Pessoas: gestores e fiscais
   function itemPessoas() {
     const papel = ST.pesPapel, lista = filtrada({ pes: true }), m = new Map();
@@ -9619,6 +9692,7 @@ function montarMenuContratos(painel, getContext) {
       ] },
       { tipo: "Valores", itens: [
         { id: "valor", titulo: "Valor por categoria de objeto", sub: "Onde está o dinheiro.", render: itemValor, depois: (c) => ligarTabela(c, ultimaLista.valor) },
+        { id: "impacto", titulo: "Impacto mensal estimado dos contratos", sub: "Quanto os contratos em vigor pesam por mês, em média. Estimativa, não gasto realizado.", render: itemImpacto, depois: (c) => ligarTabela(c, ultimaLista.valor) },
         { id: "gerencial", titulo: "Valor, maiores contratos e variação de valor", etiqueta: "Gerencial", legado: "gerencial" },
         { id: "porcategoria", titulo: "Contratos por categoria, perfil completo", etiqueta: "Por categoria", legado: "porcategoria" },
       ] },
@@ -13400,6 +13474,7 @@ function montarEstudoFrota(raiz, E) {
             <li><b>Investimento.</b> Próprias entregues de 2023 a 2026 com valor informado, incluindo o reboque e o VUC: ${N(todos.I.n)} viaturas e ${moedaExata(todos.I.v)}. A nota técnica traz ${NOTA.viaturas} viaturas e ${moedaExata(NOTA.valor)}: a quantidade ${todos.I.n === NOTA.viaturas ? "bate" : "difere"} e o valor ${Math.abs(NOTA.valor - todos.I.v) < 1 ? `difere em ${moedaExata(Math.abs(NOTA.valor - todos.I.v))}, só arredondamento` : `difere em ${moedaExata(Math.abs(NOTA.valor - todos.I.v))}, diferença que não foi reproduzida com a planilha de hoje`}. Ficam fora ${N(pEnt.veladas + pEnt.caracterizadas)} doações que vieram sem valor, porque não são dinheiro do Estado.</li>
             <li><b>Ritmo e reposição por município.</b> Comparam as veladas entregues (sem motos e caminhões, como a baixa) com as veladas a baixar, e as entregas passam pelos mesmos filtros da baixa. A coluna de quem completa 8 anos mostra elegibilidade. O ano de 2026 está incompleto, porque a base é de ${dataBase}.</li>
             <li><b>Cenários.</b> A hipótese A repõe cada viatura por um modelo equivalente (compactos pelo Cronos a ${moeda(EST.precoA.c)}, pick-ups pela Ranger a ${moeda(EST.precoA.p)} e SUV pelo Duster a ${moeda(EST.precoA.s)}). A hipótese B usa um preço único de ${moeda(EST.precoB)}. São os preços pagos em 2025 e 2026, a confirmar com o valor vigente da DILOG. A fila começa pelas unidades que perderiam todas as veladas, das menores para as maiores.</li>
+            ${op.secoes.has("prev") ? `<li><b>Entregas previstas.</b> Vêm da nota técnica de 14/10/2026, não da planilha de frota. Não entram na conta da baixa, porque a nota não diz quais delas são veladas.</li>` : ""}
             <li><b>Filtros.</b> ${filtroTxt ? `Este relatório foi gerado com: ${escapeHTML(filtroTxt)}. Entregas, baixa das veladas e baixa das caracterizadas passam pelos mesmos filtros, para as razões sempre compararem o mesmo recorte. Os inservíveis são o total informado e não mudam com os filtros.` : "Nenhum filtro aplicado: os números são da frota toda."}</li>
           </ol>`;
         if (op.secoes.has("info")) h += `<div class="rel-poster">${relLeituraHTML("Mostra o tamanho do problema e onde ele está. As três barras comparam o total de descaracterizadas, as que passam de 8 anos e os inservíveis informados. O mapa pinta cada município pela quantidade de viaturas a baixar, com Salvador em destaque, e os departamentos aparecem separados entre Salvador e os demais municípios.")}${relPaineisHTML(infograficoSVG({ C, ...entradasInfografico() }))}</div>`;
