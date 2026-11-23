@@ -154,6 +154,7 @@
       yrs.append(row);
     });
     c.append(yrs);
+    if (e.observacao) { const o = h('p', 'buy'); o.append(document.createTextNode('Observação: '), h('b', null, e.observacao)); c.append(o); }
     D.processos.filter((p) => p.id_entrega === e.id_entrega).forEach((p) => { const b = h('p', 'buy'); b.append(document.createTextNode('Aquisição: '), h('b', null, p.etapa), document.createTextNode(` · ${p.objeto}`)); c.append(b); });
     return c;
   };
