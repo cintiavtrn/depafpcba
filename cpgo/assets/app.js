@@ -154,6 +154,31 @@
   };
   const ORDERS = { cadeia: ['comp', 'ini', 'ent'], usp: ['usp', 'comp', 'ent'], status: ['stage', 'usp', 'ent'] };
 
+  // Números que a planilha traz junto do status: quantidade informada contra a meta do PPA e o indicador da linha.
+  const fmtN = (v, un) => (v == null ? '—' : un === '%' ? pf1.format(v) : f2.format(v));
+  const numerosEntrega = (e) => {
+    const box = h('div', 'nums'); let tem = false;
+    const q = e.qtd || {}; const anos = [2024, 2025, 2026].filter((y) => q[y] != null);
+    if (e.meta_num != null && anos.length) {
+      let acum = 0; anos.forEach((y) => { acum += q[y]; });
+      const p = h('p', 'nums-l'); p.append(h('b', null, 'Quantidade informada: '), document.createTextNode(`${anos.map((y) => `${y}: ${nf.format(q[y])}`).join(' · ')}. Acumulado ${nf.format(acum)} de ${nf.format(e.meta_num)} da meta do PPA (${pf.format(acum / e.meta_num)}).`));
+      box.append(p); tem = true;
+    }
+    const ind = D.indicadores.filter((r) => r.id_indicador === 'IND' + e.id_entrega.slice(1)).sort((a, z) => a.ano - z.ano);
+    if (ind.length) {
+      const un = ind[0].unidade; const p = h('p', 'nums-l'); p.append(h('b', null, 'Indicador: '), document.createTextNode(`${ind[0].indicador}. Meta do PPA: ${fmtN(ind[0].meta_ppa, un)}.`)); box.append(p);
+      const ul = h('ul', 'nums-i');
+      ind.forEach((r) => {
+        const pol = r.polaridade === -1 ? -1 : 1;
+        let v = '';
+        if (r.apurado != null && r.planejado != null) { const ok = pol > 0 ? r.apurado >= r.planejado : r.apurado <= r.planejado; v = ok ? ' · dentro do planejado' : ' · abaixo do planejado'; }
+        ul.append(h('li', null, `${r.ano}: planejado ${r.planejado == null ? 'NS (não apurado no período)' : fmtN(r.planejado, un)} · apurado ${r.apurado == null ? (r.planejado == null ? 'NS' : 'sem apuração') : fmtN(r.apurado, un)}${r.apuracao_parcial ? ' (parcial)' : ''}${v}`));
+      });
+      box.append(ul); tem = true;
+    }
+    return tem ? box : null;
+  };
+
   const detailCard = (e) => {
     const c = h('article', 'detail-card');
     c.append(h('h3', null, e.entrega));
@@ -170,6 +195,7 @@
       yrs.append(row);
     });
     c.append(yrs);
+    const nums = numerosEntrega(e); if (nums) c.append(nums);
     if (e.observacao) { const o = h('p', 'buy'); o.append(document.createTextNode('Observação: '), h('b', null, e.observacao)); c.append(o); }
     D.processos.filter((p) => p.id_entrega === e.id_entrega).forEach((p) => { const b = h('p', 'buy'); b.append(document.createTextNode('Aquisição: '), h('b', null, p.etapa), document.createTextNode(` · ${p.objeto}`)); c.append(b); });
     return c;

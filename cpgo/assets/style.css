@@ -174,3 +174,9 @@ button.kpi { font: inherit; color: inherit; text-align: left; cursor: pointer; }
 button.kpi:hover { border-color: var(--core); }
 button.kpi[aria-pressed="true"] { border-color: var(--core); background: var(--panel-on); }
 .kpis.filtrando button.kpi[aria-pressed="false"] { opacity: 0.6; }
+
+/* números da planilha no detalhe da entrega: quantidade contra a meta e indicador */
+.nums { margin-top: 0.6rem; padding-top: 0.5rem; border-top: 1px solid var(--line); font-size: 0.8rem; line-height: 1.45; color: var(--muted); }
+.nums-l { margin: 0 0 0.3rem; }
+.nums-l b { color: var(--fg); }
+.nums-i { margin: 0 0 0.2rem; padding-left: 1rem; }
