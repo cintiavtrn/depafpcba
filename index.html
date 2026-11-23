@@ -5954,10 +5954,10 @@ document.addEventListener("pointerout", (ev) => {
   if (!svg.classList.contains("mosaico-login")) { wrap.classList.remove("dim"); atualizarLeituraMosaico(wrap, null); }
   svg.querySelectorAll(".sh").forEach((g) => g.classList.remove("on"));
 });
-// Login: os losangos se juntam e formam o emblema da Polícia Civil seguido de
-// DEPAF (letra feita de peças). Acontece uma vez, quando a tela de login
-// aparece; depois fica quieta. Passar o cursor solta as peças, que voltam ao
-// lugar quando ele sai. Com "reduzir movimento", mostra só o resultado.
+// Login: bolinhas se juntam e formam o emblema da Polícia Civil seguido de
+// DEPAF. Quando assentam, as bolinhas somem e o emblema e a palavra aparecem
+// nítidos, de verdade. Passar o cursor solta as bolinhas de novo, e o desenho
+// nítido volta quando ele sai. Com "reduzir movimento", mostra só o nítido.
 async function montarMosaicoLogin() {
   const alvo = document.getElementById("login-mosaico"); if (!alvo) return;
   const cel = 5, cols = 95, linhas = 42, W = cols * cel, H = linhas * cel, dpr = Math.min(2, window.devicePixelRatio || 1);
@@ -5967,7 +5967,7 @@ async function montarMosaicoLogin() {
   if (!ctx) { alvo.innerHTML = ""; document.getElementById("tela-login")?.classList.add("sem-mosaico"); return; }
   ctx.scale(dpr, dpr);
   const reduz = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
-  let pecas = null, fundo = null, rodando = false, ponteiro = null, iniciou = false;
+  let pecas = null, fundo = null, nit = null, rodando = false, ponteiro = null, iniciou = false, nitido = 0, tMontou = 0, ultimo = 0;
 
   async function preparar() {
     const fonte = document.querySelector(".login-brasao img");
@@ -5978,8 +5978,8 @@ async function montarMosaicoLogin() {
     try { await ate(document.fonts.load("700 88px Spectral"), 1500); } catch { /* usa a serifa do sistema */ }
     const off = document.createElement("canvas"); off.width = W; off.height = H;
     const o = off.getContext("2d", { willReadFrequently: true });
-    let x0 = 4;
-    if (img.naturalWidth) { const eh = 192, ew = eh * img.naturalWidth / img.naturalHeight; o.drawImage(img, x0, (H - eh) / 2, ew, eh); x0 += ew + 18; }
+    let x0 = 4, emb = null;
+    if (img.naturalWidth) { const eh = 192, ew = eh * img.naturalWidth / img.naturalHeight; emb = [x0, (H - eh) / 2, ew, eh]; o.drawImage(img, ...emb); x0 += ew + 18; }
     let fs = 90; o.font = `700 ${fs}px Spectral, serif`;
     const espaco = (f) => `${Math.round(f * 0.07)}px`;
     o.letterSpacing = espaco(fs);
@@ -5988,6 +5988,13 @@ async function montarMosaicoLogin() {
     o.fillStyle = "#E4EBE9"; o.strokeStyle = "#E4EBE9"; o.textBaseline = "alphabetic"; o.lineJoin = "round"; o.lineWidth = fs * 0.025;
     o.strokeText("DEPAF", x0 + 2, H / 2 + fs * 0.33);
     o.fillText("DEPAF", x0 + 2, H / 2 + fs * 0.33);
+    // o desenho de verdade (emblema e palavra), na resolução da tela, que aparece depois das bolinhas
+    nit = document.createElement("canvas"); nit.width = W * dpr; nit.height = H * dpr;
+    const n = nit.getContext("2d"); n.scale(dpr, dpr);
+    if (emb) n.drawImage(img, ...emb);
+    n.font = o.font; n.letterSpacing = o.letterSpacing; n.fillStyle = o.fillStyle; n.strokeStyle = o.strokeStyle; n.textBaseline = "alphabetic"; n.lineJoin = "round"; n.lineWidth = o.lineWidth;
+    n.strokeText("DEPAF", x0 + 2, H / 2 + fs * 0.33);
+    n.fillText("DEPAF", x0 + 2, H / 2 + fs * 0.33);
     const dados = o.getImageData(0, 0, W, H).data;
     const lista = [], bg = [];
     for (let cy = 0; cy < linhas; cy++) for (let cx = 0; cx < cols; cx++) {
@@ -6003,7 +6010,7 @@ async function montarMosaicoLogin() {
     }
     // fundo fixo e discreto: a grade de losangos que não entrou no desenho
     fundo = document.createElement("canvas"); fundo.width = W * dpr; fundo.height = H * dpr;
-    const f = fundo.getContext("2d"); f.scale(dpr, dpr); f.strokeStyle = "rgba(139,147,163,.22)"; f.lineWidth = 1;
+    const f = fundo.getContext("2d"); f.scale(dpr, dpr); f.strokeStyle = "rgba(139,147,163,.16)"; f.lineWidth = 1;
     bg.forEach(([x, y]) => { f.beginPath(); f.moveTo(x, y - 1.8); f.lineTo(x + 1.8, y); f.lineTo(x, y + 1.8); f.lineTo(x - 1.8, y); f.closePath(); f.stroke(); });
     pecas = lista.map((q) => ({ ...q, x: reduz ? q.tx : Math.random() * W, y: reduz ? q.ty : Math.random() * H, x0: 0, y0: 0, vx: 0, vy: 0, atraso: (q.tx / W) * 1100 + Math.random() * 260, a: reduz ? 1 : 0 }));
     pecas.forEach((q) => { q.x0 = q.x; q.y0 = q.y; });
@@ -6011,20 +6018,23 @@ async function montarMosaicoLogin() {
   const ease = (u) => 1 - Math.pow(1 - u, 3);
   function desenhar() {
     ctx.clearRect(0, 0, W, H);
-    ctx.drawImage(fundo, 0, 0, W, H);
-    pecas.forEach((q) => {
-      if (q.a <= 0) return;
-      ctx.globalAlpha = q.a; ctx.fillStyle = q.cor;
-      const r = 2.5;
-      ctx.beginPath(); ctx.moveTo(q.x, q.y - r); ctx.lineTo(q.x + r, q.y); ctx.lineTo(q.x, q.y + r); ctx.lineTo(q.x - r, q.y); ctx.closePath(); ctx.fill();
-    });
+    const d = 1 - nitido;
+    if (d > 0.01) {
+      ctx.globalAlpha = d; ctx.drawImage(fundo, 0, 0, W, H);
+      pecas.forEach((q) => {
+        if (q.a <= 0) return;
+        ctx.globalAlpha = q.a * d; ctx.fillStyle = q.cor;
+        ctx.beginPath(); ctx.arc(q.x, q.y, 2.2, 0, Math.PI * 2); ctx.fill();
+      });
+    }
+    if (nitido > 0.01 && nit) { ctx.globalAlpha = nitido; ctx.drawImage(nit, 0, 0, W, H); }
     ctx.globalAlpha = 1;
   }
   let t0 = 0;
   function quadro(agora) {
     if (!t0) t0 = agora;
     let mexendo = false;
-    const dec = agora - t0;
+    const dec = agora - t0, dt = ultimo ? Math.min(64, agora - ultimo) : 16; ultimo = agora;
     pecas.forEach((q) => {
       if (dec < 1700 + 1400 && q.a < 1 && !q.chegou) {
         const u = Math.min(1, Math.max(0, (dec - q.atraso) / 1100));
@@ -6045,14 +6055,18 @@ async function montarMosaicoLogin() {
       if (Math.hypot(q.tx - q.x, q.ty - q.y) < 0.25 && Math.abs(q.vx) < 0.08 && Math.abs(q.vy) < 0.08) { q.x = q.tx; q.y = q.ty; q.vx = 0; q.vy = 0; return; }
       if (Math.abs(q.vx) > 0.03 || Math.abs(q.vy) > 0.03 || Math.abs(q.tx - q.x) > 0.1 || Math.abs(q.ty - q.y) > 0.1) mexendo = true;
     });
+    // assentou: espera um instante, e as bolinhas dão lugar ao desenho nítido; o cursor traz as bolinhas de volta
+    let alvo = 0;
+    if (!mexendo && !ponteiro) { if (!tMontou) tMontou = agora; alvo = agora - tMontou > 700 ? 1 : 0; } else tMontou = 0;
+    if (nitido !== alvo) nitido += Math.max(-dt / 400, Math.min(dt / 900, alvo - nitido));
     desenhar();
-    if (mexendo || ponteiro) requestAnimationFrame(quadro); else rodando = false;
+    if (mexendo || ponteiro || nitido !== alvo || (tMontou && nitido < 1)) requestAnimationFrame(quadro); else { rodando = false; ultimo = 0; }
   }
   function acordar() { if (!rodando && pecas && !reduz) { rodando = true; requestAnimationFrame(quadro); } }
   async function iniciar() {
     if (iniciou) return; iniciou = true;
     try { await preparar(); } catch (e) { console.warn("Mosaico do login indisponível:", e); document.getElementById("tela-login")?.classList.add("sem-mosaico"); alvo.innerHTML = ""; return; }
-    if (reduz) { desenhar(); return; }
+    if (reduz) { nitido = 1; desenhar(); return; }
     t0 = 0; rodando = true; requestAnimationFrame(quadro);
   }
   cv.addEventListener("pointermove", (ev) => {
