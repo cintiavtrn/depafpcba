@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Monitor PPA PCBA</title>
+<meta name="description" content="Monitoramento do PPA 2024–2027 da Polícia Civil da Bahia.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Atkinson+Hyperlegible:wght@400;700&display=swap">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="app" id="app">
+
+  <aside class="side" id="side" aria-label="Painel">
+    <div class="side-top">
+      <div class="brand">
+        <svg class="mark" viewBox="0 0 100 100" aria-hidden="true"><circle class="wo-track" cx="50" cy="50" r="40"></circle><path class="wo-time" d=""></path><circle class="wo-core-bg" cx="50" cy="50" r="27"></circle><path class="wo-core" d=""></path></svg>
+        <div class="brand-txt">
+          <p class="brand-t">Monitor PPA</p>
+          <p class="brand-s">PCBA · 2024–2027</p>
+        </div>
+      </div>
+      <button type="button" class="collapse" id="collapse" aria-expanded="true" aria-controls="side-body" title="Recolher painel">
+        <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M12.5 4.5 7 10l5.5 5.5"></path></svg>
+        <span class="sr">Recolher painel</span>
+      </button>
+    </div>
+
+    <div class="side-body" id="side-body">
+      <section aria-labelledby="years-t">
+        <h2 id="years-t" class="side-t">Situação no fim de</h2>
+        <div class="years-rail" role="radiogroup" aria-labelledby="years-t">
+          <button type="button" role="radio" data-year="2024" aria-checked="false">2024</button>
+          <button type="button" role="radio" data-year="2025" aria-checked="false">2025</button>
+          <button type="button" role="radio" data-year="2026" aria-checked="true">2026</button>
+          <button type="button" role="radio" data-year="2027" aria-checked="false" disabled>2027</button>
+        </div>
+      </section>
+
+      <section class="filters" aria-labelledby="f-t">
+        <h2 id="f-t" class="side-t">Recorte</h2>
+        <label>Compromisso <select id="f-comp"><option value="">Todos</option></select></label>
+        <label>Unidade (USP) <select id="f-usp"><option value="">Todas</option></select></label>
+        <button type="button" id="f-clear" class="ghost" hidden>Limpar recorte</button>
+      </section>
+
+      <section class="legend" aria-labelledby="lg-t">
+        <h2 id="lg-t" class="side-t">Legenda</h2>
+        <ul>
+          <li><svg viewBox="0 0 20 20" aria-hidden="true"><rect x="4" y="4" width="12" height="12" transform="rotate(45 10 10)" class="sh-comp"></rect></svg>Compromisso</li>
+          <li><svg viewBox="0 0 20 20" aria-hidden="true"><rect x="4" y="4" width="12" height="12" class="sh-ini"></rect></svg>Iniciativa</li>
+          <li id="lg-ent">Entrega · anel = tempo decorrido</li>
+        </ul>
+      </section>
+    </div>
+  </aside>
+
+  <main class="main" id="main">
+    <header class="top">
+      <div class="top-t">
+        <h1>Programa 437 · Bahia mais Segura</h1>
+        <p class="crumb" id="crumb"></p>
+      </div>
+      <div class="kpis" id="kpis" aria-live="polite"></div>
+    </header>
+
+    <div class="bar">
+      <label>Abrir por
+        <select id="d-order">
+          <option value="cadeia">Compromisso → Iniciativa → Entrega</option>
+          <option value="usp">USP → Compromisso → Entrega</option>
+          <option value="status">Etapa → USP → Entrega</option>
+        </select>
+      </label>
+      <div class="seg" role="group" aria-label="Ordenar">
+        <button type="button" data-sort="risco" aria-pressed="true">Menos avançadas primeiro</button>
+        <button type="button" data-sort="codigo" aria-pressed="false">Ordem do PPA</button>
+      </div>
+    </div>
+
+    <div class="decomp-scroll" tabindex="0" aria-label="Árvore de decomposição">
+      <div class="decomp" id="decomp"></div>
+    </div>
+  </main>
+</div>
+<script src="assets/app.js"></script>
+</body>
+</html>

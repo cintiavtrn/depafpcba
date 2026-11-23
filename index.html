@@ -588,6 +588,8 @@ body{background:var(--paper);color:var(--carvao);font-family:'Archivo',sans-seri
 .es-rel-opcao b{color:var(--carvao)}
 .es-rel-botoes{display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap;margin-top:18px}
 #tela-conteudo:has(#tab-frota-estudo:not([hidden])){max-width:2100px}
+#tela-conteudo:has(#tab-cpgo:not([hidden])){max-width:2100px}
+.cpgo-quadro{display:block;width:100%;height:calc(100vh - 210px);min-height:640px;border:0;background:var(--paper)}
 .menu-estudo .nota-v2{grid-template-columns:1fr;gap:6px 0}
 .menu-estudo .nota-v2>.k{text-align:left;padding-top:0}
 .es-duo{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,460px),1fr));gap:14px;margin-bottom:14px}
@@ -2692,6 +2694,7 @@ const SUBPORTAIS = {
     { tab: "contratos", rotulo: "CPG - CONTRATOS", modulo: "contratos" },
     { tab: "cfcr", rotulo: "CFCR - TCT MUNICIPAIS", modulo: "cfcr" },
     { tab: "cfcr-acordos", rotulo: "CFCR - ACORDOS CONGÊNERES", modulo: "cfcr" },
+    { tab: "cpgo", rotulo: "CPGO - PPA", modulo: "cpgo" },
   ],
   infraestrutura: [{ tab: "obras", rotulo: "PAINEL DE OBRAS", modulo: "obras" }],
   // O portal Frota agora é só o painel novo: as abas padrão (Visão Geral /
@@ -12743,6 +12746,15 @@ function criarMotorDimensoesPorValor(linhasTodas, dimensoes, campoRegiao) {
 // modelo, e clicar num trecho colorido filtra por aquela categoria. A imagem
 // baixada leva escrito qual filtro estava ativo.
 // =====================================================================
+// CPGO - Monitor do PPA: painel estático (SVG, sem bibliotecas) que mora em cpgo/ na mesma publicação do
+// site; aqui só abre dentro do portal, na aba do módulo "cpgo". Os dados são os do PPA 2024-2027.
+function carregarCpgoPortal() {
+  const painel = document.getElementById("tab-cpgo");
+  if (!painel || painel.dataset.montado) return;
+  painel.dataset.montado = "1";
+  painel.innerHTML = `<iframe class="cpgo-quadro" src="cpgo/index.html" title="CPGO - Monitor do PPA 2024-2027 da Polícia Civil da Bahia" loading="lazy"></iframe>`;
+}
+
 async function carregarFrotaEstudoPortal(portalSlug) {
   const painel = document.getElementById("tab-frota-estudo");
   painel.innerHTML = `<p class="tela-intro">Carregando o estudo...</p>`;
@@ -17702,6 +17714,7 @@ async function abrirTela(id) {
     if (nome === "frota-estudo") carregarFrotaEstudoPortal(p.id);
     if (nome === "cfcr") carregarCfcrPortal(p.id);
     if (nome === "cfcr-acordos") carregarCfcrAcordosPortal(p.id);
+    if (nome === "cpgo") carregarCpgoPortal();
     // recarrega os destaques ao voltar pra Visão Geral: marcar um painel na
     // aba PAINÉIS precisa refletir aqui sem ter que sair e entrar no portal
     if (nome === "geral") carregarDestaques(p.id);
