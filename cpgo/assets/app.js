@@ -63,13 +63,20 @@
 
   // ---------- dados ----------
   // Status no ano. Sem registro no ano, uma entrega já concluída ou descontinuada mantém o estado final.
+  // Situação da entrega em um ano. A planilha só anota o que mudou: ano em branco ou "0" depois de um avanço não
+  // quer dizer que voltou ao início. Por isso o status nunca recua em relação ao ano anterior (a não ser
+  // descontinuada). A planilha original continua visível no detalhe da entrega.
+  const ORD = { 'Sem registro': -1, 'Não iniciada': 0, 'Iniciada': 1, 'Em execução': 2, 'Concluída': 3 };
   const st = (e, y = S.year) => {
     y = Math.min(y, 2026);
-    const v = e['status_' + y];
-    if (v !== 'Sem registro' || y === 2024) return v;
+    const raw = e['status_' + y];
+    if (y === 2024) return raw;
     const before = st(e, y - 1);
-    return before === 'Concluída' || before === 'Descontinuada' ? before : v;
+    if (before === 'Descontinuada') return before;
+    if (raw === 'Descontinuada') return raw;
+    return (ORD[raw] ?? -1) >= (ORD[before] ?? -1) ? raw : before;
   };
+  const carried = (e, y) => y > 2024 && st(e, y) !== e['status_' + Math.min(y, 2026)];
   const pass = (r) => (!S.comp || r.id_compromisso === S.comp) && (!S.usp || r.usp === S.usp);
   const ents = () => D.entregas.filter(pass);
   const progress = (rows) => rows.length ? rows.reduce((a, e) => a + (FILL[st(e)] ?? 0), 0) / rows.length : 0;
@@ -149,7 +156,7 @@
     [2024, 2025, 2026].forEach((y) => {
       const s = st(e, y); const raw = e['texto_' + y];
       const row = h('div', 'yr' + (y > S.year ? ' future' : ''));
-      const t = h('div', 'yr-t' + (raw ? '' : ' nil')); t.append(h('small', null, s), document.createTextNode(raw || '—'));
+      const t = h('div', 'yr-t' + (raw ? '' : ' nil')); t.append(h('small', null, carried(e, y) ? `${s} · mantido do ano anterior` : s), document.createTextNode(raw || '—'));
       row.append(glyph(s, TIME[y], `${y}: ${s}`), h('span', 'yr-y', String(y)), t);
       yrs.append(row);
     });
