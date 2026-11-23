@@ -2,18 +2,18 @@
    Layout: painel lateral recolhível + árvore de decomposição que abre para a direita.
    Formas: losango = compromisso, quadrado = iniciativa, círculo = entrega (anel = tempo, miolo = etapa). */
 :root {
-  --bg: #0a2230;
-  --bg-2: #0d2939;
-  --panel: #112f40;
-  --panel-on: #16394c;
-  --line: #22465a;
+  --bg: #0b0f10;
+  --bg-2: #101516;
+  --panel: #151b1d;
+  --panel-on: #1c2427;
+  --line: #2b3839;
   --fg: #eef5f7;
-  --muted: #9fb8c2;
+  --muted: #a3b0b2;
   --time: #e9e4d2;
   --core: #5fd3c6;
   --risk: #ff8a75;
   --gold: #f2c14e;
-  --off: #6f8c98;
+  --off: #70807f;
   --display: "Bricolage Grotesque", "Atkinson Hyperlegible", system-ui, sans-serif;
   --body: "Atkinson Hyperlegible", system-ui, -apple-system, "Segoe UI", sans-serif;
   --r: 6px;
