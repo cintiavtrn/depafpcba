@@ -1220,6 +1220,12 @@ footer{border-top:1px solid var(--paper-line)}
 .login-frase h1{font-size:clamp(1.9rem,3vw,2.7rem);line-height:1.1;max-width:19ch;letter-spacing:-.01em}
 .login-frase p{font-size:var(--fs-lead);max-width:44ch;color:#9AA3B2}
 .login-areas{list-style:none;display:flex;flex-wrap:wrap;gap:8px;margin-top:26px}
+/* atalho público para o monitor do Diário Oficial: fio e tipografia, sem caixa */
+.login-monitor{display:block;max-width:420px;margin-top:26px;padding-top:14px;border-top:1px solid var(--paper-line);text-decoration:none;color:inherit}
+.login-monitor .lm-rot{display:block;font-family:'IBM Plex Mono',monospace;font-size:var(--fs-ui-xs);letter-spacing:.08em;text-transform:uppercase;color:#8E9B9D}
+.login-monitor .lm-tit{display:block;margin-top:4px;font-size:var(--fs-subtitulo);color:#E4EBE9}
+.login-monitor .lm-txt{display:block;margin-top:3px;font-size:var(--fs-corpo);line-height:1.5;color:#B7BFCC}
+.login-monitor:hover .lm-tit,.login-monitor:focus-visible .lm-tit{text-decoration:underline;text-underline-offset:3px}
 .login-areas li{font-family:'IBM Plex Mono',monospace;font-size:var(--fs-ui-sm);letter-spacing:.06em;color:#B7BFCC;
   padding:6px 12px;border:1px solid var(--border-subtle);border-radius:var(--radius-chip);background:rgba(255,255,255,.02)}
 .login-acesso{background:var(--paper);padding:48px 40px}
@@ -1482,6 +1488,7 @@ svg.mosaico-login .sh.on{transform:scale(1.3)}
         <h1>Contratos, termos, obras e frota em um só lugar.</h1>
         <p>O acesso é liberado pela administração conforme a sua unidade e a sua coordenação.</p>
         <ul class="login-areas" aria-label="Áreas do portal"><li>Contratos</li><li>Termos de cooperação</li><li>Obras</li><li>Frota</li></ul>
+        <a class="login-monitor" href="https://projetosdepaf.github.io/monitordool/" target="_blank" rel="noopener"><span class="lm-rot">Sem precisar de login</span><b class="lm-tit">Monitor do Diário Oficial →</b><span class="lm-txt">Publicações do DEPAF e de toda a Polícia Civil, com a página do PDF já recortada, pronta para anexar ao processo.</span></a>
       </div>
     </aside>
     <div class="login-acesso">
