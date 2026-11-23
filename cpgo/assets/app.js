@@ -4,7 +4,7 @@
   'use strict';
 
   // ---------- estado ----------
-  const S = { year: 2026, comp: '', usp: '', order: 'cadeia', sort: 'risco', path: [] };
+  const S = { year: 2026, comp: '', usp: '', stage: '', order: 'cadeia', sort: 'risco', path: [] };
   const D = {};
   const STAGES = ['Não iniciada', 'Iniciada', 'Em execução', 'Concluída', 'Descontinuada', 'Sem registro'];
   const FILL = { 'Não iniciada': 0, 'Iniciada': 0.25, 'Em execução': 0.5, 'Concluída': 1 };
@@ -77,7 +77,10 @@
     return (ORD[raw] ?? -1) >= (ORD[before] ?? -1) ? raw : before;
   };
   const carried = (e, y) => y > 2024 && st(e, y) !== e['status_' + Math.min(y, 2026)];
-  const pass = (r) => (!S.comp || r.id_compromisso === S.comp) && (!S.usp || r.usp === S.usp);
+  // Situação agrupada, como nos cartões do topo: "iniciada" e "em execução" contam juntas como "em andamento".
+  const grp = (e) => { const x = st(e); return x === 'Iniciada' || x === 'Em execução' ? 'Em andamento' : x; };
+  const passBase = (r) => (!S.comp || r.id_compromisso === S.comp) && (!S.usp || r.usp === S.usp);
+  const pass = (r) => passBase(r) && (!S.stage || grp(r) === S.stage);
   const ents = () => D.entregas.filter(pass);
   const progress = (rows) => rows.length ? rows.reduce((a, e) => a + (FILL[st(e)] ?? 0), 0) / rows.length : 0;
   const fmtInd = (v, u) => v == null ? '—' : u === '%' ? pf1.format(v) : u === 'razão' ? f2.format(v) : nf.format(v);
@@ -113,19 +116,25 @@
 
   const renderTop = () => {
     $$('[data-year]').forEach((b) => b.setAttribute('aria-checked', String(Number(b.dataset.year) === S.year)));
-    $('#f-clear').hidden = !S.comp && !S.usp;
+    $('#f-clear').hidden = !S.comp && !S.usp && !S.stage;
     const lg = $('#lg-ent'); const old = lg.querySelector('svg'); if (old) old.remove(); lg.prepend(glyph('Em execução', TIME[S.year], 'Entrega'));
-    const E = ents(); const n = (f) => E.filter(f).length;
+    // os cartões contam o recorte sem a situação escolhida, para dar para trocar de um para outro (filtro cruzado)
+    const E = D.entregas.filter(passBase); const n = (f) => E.filter(f).length;
     const items = [
-      ['Concluída', n((e) => st(e) === 'Concluída'), 'concluídas'],
-      ['Em execução', n((e) => ['Iniciada', 'Em execução'].includes(st(e))), 'em andamento'],
-      ['Não iniciada', n((e) => st(e) === 'Não iniciada'), 'não iniciadas'],
-      ['Sem registro', n((e) => st(e) === 'Sem registro'), 'sem registro'],
-      ['Descontinuada', n((e) => st(e) === 'Descontinuada'), 'descontinuadas'],
-    ].filter((x, i) => i < 3 || x[1] > 0);
-    const k = $('#kpis'); k.replaceChildren();
-    const tot = h('div', 'kpi total'); tot.append(h('b', null, nf.format(E.length)), h('span', null, `entregas · ${S.year}`)); k.append(tot);
-    items.forEach(([stg, v, lab]) => { const d = h('div', 'kpi'); d.append(glyph(stg, TIME[S.year], stg), h('b', null, nf.format(v)), h('span', null, lab)); k.append(d); });
+      ['Concluída', n((e) => st(e) === 'Concluída'), 'concluídas', 'Concluída'],
+      ['Em execução', n((e) => ['Iniciada', 'Em execução'].includes(st(e))), 'em andamento', 'Em andamento'],
+      ['Não iniciada', n((e) => st(e) === 'Não iniciada'), 'não iniciadas', 'Não iniciada'],
+      ['Sem registro', n((e) => st(e) === 'Sem registro'), 'sem registro', 'Sem registro'],
+      ['Descontinuada', n((e) => st(e) === 'Descontinuada'), 'descontinuadas', 'Descontinuada'],
+    ].filter((x, i) => i < 3 || x[1] > 0 || x[3] === S.stage);
+    const k = $('#kpis'); k.replaceChildren(); k.classList.toggle('filtrando', !!S.stage);
+    const pick = (stage) => { S.stage = S.stage === stage ? '' : stage; S.path = []; render(); };
+    const tot = h('button', 'kpi total'); tot.type = 'button'; tot.setAttribute('aria-pressed', String(!S.stage)); tot.title = 'Mostrar todas as situações';
+    tot.append(h('b', null, nf.format(E.length)), h('span', null, `entregas · ${S.year}`)); tot.addEventListener('click', () => { S.stage = ''; S.path = []; render(); }); k.append(tot);
+    items.forEach(([stg, v, lab, key]) => {
+      const d = h('button', 'kpi'); d.type = 'button'; d.setAttribute('aria-pressed', String(S.stage === key)); d.title = `Filtrar por: ${lab}`;
+      d.append(glyph(stg, TIME[S.year], stg), h('b', null, nf.format(v)), h('span', null, lab)); d.addEventListener('click', () => pick(key)); k.append(d);
+    });
     markO();
   };
 
@@ -259,7 +268,7 @@
     });
     $('#f-comp').addEventListener('change', (e) => { S.comp = e.target.value; S.path = []; render(); });
     $('#f-usp').addEventListener('change', (e) => { S.usp = e.target.value; S.path = []; render(); });
-    $('#f-clear').addEventListener('click', () => { S.comp = ''; S.usp = ''; $('#f-comp').value = ''; $('#f-usp').value = ''; S.path = []; render(); });
+    $('#f-clear').addEventListener('click', () => { S.comp = ''; S.usp = ''; S.stage = ''; $('#f-comp').value = ''; $('#f-usp').value = ''; S.path = []; render(); });
     $('#d-order').addEventListener('change', (e) => { S.order = e.target.value; S.path = []; renderDecomp(); });
     $$('[data-sort]').forEach((b) => b.addEventListener('click', () => { S.sort = b.dataset.sort; $$('[data-sort]').forEach((x) => x.setAttribute('aria-pressed', String(x === b))); renderDecomp(); }));
     $('#collapse').addEventListener('click', () => { setCollapsed(!$('#app').classList.contains('collapsed')); setTimeout(renderDecomp, reduce ? 0 : 280); });

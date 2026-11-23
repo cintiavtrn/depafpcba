@@ -168,3 +168,9 @@ select { width: 100%; background: var(--panel); border: 1px solid var(--line); b
   .col { width: min(80vw, 17rem); }
   .col.detail { width: min(88vw, 22rem); }
 }
+
+/* cartões do topo clicáveis: filtram a árvore pela situação */
+button.kpi { font: inherit; color: inherit; text-align: left; cursor: pointer; }
+button.kpi:hover { border-color: var(--core); }
+button.kpi[aria-pressed="true"] { border-color: var(--core); background: var(--panel-on); }
+.kpis.filtrando button.kpi[aria-pressed="false"] { opacity: 0.6; }
