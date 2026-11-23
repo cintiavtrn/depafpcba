@@ -2941,7 +2941,7 @@ const DESTINOS_BUSCA = [
   { id: "pa-res", tipo: "Quantidades", t: "Patrimônio: itens tombados, requisições e bens sob guarda", kw: "patrimonio bens tombados requisicoes material apreendidos guarda itens", portal: "patrimonio" }
 ];
 const destinoDisponivel = (d) => PORTAIS.some((p) => p.id === d.portal) && (!d.sub || subportaisDe(d.portal).some((sp) => sp.tab === d.sub));
-const ROTULO_SUB_BUSCA = { contratos: "Contratos", cfcr: "Termos de cooperação", "cfcr-acordos": "Acordos congêneres", obras: "Obras e manutenção", frota: "Frota de viaturas", paineis: "Painéis" };
+const ROTULO_SUB_BUSCA = { contratos: "Contratos", cfcr: "Termos de cooperação", "cfcr-acordos": "Acordos congêneres", obras: "Obras e manutenção", frota: "Frota de viaturas", "frota-estudo": "Estudo de viaturas veladas", cpgo: "Monitor do PPA", paineis: "Painéis" };
 const rotuloCaminho = (d) => { const p = PORTAIS.find((x) => x.id === d.portal); return `${p ? p.label : ""}${d.sub ? " › " + (ROTULO_SUB_BUSCA[d.sub] || d.sub) : ""}`; };
 const todosDestinosBusca = () => [
   ...DESTINOS_BUSCA.filter(destinoDisponivel),
@@ -17536,7 +17536,7 @@ function renderAtualizadosRecentemente(lista, decisoesRenovacao) {
 const ROTULO_ABA = {
   geral: "Visão geral", paineis: "Painéis", planilhas: "Planilhas enviadas",
   contratos: "CPG — Contratos", cfcr: "TCT municipais", "cfcr-acordos": "Acordos congêneres",
-  obras: "Painel de obras", frota: "Painel de frota",
+  obras: "Painel de obras", frota: "Painel de frota", "frota-estudo": "Estudo: viaturas veladas", cpgo: "CPGO — PPA",
 };
 function montarMenuLateral(p, SUB, ocultarAbasPadrao) {
   const navTabs = [...(ocultarAbasPadrao ? [] : ["geral"]), ...SUB.map(sp => sp.tab)];
