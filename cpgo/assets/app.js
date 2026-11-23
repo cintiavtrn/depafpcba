@@ -130,8 +130,8 @@
 
   // ---------- árvore de decomposição ----------
   const LV = {
-    comp: { title: 'Compromissos', icon: 'comp', key: (r) => r.id_compromisso, label: (r) => r.compromisso, code: (r) => r.id_compromisso },
-    ini: { title: 'Iniciativas', icon: 'ini', key: (r) => r.id_iniciativa, label: (r) => r.iniciativa },
+    comp: { title: 'Compromissos', icon: 'comp', key: (r) => r.id_compromisso, label: (r) => r.compromisso, code: (r) => r.cod_compromisso },
+    ini: { title: 'Iniciativas', icon: 'ini', key: (r) => r.id_iniciativa, label: (r) => r.iniciativa, code: (r) => r.cod_iniciativa },
     usp: { title: 'Unidades (USP)', icon: 'cut', key: (r) => r.usp || 'Sem USP', label: (r) => r.usp || 'Sem USP' },
     stage: { title: 'Etapas', icon: 'stage', key: (r) => st(r), label: (r) => st(r) },
     ent: { title: 'Entregas', icon: 'ent', key: (r) => r.id_entrega, label: (r) => r.entrega, leaf: true },
@@ -142,7 +142,7 @@
     const c = h('article', 'detail-card');
     c.append(h('h3', null, e.entrega));
     const dl = h('dl', 'facts');
-    [['Compromisso', `${e.id_compromisso} · ${e.compromisso}`], ['Iniciativa', e.iniciativa], ['USP', e.usp || '—'], ['Meta PPA', fmtMeta(e.meta_ppa)]]
+    [['Compromisso', `${e.cod_compromisso} · ${e.compromisso}`], ['Iniciativa', `${e.cod_iniciativa} · ${e.iniciativa}`], ['USP', e.usp || '—'], ['Meta PPA', fmtMeta(e.meta_ppa)]]
       .forEach(([k, v]) => dl.append(h('dt', null, k), h('dd', null, v)));
     c.append(dl);
     const yrs = h('div', 'yrs');
@@ -267,8 +267,8 @@
       $('#decomp').replaceChildren(h('p', 'empty', 'Não foi possível carregar os dados.'));
       return;
     }
-    Array.from(new Map(D.entregas.map((e) => [e.id_compromisso, e.compromisso])).entries()).sort()
-      .forEach(([id, nm]) => $('#f-comp').append(new Option(`${id} · ${nm}`, id)));
+    Array.from(new Map(D.entregas.map((e) => [e.id_compromisso, [e.cod_compromisso, e.compromisso]])).entries()).sort()
+      .forEach(([id, [cod, nm]]) => $('#f-comp').append(new Option(`${cod} · ${nm}`, id)));
     Array.from(new Set(D.entregas.map((e) => e.usp).filter(Boolean))).sort().forEach((u) => $('#f-usp').append(new Option(u, u)));
     let saved = window.matchMedia('(max-width: 900px)').matches; try { const v = localStorage.getItem('ppa-side'); if (v != null) saved = v === '1'; } catch (e) { /* sem armazenamento */ }
     setCollapsed(saved);

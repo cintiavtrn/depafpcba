@@ -115,7 +115,7 @@ select { width: 100%; background: var(--panel); border: 1px solid var(--line); b
 .node.root { cursor: default; }
 .node-ic { width: 1.5rem; height: 1.5rem; grid-row: 1 / span 3; align-self: start; }
 .node > :not(.node-ic) { grid-column: 2; }
-.node-nm { font-size: 0.88rem; line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.node-nm { font-size: 0.88rem; line-height: 1.35; overflow-wrap: anywhere; }
 .node-code { color: var(--muted); font-variant-numeric: tabular-nums; margin-right: 0.3rem; }
 .node-meta { font-size: 0.76rem; color: var(--muted); font-variant-numeric: tabular-nums; }
 .node-meta b { color: var(--fg); font-weight: 700; }
