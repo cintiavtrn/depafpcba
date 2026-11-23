@@ -17202,6 +17202,10 @@ async function carregarContratosPortal(portalSlug) {
     return "DEPAF";
   }
   const UNIDADES_GESTORAS_DISPONIVEIS = [...new Set(lista.map(unidadeGestoraTopo))].sort();
+  // DPSV - Saúde: os contratos de área gestora DEMEP. Diferente do GDG, eles CONTINUAM contando no DEPAF
+  // (pedido direto: "mantém dentro de DEPAF os que estão como DEMEP"); o atalho só direciona para eles.
+  const ehDpsvSaude = (c) => /^DEMEP/i.test(String(c.areaGestora || "").trim());
+  const pertenceUnidade = (c, chave) => (chave === "DPSV" ? ehDpsvSaude(c) : unidadeGestoraTopo(c) === chave);
 
   // Pedido direto: "no topo onde selecionamos unidades gestoras... a gente
   // já sabe quais serão: DEPAF, DPSV - Saúde, DEPIN, ACADEPOL e DEPOM...
@@ -17217,8 +17221,7 @@ async function carregarContratosPortal(portalSlug) {
     { chave: "", label: "TODOS", icone: "painel_dashboard" },
     { chave: "DEPAF", label: "DEPAF", icone: "unidade_depaf" },
     { chave: "DEPIN", label: "DEPIN", icone: "unidade_depin" },
-    { chave: "DPSV", label: "DPSV · SAÚDE", icone: "saude", semDados: true },
-    { chave: "ACADEPOL", label: "ACADEPOL", icone: "unidade_acadepol", semDados: true },
+    { chave: "DPSV", label: "DPSV · SAÚDE", icone: "saude", semDados: !lista.some(ehDpsvSaude) },
     { chave: "DEPOM", label: "DEPOM", icone: "unidade_depom", semDados: true },
     // GDG acende sozinho quando houver contrato de área gestora GDG.
     { chave: "GDG", label: "GDG · GABINETE", icone: "unidade_gdg", semDados: !lista.some((c) => unidadeGestoraTopo(c) === "GDG") },
@@ -17293,7 +17296,7 @@ async function carregarContratosPortal(portalSlug) {
         <label>UNIDADE GESTORA</label>
         <div id="contratos-filtro-unidade-gestora" style="display:flex;gap:10px;flex-wrap:wrap;margin-top:6px">
           ${UNIDADES_GESTORAS_ICONES.map((u) => {
-            const qtd = u.chave ? lista.filter((c) => unidadeGestoraTopo(c) === u.chave).length : lista.length;
+            const qtd = u.chave ? lista.filter((c) => pertenceUnidade(c, u.chave)).length : lista.length;
             return `<button type="button" class="unidade-gestora-btn${u.chave === "" ? " active" : ""}" data-unidade="${escapeAttr(u.chave)}"${u.semDados ? ` data-sem-dados="1"` : ""} title="${u.semDados ? "Ainda sem contrato cadastrado — assim que a planilha chegar, entra aqui" : `${escapeAttr(u.label)}: ${qtd} contrato(s)`}">
               <div class="unidade-gestora-icone">${ICONS[u.icone]}</div>
               <span>${escapeHTML(u.label)}</span>
@@ -17439,7 +17442,7 @@ async function carregarContratosPortal(portalSlug) {
   // filtros em dois lugares.
   function aplicarFiltrosTopoContratos() {
     const valor = seletorUnidadeGestora?.querySelector(".unidade-gestora-btn.active")?.dataset.unidade || "";
-    let listaExibida = valor ? lista.filter((c) => unidadeGestoraTopo(c) === valor) : lista;
+    let listaExibida = valor ? lista.filter((c) => pertenceUnidade(c, valor)) : lista;
     if (valor === "DEPIN" && filtroDirpinTopo) {
       listaExibida = listaExibida.filter((c) => dirpinsDoContrato(c).includes(filtroDirpinTopo));
     }
@@ -17448,7 +17451,7 @@ async function carregarContratosPortal(portalSlug) {
   if (seletorUnidadeGestora) {
     seletorUnidadeGestora.querySelectorAll(".unidade-gestora-btn").forEach((btn) => {
       btn.addEventListener("click", () => {
-        // Unidade "em preparação" (DPSV/ACADEPOL/DEPOM/GDG, por hora) — avisa
+        // Unidade "em preparação" (DEPOM, por hora; DPSV e GDG quando não há contrato) — avisa
         // em vez de fingir que filtrou algo. Não mexe na aba ativa nem no
         // estado atual, só informa.
         if (btn.dataset.semDados) {
