@@ -2999,7 +2999,7 @@ const FONTES_BUSCA = [
     const base = [], pessoas = new Map();
     for (const c of dados) {
       const nomes = (c.pessoas || []).map((x) => x.nomePessoa).filter(Boolean);
-      base.push({ tipo: "Contrato", t: `${c.numeroContrato} · ${c.empresa || "sem empresa"}`, d: (c.objeto || "").slice(0, 90), hay: normBusca([c.numeroContrato, c.empresa, c.objeto, c.processo, c.cnpjCpf, c.analista, c.tipoObjeto, ...nomes].join(" ")), portal: "orcamento", sub: "contratos", esperar: "#op-select-contrato", abrir: () => abrirContratoNoOperacional(c.id) });
+      base.push({ tipo: "Contrato", t: `${c.numeroContrato} · ${c.empresa || "sem empresa"}`, d: (c.objeto || "").slice(0, 90), hay: indiceBuscaContrato(c), portal: "orcamento", sub: "contratos", esperar: "#op-select-contrato", abrir: () => abrirContratoNoOperacional(c.id) });
       for (const x of c.pessoas || []) {
         if (!x.nomePessoa) continue;
         const e = pessoas.get(x.nomePessoa) || { papeis: new Set(), n: 0 };
@@ -3094,6 +3094,8 @@ function areaDe(d) {
   if (a) return a;
   return { k: "outras", rot: "Outras áreas", outras: true };
 }
+// Antes a lista cortava em 3 resultados por tipo e quem não estava entre os primeiros sumia da busca.
+const LIMITE_TIPO_BUSCA = 8;
 function resultadosBusca(q) {
   const toks = normBusca(q).split(/\s+/).filter((w) => w && !STOP_BUSCA.has(w));
   const atual = !telaConteudo.hidden ? PORTAL_ATUAL : null;
@@ -3105,15 +3107,17 @@ function resultadosBusca(q) {
     return { ...d, s: s + (d.portal === atual ? 0.5 : 0), ord, caminho: rotuloCaminho(d) };
   }).filter(Boolean);
   // Nomes e números só entram quando há o que procurar e nenhum tipo está escolhido.
-  let ents = [];
+  let ents = [], maisEnts = 0;
   if (toks.length && !buscaEst.tipo) {
     const porTipo = {};
     ents = INDICE_BUSCA.itens.map((e, ord) => {
       if (!toks.every((w) => e.hay.includes(w))) return null;
       const tit = normBusca(e.t), noTitulo = toks.every((w) => tit.includes(w)) ? 1.5 : 0, exato = tit === toks.join(" ") ? 1 : 0;
       return { ...e, id: "e-" + ord, s: toks.length * 2 + noTitulo + exato + (e.portal === atual ? 0.5 : 0), ord: 1000 + ord, caminho: rotuloCaminho(e) };
-    }).filter(Boolean).sort((a, b) => b.s - a.s || a.ord - b.ord)
-      .filter((e) => (porTipo[e.tipo + e.portal] = (porTipo[e.tipo + e.portal] || 0) + 1) <= 3);
+    }).filter(Boolean).sort((a, b) => b.s - a.s || a.ord - b.ord);
+    const todos = ents.length;
+    ents = ents.filter((e) => (porTipo[e.tipo + e.portal] = (porTipo[e.tipo + e.portal] || 0) + 1) <= LIMITE_TIPO_BUSCA);
+    maisEnts = todos - ents.length;
   }
   const grupos = new Map();
   for (const r of [...ents, ...dest]) {
@@ -3124,10 +3128,14 @@ function resultadosBusca(q) {
     grupos.get(a.k).itens.push(r);
   }
   // Sem consulta nem filtro, cada área mostra só o começo: o menu vira um índice do que existe.
-  const cap = buscaEst.area ? 9 : toks.length ? 4 : buscaEst.tipo ? 3 : 2;
+  const cap = buscaEst.area ? 12 : toks.length ? LIMITE_TIPO_BUSCA : buscaEst.tipo ? 3 : 2;
   const peso = (g) => (g.itens.some((i) => i.portal === atual) ? 0 : 1000) + (g.a.outras ? 500 : AREAS_BUSCA.indexOf(g.a)) - (toks.length ? Math.max(...g.itens.map((i) => i.s)) : 0);
-  return [...grupos.values()].sort((x, y) => peso(x) - peso(y))
-    .flatMap((g) => g.itens.sort((x, y) => y.s - x.s || x.ord - y.ord).slice(0, cap)).slice(0, 24);
+  const ordenados = [...grupos.values()].sort((x, y) => peso(x) - peso(y))
+    .flatMap((g) => g.itens.sort((x, y) => y.s - x.s || x.ord - y.ord).slice(0, cap));
+  const resultado = ordenados.slice(0, 40);
+  // quantos resultados ficaram de fora, para a lista avisar em vez de parecer que não existem
+  buscaEst.mais = maisEnts + [...grupos.values()].reduce((a, g) => a + g.itens.length, 0) - resultado.length;
+  return resultado;
 }
 function desenharListaBusca(caixa) {
   const inp = caixa.querySelector("[data-busca-in]"), lista = caixa.querySelector(".busca-lista");
@@ -3146,7 +3154,7 @@ function desenharListaBusca(caixa) {
     corpo += `<button type="button" class="busca-res" role="option" data-busca-res="${i}" aria-selected="${i === buscaEst.sel}"><span class="k">${escapeHTML(r.tipo)}</span><span><b>${escapeHTML(r.t)}</b>${r.d ? `<em>${escapeHTML(r.d)}</em>` : ""}${r.area.outras ? `<small>${escapeHTML(r.caminho)}</small>` : ""}</span></button>`;
   });
   const carregando = !INDICE_BUSCA.pronto && inp.value.trim() ? `<p class="busca-vazia">Carregando nomes e números…</p>` : "";
-  lista.innerHTML = filtros + (corpo || (INDICE_BUSCA.pronto || !inp.value.trim() ? `<p class="busca-vazia">Nenhum resultado nas áreas que o seu acesso permite.</p>` : "")) + carregando + `<p class="busca-dica">Atalho: Ctrl K ou /</p>`;
+  lista.innerHTML = filtros + (corpo || (INDICE_BUSCA.pronto || !inp.value.trim() ? `<p class="busca-vazia">Nenhum resultado nas áreas que o seu acesso permite.</p>` : "")) + carregando + `${buscaEst.mais > 0 && inp.value.trim() ? `<p class="busca-dica">Mais ${buscaEst.mais.toLocaleString("pt-BR")} resultado${buscaEst.mais > 1 ? "s" : ""} não aparece${buscaEst.mais > 1 ? "m" : ""} aqui. Acrescente uma palavra ou escolha a área ou o tipo acima para refinar.</p>` : ""}<p class="busca-dica">Atalho: Ctrl K ou /</p>`;
   lista.hidden = false;
   inp.setAttribute("aria-expanded", "true");
 }
