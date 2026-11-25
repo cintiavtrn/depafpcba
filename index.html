@@ -2883,6 +2883,18 @@ async function carregarPortais() {
 const TIPOS_BUSCA = ["Prazos", "Quantidades", "Pessoas", "Onde estão", "Valores", "Situação"];
 const STOP_BUSCA = new Set("a o os as de do da dos das e em que quero saber vao vai ser tem ter sao um uma para por no na nos nas ate me mostre mostrar ver qual quais como sera indicador indicadores dados informacao informacoes numeros".split(" "));
 const normBusca = (t) => String(t).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+// Termo de texto casa no COMEÇO de uma palavra ("creta" acha Creta, mas não "secretaria"). Número, sigla curta (menos de
+// 3 letras) e pedaço de número de contrato ("25/2020" dentro de "025/2020") seguem casando em qualquer ponto.
+function casaTermoBusca(hay, w) {
+  if (!w) return true;
+  if (w.length < 3 || /\d/.test(w)) return hay.includes(w);
+  for (let i = hay.indexOf(w); i !== -1; i = hay.indexOf(w, i + 1)) if (i === 0 || !/[a-z0-9]/.test(hay[i - 1])) return true;
+  return false;
+}
+// Todas as palavras digitadas precisam casar (em qualquer ordem).
+function casaBusca(hay, texto) {
+  return normBusca(texto).split(/\s+/).filter(Boolean).every((w) => casaTermoBusca(hay, w));
+}
 const DESTINOS_BUSCA = [
   // CPG - Contratos
   { id: "c-prazos", tipo: "Prazos", t: "Vencimentos por mês e os contratos que vencem primeiro", kw: "quantos vencer vencem vencimento vencimentos prazo prazos quando mes meses", portal: "orcamento", sub: "contratos", menuItem: "mes", ancoraSel: '[data-item="mes"]' },
@@ -3102,7 +3114,7 @@ function resultadosBusca(q) {
   const dest = todosDestinosBusca().map((d, ord) => {
     if (buscaEst.tipo && d.tipo !== buscaEst.tipo) return null;
     if (!toks.length && d.tipo === "Área") return null;
-    const h = normBusca(`${d.t} ${d.kw} ${d.tipo}`), s = toks.filter((w) => h.includes(w)).length;
+    const h = normBusca(`${d.t} ${d.kw} ${d.tipo}`), s = toks.filter((w) => casaTermoBusca(h, w)).length;
     if (toks.length && !s) return null;
     return { ...d, s: s + (d.portal === atual ? 0.5 : 0), ord, caminho: rotuloCaminho(d) };
   }).filter(Boolean);
@@ -3111,8 +3123,8 @@ function resultadosBusca(q) {
   if (toks.length && !buscaEst.tipo) {
     const porTipo = {};
     ents = INDICE_BUSCA.itens.map((e, ord) => {
-      if (!toks.every((w) => e.hay.includes(w))) return null;
-      const tit = normBusca(e.t), noTitulo = toks.every((w) => tit.includes(w)) ? 1.5 : 0, exato = tit === toks.join(" ") ? 1 : 0;
+      if (!toks.every((w) => casaTermoBusca(e.hay, w))) return null;
+      const tit = normBusca(e.t), noTitulo = toks.every((w) => casaTermoBusca(tit, w)) ? 1.5 : 0, exato = tit === toks.join(" ") ? 1 : 0;
       return { ...e, id: "e-" + ord, s: toks.length * 2 + noTitulo + exato + (e.portal === atual ? 0.5 : 0), ord: 1000 + ord, caminho: rotuloCaminho(e) };
     }).filter(Boolean).sort((a, b) => b.s - a.s || a.ord - b.ord);
     const todos = ents.length;
@@ -7271,7 +7283,7 @@ function ligarBuscaContratos(lista, porId, idInput, idResultado) {
   input.addEventListener("input", () => {
     const termo = normalizarBusca(input.value.trim());
     if (!termo) { resultado.innerHTML = ""; return; }
-    const encontrados = indexado.filter((x) => x.indice.includes(termo)).map((x) => x.c);
+    const encontrados = indexado.filter((x) => casaBusca(x.indice, termo)).map((x) => x.c);
     resultado.innerHTML = `
       <div class="dash-chart-box" style="margin-top:10px">
         <h4>Resultado da busca</h4>
@@ -16552,7 +16564,7 @@ async function carregarCfcrPortal(portalSlug) {
     const termoBusca = normalizarBusca(bruto);
     const resultado = document.getElementById("cfcr-busca-resultado");
     if (!termoBusca) { resultado.innerHTML = ""; return; }
-    const encontrados = indexadoCfcr.filter((x) => x.indice.includes(termoBusca)).map((x) => x.t);
+    const encontrados = indexadoCfcr.filter((x) => casaBusca(x.indice, termoBusca)).map((x) => x.t);
     resultado.innerHTML = `
       <div class="dash-chart-box" style="margin-bottom:14px">
         <h4>Resultado da busca</h4>
