@@ -169,18 +169,23 @@
       const p = h('p', 'nums-l'); p.append(h('b', null, anual ? 'Quantidade por ano: ' : 'Total informado em cada ano: '), document.createTextNode(`${lista}. ${resumo}`));
       box.append(p); tem = true;
     }
-    const ind = D.indicadores.filter((r) => r.id_indicador === 'IND' + e.id_entrega.slice(1)).sort((a, z) => a.ano - z.ano);
-    if (ind.length) {
-      const un = ind[0].unidade; const p = h('p', 'nums-l'); p.append(h('b', null, 'Indicador: '), document.createTextNode(`${ind[0].indicador}. Meta do PPA: ${fmtN(ind[0].meta_ppa, un)}.`)); box.append(p);
-      const ul = h('ul', 'nums-i');
-      ind.forEach((r) => {
-        const pol = r.polaridade === -1 ? -1 : 1;
-        let v = '';
-        if (r.apurado != null && r.planejado != null) { const ok = pol > 0 ? r.apurado >= r.planejado : r.apurado <= r.planejado; v = ok ? ' · dentro do planejado' : ' · abaixo do planejado'; }
-        ul.append(h('li', null, `${r.ano}: planejado ${r.planejado == null ? 'NS (não apurado no período)' : fmtN(r.planejado, un)} · apurado ${r.apurado == null ? (r.planejado == null ? 'NS' : 'sem apuração') : fmtN(r.apurado, un)}${r.apuracao_parcial ? ' (parcial)' : ''}${v}`));
+    const blocoInd = (rotulo, explica, lista) => {
+      const ids = Array.from(new Set(lista.map((r) => r.id_indicador)));
+      ids.forEach((id) => {
+        const ind = lista.filter((r) => r.id_indicador === id).sort((a, z) => a.ano - z.ano); const un = ind[0].unidade;
+        const p = h('p', 'nums-l'); p.append(h('b', null, `${rotulo}: `), document.createTextNode(`${ind[0].curto}. Meta do PPA: ${fmtN(ind[0].meta_ppa, un)}${ind[0].polaridade === -1 ? ' (quanto menor, melhor)' : ''}.`)); box.append(p);
+        box.append(h('p', 'nums-x', `${explica} Na planilha: “${ind[0].indicador.trim().replace(/\s*-\s*$/, '')}”.`));
+        const ul = h('ul', 'nums-i');
+        ind.forEach((r) => {
+          const pol = r.polaridade === -1 ? -1 : 1; let v = '';
+          if (r.apurado != null && r.planejado != null) { const ok = pol > 0 ? r.apurado >= r.planejado : r.apurado <= r.planejado; v = ok ? ' · dentro do planejado' : ' · fora do planejado'; }
+          ul.append(h('li', null, `${r.ano}: planejado ${r.planejado == null ? 'NS (não apurado no período)' : fmtN(r.planejado, un)} · apurado ${r.apurado == null ? (r.planejado == null ? 'NS' : 'sem apuração') : fmtN(r.apurado, un)}${r.apuracao_parcial ? ' (parcial)' : ''}${v}`));
+        });
+        box.append(ul); tem = true;
       });
-      box.append(ul); tem = true;
-    }
+    };
+    blocoInd('Indicador desta entrega', 'Mede o que a própria entrega faz.', D.indicadores.filter((r) => r.tipo === 'entrega' && r.entregas.includes(e.id_entrega)));
+    blocoInd('Resultado da iniciativa', 'Mede o efeito do conjunto das entregas da iniciativa, não só desta.', D.indicadores.filter((r) => r.tipo === 'resultado' && r.id_iniciativa === e.id_iniciativa));
     return tem ? box : null;
   };
 
@@ -243,8 +248,14 @@
           const nm = h('span', 'node-nm'); if (lv.code) nm.append(h('span', 'node-code', lv.code(r0))); nm.append(document.createTextNode(lv.label(r0))); b.append(nm);
           b.append(meta(g.rs));
           if (lv === LV.ini) {
-            const ind = D.indicadores.filter((r) => r.id_iniciativa === g.key && r.ano <= S.year && r.apurado != null).sort((a, z) => z.ano - a.ano)[0];
-            if (ind) { const m = h('div', 'node-meta'); m.append(document.createTextNode(`Indicador ${ind.ano}${ind.apuracao_parcial ? ' (parcial)' : ''}: `), h('b', null, fmtInd(ind.apurado, ind.unidade)), document.createTextNode(` de ${fmtInd(ind.planejado, ind.unidade)}`)); b.append(m); }
+            const res = D.indicadores.filter((r) => r.id_iniciativa === g.key && r.tipo === 'resultado');
+            const ult = res.filter((r) => r.ano <= S.year && r.apurado != null).sort((a, z) => z.ano - a.ano)[0];
+            if (res.length) {
+              const m = h('div', 'node-meta resultado'); m.append(h('small', null, 'Resultado da iniciativa'), h('span', null, res[0].curto));
+              if (ult) m.append(h('span', null, `${ult.ano}${ult.apuracao_parcial ? ' (parcial)' : ''}: ${fmtInd(ult.apurado, ult.unidade)} apurado, ${fmtInd(ult.planejado, ult.unidade)} planejado`));
+              else m.append(h('span', null, 'sem apuração até aqui'));
+              b.append(m);
+            }
           }
           b.append(dots(g.rs));
         }
