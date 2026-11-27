@@ -160,8 +160,13 @@
     const box = h('div', 'nums'); let tem = false;
     const q = e.qtd || {}; const anos = [2024, 2025, 2026].filter((y) => q[y] != null);
     if (e.meta_num != null && anos.length) {
-      let acum = 0; anos.forEach((y) => { acum += q[y]; });
-      const p = h('p', 'nums-l'); p.append(h('b', null, 'Quantidade informada: '), document.createTextNode(`${anos.map((y) => `${y}: ${nf.format(q[y])}`).join(' · ')}. Acumulado ${nf.format(acum)} de ${nf.format(e.meta_num)} da meta do PPA (${pf.format(acum / e.meta_num)}).`));
+      // a planilha escreve ora o total que já existe (2, 3, 4 = hoje são 4), ora o que entrou no ano (4, 1, 0 = 5)
+      const anual = e.qtd_tipo === 'anual'; const total = e.qtd_total;
+      const lista = anos.map((y) => `${y}: ${nf.format(q[y])}`).join(' · ');
+      const rotulo = anual ? 'Soma dos anos' : 'Posição mais recente';
+      const resumo = total > e.meta_num ? `${rotulo}: ${nf.format(total)}, acima da meta do PPA de ${nf.format(e.meta_num)}.`
+        : `${rotulo}: ${nf.format(total)} de ${nf.format(e.meta_num)} da meta do PPA (${pf.format(total / e.meta_num)}).`;
+      const p = h('p', 'nums-l'); p.append(h('b', null, anual ? 'Quantidade por ano: ' : 'Total informado em cada ano: '), document.createTextNode(`${lista}. ${resumo}`));
       box.append(p); tem = true;
     }
     const ind = D.indicadores.filter((r) => r.id_indicador === 'IND' + e.id_entrega.slice(1)).sort((a, z) => a.ano - z.ano);
